@@ -1,0 +1,81 @@
+name: CI
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-ios:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3.6.0
+        with:
+          node-version: 16.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Cache pods
+        uses: actions/cache@v3
+        with:
+          path: |
+            example/ios/Pods
+            example/ios/build
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+      - name: Test
+        run: |
+          yarn
+          yarn bootstrap
+          yarn lint
+          yarn typecheck
+          yarn prepack
+          yarn test
+      - name: Build example
+        run: |
+          yarn example pods
+          cd example
+          xcodebuild -workspace ios/RNWhisperExample.xcworkspace -scheme RNWhisperExample -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build
+  test-android:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3.6.0
+        with:
+          node-version: 16.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Install Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: zulu
+          java-version: 17
+      - name: Test
+        run: |
+          yarn
+          yarn bootstrap
+          yarn lint
+          yarn typecheck
+          yarn prepack
+          yarn test
+      - name: Build example
+        run: |
+          cd example/android
+          ./gradlew assembleRelease

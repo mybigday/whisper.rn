@@ -1,0 +1,132 @@
+{
+  "name": "whisper.rn",
+  "version": "0.1.0",
+  "description": "React Native binding of whisper.cpp",
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index",
+  "source": "src/index",
+  "files": [
+    "src",
+    "lib",
+    "jest",
+    "android",
+    "ios",
+    "cpp",
+    "*.podspec",
+    "!lib/typescript/example",
+    "!ios/build",
+    "!android/build",
+    "!android/gradle",
+    "!android/gradlew",
+    "!android/gradlew.bat",
+    "!android/local.properties",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "bootstrap": "./scripts/bootstrap.sh",
+    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "prepack": "bob build",
+    "test": "jest",
+    "example": "yarn --cwd example",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build"
+  },
+  "keywords": [
+    "react-native",
+    "ios",
+    "android",
+    "whisper",
+    "whisper.cpp",
+    "speech recognition"
+  ],
+  "repository": "https://github.com/mybigday/whisper.rn",
+  "author": "Jhen <developer@jhen.me> (https://github.com/jhen0409)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mybigday/whisper.rn/issues"
+  },
+  "homepage": "https://github.com/mybigday/whisper.rn#readme",
+  "devDependencies": {
+    "@commitlint/config-conventional": "^17.0.2",
+    "@evilmartians/lefthook": "^1.2.2",
+    "@fugood/eslint-config-react": "^0.5.0",
+    "@release-it/conventional-changelog": "^5.0.0",
+    "@types/jest": "^29.4.4",
+    "@types/react": "~17.0.21",
+    "@types/react-native": "0.70.0",
+    "@typescript-eslint/eslint-plugin": "^5.55.0",
+    "@typescript-eslint/parser": "^5.55.0",
+    "commitlint": "^17.0.2",
+    "del-cli": "^5.0.0",
+    "eslint": "^8.36.0",
+    "metro-react-native-babel-preset": "0.73.8",
+    "pod-install": "^0.1.38",
+    "react": "18.2.0",
+    "react-native": "0.71.4",
+    "react-native-builder-bob": "^0.20.4",
+    "release-it": "^15.8.0",
+    "typescript": "^4.9.5"
+  },
+  "resolutions": {
+    "@types/react": "17.0.21"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "engines": {
+    "node": ">= 16.0.0"
+  },
+  "jest": {
+    "preset": "react-native",
+    "modulePathIgnorePatterns": [
+      "<rootDir>/example/node_modules",
+      "<rootDir>/lib/",
+      "<rootDir>/whisper.cpp/"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "release-it": {
+    "git": {
+      "commitMessage": "chore: release ${version}",
+      "tagName": "v${version}"
+    },
+    "npm": {
+      "publish": true
+    },
+    "github": {
+      "release": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": "angular"
+      }
+    }
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "dependencies": {
+    "jest": "^29.5.0"
+  }
+}

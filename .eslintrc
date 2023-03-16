@@ -1,0 +1,51 @@
+{
+  "extends": "@fugood/eslint-config-react",
+  "env": {
+    "browser": true,
+    "jest": true
+  },
+  "globals": {},
+  "rules": {
+    "react/no-array-index-key": 0,
+    "global-require": 0
+  },
+  "overrides": [
+    {
+      "files": [
+        "*.ts",
+        "*.tsx"
+      ],
+      "parser": "@typescript-eslint/parser",
+      "plugins": [
+        "@typescript-eslint/eslint-plugin"
+      ],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": [
+          "error",
+          {
+            "argsIgnorePattern": "^_",
+            "destructuredArrayIgnorePattern": "^_"
+          }
+        ],
+        "no-unused-vars": "off",
+        "no-shadow": "off",
+        "@typescript-eslint/no-shadow": 1,
+        "no-undef": "off",
+        "func-call-spacing": "off",
+        "@typescript-eslint/func-call-spacing": 1
+      }
+    }
+  ],
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [
+          ".js",
+          ".jsx",
+          ".ts",
+          ".tsx"
+        ]
+      }
+    }
+  }
+}
