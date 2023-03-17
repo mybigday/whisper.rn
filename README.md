@@ -41,14 +41,14 @@ const { result } = await whisperContext.transcribe(sampleFilePath, {
 
 The example app is using [react-native-fs](https://github.com/itinance/react-native-fs) to download the model file and audio file.
 
-Model: `base.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp
+Model: `base.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp  
 Sample file: `jfk.wav` in https://github.com/ggerganov/whisper.cpp/tree/master/samples
 
 For test better performance on transcribe, you can run the app in Release mode.
   - iOS: `yarn example ios --configuration Release`
   - Android: `yarn example android --mode release`
 
-Please follow [CONTIBUTING.md](./CONTRIBUTING.md#development-workflow) to run the example app.
+Please follow the [Development Workflow section of contributing guide](./CONTRIBUTING.md#development-workflow) to run the example app.
 
 ## Mock `whisper.rn`
 
