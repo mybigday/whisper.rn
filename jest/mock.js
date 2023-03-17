@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native'
+const { NativeModules } = require('react-native')
 
 if (!NativeModules.RNWhisper) {
   NativeModules.RNWhisper = {
