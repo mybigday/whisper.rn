@@ -40,7 +40,9 @@
     "react-native",
     "ios",
     "android",
+    "native module",
     "whisper",
+    "openai",
     "whisper.cpp",
     "speech recognition"
   ],
