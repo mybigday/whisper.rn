@@ -7,8 +7,14 @@ buildscript {
         compileSdkVersion = 33
         targetSdkVersion = 33
 
-        // We use NDK 23 which has both M1 support and is the side-by-side NDK version from AGP.
-        ndkVersion = "23.1.7779620"
+        if (System.properties['os.arch'] == "aarch64") {
+            // For M1 Users we need to use the NDK 24 which added support for aarch64
+            ndkVersion = "24.0.8215888"
+        } else if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+	        // For Android Users, we need to use NDK 23, otherwise the build will
+            // fail due to paths longer than the OS limit
+            ndkVersion = "23.1.7779620"
+        }
     }
     repositories {
         google()
