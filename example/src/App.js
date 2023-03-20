@@ -74,9 +74,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-      >
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
