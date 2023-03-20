@@ -16,11 +16,6 @@ const RNWhisper = NativeModules.RNWhisper
   )
 
 export type TranscribeOptions = {
-  abortControl?: {
-    contextId: number,
-    jobId: number,
-    abort: () => void,
-  },
   maxThreads?: number,
   maxContext?: number,
   maxLen?: number,
@@ -45,15 +40,17 @@ class WhisperContext {
     this.id = id
   }
 
-  async transcribe(path: string, options: TranscribeOptions = {}): Promise<TranscribeResult> {
+  transcribe(path: string, options: TranscribeOptions = {}): {
+    stop: () => void,
+    promise: Promise<TranscribeResult>,
+  } {
     const jobId: number = Math.floor(Math.random() * 10000)
-    if (options.abortControl) {
-      options.abortControl.contextId = this.id
-      options.abortControl.jobId = jobId
+    return {
+      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
+      promise: RNWhisper.transcribe(this.id, jobId, path, options).then((result: string) => ({
+        result
+      }))
     }
-    return RNWhisper.transcribe(this.id, jobId, path, options).then((result: string) => ({
-      result
-    }))
   }
 
   async release() {
@@ -67,15 +64,6 @@ export async function initWhisper(
   const id = await RNWhisper.initContext(filePath)
   return new WhisperContext(id)
 }
-
-export const createAbortControl = () => ({
-  contextId: null,
-  jobId: null,
-  abort() {
-    if (!this.jobId) return
-    RNWhisper.abortTranscribe(this.contextId, this.jobId)
-  }
-})
 
 export async function releaseAllWhisper(): Promise<void> {
   return RNWhisper.releaseAllContexts()
