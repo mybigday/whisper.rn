@@ -1,6 +1,7 @@
 
 #import "RNWhisper.h"
 #include <stdlib.h>
+#include <string>
 
 @interface WhisperContext : NSObject {
 }
@@ -116,6 +117,15 @@ RCT_REMAP_METHOD(transcribe,
     }
     if (options[@"temperatureInc"] != nil) {
         params.temperature_inc = [options[@"temperature_inc"] floatValue];
+    }
+
+    if (options[@"prompt"] != nil) {
+        std::string *prompt = new std::string([options[@"prompt"] UTF8String]);
+        rn_whisper_convert_prompt(
+            context.ctx,
+            params,
+            prompt
+        );
     }
 
     whisper_reset_timings(context.ctx);

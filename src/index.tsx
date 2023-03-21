@@ -29,6 +29,7 @@ export type TranscribeOptions = {
   beamSize?: number,
   bestOf?: number,
   speedUp?: boolean,
+  prompt?: string,
 }
 
 export type TranscribeResult = {
