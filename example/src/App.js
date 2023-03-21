@@ -46,6 +46,27 @@ console.log('[App] fileDir', fileDir)
 const modelFilePath = `${fileDir}/base.en`
 const sampleFilePath = `${fileDir}/jfk.wav`
 
+function toTimestamp(t, comma = false) {
+  let msec = t * 10
+  const hr = Math.floor(msec / (1000 * 60 * 60))
+  msec -= hr * (1000 * 60 * 60)
+  const min = Math.floor(msec / (1000 * 60))
+  msec -= min * (1000 * 60)
+  const sec = Math.floor(msec / 1000)
+  msec -= sec * 1000
+
+  const separator = comma ? ',' : '.'
+  const timestamp = `${String(hr).padStart(2, '0')}:${String(min).padStart(
+    2,
+    '0',
+  )}:${String(sec).padStart(2, '0')}${separator}${String(msec).padStart(
+    3,
+    '0',
+  )}`
+
+  return timestamp
+}
+
 const filterPath = (path) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
@@ -74,9 +95,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-      >
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
@@ -146,14 +165,21 @@ export default function App() {
                 sampleFilePath,
                 {
                   language: 'en',
-                  maxLen: 3,
+                  maxLen: 1,
                   tokenTimestamps: true,
                 },
               )
               const endTime = Date.now()
               log('Transcribed result:', result)
               log('Transcribed in', endTime - startTime, `ms in ${mode} mode`)
-              log('Segments:', JSON.stringify(segments, null, 2))
+              log('Segments:')
+              segments.forEach((segment) => {
+                log(
+                  `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+                    segment.t1,
+                  )}]  ${segment.text}`,
+                )
+              })
             }}
           >
             <Text style={styles.buttonText}>Transcribe</Text>
