@@ -142,15 +142,18 @@ export default function App() {
               }
               log('Start transcribing...')
               const startTime = Date.now()
-              const { result } = await whisperContext.transcribe(
+              const { result, segments } = await whisperContext.transcribe(
                 sampleFilePath,
                 {
                   language: 'en',
+                  maxLen: 3,
+                  tokenTimestamps: true,
                 },
               )
               const endTime = Date.now()
               log('Transcribed result:', result)
               log('Transcribed in', endTime - startTime, `ms in ${mode} mode`)
+              log('Segments:', JSON.stringify(segments, null, 2))
             }}
           >
             <Text style={styles.buttonText}>Transcribe</Text>

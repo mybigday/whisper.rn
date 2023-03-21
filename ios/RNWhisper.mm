@@ -94,15 +94,18 @@ RCT_REMAP_METHOD(transcribe,
     params.no_context       = true;
     params.single_segment   = false;
 
+    if (options[@"maxLen"] != nil) {
+        params.max_len = [options[@"maxLen"] intValue];
+    }
+    params.token_timestamps = options[@"tokenTimestamps"] != nil ? [options[@"tokenTimestamps"] boolValue] : false;
+
     if (options[@"bestOf"] != nil) {
         params.greedy.best_of = [options[@"bestOf"] intValue];
     }
     if (options[@"maxContext"] != nil) {
         params.n_max_text_ctx = [options[@"maxContext"] intValue];
     }
-    if (options[@"maxLen"] != nil) {
-        params.max_len = [options[@"maxLen"] intValue];
-    }
+    
     if (options[@"offset"] != nil) {
         params.offset_ms = [options[@"offset"] intValue];
     }
@@ -118,7 +121,7 @@ RCT_REMAP_METHOD(transcribe,
     if (options[@"temperatureInc"] != nil) {
         params.temperature_inc = [options[@"temperature_inc"] floatValue];
     }
-
+    
     if (options[@"prompt"] != nil) {
         std::string *prompt = new std::string([options[@"prompt"] UTF8String]);
         rn_whisper_convert_prompt(
@@ -142,11 +145,25 @@ RCT_REMAP_METHOD(transcribe,
 
     NSString *result = @"";
     int n_segments = whisper_full_n_segments(context.ctx);
+
+    NSMutableArray *segments = [[NSMutableArray alloc] init];
     for (int i = 0; i < n_segments; i++) {
         const char * text_cur = whisper_full_get_segment_text(context.ctx, i);
         result = [result stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
+
+        const int64_t t0 = whisper_full_get_segment_t0(context.ctx, i);
+        const int64_t t1 = whisper_full_get_segment_t1(context.ctx, i);
+        NSDictionary *segment = @{
+            @"text": [NSString stringWithUTF8String:text_cur],
+            @"t0": [NSNumber numberWithLongLong:t0],
+            @"t1": [NSNumber numberWithLongLong:t1]
+        };
+        [segments addObject:segment];
     }
-    resolve(result);
+    resolve(@{
+        @"result": result,
+        @"segments": segments
+    });
 }
 
 RCT_REMAP_METHOD(releaseContext,
