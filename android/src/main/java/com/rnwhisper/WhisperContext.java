@@ -60,7 +60,7 @@ public class WhisperContext {
       // jstring language,
       options.hasKey("language") ? options.getString("language") : "auto",
       // jstring prompt
-      options.hasKey("prompt") ? options.getString("prompt") : ""
+      options.hasKey("prompt") ? options.getString("prompt") : null
     );
     if (code != 0) {
       throw new Exception("Transcription failed with code " + code);
