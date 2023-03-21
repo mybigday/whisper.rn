@@ -16,6 +16,8 @@ const RNWhisper = NativeModules.RNWhisper
   )
 
 export type TranscribeOptions = {
+  language?: string,
+  translate?: boolean,
   maxThreads?: number,
   maxContext?: number,
   maxLen?: number,
