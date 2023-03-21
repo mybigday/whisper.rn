@@ -98,13 +98,17 @@
       "@commitlint/config-conventional"
     ]
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "release-it": {
     "git": {
       "commitMessage": "chore: release ${version}",
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": true,
+      "skipChecks": true
     },
     "github": {
       "release": true
