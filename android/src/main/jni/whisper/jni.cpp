@@ -44,10 +44,11 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jfloatArray audio_data,
     jint n_threads,
     jint max_context,
-    jint max_len,
+    int word_thold,
+    int max_len,
+    jboolean token_timestamps,
     jint offset,
     jint duration,
-    jint word_thold,
     jfloat temperature,
     jfloat temperature_inc,
     jint beam_size,
@@ -86,14 +87,16 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     params.no_context = true;
     params.single_segment = false;
 
+    if (max_len > -1) {
+        params.max_len = max_len;
+    }
+    params.token_timestamps = token_timestamps;
+
     if (best_of > -1) {
         params.greedy.best_of = best_of;
     }
     if (max_context > -1) {
         params.n_max_text_ctx = max_context;
-    }
-    if (max_len > -1) {
-        params.max_len = max_len;
     }
     if (offset > -1) {
         params.offset_ms = offset;
@@ -148,6 +151,24 @@ Java_com_rnwhisper_WhisperContext_getTextSegment(
     const char *text = whisper_full_get_segment_text(context, index);
     jstring string = env->NewStringUTF(text);
     return string;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_rnwhisper_WhisperContext_getTextSegmentT0(
+        JNIEnv *env, jobject thiz, jlong context_ptr, jint index) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    return whisper_full_get_segment_t0(context, index);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_rnwhisper_WhisperContext_getTextSegmentT1(
+        JNIEnv *env, jobject thiz, jlong context_ptr, jint index) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    return whisper_full_get_segment_t1(context, index);
 }
 
 JNIEXPORT void JNICALL
