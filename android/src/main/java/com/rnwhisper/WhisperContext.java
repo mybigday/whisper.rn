@@ -1,5 +1,8 @@
 package com.rnwhisper;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.WritableArray;
+import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.ReadableMap;
 
 import android.util.Log;
@@ -29,7 +32,7 @@ public class WhisperContext {
     this.context = context;
   }
 
-  public String transcribe(final String filePath, final ReadableMap options) throws IOException, Exception {
+  public WritableMap transcribe(final String filePath, final ReadableMap options) throws IOException, Exception {
     int code = fullTranscribe(
       context,
       decodeWaveFile(new File(filePath)),
@@ -37,14 +40,18 @@ public class WhisperContext {
       options.hasKey("maxThreads") ? options.getInt("maxThreads") : -1,
       // jint max_context,
       options.hasKey("maxContext") ? options.getInt("maxContext") : -1,
+
+      // jint word_thold,
+      options.hasKey("wordThold") ? options.getInt("wordThold") : -1,
       // jint max_len,
       options.hasKey("maxLen") ? options.getInt("maxLen") : -1,
+      // jboolean token_timestamps,
+      options.hasKey("tokenTimestamps") ? options.getBoolean("tokenTimestamps") : false,
+  
       // jint offset,
       options.hasKey("offset") ? options.getInt("offset") : -1,
       // jint duration,
       options.hasKey("duration") ? options.getInt("duration") : -1,
-      // jint word_thold,
-      options.hasKey("wordThold") ? options.getInt("wordThold") : -1,
       // jfloat temperature,
       options.hasKey("temperature") ? (float) options.getDouble("temperature") : -1.0f,
       // jfloat temperature_inc,
@@ -67,10 +74,22 @@ public class WhisperContext {
     }
     Integer count = getTextSegmentCount(context);
     StringBuilder builder = new StringBuilder();
+
+    WritableMap data = Arguments.createMap();
+    WritableArray segments = Arguments.createArray();
     for (int i = 0; i < count; i++) {
-      builder.append(getTextSegment(context, i));
+      String text = getTextSegment(context, i);
+      builder.append(text);
+
+      WritableMap segment = Arguments.createMap();
+      segment.putString("text", text);
+      segment.putInt("t0", getTextSegmentT0(context, i));
+      segment.putInt("t1", getTextSegmentT1(context, i));
+      segments.pushMap(segment);
     }
-    return builder.toString();
+    data.putString("result", builder.toString());
+    data.putArray("segments", segments);
+    return data;
   }
 
   public void release() {
@@ -170,10 +189,11 @@ public class WhisperContext {
     float[] audio_data,
     int n_threads,
     int max_context,
+    int word_thold,
     int max_len,
+    boolean token_timestamps,
     int offset,
     int duration,
-    int word_thold,
     float temperature,
     float temperature_inc,
     int beam_size,
@@ -185,5 +205,7 @@ public class WhisperContext {
   );
   protected static native int getTextSegmentCount(long context);
   protected static native String getTextSegment(long context, int index);
+  protected static native int getTextSegmentT0(long context, int index);
+  protected static native int getTextSegmentT1(long context, int index);
   protected static native void freeContext(long contextPtr);
 }

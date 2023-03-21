@@ -21,6 +21,7 @@ export type TranscribeOptions = {
   maxThreads?: number,
   maxContext?: number,
   maxLen?: number,
+  tokenTimestamps?: boolean,
   offset?: number,
   duration?: number,
   wordThold?: number,
@@ -34,6 +35,11 @@ export type TranscribeOptions = {
 
 export type TranscribeResult = {
   result: string,
+  segments: Array<{
+    text: string,
+    t0: number,
+    t1: number,
+  }>,
 }
 
 class WhisperContext {
@@ -44,9 +50,7 @@ class WhisperContext {
   }
 
   async transcribe(path: string, options: TranscribeOptions = {}): Promise<TranscribeResult> {
-    return RNWhisper.transcribe(this.id, path, options).then((result: string) => ({
-      result
-    }))
+    return RNWhisper.transcribe(this.id, path, options)
   }
 
   async release() {
