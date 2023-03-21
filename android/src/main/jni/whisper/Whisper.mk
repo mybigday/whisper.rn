@@ -16,4 +16,4 @@ LOCAL_CPPFLAGS  += -std=c++11
 LOCAL_SRC_FILES := $(WHISPER_LIB_DIR)/ggml.c \
                    $(WHISPER_LIB_DIR)/whisper.cpp \
                    $(WHISPER_LIB_DIR)/rn-whisper.cpp \
-                   $(LOCAL_PATH)/jni.c
+                   $(LOCAL_PATH)/jni.cpp

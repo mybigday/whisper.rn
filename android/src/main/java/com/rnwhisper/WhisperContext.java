@@ -58,7 +58,9 @@ public class WhisperContext {
       // jboolean translate,
       options.hasKey("translate") ? options.getBoolean("translate") : false,
       // jstring language,
-      options.hasKey("language") ? options.getString("language") : "auto"
+      options.hasKey("language") ? options.getString("language") : "auto",
+      // jstring prompt
+      options.hasKey("prompt") ? options.getString("prompt") : ""
     );
     if (code != 0) {
       throw new Exception("Transcription failed with code " + code);
@@ -178,7 +180,8 @@ public class WhisperContext {
     int best_of,
     boolean speed_up,
     boolean translate,
-    String language
+    String language,
+    String prompt
   );
   protected static native int getTextSegmentCount(long context);
   protected static native String getTextSegment(long context, int index);
