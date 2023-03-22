@@ -16,9 +16,12 @@ const RNWhisper = NativeModules.RNWhisper
   )
 
 export type TranscribeOptions = {
+  language?: string,
+  translate?: boolean,
   maxThreads?: number,
   maxContext?: number,
   maxLen?: number,
+  tokenTimestamps?: boolean,
   offset?: number,
   duration?: number,
   wordThold?: number,
@@ -27,10 +30,16 @@ export type TranscribeOptions = {
   beamSize?: number,
   bestOf?: number,
   speedUp?: boolean,
+  prompt?: string,
 }
 
 export type TranscribeResult = {
   result: string,
+  segments: Array<{
+    text: string,
+    t0: number,
+    t1: number,
+  }>,
 }
 
 class WhisperContext {
@@ -47,9 +56,7 @@ class WhisperContext {
     const jobId: number = Math.floor(Math.random() * 10000)
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),
-      promise: RNWhisper.transcribe(this.id, jobId, path, options).then((result: string) => ({
-        result
-      }))
+      promise: RNWhisper.transcribe(this.id, jobId, path, options),
     }
   }
 

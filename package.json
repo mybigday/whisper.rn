@@ -1,6 +1,6 @@
 {
   "name": "whisper.rn",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "React Native binding of whisper.cpp",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -47,7 +47,7 @@
     "speech recognition"
   ],
   "repository": "https://github.com/mybigday/whisper.rn",
-  "author": "Jhen <developer@jhen.me> (https://github.com/jhen0409)",
+  "author": "Jhen-Jie Hong <developer@jhen.me>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/mybigday/whisper.rn/issues"
@@ -98,13 +98,17 @@
       "@commitlint/config-conventional"
     ]
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "release-it": {
     "git": {
       "commitMessage": "chore: release ${version}",
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": true,
+      "skipChecks": true
     },
     "github": {
       "release": true

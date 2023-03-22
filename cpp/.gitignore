@@ -1,3 +1,4 @@
 *.c
 *.h
 *.cpp
+!rn-whisper*

@@ -12,6 +12,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.module.annotations.ReactModule;
 
 import java.util.HashMap;
@@ -72,11 +73,11 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
 
   @ReactMethod
   public void transcribe(int id, int jobId, String filePath, ReadableMap options, Promise promise) {
-    new AsyncTask<Void, Void, String>() {
+    new AsyncTask<Void, Void, WritableMap>() {
       private Exception exception;
 
       @Override
-      protected String doInBackground(Void... voids) {
+      protected WritableMap doInBackground(Void... voids) {
         try {
           WhisperContext context = contexts.get(id);
           if (context == null) {
@@ -90,12 +91,12 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
       }
 
       @Override
-      protected void onPostExecute(String result) {
+      protected void onPostExecute(WritableMap data) {
         if (exception != null) {
           promise.reject(exception);
           return;
         }
-        promise.resolve(result);
+        promise.resolve(data);
       }
     }.execute();
   }
