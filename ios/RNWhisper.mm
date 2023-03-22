@@ -132,7 +132,7 @@ RCT_REMAP_METHOD(transcribe,
         );
     }
 
-    params.encoder_begin_callback = [](struct whisper_context * ctx, void * user_data) { 
+    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return !is_aborted;
     };
