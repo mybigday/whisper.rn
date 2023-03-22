@@ -55,7 +55,7 @@ class WhisperContext {
   } {
     const jobId: number = Math.floor(Math.random() * 10000)
     return {
-      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
+      stop: () => RNWhisper.abortTranscribe(jobId),
       promise: RNWhisper.transcribe(this.id, jobId, path, options),
     }
   }

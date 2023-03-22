@@ -102,12 +102,8 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
   }
 
   @ReactMethod
-  public void abortTranscribe(int id, int jobId) {
-    WhisperContext context = contexts.get(id);
-    if (context == null) {
-      return;
-    }
-    context.abortTranscribeBy(jobId);
+  public void abortTranscribe(int jobId) {
+    WhisperContext.abortTranscribe(jobId);
   }
 
   @ReactMethod
@@ -177,6 +173,7 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
 
   @Override
   public void onHostDestroy() {
+    WhisperContext.abortAllTranscribe();
     for (WhisperContext context : contexts.values()) {
       context.release();
     }

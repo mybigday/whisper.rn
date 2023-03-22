@@ -5,7 +5,6 @@
 #include <cstdlib>
 #include <sys/sysinfo.h>
 #include <string>
-#include <unordered_map>
 #include "whisper.h"
 #include "rn-whisper.h"
 #include "ggml.h"
@@ -37,8 +36,6 @@ Java_com_rnwhisper_WhisperContext_initContext(
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
     return reinterpret_cast<jlong>(context);
 }
-
-std::unordered_map<int, bool> abort_map;
 
 JNIEXPORT jint JNICALL
 Java_com_rnwhisper_WhisperContext_fullTranscribe(
@@ -126,15 +123,11 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         );
     }
 
-    if (abort_map.find(job_id) != abort_map.end()) {
-        return -1;
-    }
-    abort_map[job_id] = false;
     params.encoder_begin_callback = [](struct whisper_context * ctx, void * user_data) { 
         bool is_aborted = *(bool*)user_data;
         return !is_aborted;
     };
-    params.encoder_begin_callback_user_data = &abort_map[job_id];
+    params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
 
     LOGI("About to reset timings");
     whisper_reset_timings(context);
@@ -146,7 +139,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     }
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
     env->ReleaseStringUTFChars(language, language_chars);
-    abort_map.erase(job_id);
+    rn_whisper_remove_abort_map(job_id);
     return code;
 }
 
@@ -157,9 +150,16 @@ Java_com_rnwhisper_WhisperContext_abortTranscribe(
     jint job_id
 ) {
     UNUSED(thiz);
-    if (abort_map.find(job_id) != abort_map.end()) {
-        abort_map[job_id] = true;
-    }
+    rn_whisper_abort_transcribe(job_id);
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_abortAllTranscribe(
+    JNIEnv *env,
+    jobject thiz
+) {
+    UNUSED(thiz);
+    rn_whisper_abort_all_transcribe();
 }
 
 JNIEXPORT jint JNICALL

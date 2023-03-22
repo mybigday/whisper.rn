@@ -93,10 +93,6 @@ public class WhisperContext {
     return data;
   }
 
-  public void abortTranscribeBy(int jobId) {
-    abortTranscribe(jobId);
-  }
-
   public void release() {
     freeContext(context);
   }
@@ -210,6 +206,7 @@ public class WhisperContext {
     String prompt
   );
   protected static native void abortTranscribe(int jobId);
+  protected static native void abortAllTranscribe();
   protected static native int getTextSegmentCount(long context);
   protected static native String getTextSegment(long context, int index);
   protected static native int getTextSegmentT0(long context, int index);
