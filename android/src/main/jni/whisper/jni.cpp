@@ -9,7 +9,6 @@
 #include "rn-whisper.h"
 #include "ggml.h"
 
-
 #define UNUSED(x) (void)(x)
 #define TAG "JNI"
 
