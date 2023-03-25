@@ -19,10 +19,6 @@ static inline int min(int a, int b) {
     return (a < b) ? a : b;
 }
 
-static inline int max(int a, int b) {
-    return (a > b) ? a : b;
-}
-
 extern "C" {
 
 JNIEXPORT jlong JNICALL
@@ -64,7 +60,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
     const jsize audio_data_length = env->GetArrayLength(audio_data);
 
-    int max_threads = max(1, min(8, get_nprocs() - 2));
+    int max_threads = min(4, get_nprocs());
 
     LOGI("About to create params");
 

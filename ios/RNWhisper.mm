@@ -76,7 +76,7 @@ RCT_REMAP_METHOD(transcribe,
 
     const int max_threads = options[@"maxThreads"] != nil ?
       [options[@"maxThreads"] intValue] :
-      MIN(8, (int)[[NSProcessInfo processInfo] processorCount]) - 2;
+      MIN(4, (int)[[NSProcessInfo processInfo] processorCount]);
 
     if (options[@"beamSize"] != nil) {
         params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
