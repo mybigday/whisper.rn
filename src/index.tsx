@@ -1,4 +1,10 @@
-import { NativeModules, Platform } from 'react-native'
+import {
+  NativeEventEmitter,
+  DeviceEventEmitter,
+  NativeModules,
+  Platform,
+  DeviceEventEmitterStatic,
+} from 'react-native'
 
 const LINKING_ERROR =
   `The package 'whisper.rn' doesn't seem to be linked. Make sure: \n\n${Platform.select({ ios: "- You have run 'pod install'\n", default: '' })
@@ -14,6 +20,16 @@ const RNWhisper = NativeModules.RNWhisper
       },
     },
   )
+
+let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
+if (Platform.OS === 'ios') {
+  EventEmitter = new NativeEventEmitter(RNWhisper)
+}
+if (Platform.OS === 'android') {
+  EventEmitter = DeviceEventEmitter
+}
+
+const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 
 export type TranscribeOptions = {
   language?: string,
@@ -33,6 +49,10 @@ export type TranscribeOptions = {
   prompt?: string,
 }
 
+export type TranscribeRealtimeOptions = TranscribeOptions & {
+  realtimeMaxAudioSec?: number,
+}
+
 export type TranscribeResult = {
   result: string,
   segments: Array<{
@@ -40,6 +60,30 @@ export type TranscribeResult = {
     t0: number,
     t1: number,
   }>,
+}
+
+export type TranscribeRealtimeEvent = {
+  contextId: number,
+  jobId: number,
+  isCapturing: boolean,
+  code: number,
+  processTime: number,
+  recordingTime: number,
+  data?: TranscribeResult,
+  error?: string,
+}
+
+export type TranscribeRealtimeNativeEvent = {
+  contextId: number,
+  jobId: number,
+  payload: {
+    isCapturing: boolean,
+    code: number,
+    processTime: number,
+    recordingTime: number,
+    data?: TranscribeResult,
+    error?: string,
+  },
 }
 
 class WhisperContext {
@@ -55,8 +99,31 @@ class WhisperContext {
   } {
     const jobId: number = Math.floor(Math.random() * 10000)
     return {
-      stop: () => RNWhisper.abortTranscribe(jobId),
-      promise: RNWhisper.transcribe(this.id, jobId, path, options),
+      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
+      promise: RNWhisper.transcribeFile(this.id, jobId, path, options),
+    }
+  }
+
+  async transcribeRealtime(options: TranscribeRealtimeOptions = {}): Promise<{
+    stop: () => void,
+    subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void,
+  }> {
+    const jobId: number = Math.floor(Math.random() * 10000)
+    await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
+    let remove: () => void
+    return {
+      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
+      subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
+        ({ remove } = EventEmitter.addListener(
+          EVENT_ON_REALTIME_TRANSCRIBE,
+          (evt: TranscribeRealtimeNativeEvent) => {
+            const { contextId, payload } = evt
+            if (contextId !== this.id || evt.jobId !== jobId) return
+            callback({ contextId, jobId: evt.jobId, ...payload })
+            if (!payload.isCapturing) remove()
+          }
+        ))
+      },
     }
   }
 

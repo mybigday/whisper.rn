@@ -32,7 +32,7 @@ public class WhisperContext {
     this.context = context;
   }
 
-  public WritableMap transcribe(int jobId, String filePath, ReadableMap options) throws IOException, Exception {
+  public WritableMap transcribeFile(int jobId, String filePath, ReadableMap options) throws IOException, Exception {
     int code = fullTranscribe(
       jobId,
       context,

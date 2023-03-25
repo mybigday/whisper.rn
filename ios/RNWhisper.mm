@@ -1,22 +1,7 @@
-
 #import "RNWhisper.h"
+#import "RNWhisperContext.h"
 #include <stdlib.h>
 #include <string>
-
-@interface WhisperContext : NSObject {
-}
-
-@property struct whisper_context * ctx;
-
-@end
-
-@implementation WhisperContext
-
-- (void)invalidate {
-    whisper_free(self.ctx);
-}
-
-@end
 
 @implementation RNWhisper
 
@@ -33,10 +18,8 @@ RCT_REMAP_METHOD(initContext,
         contexts = [[NSMutableDictionary alloc] init];
     }
 
-    WhisperContext *context = [[WhisperContext alloc] init];
-    context.ctx = whisper_init_from_file([modelPath UTF8String]);
-
-    if (context.ctx == NULL) {
+    RNWhisperContext *context = [RNWhisperContext initWithModelPath:modelPath];
+    if ([context getContext] == NULL) {
         reject(@"whisper_cpp_error", @"Failed to load the model", nil);
         return;
     }
@@ -47,18 +30,22 @@ RCT_REMAP_METHOD(initContext,
     resolve([NSNumber numberWithInt:contextId]);
 }
 
-RCT_REMAP_METHOD(transcribe,
+RCT_REMAP_METHOD(transcribeFile,
                  withContextId:(int)contextId
-                 withJobId:(int)job_id
+                 withJobId:(int)jobId
                  withWaveFile:(NSString *)waveFilePath
                  withOptions:(NSDictionary *)options
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    WhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
 
     if (context == nil) {
         reject(@"whisper_error", @"Context not found", nil);
+        return;
+    }
+    if ([context isTranscribing]) {
+        reject(@"whisper_error", @"Context is already transcribing", nil);
         return;
     }
 
@@ -66,119 +53,70 @@ RCT_REMAP_METHOD(transcribe,
 
     int count = 0;
     float *waveFile = [self decodeWaveFile:url count:&count];
-
     if (waveFile == nil) {
         reject(@"whisper_error", @"Invalid file", nil);
         return;
     }
-
-    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-
-    const int max_threads = options[@"maxThreads"] != nil ?
-      [options[@"maxThreads"] intValue] :
-      MIN(4, (int)[[NSProcessInfo processInfo] processorCount]);
-
-    if (options[@"beamSize"] != nil) {
-        params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
-        params.beam_search.beam_size = [options[@"beamSize"] intValue];
-    }
-
-    params.print_realtime   = false;
-    params.print_progress   = false;
-    params.print_timestamps = false;
-    params.print_special    = false;
-    params.speed_up         = options[@"speedUp"] != nil ? [options[@"speedUp"] boolValue] : false;
-    params.translate        = options[@"translate"] != nil ? [options[@"translate"] boolValue] : false;
-    params.language         = options[@"language"] != nil ? [options[@"language"] UTF8String] : "auto";
-    params.n_threads        = max_threads;
-    params.offset_ms        = 0;
-    params.no_context       = true;
-    params.single_segment   = false;
-
-    if (options[@"maxLen"] != nil) {
-        params.max_len = [options[@"maxLen"] intValue];
-    }
-    params.token_timestamps = options[@"tokenTimestamps"] != nil ? [options[@"tokenTimestamps"] boolValue] : false;
-
-    if (options[@"bestOf"] != nil) {
-        params.greedy.best_of = [options[@"bestOf"] intValue];
-    }
-    if (options[@"maxContext"] != nil) {
-        params.n_max_text_ctx = [options[@"maxContext"] intValue];
-    }
-    
-    if (options[@"offset"] != nil) {
-        params.offset_ms = [options[@"offset"] intValue];
-    }
-    if (options[@"duration"] != nil) {
-        params.duration_ms = [options[@"duration"] intValue];
-    }
-    if (options[@"wordThold"] != nil) {
-        params.thold_pt = [options[@"wordThold"] intValue];
-    }
-    if (options[@"temperature"] != nil) {
-        params.temperature = [options[@"temperature"] floatValue];
-    }
-    if (options[@"temperatureInc"] != nil) {
-        params.temperature_inc = [options[@"temperature_inc"] floatValue];
-    }
-    
-    if (options[@"prompt"] != nil) {
-        std::string *prompt = new std::string([options[@"prompt"] UTF8String]);
-        rn_whisper_convert_prompt(
-            context.ctx,
-            params,
-            prompt
-        );
-    }
-
-    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
-        bool is_aborted = *(bool*)user_data;
-        return !is_aborted;
-    };
-    params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
-
-    whisper_reset_timings(context.ctx);
-    int code = whisper_full(context.ctx, params, waveFile, count);
+    int code = [context transcribeFile:jobId audioData:waveFile audioDataCount:count options:options];
     if (code != 0) {
         NSLog(@"Failed to run the model");
         free(waveFile);
         reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to run the model. Code: %d", code], nil);
         return;
     }
-
-    // whisper_print_timings(context.ctx);
     free(waveFile);
-
-    rn_whisper_remove_abort_map(job_id);
-
-    NSString *result = @"";
-    int n_segments = whisper_full_n_segments(context.ctx);
-
-    NSMutableArray *segments = [[NSMutableArray alloc] init];
-    for (int i = 0; i < n_segments; i++) {
-        const char * text_cur = whisper_full_get_segment_text(context.ctx, i);
-        result = [result stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
-
-        const int64_t t0 = whisper_full_get_segment_t0(context.ctx, i);
-        const int64_t t1 = whisper_full_get_segment_t1(context.ctx, i);
-        NSDictionary *segment = @{
-            @"text": [NSString stringWithUTF8String:text_cur],
-            @"t0": [NSNumber numberWithLongLong:t0],
-            @"t1": [NSNumber numberWithLongLong:t1]
-        };
-        [segments addObject:segment];
-    }
-    resolve(@{
-        @"result": result,
-        @"segments": segments
-    });
+    resolve([context getTextSegments]);
 }
 
-RCT_REMAP_METHOD(abortTranscribe,
-                 withJobId:(int)job_id)
+- (NSArray *)supportedEvents {
+  return@[
+    @"@RNWhisper_onRealtimeTranscribe",
+  ];
+}
+
+RCT_REMAP_METHOD(startRealtimeTranscribe,
+                 withContextId:(int)contextId
+                 withJobId:(int)jobId
+                 withOptions:(NSDictionary *)options
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    rn_whisper_abort_transcribe(job_id);
+    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+
+    if (context == nil) {
+        reject(@"whisper_error", @"Context not found", nil);
+        return;
+    }
+    if ([context isTranscribing]) {
+        reject(@"whisper_error", @"Context is already transcribing", nil);
+        return;
+    }
+
+    OSStatus status = [context transcribeRealtime:jobId
+        options:options
+        onTranscribe:^(int _jobId, NSDictionary *payload) {
+            [self sendEventWithName:@"@RNWhisper_onRealtimeTranscribe"
+                body:@{
+                    @"contextId": [NSNumber numberWithInt:contextId],
+                    @"jobId": [NSNumber numberWithInt:jobId],
+                    @"payload": payload
+                }
+            ];
+        }
+    ];
+    NSLog(@"Status: %d", status);
+    if (status == 0) {
+        resolve(@{});
+    } else {
+        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to start realtime transcribe. Status: %d", status], nil);
+    }
+}
+RCT_REMAP_METHOD(abortTranscribe,
+                 withContextId:(int)contextId
+                 withJobId:(int)jobId)
+{
+    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+    [context stopTranscribe:jobId];
 }
 
 RCT_REMAP_METHOD(releaseContext,
@@ -186,7 +124,7 @@ RCT_REMAP_METHOD(releaseContext,
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    WhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
     if (context == nil) {
         reject(@"whisper_error", @"Context not found", nil);
         return;
@@ -232,7 +170,7 @@ RCT_REMAP_METHOD(releaseAllContexts,
     }
 
     for (NSNumber *contextId in contexts) {
-        WhisperContext *context = contexts[contextId];
+        RNWhisperContext *context = contexts[contextId];
         [context invalidate];
     }
 

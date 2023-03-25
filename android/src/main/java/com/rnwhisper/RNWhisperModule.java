@@ -72,7 +72,7 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
   }
 
   @ReactMethod
-  public void transcribe(int id, int jobId, String filePath, ReadableMap options, Promise promise) {
+  public void transcribeFile(int id, int jobId, String filePath, ReadableMap options, Promise promise) {
     new AsyncTask<Void, Void, WritableMap>() {
       private Exception exception;
 
@@ -83,7 +83,7 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
           if (context == null) {
             throw new Exception("Context " + id + " not found");
           }
-          return context.transcribe(jobId, filePath, options);
+          return context.transcribeFile(jobId, filePath, options);
         } catch (Exception e) {
           exception = e;
           return null;
@@ -102,7 +102,7 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
   }
 
   @ReactMethod
-  public void abortTranscribe(int jobId) {
+  public void abortTranscribe(int contextId, int jobId) {
     WhisperContext.abortTranscribe(jobId);
   }
 
