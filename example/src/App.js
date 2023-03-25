@@ -161,7 +161,10 @@ export default function App() {
               }
               log('Start transcribing...')
               const startTime = Date.now()
-              const { result, segments } = await whisperContext.transcribe(
+              const {
+                // stop,
+                promise
+              } = await whisperContext.transcribe(
                 sampleFilePath,
                 {
                   language: 'en',
@@ -169,6 +172,7 @@ export default function App() {
                   tokenTimestamps: true,
                 },
               )
+              const { result, segments } = await promise
               const endTime = Date.now()
               log('Transcribed result:', result)
               log('Transcribed in', endTime - startTime, `ms in ${mode} mode`)

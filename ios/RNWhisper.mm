@@ -49,6 +49,7 @@ RCT_REMAP_METHOD(initContext,
 
 RCT_REMAP_METHOD(transcribe,
                  withContextId:(int)contextId
+                 withJobId:(int)job_id
                  withWaveFile:(NSString *)waveFilePath
                  withOptions:(NSDictionary *)options
                  withResolver:(RCTPromiseResolveBlock)resolve
@@ -131,6 +132,12 @@ RCT_REMAP_METHOD(transcribe,
         );
     }
 
+    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
+        bool is_aborted = *(bool*)user_data;
+        return !is_aborted;
+    };
+    params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
+
     whisper_reset_timings(context.ctx);
     int code = whisper_full(context.ctx, params, waveFile, count);
     if (code != 0) {
@@ -142,6 +149,8 @@ RCT_REMAP_METHOD(transcribe,
 
     // whisper_print_timings(context.ctx);
     free(waveFile);
+
+    rn_whisper_remove_abort_map(job_id);
 
     NSString *result = @"";
     int n_segments = whisper_full_n_segments(context.ctx);
@@ -164,6 +173,12 @@ RCT_REMAP_METHOD(transcribe,
         @"result": result,
         @"segments": segments
     });
+}
+
+RCT_REMAP_METHOD(abortTranscribe,
+                 withJobId:(int)job_id)
+{
+    rn_whisper_abort_transcribe(job_id);
 }
 
 RCT_REMAP_METHOD(releaseContext,
@@ -210,6 +225,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
 }
 
 - (void)invalidate {
+    rn_whisper_abort_all_transcribe();
+
     if (contexts == nil) {
         return;
     }

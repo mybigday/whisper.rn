@@ -36,6 +36,7 @@ JNIEXPORT jint JNICALL
 Java_com_rnwhisper_WhisperContext_fullTranscribe(
     JNIEnv *env,
     jobject thiz,
+    jint job_id,
     jlong context_ptr,
     jfloatArray audio_data,
     jint n_threads,
@@ -117,6 +118,12 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         );
     }
 
+    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
+        bool is_aborted = *(bool*)user_data;
+        return !is_aborted;
+    };
+    params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
+
     LOGI("About to reset timings");
     whisper_reset_timings(context);
 
@@ -127,7 +134,27 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     }
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
     env->ReleaseStringUTFChars(language, language_chars);
+    rn_whisper_remove_abort_map(job_id);
     return code;
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_abortTranscribe(
+    JNIEnv *env,
+    jobject thiz,
+    jint job_id
+) {
+    UNUSED(thiz);
+    rn_whisper_abort_transcribe(job_id);
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_abortAllTranscribe(
+    JNIEnv *env,
+    jobject thiz
+) {
+    UNUSED(thiz);
+    rn_whisper_abort_all_transcribe();
 }
 
 JNIEXPORT jint JNICALL

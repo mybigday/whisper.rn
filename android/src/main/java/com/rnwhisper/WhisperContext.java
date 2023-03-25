@@ -32,8 +32,9 @@ public class WhisperContext {
     this.context = context;
   }
 
-  public WritableMap transcribe(final String filePath, final ReadableMap options) throws IOException, Exception {
+  public WritableMap transcribe(int jobId, String filePath, ReadableMap options) throws IOException, Exception {
     int code = fullTranscribe(
+      jobId,
       context,
       decodeWaveFile(new File(filePath)),
       // jint n_threads,
@@ -185,6 +186,7 @@ public class WhisperContext {
 
   protected static native long initContext(String modelPath);
   protected static native int fullTranscribe(
+    int job_id,
     long context,
     float[] audio_data,
     int n_threads,
@@ -203,6 +205,8 @@ public class WhisperContext {
     String language,
     String prompt
   );
+  protected static native void abortTranscribe(int jobId);
+  protected static native void abortAllTranscribe();
   protected static native int getTextSegmentCount(long context);
   protected static native String getTextSegment(long context, int index);
   protected static native int getTextSegmentT0(long context, int index);

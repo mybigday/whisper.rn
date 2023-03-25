@@ -49,8 +49,15 @@ class WhisperContext {
     this.id = id
   }
 
-  async transcribe(path: string, options: TranscribeOptions = {}): Promise<TranscribeResult> {
-    return RNWhisper.transcribe(this.id, path, options)
+  transcribe(path: string, options: TranscribeOptions = {}): {
+    stop: () => void,
+    promise: Promise<TranscribeResult>,
+  } {
+    const jobId: number = Math.floor(Math.random() * 10000)
+    return {
+      stop: () => RNWhisper.abortTranscribe(jobId),
+      promise: RNWhisper.transcribe(this.id, jobId, path, options),
+    }
   }
 
   async release() {
