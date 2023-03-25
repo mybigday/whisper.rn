@@ -15,9 +15,6 @@
 }
 
 - (void)prepareRealtime:(NSDictionary *)options {
-    if (self->recordState.isRealtimeSetup) {
-        return;
-    }
     self->recordState.options = options;
 
     self->recordState.dataFormat.mSampleRate = WHISPER_SAMPLE_RATE; // 16000
@@ -43,7 +40,6 @@
     self->recordState.isCapturing = false;
 
     self->recordState.mSelf = self;
-    self->recordState.isRealtimeSetup = true;
 }
 
 void AudioInputCallback(void * inUserData,

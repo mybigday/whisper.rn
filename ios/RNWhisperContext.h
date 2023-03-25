@@ -26,7 +26,6 @@ typedef struct {
     AudioQueueRef queue;
     AudioStreamBasicDescription dataFormat;
     AudioQueueBufferRef buffers[NUM_BUFFERS];
-    bool isRealtimeSetup;
 
     void (^transcribeHandler)(int, NSDictionary *);
 } RNWhisperContextRecordState;
