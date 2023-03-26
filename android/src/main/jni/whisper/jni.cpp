@@ -38,7 +38,9 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jobject thiz,
     jint job_id,
     jlong context_ptr,
+    jboolean realtime,
     jfloatArray audio_data,
+    jint audio_data_len,
     jint n_threads,
     jint max_context,
     int word_thold,
@@ -58,7 +60,6 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     UNUSED(thiz);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
-    const jsize audio_data_length = env->GetArrayLength(audio_data);
 
     int max_threads = min(4, get_nprocs());
 
@@ -82,7 +83,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     params.speed_up = speed_up;
     params.offset_ms = 0;
     params.no_context = true;
-    params.single_segment = false;
+    params.single_segment = realtime;
 
     if (max_len > -1) {
         params.max_len = max_len;
@@ -128,7 +129,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     whisper_reset_timings(context);
 
     LOGI("About to run whisper_full");
-    int code = whisper_full(context, params, audio_data_arr, audio_data_length);
+    int code = whisper_full(context, params, audio_data_arr, audio_data_len);
     if (code == 0) {
         // whisper_print_timings(context);
     }

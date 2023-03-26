@@ -6,10 +6,26 @@ import {
   Text,
   TouchableOpacity,
   SafeAreaView,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native'
 import RNFS from 'react-native-fs'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper } from 'whisper.rn'
+
+if (Platform.OS === 'android') {
+  // Request record audio permission
+  PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    {
+      title: 'Whisper Audio Permission',
+      message: 'Whisper needs access to your microphone',
+      buttonNeutral: 'Ask Me Later',
+      buttonNegative: 'Cancel',
+      buttonPositive: 'OK',
+    },
+  )
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -187,6 +203,7 @@ export default function App() {
                     )
                     .join('\n')}`,
               )
+              log('Finished transcribing')
             }}
           >
             <Text style={styles.buttonText}>Transcribe</Text>
