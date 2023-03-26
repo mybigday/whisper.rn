@@ -76,6 +76,7 @@ void AudioInputCallback(void * inUserData,
     if (!state->isTranscribing) {
         state->isTranscribing = true;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            // convert I16 to F32
             for (int i = 0; i < state->nSamples; i++) {
                 state->audioBufferF32[i] = (float)state->audioBufferI16[i] / 32768.0f;
             }
@@ -116,7 +117,8 @@ void AudioInputCallback(void * inUserData,
     options:(NSDictionary *)options
     onTranscribe:(void (^)(int, NSDictionary *))onTranscribe
 {
-    if (self->recordState.isTranscribing) {
+    if (self->recordState.isCapturing || self->recordState.isTranscribing) {
+        // TODO
         return -100;
     }
     self->recordState.transcribeHandler = onTranscribe;

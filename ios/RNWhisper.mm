@@ -106,10 +106,10 @@ RCT_REMAP_METHOD(startRealtimeTranscribe,
     ];
     NSLog(@"Status: %d", status);
     if (status == 0) {
-        resolve(@{});
-    } else {
-        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to start realtime transcribe. Status: %d", status], nil);
+        resolve(nil);
+        return;
     }
+    reject(@"whisper_error", [NSString stringWithFormat:@"Failed to start realtime transcribe. Status: %d", status], nil);
 }
 RCT_REMAP_METHOD(abortTranscribe,
                  withContextId:(int)contextId
