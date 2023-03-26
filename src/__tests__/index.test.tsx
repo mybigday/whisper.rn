@@ -10,6 +10,45 @@ test('Mock', async () => {
     result: ' Test',
     segments: [{ text: ' Test', t0: 0, t1: 33 }],
   })
+
+  const { subscribe } = await context.transcribeRealtime()
+  const events: any[] = []
+  subscribe((event) => events.push(event))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(events).toMatchObject([
+    {
+      contextId: 1,
+      data: {
+        result: ' Test',
+        segments: [
+          {
+            t0: 0,
+            t1: 33,
+            text: ' Test',
+          },
+        ],
+      },
+      isCapturing: true,
+      processTime: 100,
+      recordingTime: 1000,
+    },
+    {
+      contextId: 1,
+      data: {
+        result: ' Test',
+        segments: [
+          {
+            t0: 0,
+            t1: 33,
+            text: ' Test',
+          },
+        ],
+      },
+      isCapturing: false,
+      processTime: 100,
+      recordingTime: 2000,
+    },
+  ])
   await context.release()
   await releaseAllWhisper()
 })
