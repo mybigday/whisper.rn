@@ -61,7 +61,7 @@ RCT_REMAP_METHOD(transcribeFile,
     if (code != 0) {
         NSLog(@"Failed to run the model");
         free(waveFile);
-        reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to run the model. Code: %d", code], nil);
+        reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
         return;
     }
     free(waveFile);

@@ -96,8 +96,9 @@ public class WhisperContext {
             try {
               int n = recorder.read(buffer, 0, bufferSize);
               if (n == 0) continue;
-              // Full, ignore data
+
               if (nSamples + n > maxAudioSec * SAMPLE_RATE) {
+                // Full, ignore data
                 isCapturing = false;
                 break;
               }
@@ -112,36 +113,32 @@ public class WhisperContext {
                   @Override
                   public void run() {
                     if (!isCapturing) return;
-                    try {
-                      // convert I16 to F32
-                      float[] nSamplesBuffer32 = new float[nSamples];
-                      for (int i = 0; i < nSamples; i++) {
-                        nSamplesBuffer32[i] = buffer16[i] / 32768.0f;
-                      }
 
-                      int timeStart = (int) System.currentTimeMillis();
-                      int code = full(jobId, options, nSamplesBuffer32, nSamples);
-                      int timeEnd = (int) System.currentTimeMillis();
-                      int timeRecording = (int) (nSamples / SAMPLE_RATE * 1000);
-
-                      WritableMap payload = Arguments.createMap();
-                      payload.putBoolean("isCapturing", isCapturing);
-                      payload.putInt("code", code);
-                      payload.putInt("processTime", timeEnd - timeStart);
-                      payload.putInt("recordingTime", timeRecording);
-
-                      if (code == 0) {
-                        payload.putMap("data", getTextSegments());
-                        emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-                      } else {
-                        payload.putString("error", "Transcribe failed with code " + code);
-                        emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-                      }
-                    } catch (Exception e) {
-                      Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
-                    } finally {
-                      isTranscribing = false;
+                    // convert I16 to F32
+                    float[] nSamplesBuffer32 = new float[nSamples];
+                    for (int i = 0; i < nSamples; i++) {
+                      nSamplesBuffer32[i] = buffer16[i] / 32768.0f;
                     }
+
+                    int timeStart = (int) System.currentTimeMillis();
+                    int code = full(jobId, options, nSamplesBuffer32, nSamples);
+                    int timeEnd = (int) System.currentTimeMillis();
+                    int timeRecording = (int) (nSamples / SAMPLE_RATE * 1000);
+
+                    WritableMap payload = Arguments.createMap();
+                    payload.putBoolean("isCapturing", isCapturing);
+                    payload.putInt("code", code);
+                    payload.putInt("processTime", timeEnd - timeStart);
+                    payload.putInt("recordingTime", timeRecording);
+
+                    if (code == 0) {
+                      payload.putMap("data", getTextSegments());
+                      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+                    } else {
+                      payload.putString("error", "Transcribe failed with code " + code);
+                      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+                    }
+                    isTranscribing = false;
                   }
                 });
                 fullHandler.start();
@@ -182,7 +179,7 @@ public class WhisperContext {
     isTranscribing = false;
     this.jobId = -1;
     if (code != 0) {
-      throw new Exception("Transcription failed with code " + code);
+      throw new Exception("Failed to transcribe the file. Code: " + code);
     }
     return getTextSegments();
   }
@@ -264,9 +261,7 @@ public class WhisperContext {
   }
 
   public void stopCurrentTranscribe() {
-    if (this.jobId > -1) abortTranscribe(this.jobId);
-    isCapturing = false;
-    isTranscribing = false;
+    stopTranscribe(this.jobId);
   }
 
   public void release() {
