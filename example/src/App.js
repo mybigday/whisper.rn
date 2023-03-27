@@ -220,6 +220,7 @@ export default function App() {
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
+                    realtimeMaxAudioSec: 10,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {
@@ -230,6 +231,7 @@ export default function App() {
                       `Process time: ${processTime}ms\n` +
                       `Recording time: ${recordingTime}ms`
                   )
+                  if (!isCapturing) setStopTranscribe(null)
                 })
               } catch (e) {
                 log('Error:', e)

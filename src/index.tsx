@@ -30,6 +30,7 @@ if (Platform.OS === 'android') {
 }
 
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
+const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
 
 export type TranscribeOptions = {
   language?: string,
@@ -110,19 +111,34 @@ class WhisperContext {
   }> {
     const jobId: number = Math.floor(Math.random() * 10000)
     await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
-    let remove: () => void
+    let removeTranscribe: () => void
+    let removeEnd: () => void
+    let lastTranscribePayload: TranscribeRealtimeNativeEvent['payload']
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),
       subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
-        ({ remove } = EventEmitter.addListener(
+        const transcribeListener = EventEmitter.addListener(
           EVENT_ON_REALTIME_TRANSCRIBE,
           (evt: TranscribeRealtimeNativeEvent) => {
             const { contextId, payload } = evt
             if (contextId !== this.id || evt.jobId !== jobId) return
+            lastTranscribePayload = payload
             callback({ contextId, jobId: evt.jobId, ...payload })
-            if (!payload.isCapturing) remove()
+            if (!payload.isCapturing) removeTranscribe()
           }
-        ))
+        )
+        removeTranscribe = transcribeListener.remove
+        const endListener = EventEmitter.addListener(
+          EVENT_ON_REALTIME_TRANSCRIBE_END,
+          (evt: TranscribeRealtimeNativeEvent) => {
+            const { contextId } = evt
+            if (contextId !== this.id || evt.jobId !== jobId) return
+            callback({ contextId, jobId: evt.jobId, ...lastTranscribePayload, isCapturing: false })
+            removeTranscribe?.()
+            removeEnd()
+          }
+        )
+        removeEnd = endListener.remove
       },
     }
   }

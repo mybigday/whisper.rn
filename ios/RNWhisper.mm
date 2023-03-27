@@ -71,6 +71,7 @@ RCT_REMAP_METHOD(transcribeFile,
 - (NSArray *)supportedEvents {
   return@[
     @"@RNWhisper_onRealtimeTranscribe",
+    @"@RNWhisper_onRealtimeTranscribeEnd",
   ];
 }
 
@@ -87,15 +88,24 @@ RCT_REMAP_METHOD(startRealtimeTranscribe,
         reject(@"whisper_error", @"Context not found", nil);
         return;
     }
-    if ([context isTranscribing]) {
-        reject(@"whisper_error", @"Context is already transcribing", nil);
+    if ([context isCapturing]) {
+        reject(@"whisper_error", @"The context is already capturing", nil);
         return;
     }
 
     OSStatus status = [context transcribeRealtime:jobId
         options:options
-        onTranscribe:^(int _jobId, NSDictionary *payload) {
-            [self sendEventWithName:@"@RNWhisper_onRealtimeTranscribe"
+        onTranscribe:^(int _jobId, NSString *type, NSDictionary *payload) {
+            NSString *eventName = nil;
+            if ([type isEqual:@"transcribe"]) {
+                eventName = @"@RNWhisper_onRealtimeTranscribe";
+            } else if ([type isEqual:@"end"]) {
+                eventName = @"@RNWhisper_onRealtimeTranscribeEnd";
+            }
+            if (eventName == nil) {
+                return;
+            }
+            [self sendEventWithName:eventName
                 body:@{
                     @"contextId": [NSNumber numberWithInt:contextId],
                     @"jobId": [NSNumber numberWithInt:jobId],

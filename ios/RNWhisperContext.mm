@@ -61,6 +61,13 @@ void AudioInputCallback(void * inUserData,
 
     if (state->nSamples + n > state->maxAudioSec * WHISPER_SAMPLE_RATE) {
         NSLog(@"Audio buffer is full, ignoring audio");
+        state->isCapturing = false;
+        if (!state->isTranscribing) {
+            state->transcribeHandler(state->jobId, @"end", @{});
+        } else {
+            NSLog(@"Still transcribing");
+        }
+        [state->mSelf stopAudio];
         return;
     }
 
@@ -70,8 +77,6 @@ void AudioInputCallback(void * inUserData,
     state->nSamples += n;
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
-
-    // NSLog(@"Audio buffer size: %d", state->nSamples);
 
     if (!state->isTranscribing) {
         state->isTranscribing = true;
@@ -87,7 +92,7 @@ void AudioInputCallback(void * inUserData,
             CFTimeInterval timeEnd = CACurrentMediaTime();
             const float timeRecording = (float) state->nSamples / (float) state->dataFormat.mSampleRate;
             if (code == 0) {
-                state->transcribeHandler(state->jobId, @{
+                state->transcribeHandler(state->jobId, @"transcribe", @{
                     @"isCapturing": @(state->isCapturing),
                     @"code": [NSNumber numberWithInt:code],
                     @"data": [state->mSelf getTextSegments],
@@ -97,16 +102,24 @@ void AudioInputCallback(void * inUserData,
                 state->isTranscribing = false;
                 return;
             }
-            state->transcribeHandler(state->jobId, @{
+            state->transcribeHandler(state->jobId, @"transcribe", @{
                 @"isCapturing": @(state->isCapturing),
                 @"code": [NSNumber numberWithInt:code],
                 @"error": [NSString stringWithFormat:@"Transcribe failed with code %d", code],
                 @"processTime": [NSNumber numberWithDouble:timeEnd - timeStart],
                 @"recordingTime": [NSNumber numberWithFloat:timeRecording],
             });
+            if (!state->isCapturing) {
+                NSLog(@"Transcribe end");
+                state->transcribeHandler(state->jobId, @"end", @{});
+            }
             state->isTranscribing = false;
         });
     }
+}
+
+- (bool)isCapturing {
+    return self->recordState.isCapturing;
 }
 
 - (bool)isTranscribing {
@@ -115,12 +128,8 @@ void AudioInputCallback(void * inUserData,
 
 - (OSStatus)transcribeRealtime:(int)jobId
     options:(NSDictionary *)options
-    onTranscribe:(void (^)(int, NSDictionary *))onTranscribe
+    onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe
 {
-    if (self->recordState.isCapturing || self->recordState.isTranscribing) {
-        // TODO
-        return -100;
-    }
     self->recordState.transcribeHandler = onTranscribe;
     self->recordState.jobId = jobId;
     [self prepareRealtime:options];
@@ -162,17 +171,21 @@ void AudioInputCallback(void * inUserData,
     return code;
 }
 
+- (void)stopAudio {
+    AudioQueueStop(self->recordState.queue, true);
+    for (int i = 0; i < NUM_BUFFERS; i++) {
+        AudioQueueFreeBuffer(self->recordState.queue, self->recordState.buffers[i]);
+    }
+    AudioQueueDispose(self->recordState.queue, true);
+}
+
 - (void)stopTranscribe:(int)jobId {
     rn_whisper_abort_transcribe(jobId);
     if (!self->recordState.isRealtime || !self->recordState.isCapturing) {
         return;
     }
     self->recordState.isCapturing = false;
-    AudioQueueStop(self->recordState.queue, true);
-    for (int i = 0; i < NUM_BUFFERS; i++) {
-        AudioQueueFreeBuffer(self->recordState.queue, self->recordState.buffers[i]);
-    }
-    AudioQueueDispose(self->recordState.queue, true);
+    [self stopAudio];
 }
 
 - (void)stopCurrentTranscribe {

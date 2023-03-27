@@ -27,7 +27,7 @@ typedef struct {
     AudioStreamBasicDescription dataFormat;
     AudioQueueBufferRef buffers[NUM_BUFFERS];
 
-    void (^transcribeHandler)(int, NSDictionary *);
+    void (^transcribeHandler)(int, NSString *, NSDictionary *);
 } RNWhisperContextRecordState;
 
 @interface RNWhisperContext : NSObject {
@@ -39,12 +39,13 @@ typedef struct {
 - (struct whisper_context *)getContext;
 - (OSStatus)transcribeRealtime:(int)jobId
     options:(NSDictionary *)options
-    onTranscribe:(void (^)(int, NSDictionary *))onTranscribe;
+    onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe;
 - (int)transcribeFile:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options;
 - (void)stopTranscribe:(int)jobId;
+- (bool)isCapturing;
 - (bool)isTranscribing;
 - (NSDictionary *)getTextSegments;
 - (void)invalidate;
