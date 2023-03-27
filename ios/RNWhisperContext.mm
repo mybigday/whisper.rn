@@ -29,7 +29,7 @@
 
     self->recordState.nSamples = 0;
 
-    int maxAudioSecOpt = options[@"realtimeMaxAudioSec"] != nil ? [options[@"realtimeMaxAudioSec"] intValue] : 0;
+    int maxAudioSecOpt = options[@"realtimeAudioSec"] != nil ? [options[@"realtimeAudioSec"] intValue] : 0;
     int maxAudioSec = maxAudioSecOpt > 0 ? maxAudioSecOpt : DEFAULT_MAX_AUDIO_SEC;
     self->recordState.maxAudioSec = maxAudioSec;
     self->recordState.audioBufferI16 = (int16_t *) malloc(maxAudioSec * WHISPER_SAMPLE_RATE * sizeof(int16_t));

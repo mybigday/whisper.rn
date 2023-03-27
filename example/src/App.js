@@ -220,7 +220,7 @@ export default function App() {
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
-                    realtimeMaxAudioSec: 10,
+                    realtimeAudioSec: 10,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {

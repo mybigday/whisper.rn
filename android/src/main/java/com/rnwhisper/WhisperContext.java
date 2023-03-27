@@ -74,8 +74,8 @@ public class WhisperContext {
       return state;
     }
     
-    int realtimeMaxAudioSec = options.hasKey("maxAudioSec") ? options.getInt("maxAudioSec") : 0;
-    final int maxAudioSec = realtimeMaxAudioSec > 0 ? realtimeMaxAudioSec : DEFAULT_MAX_AUDIO_SEC;
+    int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
+    final int maxAudioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
 
     buffer16 = new short[maxAudioSec * SAMPLE_RATE * Short.BYTES];
 

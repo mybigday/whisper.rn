@@ -51,7 +51,7 @@ export type TranscribeOptions = {
 }
 
 export type TranscribeRealtimeOptions = TranscribeOptions & {
-  realtimeMaxAudioSec?: number,
+  realtimeAudioSec?: number,
 }
 
 export type TranscribeResult = {
