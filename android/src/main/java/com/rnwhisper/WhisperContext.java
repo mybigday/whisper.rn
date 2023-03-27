@@ -15,6 +15,7 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder.AudioSource;
 
 import java.util.Random;
+import java.util.ArrayList;
 import java.lang.StringBuilder;
 import java.io.File;
 import java.io.BufferedReader;
@@ -47,8 +48,13 @@ public class WhisperContext {
   private int jobId = -1;
   private AudioRecord recorder = null;
   private int bufferSize;
-  private short[] buffer16;
-  private int nSamples = 0;
+  private ArrayList<short[]> shortBufferSlices;
+  // Remember number of samples in each slice
+  private ArrayList<Integer> sliceNSamples;
+  // Current buffer slice index
+  private int sliceIndex = 0;
+  // Current transcribing slice index
+  private int transcribeSliceIndex = 0;
   private boolean isCapturing = false;
   private boolean isTranscribing = false;
   private boolean isRealtime = false;
@@ -77,12 +83,20 @@ public class WhisperContext {
     int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
     final int maxAudioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
 
-    buffer16 = new short[maxAudioSec * SAMPLE_RATE * Short.BYTES];
+    int realtimeSliceInterval = options.hasKey("realtimeSliceInterval") ? options.getInt("realtimeSliceInterval") : 0;
+    final int sliceInterval = realtimeSliceInterval > 0 ? realtimeSliceInterval : maxAudioSec;
+
+    shortBufferSlices = new ArrayList<short[]>();
+    shortBufferSlices.add(new short[sliceInterval * SAMPLE_RATE]);
+    sliceNSamples = new ArrayList<Integer>();
+    sliceNSamples.add(0);
+
+    sliceIndex = 0;
+    transcribeSliceIndex = 0;
 
     this.jobId = jobId;
     isCapturing = true;
     isRealtime = true;
-    nSamples = 0;
   
     recorder.startRecording();
 
@@ -97,35 +111,60 @@ public class WhisperContext {
               int n = recorder.read(buffer, 0, bufferSize);
               if (n == 0) continue;
 
-              if (nSamples + n > maxAudioSec * SAMPLE_RATE) {
+              int totalNSamples = 0;
+              for (int i = 0; i < sliceNSamples.size(); i++) {
+                totalNSamples += sliceNSamples.get(i);
+              }
+
+              if (totalNSamples + n > maxAudioSec * SAMPLE_RATE) {
                 // Full, ignore data
                 isCapturing = false;
                 if (!isTranscribing)
                   emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
                 break;
               }
-              nSamples += n;
-              for (int i = 0; i < n; i++) {
-                buffer16[nSamples + i] = buffer[i];
+
+              short[] shortBuffer = shortBufferSlices.get(sliceIndex);
+              int nSamples = sliceNSamples.get(sliceIndex);
+              if (nSamples + n > sliceInterval * SAMPLE_RATE) {
+                Log.d(NAME, "next slice");
+
+                sliceIndex++;
+                nSamples = 0;
+                shortBuffer = new short[sliceInterval * SAMPLE_RATE];
+                shortBufferSlices.add(shortBuffer);
+                sliceNSamples.add(0);
               }
+
+              for (int i = 0; i < n; i++) {
+                shortBuffer[nSamples + i] = buffer[i];
+              }
+              nSamples += n;
+              sliceNSamples.set(sliceIndex, nSamples);
+
               if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
                 isTranscribing = true;
-                Log.d(NAME, "Start transcribing realtime: " + nSamples);
                 fullHandler = new Thread(new Runnable() {
                   @Override
                   public void run() {
                     if (!isCapturing) return;
 
+                    short[] shortBuffer = shortBufferSlices.get(transcribeSliceIndex);
+                    int nSamples = sliceNSamples.get(transcribeSliceIndex);
+
                     // convert I16 to F32
                     float[] nSamplesBuffer32 = new float[nSamples];
                     for (int i = 0; i < nSamples; i++) {
-                      nSamplesBuffer32[i] = buffer16[i] / 32768.0f;
+                      nSamplesBuffer32[i] = shortBuffer[i] / 32768.0f;
                     }
+                    Log.d(NAME, "Start transcribing realtime: " + nSamples);
 
                     int timeStart = (int) System.currentTimeMillis();
                     int code = full(jobId, options, nSamplesBuffer32, nSamples);
                     int timeEnd = (int) System.currentTimeMillis();
                     int timeRecording = (int) (nSamples / SAMPLE_RATE * 1000);
+
+                    Log.d(NAME, "Finished transcribing realtime: " + nSamples);
 
                     WritableMap payload = Arguments.createMap();
                     payload.putBoolean("isCapturing", isCapturing);
@@ -145,6 +184,14 @@ public class WhisperContext {
                       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
                     }
                     isTranscribing = false;
+
+                    if (
+                      // If no more samples on current slice, move to next slice
+                      nSamples == sliceNSamples.get(transcribeSliceIndex) &&
+                      transcribeSliceIndex != sliceIndex
+                    ) {
+                      transcribeSliceIndex++;
+                    }
                   }
                 });
                 fullHandler.start();
