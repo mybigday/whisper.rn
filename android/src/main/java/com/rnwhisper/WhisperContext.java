@@ -256,6 +256,11 @@ public class WhisperContext {
     return data;
   }
 
+
+  public boolean isCapturing() {
+    return isCapturing;
+  }
+
   public boolean isTranscribing() {
     return isTranscribing;
   }

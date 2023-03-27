@@ -114,8 +114,8 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
       promise.reject("Context not found");
       return;
     }
-    if (context.isTranscribing()) {
-      promise.reject("Context is already transcribing");
+    if (context.isCapturing()) {
+      promise.reject("Context is already in capturing");
       return;
     }
     int state = context.startRealtimeTranscribe(jobId, options);
