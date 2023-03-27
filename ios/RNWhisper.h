@@ -3,9 +3,9 @@
 #import "rn-whisper.h"
 #endif
 
-
 #import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
 
-@interface RNWhisper : NSObject <RCTBridgeModule>
+@interface RNWhisper : RCTEventEmitter <RCTBridgeModule>
 
 @end

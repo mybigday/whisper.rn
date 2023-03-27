@@ -20,6 +20,23 @@ npm install whisper.rn
 
 Then re-run `npx pod-install` again for iOS.
 
+## Add Microphone Permissions (Optional)
+
+If you want to use realtime transcribe, you need to add the microphone permission to your app.
+
+### iOS
+Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>This app requires microphone access in order to transcribe speech</string>
+```
+
+### Android
+Add the following line to ```android/app/src/main/AndroidManifest.xml```
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+```
+
 ## Usage
 
 ```js
@@ -30,12 +47,34 @@ const sampleFilePath = 'file://.../sample.wav'
 
 const whisperContext = await initWhisper({ filePath })
 
-const { result } = await whisperContext.transcribe(sampleFilePath, {
-  language: 'en',
-  // More options
-})
+const options = { language: 'en' }
+const { stop, promise } = whisperContext.transcribe(sampleFilePath, options)
+
+const { result } = await promise
 // result: (The inference text result from audio file)
 ```
+
+Use realtime transcribe:
+
+```js
+const { stop, subscribe } = whisperContext.transcribeRealtime(options)
+
+subscribe(evt => {
+  const { isCapturing, data, processTime, recordingTime } = evt
+  console.log(
+    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
+      // The inference text result from audio record:
+      `Result: ${data.result}\n\n` + 
+      `Process time: ${processTime}ms\n` +
+      `Recording time: ${recordingTime}ms`,
+  )
+  if (!isCapturing) console.log('Finished realtime transcribing')
+})
+```
+
+In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
+
+The documentation is not ready yet, please see the comments of [index](./src/index.tsx) file for more details at the moment.
 
 ## Run with example
 

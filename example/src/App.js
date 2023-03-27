@@ -6,10 +6,23 @@ import {
   Text,
   TouchableOpacity,
   SafeAreaView,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native'
 import RNFS from 'react-native-fs'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper } from 'whisper.rn'
+
+if (Platform.OS === 'android') {
+  // Request record audio permission
+  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
+    title: 'Whisper Audio Permission',
+    message: 'Whisper needs access to your microphone',
+    buttonNeutral: 'Ask Me Later',
+    buttonNegative: 'Cancel',
+    buttonPositive: 'OK',
+  })
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -73,6 +86,8 @@ const filterPath = (path) =>
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
   const [logs, setLogs] = useState([])
+  const [transcibeResult, setTranscibeResult] = useState(null)
+  const [stopTranscribe, setStopTranscribe] = useState(null)
 
   const log = useCallback((...messages) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -136,6 +151,7 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.button}
+            disabled={stopTranscribe?.stop}
             onPress={async () => {
               if (!whisperContext) {
                 log('No context')
@@ -163,41 +179,77 @@ export default function App() {
               const startTime = Date.now()
               const {
                 // stop,
-                promise
-              } = await whisperContext.transcribe(
-                sampleFilePath,
-                {
-                  language: 'en',
-                  maxLen: 1,
-                  tokenTimestamps: true,
-                },
-              )
+                promise,
+              } = whisperContext.transcribe(sampleFilePath, {
+                language: 'en',
+                maxLen: 1,
+                tokenTimestamps: true,
+              })
               const { result, segments } = await promise
               const endTime = Date.now()
-              log('Transcribed result:', result)
-              log('Transcribed in', endTime - startTime, `ms in ${mode} mode`)
-              log('Segments:')
-              segments.forEach((segment) => {
-                log(
-                  `[${toTimestamp(segment.t0)} --> ${toTimestamp(
-                    segment.t1,
-                  )}]  ${segment.text}`,
-                )
-              })
+              setTranscibeResult(
+                `Transcribed result: ${result}\n` +
+                  `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
+                  `\n` +
+                  `Segments:` +
+                  `\n${segments
+                    .map(
+                      (segment) =>
+                        `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+                          segment.t1,
+                        )}]  ${segment.text}`,
+                    )
+                    .join('\n')}`,
+              )
+              log('Finished transcribing')
             }}
           >
-            <Text style={styles.buttonText}>Transcribe</Text>
+            <Text style={styles.buttonText}>Transcribe File</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, styles.buttonClear]}
+            style={[
+              styles.button,
+              stopTranscribe?.stop ? styles.buttonClear : null,
+            ]}
             onPress={async () => {
-              if (!whisperContext) return
-              await whisperContext.release()
-              setWhisperContext(null)
-              log('Released context')
+              if (!whisperContext) {
+                log('No context')
+                return
+              }
+              if (stopTranscribe?.stop) {
+                stopTranscribe?.stop()
+                setStopTranscribe(null)
+                return
+              }
+              log('Start realtime transcribing...')
+              try {
+                const { stop, subscribe } =
+                  await whisperContext.transcribeRealtime({
+                    language: 'en',
+                    realtimeAudioSec: 10,
+                  })
+                setStopTranscribe({ stop })
+                subscribe((evt) => {
+                  const { isCapturing, data, processTime, recordingTime } = evt
+                  setTranscibeResult(
+                    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
+                      `Result: ${data.result}\n\n` +
+                      `Process time: ${processTime}ms\n` +
+                      `Recording time: ${recordingTime}ms`,
+                  )
+                  if (!isCapturing) {
+                    setStopTranscribe(null)
+                    log('Finished realtime transcribing')
+                  }
+                })
+              } catch (e) {
+                log('Error:', e)
+              }
             }}
           >
-            <Text style={styles.buttonText}>Release Context</Text>
+            <Text style={styles.buttonText}>
+              {stopTranscribe?.stop ? 'Stop' : 'Realtime'}
+            </Text>
           </TouchableOpacity>
         </View>
         <View style={styles.logContainer}>
@@ -207,9 +259,29 @@ export default function App() {
             </Text>
           ))}
         </View>
+        {transcibeResult && (
+          <View style={styles.logContainer}>
+            <Text style={styles.logText}>{transcibeResult}</Text>
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.button, styles.buttonClear]}
-          onPress={() => setLogs([])}
+          onPress={async () => {
+            if (!whisperContext) return
+            await whisperContext.release()
+            setWhisperContext(null)
+            log('Released context')
+          }}
+        >
+          <Text style={styles.buttonText}>Release Context</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonClear]}
+          onPress={() => {
+            setLogs([])
+            setTranscibeResult('')
+          }}
         >
           <Text style={styles.buttonText}>Clear Logs</Text>
         </TouchableOpacity>

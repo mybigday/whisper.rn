@@ -5,6 +5,7 @@ import android.util.Log;
 import android.os.Build;
 import android.os.Handler;
 import android.os.AsyncTask;
+import android.media.AudioRecord;
 
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -51,7 +52,7 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
             throw new Exception("Failed to initialize context");
           }
           int id = Math.abs(new Random().nextInt());
-          WhisperContext whisperContext = new WhisperContext(context);
+          WhisperContext whisperContext = new WhisperContext(id, reactContext, context);
           contexts.put(id, whisperContext);
           return id;
         } catch (Exception e) {
@@ -72,18 +73,27 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
   }
 
   @ReactMethod
-  public void transcribe(int id, int jobId, String filePath, ReadableMap options, Promise promise) {
+  public void transcribeFile(int id, int jobId, String filePath, ReadableMap options, Promise promise) {
+    final WhisperContext context = contexts.get(id);
+    if (context == null) {
+      promise.reject("Context not found");
+      return;
+    }
+    if (context.isCapturing()) {
+      promise.reject("The context is in realtime transcribe mode");
+      return;
+    }
+    if (context.isTranscribing()) {
+      promise.reject("Context is already transcribing");
+      return;
+    }
     new AsyncTask<Void, Void, WritableMap>() {
       private Exception exception;
 
       @Override
       protected WritableMap doInBackground(Void... voids) {
         try {
-          WhisperContext context = contexts.get(id);
-          if (context == null) {
-            throw new Exception("Context " + id + " not found");
-          }
-          return context.transcribe(jobId, filePath, options);
+          return context.transcribeFile(jobId, filePath, options);
         } catch (Exception e) {
           exception = e;
           return null;
@@ -102,8 +112,32 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
   }
 
   @ReactMethod
-  public void abortTranscribe(int jobId) {
-    WhisperContext.abortTranscribe(jobId);
+  public void startRealtimeTranscribe(int id, int jobId, ReadableMap options, Promise promise) {
+    final WhisperContext context = contexts.get(id);
+    if (context == null) {
+      promise.reject("Context not found");
+      return;
+    }
+    if (context.isCapturing()) {
+      promise.reject("Context is already in capturing");
+      return;
+    }
+    int state = context.startRealtimeTranscribe(jobId, options);
+    if (state == AudioRecord.STATE_INITIALIZED) {
+      promise.resolve(null);
+      return;
+    }
+    promise.reject("Failed to start realtime transcribe. State: " + state);
+  }
+
+  @ReactMethod
+  public void abortTranscribe(int contextId, int jobId, Promise promise) {
+    WhisperContext context = contexts.get(contextId);
+    if (context == null) {
+      promise.reject("Context not found");
+      return;
+    }
+    context.stopTranscribe(jobId);
   }
 
   @ReactMethod
