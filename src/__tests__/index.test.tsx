@@ -2,6 +2,8 @@ import { initWhisper, releaseAllWhisper } from '..'
 
 jest.mock('..', () => require('../../jest/mock'))
 
+Math.random = () => 0.5
+
 test('Mock', async () => {
   const context = await initWhisper()
   expect(context.id).toBe(1)
