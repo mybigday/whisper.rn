@@ -44,6 +44,10 @@ RCT_REMAP_METHOD(transcribeFile,
         reject(@"whisper_error", @"Context not found", nil);
         return;
     }
+    if ([context isCapturing]) {
+        reject(@"whisper_error", @"The context is in realtime transcribe mode", nil);
+        return;
+    }
     if ([context isTranscribing]) {
         reject(@"whisper_error", @"Context is already transcribing", nil);
         return;
