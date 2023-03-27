@@ -63,7 +63,6 @@ RCT_REMAP_METHOD(transcribeFile,
     }
     int code = [context transcribeFile:jobId audioData:waveFile audioDataCount:count options:options];
     if (code != 0) {
-        NSLog(@"Failed to run the model");
         free(waveFile);
         reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
         return;
@@ -118,7 +117,6 @@ RCT_REMAP_METHOD(startRealtimeTranscribe,
             ];
         }
     ];
-    NSLog(@"Status: %d", status);
     if (status == 0) {
         resolve(nil);
         return;

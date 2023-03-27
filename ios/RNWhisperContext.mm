@@ -52,20 +52,18 @@ void AudioInputCallback(void * inUserData,
     RNWhisperContextRecordState *state = (RNWhisperContextRecordState *)inUserData;
 
     if (!state->isCapturing) {
-        NSLog(@"Not capturing, ignoring audio");
+        NSLog(@"[RNWhisper] Not capturing, ignoring audio");
         return;
     }
 
     const int n = inBuffer->mAudioDataByteSize / 2;
-    // NSLog(@"Captured %d new samples", n);
+    NSLog(@"[RNWhisper] Captured %d new samples", n);
 
     if (state->nSamples + n > state->maxAudioSec * WHISPER_SAMPLE_RATE) {
-        NSLog(@"Audio buffer is full, ignoring audio");
+        NSLog(@"[RNWhisper] Audio buffer is full, ignoring audio");
         state->isCapturing = false;
         if (!state->isTranscribing) {
             state->transcribeHandler(state->jobId, @"end", @{});
-        } else {
-            NSLog(@"Still transcribing");
         }
         [state->mSelf stopAudio];
         return;
@@ -81,6 +79,7 @@ void AudioInputCallback(void * inUserData,
     if (!state->isTranscribing) {
         state->isTranscribing = true;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSLog(@"[RNWhisper] Transcribing %d samples", state->nSamples);
             // convert I16 to F32
             for (int i = 0; i < state->nSamples; i++) {
                 state->audioBufferF32[i] = (float)state->audioBufferI16[i] / 32768.0f;
@@ -110,7 +109,7 @@ void AudioInputCallback(void * inUserData,
                 @"recordingTime": [NSNumber numberWithFloat:timeRecording],
             });
             if (!state->isCapturing) {
-                NSLog(@"Transcribe end");
+                NSLog(@"[RNWhisper] Transcribe end");
                 state->transcribeHandler(state->jobId, @"end", @{});
             }
             state->isTranscribing = false;
