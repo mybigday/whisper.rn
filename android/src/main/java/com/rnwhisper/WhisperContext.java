@@ -100,6 +100,8 @@ public class WhisperContext {
               if (nSamples + n > maxAudioSec * SAMPLE_RATE) {
                 // Full, ignore data
                 isCapturing = false;
+                if (!isTranscribing)
+                  emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
                 break;
               }
               nSamples += n;
@@ -137,6 +139,10 @@ public class WhisperContext {
                     } else {
                       payload.putString("error", "Transcribe failed with code " + code);
                       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+                    }
+
+                    if (!isCapturing) {
+                      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
                     }
                     isTranscribing = false;
                   }
