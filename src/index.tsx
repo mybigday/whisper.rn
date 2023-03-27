@@ -33,24 +33,43 @@ const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
 
 export type TranscribeOptions = {
+  /** Spoken language (Default: 'auto' for auto-detect) */
   language?: string,
+  /** Translate from source language to english (Default: false) */
   translate?: boolean,
+  /** Number of threads to use during computation (Default: 4) */
   maxThreads?: number,
+  /** Maximum number of text context tokens to store */
   maxContext?: number,
+  /** Maximum segment length in characters */
   maxLen?: number,
+  /** Enable token-level timestamps */
   tokenTimestamps?: boolean,
-  offset?: number,
-  duration?: number,
+  /** Word timestamp probability threshold */
   wordThold?: number,
+  /** Time offset in milliseconds */
+  offset?: number,
+  /** Duration of audio to process in milliseconds */
+  duration?: number,
+  /** Tnitial decoding temperature */
   temperature?: number,
   temperatureInc?: number,
+  /** Beam size for beam search */
   beamSize?: number,
+  /** Number of best candidates to keep */
   bestOf?: number,
+  /** Speed up audio by x2 (reduced accuracy) */
   speedUp?: boolean,
+  /** Initial Prompt */
   prompt?: string,
 }
 
 export type TranscribeRealtimeOptions = TranscribeOptions & {
+  /**
+   * Realtime record max duration in seconds. 
+   * Due to the whisper.cpp hard constraint - processes the audio in chunks of 30 seconds,
+   * the recommended value will be <= 30 seconds. (Default: 30)
+   */
   realtimeAudioSec?: number,
 }
 
@@ -66,6 +85,7 @@ export type TranscribeResult = {
 export type TranscribeRealtimeEvent = {
   contextId: number,
   jobId: number,
+  /** Is capturing audio, when false, the event is the final result */
   isCapturing: boolean,
   code: number,
   processTime: number,
@@ -78,6 +98,7 @@ export type TranscribeRealtimeNativeEvent = {
   contextId: number,
   jobId: number,
   payload: {
+    /** Is capturing audio, when false, the event is the final result */
     isCapturing: boolean,
     code: number,
     processTime: number,
@@ -94,8 +115,11 @@ class WhisperContext {
     this.id = id
   }
 
+  /** Transcribe audio file */
   transcribe(path: string, options: TranscribeOptions = {}): {
+    /** Stop the transcribe */
     stop: () => void,
+    /** Transcribe result promise */
     promise: Promise<TranscribeResult>,
   } {
     const jobId: number = Math.floor(Math.random() * 10000)
@@ -105,8 +129,11 @@ class WhisperContext {
     }
   }
 
+  /** Transcribe the microphone audio stream, the microphone user permission is required */
   async transcribeRealtime(options: TranscribeRealtimeOptions = {}): Promise<{
+    /** Stop the realtime transcribe */
     stop: () => void,
+    /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void,
   }> {
     const jobId: number = Math.floor(Math.random() * 10000)
