@@ -49,9 +49,12 @@ public class WhisperContext {
   private int bufferSize;
   private short[] buffer16;
   private int nSamples = 0;
+  private int nSamplesTranscribing = 0;
   private boolean isCapturing = false;
+  private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
   private boolean isRealtime = false;
+  private Thread fullHandler = null;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
     this.id = id;
@@ -81,8 +84,11 @@ public class WhisperContext {
 
     this.jobId = jobId;
     isCapturing = true;
+    isStoppedByAction = false;
     isRealtime = true;
     nSamples = 0;
+    nSamplesTranscribing = 0;
+    fullHandler = null;
   
     recorder.startRecording();
 
@@ -91,64 +97,31 @@ public class WhisperContext {
       public void run() {
         try {
           short[] buffer = new short[bufferSize];
-          Thread fullHandler = null;
           while (isCapturing) {
             try {
               int n = recorder.read(buffer, 0, bufferSize);
               if (n == 0) continue;
 
               if (nSamples + n > maxAudioSec * SAMPLE_RATE) {
-                // Full, ignore data
+                // Full, stop capturing
                 isCapturing = false;
-                if (!isTranscribing)
+                if (!isTranscribing && nSamples == nSamplesTranscribing) {
                   emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+                } else {
+                  // wait previous handler to finish
+                  fullHandler.join();
+                  fullTranscribeSamples(options, true);
+                }
                 break;
               }
+
+              // Append to buffer
               nSamples += n;
               for (int i = 0; i < n; i++) {
                 buffer16[nSamples + i] = buffer[i];
               }
-              if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
-                isTranscribing = true;
-                Log.d(NAME, "Start transcribing realtime: " + nSamples);
-                fullHandler = new Thread(new Runnable() {
-                  @Override
-                  public void run() {
-                    if (!isCapturing) return;
 
-                    // convert I16 to F32
-                    float[] nSamplesBuffer32 = new float[nSamples];
-                    for (int i = 0; i < nSamples; i++) {
-                      nSamplesBuffer32[i] = buffer16[i] / 32768.0f;
-                    }
-
-                    int timeStart = (int) System.currentTimeMillis();
-                    int code = full(jobId, options, nSamplesBuffer32, nSamples);
-                    int timeEnd = (int) System.currentTimeMillis();
-                    int timeRecording = (int) (nSamples / SAMPLE_RATE * 1000);
-
-                    WritableMap payload = Arguments.createMap();
-                    payload.putBoolean("isCapturing", isCapturing);
-                    payload.putInt("code", code);
-                    payload.putInt("processTime", timeEnd - timeStart);
-                    payload.putInt("recordingTime", timeRecording);
-
-                    if (code == 0) {
-                      payload.putMap("data", getTextSegments());
-                      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-                    } else {
-                      payload.putString("error", "Transcribe failed with code " + code);
-                      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-                    }
-
-                    if (!isCapturing) {
-                      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
-                    }
-                    isTranscribing = false;
-                  }
-                });
-                fullHandler.start();
-              }
+              fullTranscribeSamples(options, false);
             } catch (Exception e) {
               Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
             }
@@ -165,8 +138,55 @@ public class WhisperContext {
         }
       }
     }).start();
-
     return state;
+  }
+
+  private void fullTranscribeSamples(ReadableMap options, boolean skipCapturingCheck) {
+    if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
+      isTranscribing = true;
+      fullHandler = new Thread(new Runnable() {
+        @Override
+        public void run() {
+          if (!isCapturing && !skipCapturingCheck) return;
+
+          nSamplesTranscribing = nSamples;
+
+          // convert I16 to F32
+          float[] nSamplesBuffer32 = new float[nSamplesTranscribing];
+          for (int i = 0; i < nSamplesTranscribing; i++) {
+            nSamplesBuffer32[i] = buffer16[i] / 32768.0f;
+          }
+
+          Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
+
+          int timeStart = (int) System.currentTimeMillis();
+          int code = full(jobId, options, nSamplesBuffer32, nSamplesTranscribing);
+          int timeEnd = (int) System.currentTimeMillis();
+          int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
+
+          WritableMap payload = Arguments.createMap();
+          payload.putInt("code", code);
+          payload.putInt("processTime", timeEnd - timeStart);
+          payload.putInt("recordingTime", timeRecording);
+
+          if (isStoppedByAction || !isCapturing && nSamplesTranscribing == nSamples) {
+            payload.putBoolean("isCapturing", false);
+            payload.putBoolean("isStoppedByAction", isStoppedByAction);
+            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
+          } else if (code == 0) {
+            payload.putBoolean("isCapturing", true);
+            payload.putMap("data", getTextSegments());
+            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+          } else {
+            payload.putBoolean("isCapturing", true);
+            payload.putString("error", "Transcribe failed with code " + code);
+            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+          }
+          isTranscribing = false;
+        }
+      });
+      fullHandler.start();
+    }
   }
 
   private void emitTranscribeEvent(final String eventName, final WritableMap payload) {
@@ -269,6 +289,7 @@ public class WhisperContext {
     abortTranscribe(jobId);
     isCapturing = false;
     isTranscribing = false;
+    isStoppedByAction = true;
   }
 
   public void stopCurrentTranscribe() {

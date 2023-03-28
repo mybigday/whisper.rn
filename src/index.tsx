@@ -87,6 +87,7 @@ export type TranscribeRealtimeEvent = {
   jobId: number,
   /** Is capturing audio, when false, the event is the final result */
   isCapturing: boolean,
+  isStoppedByAction?: boolean,
   code: number,
   processTime: number,
   recordingTime: number,
@@ -100,6 +101,7 @@ export type TranscribeRealtimeNativeEvent = {
   payload: {
     /** Is capturing audio, when false, the event is the final result */
     isCapturing: boolean,
+    isStoppedByAction?: boolean,
     code: number,
     processTime: number,
     recordingTime: number,
@@ -138,8 +140,6 @@ class WhisperContext {
   }> {
     const jobId: number = Math.floor(Math.random() * 10000)
     await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
-    let removeTranscribe: () => void
-    let removeEnd: () => void
     let lastTranscribePayload: TranscribeRealtimeNativeEvent['payload']
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),
@@ -151,21 +151,24 @@ class WhisperContext {
             if (contextId !== this.id || evt.jobId !== jobId) return
             lastTranscribePayload = payload
             callback({ contextId, jobId: evt.jobId, ...payload })
-            if (!payload.isCapturing) removeTranscribe()
           }
         )
-        removeTranscribe = transcribeListener.remove
         const endListener = EventEmitter.addListener(
           EVENT_ON_REALTIME_TRANSCRIBE_END,
           (evt: TranscribeRealtimeNativeEvent) => {
-            const { contextId } = evt
+            const { contextId, payload } = evt
             if (contextId !== this.id || evt.jobId !== jobId) return
-            callback({ contextId, jobId: evt.jobId, ...lastTranscribePayload, isCapturing: false })
-            removeTranscribe?.()
-            removeEnd()
+            callback({
+              contextId,
+              jobId: evt.jobId,
+              ...lastTranscribePayload,
+              ...payload,
+              isCapturing: false
+            })
+            transcribeListener.remove()
+            endListener.remove()
           }
         )
-        removeEnd = endListener.remove
       },
     }
   }
