@@ -18,8 +18,10 @@ typedef struct {
     bool isTranscribing;
     bool isRealtime;
     bool isCapturing;
+    bool isStoppedByAction;
     int maxAudioSec;
     int nSamples;
+    int nSamplesTranscribing;
     int16_t* audioBufferI16;
     float* audioBufferF32;
 
