@@ -169,17 +169,21 @@ public class WhisperContext {
           payload.putInt("processTime", timeEnd - timeStart);
           payload.putInt("recordingTime", timeRecording);
 
+          if (code == 0) {
+            payload.putMap("data", getTextSegments());
+          } else {
+            payload.putString("error", "Transcribe failed with code " + code);
+          }
+
           if (isStoppedByAction || !isCapturing && nSamplesTranscribing == nSamples) {
             payload.putBoolean("isCapturing", false);
             payload.putBoolean("isStoppedByAction", isStoppedByAction);
             emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
           } else if (code == 0) {
             payload.putBoolean("isCapturing", true);
-            payload.putMap("data", getTextSegments());
             emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
           } else {
             payload.putBoolean("isCapturing", true);
-            payload.putString("error", "Transcribe failed with code " + code);
             emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
           }
           isTranscribing = false;
