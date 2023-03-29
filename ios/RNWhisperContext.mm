@@ -53,6 +53,9 @@ void AudioInputCallback(void * inUserData,
 
     if (!state->isCapturing) {
         NSLog(@"[RNWhisper] Not capturing, ignoring audio");
+        if (!state->isTranscribing) {
+            state->transcribeHandler(state->jobId, @"end", @{});
+        }
         return;
     }
 
@@ -60,12 +63,17 @@ void AudioInputCallback(void * inUserData,
     NSLog(@"[RNWhisper] Captured %d new samples", n);
 
     if (state->nSamples + n > state->maxAudioSec * WHISPER_SAMPLE_RATE) {
-        NSLog(@"[RNWhisper] Audio buffer is full, ignoring audio");
+        NSLog(@"[RNWhisper] Audio buffer is full, stop capturing");
         state->isCapturing = false;
-        if (!state->isTranscribing) {
-            state->transcribeHandler(state->jobId, @"end", @{});
-        }
         [state->mSelf stopAudio];
+        if (!state->isTranscribing && state->nSamples == state->nSamplesTranscribing) {
+            state->transcribeHandler(state->jobId, @"end", @{});
+        } else if (!state->isTranscribing && state->nSamples != state->nSamplesTranscribing) {
+            state->isTranscribing = true;
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                [state->mSelf fullTranscribeSamples:state];
+            });
+        }
         return;
     }
 
@@ -79,41 +87,55 @@ void AudioInputCallback(void * inUserData,
     if (!state->isTranscribing) {
         state->isTranscribing = true;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            NSLog(@"[RNWhisper] Transcribing %d samples", state->nSamples);
-            // convert I16 to F32
-            for (int i = 0; i < state->nSamples; i++) {
-                state->audioBufferF32[i] = (float)state->audioBufferI16[i] / 32768.0f;
-            }
-            CFTimeInterval timeStart = CACurrentMediaTime();
-            
-            int code = [state->mSelf fullTranscribe:state->jobId audioData:state->audioBufferF32 audioDataCount:state->nSamples options:state->options];
-            
-            CFTimeInterval timeEnd = CACurrentMediaTime();
-            const float timeRecording = (float) state->nSamples / (float) state->dataFormat.mSampleRate;
-            if (code == 0) {
-                state->transcribeHandler(state->jobId, @"transcribe", @{
-                    @"isCapturing": @(state->isCapturing),
-                    @"code": [NSNumber numberWithInt:code],
-                    @"data": [state->mSelf getTextSegments],
-                    @"processTime": [NSNumber numberWithInt:(timeEnd - timeStart) * 1E3],
-                    @"recordingTime": [NSNumber numberWithInt:timeRecording * 1E3],
-                });
-                state->isTranscribing = false;
-                return;
-            }
-            state->transcribeHandler(state->jobId, @"transcribe", @{
-                @"isCapturing": @(state->isCapturing),
-                @"code": [NSNumber numberWithInt:code],
-                @"error": [NSString stringWithFormat:@"Transcribe failed with code %d", code],
-                @"processTime": [NSNumber numberWithDouble:timeEnd - timeStart],
-                @"recordingTime": [NSNumber numberWithFloat:timeRecording],
-            });
-            if (!state->isCapturing) {
-                NSLog(@"[RNWhisper] Transcribe end");
-                state->transcribeHandler(state->jobId, @"end", @{});
-            }
-            state->isTranscribing = false;
+            [state->mSelf fullTranscribeSamples:state];
         });
+    }
+}
+
+- (void)fullTranscribeSamples:(RNWhisperContextRecordState*) state {
+    state->nSamplesTranscribing = state->nSamples;
+    NSLog(@"[RNWhisper] Transcribing %d samples", state->nSamplesTranscribing);
+
+    // convert I16 to F32
+    for (int i = 0; i < state->nSamplesTranscribing; i++) {
+        state->audioBufferF32[i] = (float)state->audioBufferI16[i] / 32768.0f;
+    }
+    CFTimeInterval timeStart = CACurrentMediaTime();
+    int code = [state->mSelf fullTranscribe:state->jobId audioData:state->audioBufferF32 audioDataCount:state->nSamplesTranscribing options:state->options];
+    CFTimeInterval timeEnd = CACurrentMediaTime();
+    const float timeRecording = (float) state->nSamplesTranscribing / (float) state->dataFormat.mSampleRate;
+
+    NSDictionary* base = @{
+        @"code": [NSNumber numberWithInt:code],
+        @"processTime": [NSNumber numberWithInt:(timeEnd - timeStart) * 1E3],
+        @"recordingTime": [NSNumber numberWithInt:timeRecording * 1E3],
+    };
+    NSMutableDictionary* result = [base mutableCopy];
+
+    if (code == 0) {
+        result[@"data"] = [state->mSelf getTextSegments];
+    } else {
+        result[@"error"] = [NSString stringWithFormat:@"Transcribe failed with code %d", code];
+    }
+
+    if (state->isStoppedByAction || (!state->isCapturing && state->nSamplesTranscribing == state->nSamples)) {
+        NSLog(@"[RNWhisper] Transcribe end");
+        result[@"isStoppedByAction"] = @(state->isStoppedByAction);
+        result[@"isCapturing"] = @(false);
+        state->transcribeHandler(state->jobId, @"end", result);
+    } else if (code == 0) {
+        result[@"isCapturing"] = @(true);
+        state->transcribeHandler(state->jobId, @"transcribe", result);
+    } else {
+        result[@"isCapturing"] = @(true);
+        state->transcribeHandler(state->jobId, @"transcribe", result);
+    }
+    state->isTranscribing = false;
+
+    if (!state->isCapturing && state->nSamplesTranscribing != state->nSamples) {
+        state->isTranscribing = true;
+        // Finish transcribing the rest of the samples
+        [self fullTranscribeSamples:state];
     }
 }
 
@@ -184,6 +206,7 @@ void AudioInputCallback(void * inUserData,
         return;
     }
     self->recordState.isCapturing = false;
+    self->recordState.isStoppedByAction = true;
     [self stopAudio];
 }
 
