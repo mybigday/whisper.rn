@@ -93,6 +93,13 @@ export type TranscribeRealtimeEvent = {
   recordingTime: number,
   data?: TranscribeResult,
   error?: string,
+  slices?: Array<{
+    data?: TranscribeResult,
+    code: number,
+    processTime: number,
+    recordingTime: number,
+    error?: string,
+  }>,
 }
 
 export type TranscribeRealtimeNativeEvent = {
@@ -105,6 +112,8 @@ export type TranscribeRealtimeNativeEvent = {
     code: number,
     processTime: number,
     recordingTime: number,
+    isUseSlices: boolean,
+    sliceIndex: number,
     data?: TranscribeResult,
     error?: string,
   },
@@ -141,6 +150,54 @@ class WhisperContext {
     const jobId: number = Math.floor(Math.random() * 10000)
     await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
     let lastTranscribePayload: TranscribeRealtimeNativeEvent['payload']
+
+    const slices: TranscribeRealtimeNativeEvent['payload'][] = []
+    let sliceIndex: number = 0
+    let tOffset: number = 0
+
+    const putSlice = (payload: TranscribeRealtimeNativeEvent['payload']) => {
+      if (!payload.isUseSlices) return
+      if (sliceIndex !== payload.sliceIndex) {
+        const { segments = [] } = slices[sliceIndex]?.data || {}
+        tOffset += segments[segments.length - 1]?.t1 || 0
+      }
+      ({ sliceIndex } = payload)
+      slices[sliceIndex] = {
+        ...payload,
+        data: {
+          result: payload.data?.result || '',
+          segments: payload.data?.segments.map((segment) => ({
+            text: segment.text,
+            t0: segment.t0 + tOffset,
+            t1: segment.t1 + tOffset,
+          })) || [],
+        }
+      }
+    }
+
+    const mergeSlicesIfNeeded = (payload: TranscribeRealtimeNativeEvent['payload']): TranscribeRealtimeNativeEvent['payload'] => {
+      if (!payload.isUseSlices) return payload
+
+      const mergedPayload: any = {}
+      slices.forEach(
+        (slice) => {
+          mergedPayload.data = {
+            result: (mergedPayload.data?.result || '') + (slice.data?.result || ''),
+            segments: [
+              ...(mergedPayload?.data?.segments || []),
+              ...(slice.data?.segments || []),
+            ],
+          }
+          mergedPayload.processTime = slice.processTime
+          mergedPayload.recordingTime = (mergedPayload?.recordingTime || 0) + slice.recordingTime
+        }
+      )
+      return {
+        ...payload,
+        ...mergedPayload,
+      }
+    }
+
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),
       subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
@@ -150,7 +207,13 @@ class WhisperContext {
             const { contextId, payload } = evt
             if (contextId !== this.id || evt.jobId !== jobId) return
             lastTranscribePayload = payload
-            callback({ contextId, jobId: evt.jobId, ...payload })
+            putSlice(payload)
+            callback({
+              contextId,
+              jobId: evt.jobId,
+              ...mergeSlicesIfNeeded(payload),
+              slices,
+            })
           }
         )
         const endListener = EventEmitter.addListener(
@@ -158,11 +221,16 @@ class WhisperContext {
           (evt: TranscribeRealtimeNativeEvent) => {
             const { contextId, payload } = evt
             if (contextId !== this.id || evt.jobId !== jobId) return
+            const lastPayload = {
+              ...lastTranscribePayload,
+              ...payload,
+            }
+            putSlice(lastPayload)
             callback({
               contextId,
               jobId: evt.jobId,
-              ...lastTranscribePayload,
-              ...payload,
+              ...mergeSlicesIfNeeded(lastPayload),
+              slices,
               isCapturing: false
             })
             transcribeListener.remove()

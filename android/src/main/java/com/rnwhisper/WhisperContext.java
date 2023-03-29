@@ -56,6 +56,7 @@ public class WhisperContext {
   private int sliceIndex = 0;
   // Current transcribing slice index
   private int transcribeSliceIndex = 0;
+  private boolean isUseSlices = false;
   private boolean isCapturing = false;
   private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
@@ -88,6 +89,7 @@ public class WhisperContext {
 
     int realtimeSliceInterval = options.hasKey("realtimeSliceInterval") ? options.getInt("realtimeSliceInterval") : 0;
     final int sliceInterval = realtimeSliceInterval > 0 ? realtimeSliceInterval : maxAudioSec;
+    isUseSlices = sliceInterval < maxAudioSec;
 
     shortBufferSlices = new ArrayList<short[]>();
     shortBufferSlices.add(new short[sliceInterval * SAMPLE_RATE]);
@@ -125,7 +127,11 @@ public class WhisperContext {
               if (totalNSamples + n > maxAudioSec * SAMPLE_RATE) {
                 // Full, stop capturing
                 isCapturing = false;
-                if (!isTranscribing && nSamples == nSamplesTranscribing) {
+                if (
+                  !isTranscribing &&
+                  nSamples == nSamplesTranscribing &&
+                  sliceIndex == transcribeSliceIndex
+                ) {
                   emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
                 } else {
                   // wait previous handler to finish
@@ -207,6 +213,8 @@ public class WhisperContext {
           payload.putInt("code", code);
           payload.putInt("processTime", timeEnd - timeStart);
           payload.putInt("recordingTime", timeRecording);
+          payload.putBoolean("isUseSlices", isUseSlices);
+          payload.putInt("sliceIndex", transcribeSliceIndex);
 
           if (code == 0) {
             payload.putMap("data", getTextSegments());
@@ -214,7 +222,12 @@ public class WhisperContext {
             payload.putString("error", "Transcribe failed with code " + code);
           }
 
-          if (isStoppedByAction || !isCapturing && nSamplesTranscribing == nSamples) {
+          if (
+            isStoppedByAction ||
+            !isCapturing &&
+            nSamplesTranscribing == nSamples &&
+            sliceIndex == transcribeSliceIndex
+          ) {
             payload.putBoolean("isCapturing", false);
             payload.putBoolean("isStoppedByAction", isStoppedByAction);
             emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
@@ -317,6 +330,7 @@ public class WhisperContext {
       builder.append(text);
 
       WritableMap segment = Arguments.createMap();
+      Log.d(NAME, "getTextSegments: " + text + " " + transcribeSliceIndex);
       segment.putString("text", text);
       segment.putInt("t0", getTextSegmentT0(context, i));
       segment.putInt("t1", getTextSegmentT1(context, i));

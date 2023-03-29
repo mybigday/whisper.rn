@@ -226,7 +226,8 @@ export default function App() {
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
-                    realtimeAudioSec: 10,
+                    realtimeAudioSec: 12,
+                    realtimeSliceInterval: 5,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {
@@ -235,7 +236,17 @@ export default function App() {
                     `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
                       `Result: ${data.result}\n\n` +
                       `Process time: ${processTime}ms\n` +
-                      `Recording time: ${recordingTime}ms`,
+                      `Recording time: ${recordingTime}ms` +
+                      `\n` +
+                      `Segments:` +
+                      `\n${data.segments
+                        .map(
+                          (segment) =>
+                            `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+                              segment.t1,
+                            )}]  ${segment.text}`,
+                        )
+                        .join('\n')}`,
                   )
                   if (!isCapturing) {
                     setStopTranscribe(null)
