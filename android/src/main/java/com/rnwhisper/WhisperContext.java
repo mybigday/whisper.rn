@@ -170,6 +170,8 @@ public class WhisperContext {
           if (fullHandler != null) {
             fullHandler.join(); // Wait for full transcribe to finish
           }
+          // Cleanup
+          shortBufferSlices.clear();
           recorder.stop();
         } catch (Exception e) {
           e.printStackTrace();

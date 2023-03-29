@@ -89,16 +89,16 @@ export type TranscribeRealtimeEvent = {
   isCapturing: boolean,
   isStoppedByAction?: boolean,
   code: number,
-  processTime: number,
-  recordingTime: number,
   data?: TranscribeResult,
   error?: string,
+  processTime: number,
+  recordingTime: number,
   slices?: Array<{
-    data?: TranscribeResult,
     code: number,
+    error?: string,
+    data?: TranscribeResult,
     processTime: number,
     recordingTime: number,
-    error?: string,
   }>,
 }
 
@@ -164,14 +164,14 @@ class WhisperContext {
       ({ sliceIndex } = payload)
       slices[sliceIndex] = {
         ...payload,
-        data: {
-          result: payload.data?.result || '',
-          segments: payload.data?.segments.map((segment) => ({
-            text: segment.text,
+        data: payload.data ? {
+          ...payload.data,
+          segments: payload.data.segments.map((segment) => ({
+            ...segment,
             t0: segment.t0 + tOffset,
             t1: segment.t1 + tOffset,
           })) || [],
-        }
+        } : undefined,
       }
     }
 
@@ -192,10 +192,7 @@ class WhisperContext {
           mergedPayload.recordingTime = (mergedPayload?.recordingTime || 0) + slice.recordingTime
         }
       )
-      return {
-        ...payload,
-        ...mergedPayload,
-      }
+      return { ...payload, ...mergedPayload, slices }
     }
 
     return {
@@ -212,7 +209,6 @@ class WhisperContext {
               contextId,
               jobId: evt.jobId,
               ...mergeSlicesIfNeeded(payload),
-              slices,
             })
           }
         )
@@ -230,7 +226,6 @@ class WhisperContext {
               contextId,
               jobId: evt.jobId,
               ...mergeSlicesIfNeeded(lastPayload),
-              slices,
               isCapturing: false
             })
             transcribeListener.remove()
