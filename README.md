@@ -57,7 +57,7 @@ const { result } = await promise
 Use realtime transcribe:
 
 ```js
-const { stop, subscribe } = whisperContext.transcribeRealtime(options)
+const { stop, subscribe } = await whisperContext.transcribeRealtime(options)
 
 subscribe(evt => {
   const { isCapturing, data, processTime, recordingTime } = evt

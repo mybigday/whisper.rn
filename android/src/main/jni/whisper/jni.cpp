@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <sys/sysinfo.h>
 #include <string>
+#include <thread>
 #include "whisper.h"
 #include "rn-whisper.h"
 #include "ggml.h"
@@ -61,7 +62,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
 
-    int max_threads = min(4, get_nprocs());
+    int max_threads = min(4, std::thread::hardware_concurrency());
 
     LOGI("About to create params");
 

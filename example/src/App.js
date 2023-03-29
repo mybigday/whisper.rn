@@ -151,7 +151,7 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.button}
-            disabled={stopTranscribe?.stop}
+            disabled={!!stopTranscribe?.stop}
             onPress={async () => {
               if (!whisperContext) {
                 log('No context')

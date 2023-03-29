@@ -23,7 +23,6 @@ if (!NativeModules.RNWhisper) {
             recordingTime: 1000,
           },
         })
-        // End
         DeviceEventEmitter.emit('@RNWhisper_onRealtimeTranscribe', {
           contextId,
           jobId,
@@ -36,6 +35,12 @@ if (!NativeModules.RNWhisper) {
             processTime: 100,
             recordingTime: 2000,
           },
+        })
+        // End event
+        DeviceEventEmitter.emit('@RNWhisper_onRealtimeTranscribeEnd', {
+          contextId,
+          jobId,
+          payload: {},
         })
       })
     }),

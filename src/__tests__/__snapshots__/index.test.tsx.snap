@@ -1,0 +1,57 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Mock 1`] = `
+[
+  {
+    "contextId": 1,
+    "data": {
+      "result": " Test",
+      "segments": [
+        {
+          "t0": 0,
+          "t1": 33,
+          "text": " Test",
+        },
+      ],
+    },
+    "isCapturing": true,
+    "jobId": 5000,
+    "processTime": 100,
+    "recordingTime": 1000,
+  },
+  {
+    "contextId": 1,
+    "data": {
+      "result": " Test",
+      "segments": [
+        {
+          "t0": 0,
+          "t1": 33,
+          "text": " Test",
+        },
+      ],
+    },
+    "isCapturing": false,
+    "jobId": 5000,
+    "processTime": 100,
+    "recordingTime": 2000,
+  },
+  {
+    "contextId": 1,
+    "data": {
+      "result": " Test",
+      "segments": [
+        {
+          "t0": 0,
+          "t1": 33,
+          "text": " Test",
+        },
+      ],
+    },
+    "isCapturing": false,
+    "jobId": 5000,
+    "processTime": 100,
+    "recordingTime": 2000,
+  },
+]
+`;
