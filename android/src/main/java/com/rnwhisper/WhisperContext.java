@@ -42,10 +42,9 @@ public class WhisperContext {
   private int id;
   private ReactApplicationContext reactContext;
   private long context;
-
-  private DeviceEventManagerModule.RCTDeviceEventEmitter eventEmitter;
-  
   private int jobId = -1;
+  private DeviceEventManagerModule.RCTDeviceEventEmitter eventEmitter;
+
   private AudioRecord recorder = null;
   private int bufferSize;
   private int nSamplesTranscribing = 0;
@@ -57,10 +56,11 @@ public class WhisperContext {
   // Current transcribing slice index
   private int transcribeSliceIndex = 0;
   private boolean isUseSlices = false;
+  private boolean isRealtime = false;
   private boolean isCapturing = false;
   private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
-  private boolean isRealtime = false;
+  private boolean isFirstTranscribing = true;
   private Thread fullHandler = null;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
@@ -69,6 +69,20 @@ public class WhisperContext {
     this.reactContext = reactContext;
     eventEmitter = reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class);
     bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
+  }
+
+  private void resetRealtimeTranscribe() {
+    shortBufferSlices = null;
+    sliceNSamples = null;
+    sliceIndex = 0;
+    transcribeSliceIndex = 0;
+    isUseSlices = false;
+    isRealtime = false;
+    isCapturing = false;
+    isStoppedByAction = false;
+    isTranscribing = false;
+    isFirstTranscribing = true;
+    fullHandler = null;
   }
 
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
@@ -83,29 +97,25 @@ public class WhisperContext {
       recorder.release();
       return state;
     }
-    
-    int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
-    final int maxAudioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
 
-    int realtimeSliceInterval = options.hasKey("realtimeSliceInterval") ? options.getInt("realtimeSliceInterval") : 0;
-    final int sliceInterval = realtimeSliceInterval > 0 ? realtimeSliceInterval : maxAudioSec;
-    isUseSlices = sliceInterval < maxAudioSec;
-
-    shortBufferSlices = new ArrayList<short[]>();
-    shortBufferSlices.add(new short[sliceInterval * SAMPLE_RATE]);
-    sliceNSamples = new ArrayList<Integer>();
-    sliceNSamples.add(0);
-
-    sliceIndex = 0;
-    transcribeSliceIndex = 0;
+    resetRealtimeTranscribe();
 
     this.jobId = jobId;
-    isCapturing = true;
-    isStoppedByAction = false;
-    isRealtime = true;
-    nSamplesTranscribing = 0;
-    fullHandler = null;
+
+    int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
+    final int audioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
+
+    int realtimeAudioSliceSec = options.hasKey("realtimeAudioSliceSec") ? options.getInt("realtimeAudioSliceSec") : 0;
+    final int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < audioSec ? realtimeAudioSliceSec : audioSec;
+
+    isUseSlices = audioSliceSec < audioSec;
+
+    shortBufferSlices = new ArrayList<short[]>();
+    shortBufferSlices.add(new short[audioSliceSec * SAMPLE_RATE]);
+    sliceNSamples = new ArrayList<Integer>();
+    sliceNSamples.add(0);
   
+    isCapturing = true;
     recorder.startRecording();
 
     new Thread(new Runnable() {
@@ -124,7 +134,7 @@ public class WhisperContext {
               }
 
               int nSamples = sliceNSamples.get(sliceIndex);
-              if (totalNSamples + n > maxAudioSec * SAMPLE_RATE) {
+              if (totalNSamples + n > audioSec * SAMPLE_RATE) {
                 // Full, stop capturing
                 isCapturing = false;
                 if (
@@ -143,12 +153,12 @@ public class WhisperContext {
 
               // Append to buffer
               short[] shortBuffer = shortBufferSlices.get(sliceIndex);
-              if (nSamples + n > sliceInterval * SAMPLE_RATE) {
+              if (nSamples + n > audioSliceSec * SAMPLE_RATE) {
                 Log.d(NAME, "next slice");
 
                 sliceIndex++;
                 nSamples = 0;
-                shortBuffer = new short[sliceInterval * SAMPLE_RATE];
+                shortBuffer = new short[audioSliceSec * SAMPLE_RATE];
                 shortBufferSlices.add(shortBuffer);
                 sliceNSamples.add(0);
               }
@@ -171,7 +181,7 @@ public class WhisperContext {
             fullHandler.join(); // Wait for full transcribe to finish
           }
           // Cleanup
-          shortBufferSlices.clear();
+          resetRealtimeTranscribe();
           recorder.stop();
         } catch (Exception e) {
           e.printStackTrace();
@@ -241,6 +251,7 @@ public class WhisperContext {
             emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
           }
           isTranscribing = false;
+          isFirstTranscribing = false;
 
           if (
             // If no more samples on current slice, move to next slice
@@ -280,6 +291,8 @@ public class WhisperContext {
     return fullTranscribe(
       jobId,
       context,
+      // jboolean no_context,
+      !isUseSlices || isFirstTranscribing,
       // jboolean realtime,
       isRealtime,
       // float[] audio_data,
@@ -459,6 +472,7 @@ public class WhisperContext {
   protected static native int fullTranscribe(
     int job_id,
     long context,
+    boolean no_context,
     boolean realtime,
     float[] audio_data,
     int audio_data_len,

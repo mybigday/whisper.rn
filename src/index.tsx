@@ -71,6 +71,12 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * the recommended value will be <= 30 seconds. (Default: 30)
    */
   realtimeAudioSec?: number,
+  /**
+   * Optimize audio transcription performance by slicing audio samples when `realtimeAudioSec` > 30.
+   * Set `realtimeAudioSliceSec` < 30 so performance improvements can be achieved in the Whisper hard constraint (processes the audio in chunks of 30 seconds).
+   * (Default: Equal to `realtimeMaxAudioSec`)
+   */
+  realtimeAudioSliceSec?: number
 }
 
 export type TranscribeResult = {
