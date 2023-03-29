@@ -126,6 +126,9 @@ public class WhisperContext {
               Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
             }
           }
+          if (!isTranscribing) {
+            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+          }
           if (fullHandler != null) {
             fullHandler.join(); // Wait for full transcribe to finish
           }
