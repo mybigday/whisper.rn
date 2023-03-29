@@ -143,9 +143,8 @@ public class WhisperContext {
                   sliceIndex == transcribeSliceIndex
                 ) {
                   emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
-                } else {
-                  // wait previous handler to finish
-                  fullHandler.join();
+                } else if (!isTranscribing) {
+                  isTranscribing = true;
                   fullTranscribeSamples(options, true);
                 }
                 break;
@@ -169,7 +168,16 @@ public class WhisperContext {
               nSamples += n;
               sliceNSamples.set(sliceIndex, nSamples);
 
-              fullTranscribeSamples(options, false);
+              if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
+                isTranscribing = true;
+                fullHandler = new Thread(new Runnable() {
+                  @Override
+                  public void run() {
+                    fullTranscribeSamples(options, false);
+                  }
+                });
+                fullHandler.start();
+              }
             } catch (Exception e) {
               Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
             }
@@ -195,75 +203,72 @@ public class WhisperContext {
   }
 
   private void fullTranscribeSamples(ReadableMap options, boolean skipCapturingCheck) {
-    int nSamples = sliceNSamples.get(sliceIndex);
-    if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
-      isTranscribing = true;
-      fullHandler = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          if (!isCapturing && !skipCapturingCheck) return;
+    int nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
 
-          short[] shortBuffer = shortBufferSlices.get(transcribeSliceIndex);
-          int nSamples = sliceNSamples.get(transcribeSliceIndex);
+    if (!isCapturing && !skipCapturingCheck) return;
 
-          nSamplesTranscribing = nSamples;
+    short[] shortBuffer = shortBufferSlices.get(transcribeSliceIndex);
+    int nSamples = sliceNSamples.get(transcribeSliceIndex);
 
-          // convert I16 to F32
-          float[] nSamplesBuffer32 = new float[nSamples];
-          for (int i = 0; i < nSamples; i++) {
-            nSamplesBuffer32[i] = shortBuffer[i] / 32768.0f;
-          }
+    nSamplesTranscribing = nSamplesOfIndex;
 
-          Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
-
-          int timeStart = (int) System.currentTimeMillis();
-          int code = full(jobId, options, nSamplesBuffer32, nSamplesTranscribing);
-          int timeEnd = (int) System.currentTimeMillis();
-          int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
-
-          WritableMap payload = Arguments.createMap();
-          payload.putInt("code", code);
-          payload.putInt("processTime", timeEnd - timeStart);
-          payload.putInt("recordingTime", timeRecording);
-          payload.putBoolean("isUseSlices", isUseSlices);
-          payload.putInt("sliceIndex", transcribeSliceIndex);
-
-          if (code == 0) {
-            payload.putMap("data", getTextSegments());
-          } else {
-            payload.putString("error", "Transcribe failed with code " + code);
-          }
-
-          if (
-            isStoppedByAction ||
-            !isCapturing &&
-            nSamplesTranscribing == nSamples &&
-            sliceIndex == transcribeSliceIndex
-          ) {
-            payload.putBoolean("isCapturing", false);
-            payload.putBoolean("isStoppedByAction", isStoppedByAction);
-            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
-          } else if (code == 0) {
-            payload.putBoolean("isCapturing", true);
-            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-          } else {
-            payload.putBoolean("isCapturing", true);
-            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-          }
-          isTranscribing = false;
-          isFirstTranscribing = false;
-
-          if (
-            // If no more samples on current slice, move to next slice
-            nSamplesTranscribing == sliceNSamples.get(transcribeSliceIndex) &&
-            transcribeSliceIndex != sliceIndex
-          ) {
-            transcribeSliceIndex++;
-          }
-        }
-      });
-      fullHandler.start();
+    // convert I16 to F32
+    float[] nSamplesBuffer32 = new float[nSamplesTranscribing];
+    for (int i = 0; i < nSamplesTranscribing; i++) {
+      nSamplesBuffer32[i] = shortBuffer[i] / 32768.0f;
     }
+
+    Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
+
+    int timeStart = (int) System.currentTimeMillis();
+    int code = full(jobId, options, nSamplesBuffer32, nSamplesTranscribing);
+    int timeEnd = (int) System.currentTimeMillis();
+    int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
+
+    WritableMap payload = Arguments.createMap();
+    payload.putInt("code", code);
+    payload.putInt("processTime", timeEnd - timeStart);
+    payload.putInt("recordingTime", timeRecording);
+    payload.putBoolean("isUseSlices", isUseSlices);
+    payload.putInt("sliceIndex", transcribeSliceIndex);
+
+    if (code == 0) {
+      payload.putMap("data", getTextSegments());
+    } else {
+      payload.putString("error", "Transcribe failed with code " + code);
+    }
+
+    if (
+      isStoppedByAction ||
+      !isCapturing &&
+      nSamplesTranscribing == nSamples &&
+      sliceIndex == transcribeSliceIndex
+    ) {
+      payload.putBoolean("isCapturing", false);
+      payload.putBoolean("isStoppedByAction", isStoppedByAction);
+      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
+    } else if (code == 0) {
+      payload.putBoolean("isCapturing", true);
+      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+    } else {
+      payload.putBoolean("isCapturing", true);
+      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
+    }
+    isFirstTranscribing = false;
+
+    if (
+      // If no more samples on current slice, move to next slice
+      nSamplesTranscribing == sliceNSamples.get(transcribeSliceIndex) &&
+      transcribeSliceIndex != sliceIndex
+    ) {
+      transcribeSliceIndex++;
+
+      if (!isCapturing) {
+        // If no more capturing, continue transcribing until all slices are transcribed
+        fullTranscribeSamples(options, true);
+      }
+    }
+    isTranscribing = false;
   }
 
   private void emitTranscribeEvent(final String eventName, final WritableMap payload) {
