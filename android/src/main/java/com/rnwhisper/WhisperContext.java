@@ -260,11 +260,12 @@ public class WhisperContext {
       transcribeSliceIndex != sliceIndex
     ) {
       transcribeSliceIndex++;
+      nSamplesTranscribing = 0;
+    }
 
-      if (!isCapturing) {
-        // If no more capturing, continue transcribing until all slices are transcribed
-        fullTranscribeSamples(options, true);
-      }
+    if (!isCapturing && nSamplesTranscribing != nSamplesOfIndex) {
+      // If no more capturing, continue transcribing until all slices are transcribed
+      fullTranscribeSamples(options, true);
     }
     isTranscribing = false;
   }
