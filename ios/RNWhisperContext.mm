@@ -90,7 +90,6 @@ void AudioInputCallback(void * inUserData,
     }
 
     const int n = inBuffer->mAudioDataByteSize / 2;
-    NSLog(@"[RNWhisper] Captured %d new samples", n);
 
     int nSamples = [state->sliceNSamples[state->sliceIndex] intValue];
 
@@ -134,7 +133,7 @@ void AudioInputCallback(void * inUserData,
         audioBufferI16[nSamples + i] = ((short*)inBuffer->mAudioData)[i];
     }
     nSamples += n;
-    [state->sliceNSamples replaceObjectAtIndex:state->sliceIndex withObject:[NSNumber numberWithInt:nSamples]];
+    state->sliceNSamples[state->sliceIndex] = [NSNumber numberWithInt:nSamples];
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
 
@@ -390,7 +389,6 @@ void AudioInputCallback(void * inUserData,
             @"t0": [NSNumber numberWithLongLong:t0],
             @"t1": [NSNumber numberWithLongLong:t1]
         };
-        NSLog(@"segment: %@", segment);
         [segments addObject:segment];
     }
     return @{
