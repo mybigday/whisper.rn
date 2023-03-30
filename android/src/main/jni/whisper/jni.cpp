@@ -39,8 +39,6 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jobject thiz,
     jint job_id,
     jlong context_ptr,
-    jboolean no_context,
-    jboolean realtime,
     jfloatArray audio_data,
     jint audio_data_len,
     jint n_threads,
@@ -84,8 +82,8 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     params.n_threads = n_threads > 0 ? n_threads : max_threads;
     params.speed_up = speed_up;
     params.offset_ms = 0;
-    params.no_context = no_context;
-    params.single_segment = realtime;
+    params.no_context = true;
+    params.single_segment = false;
 
     if (max_len > -1) {
         params.max_len = max_len;

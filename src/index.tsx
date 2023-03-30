@@ -165,7 +165,7 @@ class WhisperContext {
       if (!payload.isUseSlices) return
       if (sliceIndex !== payload.sliceIndex) {
         const { segments = [] } = slices[sliceIndex]?.data || {}
-        tOffset += segments[segments.length - 1]?.t1 || 0
+        tOffset = segments[segments.length - 1]?.t1 || 0
       }
       ({ sliceIndex } = payload)
       slices[sliceIndex] = {

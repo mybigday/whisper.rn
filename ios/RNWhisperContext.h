@@ -27,7 +27,6 @@ typedef struct {
     int sliceIndex;
     int transcribeSliceIndex;
     int audioSliceSec;
-    bool isFirstTranscribing;
 
     AudioQueueRef queue;
     AudioStreamBasicDescription dataFormat;

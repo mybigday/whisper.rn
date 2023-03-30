@@ -60,7 +60,6 @@ public class WhisperContext {
   private boolean isCapturing = false;
   private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
-  private boolean isFirstTranscribing = true;
   private Thread fullHandler = null;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
@@ -81,7 +80,6 @@ public class WhisperContext {
     isCapturing = false;
     isStoppedByAction = false;
     isTranscribing = false;
-    isFirstTranscribing = true;
     fullHandler = null;
   }
 
@@ -255,7 +253,6 @@ public class WhisperContext {
       payload.putBoolean("isCapturing", true);
       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
     }
-    isFirstTranscribing = false;
 
     if (
       // If no more samples on current slice, move to next slice
@@ -297,10 +294,6 @@ public class WhisperContext {
     return fullTranscribe(
       jobId,
       context,
-      // jboolean no_context,
-      !isRealtime || !isUseSlices || isFirstTranscribing,
-      // jboolean realtime,
-      isRealtime,
       // float[] audio_data,
       audioData,
       // jint audio_data_len,
@@ -478,8 +471,6 @@ public class WhisperContext {
   protected static native int fullTranscribe(
     int job_id,
     long context,
-    boolean no_context,
-    boolean realtime,
     float[] audio_data,
     int audio_data_len,
     int n_threads,
