@@ -238,10 +238,11 @@ public class WhisperContext {
       payload.putString("error", "Transcribe failed with code " + code);
     }
 
+    nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
     if (
       isStoppedByAction ||
       !isCapturing &&
-      nSamplesTranscribing == nSamples &&
+      nSamplesTranscribing == nSamplesOfIndex &&
       sliceIndex == transcribeSliceIndex
     ) {
       payload.putBoolean("isCapturing", false);
@@ -297,7 +298,7 @@ public class WhisperContext {
       jobId,
       context,
       // jboolean no_context,
-      !isUseSlices || isFirstTranscribing,
+      !isRealtime || !isUseSlices || isFirstTranscribing,
       // jboolean realtime,
       isRealtime,
       // float[] audio_data,
