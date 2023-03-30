@@ -226,8 +226,10 @@ export default function App() {
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
-                    realtimeAudioSec: 12,
-                    realtimeSliceInterval: 5,
+                    // Record duration in seconds
+                    realtimeAudioSec: 60,
+                    // Slice audio into 25 (or < 30) sec chunks for better performance
+                    realtimeAudioSliceSec: 25,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {
