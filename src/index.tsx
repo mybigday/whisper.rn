@@ -108,21 +108,23 @@ export type TranscribeRealtimeEvent = {
   }>,
 }
 
+export type TranscribeRealtimeNativePayload = {
+  /** Is capturing audio, when false, the event is the final result */
+  isCapturing: boolean,
+  isStoppedByAction?: boolean,
+  code: number,
+  processTime: number,
+  recordingTime: number,
+  isUseSlices: boolean,
+  sliceIndex: number,
+  data?: TranscribeResult,
+  error?: string,
+}
+
 export type TranscribeRealtimeNativeEvent = {
   contextId: number,
   jobId: number,
-  payload: {
-    /** Is capturing audio, when false, the event is the final result */
-    isCapturing: boolean,
-    isStoppedByAction?: boolean,
-    code: number,
-    processTime: number,
-    recordingTime: number,
-    isUseSlices: boolean,
-    sliceIndex: number,
-    data?: TranscribeResult,
-    error?: string,
-  },
+  payload: TranscribeRealtimeNativePayload,
 }
 
 class WhisperContext {
@@ -155,13 +157,13 @@ class WhisperContext {
   }> {
     const jobId: number = Math.floor(Math.random() * 10000)
     await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
-    let lastTranscribePayload: TranscribeRealtimeNativeEvent['payload']
+    let lastTranscribePayload: TranscribeRealtimeNativePayload
 
-    const slices: TranscribeRealtimeNativeEvent['payload'][] = []
+    const slices: TranscribeRealtimeNativePayload[] = []
     let sliceIndex: number = 0
     let tOffset: number = 0
 
-    const putSlice = (payload: TranscribeRealtimeNativeEvent['payload']) => {
+    const putSlice = (payload: TranscribeRealtimeNativePayload) => {
       if (!payload.isUseSlices) return
       if (sliceIndex !== payload.sliceIndex) {
         const { segments = [] } = slices[sliceIndex]?.data || {}
@@ -181,7 +183,7 @@ class WhisperContext {
       }
     }
 
-    const mergeSlicesIfNeeded = (payload: TranscribeRealtimeNativeEvent['payload']): TranscribeRealtimeNativeEvent['payload'] => {
+    const mergeSlicesIfNeeded = (payload: TranscribeRealtimeNativePayload): TranscribeRealtimeNativePayload => {
       if (!payload.isUseSlices) return payload
 
       const mergedPayload: any = {}
