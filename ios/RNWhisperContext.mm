@@ -40,6 +40,7 @@
     self->recordState.sliceIndex = 0;
     self->recordState.transcribeSliceIndex = 0;
     self->recordState.nSamplesTranscribing = 0;
+    self->recordState.isFirstTranscribing = true;
 
     [self freeBufferIfNeeded];
     self->recordState.shortBufferSlices = [NSMutableArray new];
@@ -200,6 +201,8 @@ void AudioInputCallback(void * inUserData,
         state->transcribeHandler(state->jobId, @"transcribe", result);
     }
 
+    state->isFirstTranscribing = false;
+
     if (
       // If no more samples on current slice, move to next slice
       state->nSamplesTranscribing == nSamplesOfIndex &&
@@ -318,7 +321,9 @@ void AudioInputCallback(void * inUserData,
     params.language         = options[@"language"] != nil ? [options[@"language"] UTF8String] : "auto";
     params.n_threads        = max_threads;
     params.offset_ms        = 0;
-    params.no_context       = true;
+    params.no_context       = !self->recordState.isRealtime ||
+        !self->recordState.isUseSlices ||
+        self->recordState.isFirstTranscribing;
     params.single_segment   = self->recordState.isRealtime;
 
     if (options[@"maxLen"] != nil) {
