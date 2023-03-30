@@ -20,10 +20,13 @@ typedef struct {
     bool isCapturing;
     bool isStoppedByAction;
     int maxAudioSec;
-    int nSamples;
     int nSamplesTranscribing;
-    int16_t* audioBufferI16;
-    float* audioBufferF32;
+    NSMutableArray<NSValue *> *shortBufferSlices;
+    NSMutableArray<NSNumber *> *sliceNSamples;
+    bool isUseSlices;
+    int sliceIndex;
+    int transcribeSliceIndex;
+    int audioSliceSec;
 
     AudioQueueRef queue;
     AudioStreamBasicDescription dataFormat;
