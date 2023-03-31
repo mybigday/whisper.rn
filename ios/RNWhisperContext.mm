@@ -53,6 +53,7 @@
     self->recordState.isRealtime = true;
     self->recordState.isTranscribing = false;
     self->recordState.isCapturing = false;
+    self->recordState.isStoppedByAction = false;
 
     self->recordState.mSelf = self;
 }
@@ -284,6 +285,7 @@ void AudioInputCallback(void * inUserData,
     if (!self->recordState.isRealtime || !self->recordState.isCapturing) {
         return;
     }
+    self->recordState.isTranscribing = false;
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = true;
     [self stopAudio];
