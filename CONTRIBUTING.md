@@ -10,6 +10,7 @@ To get started with the project, run `yarn` in the root directory to install the
 
 ```sh
 yarn
+yarn bootstrap
 ```
 
 > While it's possible to use [`npm`](https://github.com/npm/cli), the tooling is built around [`yarn`](https://classic.yarnpkg.com/), so you'll have an easier time if you use `yarn` for development.
