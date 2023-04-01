@@ -206,7 +206,7 @@ class WhisperContext {
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),
       subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
-        const transcribeListener = EventEmitter.addListener(
+        let transcribeListener: any = EventEmitter.addListener(
           EVENT_ON_REALTIME_TRANSCRIBE,
           (evt: TranscribeRealtimeNativeEvent) => {
             const { contextId, payload } = evt
@@ -220,7 +220,7 @@ class WhisperContext {
             })
           }
         )
-        const endListener = EventEmitter.addListener(
+        let endListener: any = EventEmitter.addListener(
           EVENT_ON_REALTIME_TRANSCRIBE_END,
           (evt: TranscribeRealtimeNativeEvent) => {
             const { contextId, payload } = evt
@@ -236,8 +236,14 @@ class WhisperContext {
               ...mergeSlicesIfNeeded(lastPayload),
               isCapturing: false
             })
-            transcribeListener.remove()
-            endListener.remove()
+            if (transcribeListener) {
+              transcribeListener.remove()
+              transcribeListener = null
+            }
+            if (endListener) {
+              endListener.remove()
+              endListener = null
+            }
           }
         )
       },
