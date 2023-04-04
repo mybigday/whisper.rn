@@ -20,6 +20,8 @@ npm install whisper.rn
 
 Then re-run `npx pod-install` again for iOS.
 
+For Expo, you will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
+
 ## Add Microphone Permissions (Optional)
 
 If you want to use realtime transcribe, you need to add the microphone permission to your app.
@@ -76,7 +78,7 @@ subscribe(evt => {
 
 In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
-The documentation is not ready yet, please see the comments of [index](./src/index.tsx) file for more details at the moment.
+The documentation is not ready yet, please see the comments of [index](./src/index.ts) file for more details at the moment.
 
 ## Run with example
 
