@@ -31,6 +31,8 @@ Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
 <string>This app requires microphone access in order to transcribe speech</string>
 ```
 
+For tvOS, please note that the microphone is not supported.
+
 ### Android
 Add the following line to ```android/app/src/main/AndroidManifest.xml```
 ```xml
