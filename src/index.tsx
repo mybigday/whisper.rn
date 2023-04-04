@@ -37,7 +37,7 @@ export type TranscribeOptions = {
   language?: string,
   /** Translate from source language to english (Default: false) */
   translate?: boolean,
-  /** Number of threads to use during computation (Default: 4) */
+  /** Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) */
   maxThreads?: number,
   /** Maximum number of text context tokens to store */
   maxContext?: number,

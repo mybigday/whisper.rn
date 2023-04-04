@@ -61,7 +61,9 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
 
-    int max_threads = min(4, std::thread::hardware_concurrency());
+    int max_threads = std::thread::hardware_concurrency();
+    // Use 2 threads by default on 4-core devices, 4 threads on more cores
+    int default_n_threads = max_threads == 4 ? 2 : min(4, max_threads);
 
     LOGI("About to create params");
 
@@ -79,7 +81,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     params.translate = translate;
     const char *language_chars = env->GetStringUTFChars(language, nullptr);
     params.language = language_chars;
-    params.n_threads = n_threads > 0 ? n_threads : max_threads;
+    params.n_threads = n_threads > 0 ? n_threads : default_n_threads;
     params.speed_up = speed_up;
     params.offset_ms = 0;
     params.no_context = true;

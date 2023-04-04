@@ -301,9 +301,12 @@ void AudioInputCallback(void * inUserData,
 - (int)fullTranscribe:(int)jobId audioData:(float *)audioData audioDataCount:(int)audioDataCount options:(NSDictionary *)options {
     struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 
-    const int max_threads = options[@"maxThreads"] != nil ?
-      [options[@"maxThreads"] intValue] :
-      MIN(4, (int)[[NSProcessInfo processInfo] processorCount]);
+    const int n_threads = options[@"maxThreads"] != nil ?
+      [options[@"maxThreads"] intValue] : 0;
+
+    const int max_threads = (int) [[NSProcessInfo processInfo] processorCount];
+    // Use 2 threads by default on 4-core devices, 4 threads on more cores
+    const int default_n_threads = max_threads == 4 ? 2 : MIN(4, max_threads);
 
     if (options[@"beamSize"] != nil) {
         params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
@@ -317,7 +320,7 @@ void AudioInputCallback(void * inUserData,
     params.speed_up         = options[@"speedUp"] != nil ? [options[@"speedUp"] boolValue] : false;
     params.translate        = options[@"translate"] != nil ? [options[@"translate"] boolValue] : false;
     params.language         = options[@"language"] != nil ? [options[@"language"] UTF8String] : "auto";
-    params.n_threads        = max_threads;
+    params.n_threads        = n_threads > 0 ? n_threads : default_n_threads;
     params.offset_ms        = 0;
     params.no_context       = true;
     params.single_segment   = false;
