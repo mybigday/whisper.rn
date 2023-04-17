@@ -7,5 +7,7 @@ cp ./whisper.cpp/ggml.h ./cpp/ggml.h
 cp ./whisper.cpp/ggml.c ./cpp/ggml.c
 cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
+# TODO:
+# cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 
 yarn example
