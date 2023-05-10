@@ -40,14 +40,19 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
 
   @ReactMethod
-  public void initContext(final String modelPath, final Promise promise) {
+  public void initContext(final String modelPath, final boolean isBundleAsset, final Promise promise) {
     new AsyncTask<Void, Void, Integer>() {
       private Exception exception;
 
       @Override
       protected Integer doInBackground(Void... voids) {
         try {
-          long context = WhisperContext.initContext(modelPath);
+          long context;
+          if (isBundleAsset) {
+            context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelPath);
+          } else {
+            context = WhisperContext.initContext(modelPath);
+          }
           if (context == 0) {
             throw new Exception("Failed to initialize context");
           }

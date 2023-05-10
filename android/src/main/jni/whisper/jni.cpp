@@ -20,6 +20,39 @@ static inline int min(int a, int b) {
     return (a < b) ? a : b;
 }
 
+static size_t asset_read(void *ctx, void *output, size_t read_size) {
+    return AAsset_read((AAsset *) ctx, output, read_size);
+}
+
+static bool asset_is_eof(void *ctx) {
+    return AAsset_getRemainingLength64((AAsset *) ctx) <= 0;
+}
+
+static void asset_close(void *ctx) {
+    AAsset_close((AAsset *) ctx);
+}
+
+static struct whisper_context *whisper_init_from_asset(
+    JNIEnv *env,
+    jobject assetManager,
+    const char *asset_path
+) {
+    LOGI("Loading model from asset '%s'\n", asset_path);
+    AAssetManager *asset_manager = AAssetManager_fromJava(env, assetManager);
+    AAsset *asset = AAssetManager_open(asset_manager, asset_path, AASSET_MODE_STREAMING);
+    if (!asset) {
+        LOGW("Failed to open '%s'\n", asset_path);
+        return NULL;
+    }
+    whisper_model_loader loader = {
+        .context = asset,
+        .read = &asset_read,
+        .eof = &asset_is_eof,
+        .close = &asset_close
+    };
+    return whisper_init(&loader);
+}
+
 extern "C" {
 
 JNIEXPORT jlong JNICALL
@@ -32,6 +65,22 @@ Java_com_rnwhisper_WhisperContext_initContext(
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
     return reinterpret_cast<jlong>(context);
 }
+
+JNIEXPORT jlong JNICALL
+Java_com_rnwhisper_WhisperContext_initContextWithAsset(
+    JNIEnv *env,
+    jobject thiz,
+    jobject asset_manager,
+    jstring model_path_str
+) {
+    UNUSED(thiz);
+    struct whisper_context *context = nullptr;
+    const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
+    context = whisper_init_from_asset(env, asset_manager, model_path_chars);
+    env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    return reinterpret_cast<jlong>(context);
+}
+
 
 JNIEXPORT jint JNICALL
 Java_com_rnwhisper_WhisperContext_fullTranscribe(

@@ -256,9 +256,9 @@ class WhisperContext {
 }
 
 export async function initWhisper(
-  { filePath }: { filePath?: string } = {}
+  { filePath, isBundleAsset }: { filePath?: string, isBundleAsset?: boolean } = {}
 ): Promise<WhisperContext> {
-  const id = await RNWhisper.initContext(filePath)
+  const id = await RNWhisper.initContext(filePath, !!isBundleAsset)
   return new WhisperContext(id)
 }
 

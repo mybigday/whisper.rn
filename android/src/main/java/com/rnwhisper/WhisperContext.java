@@ -469,6 +469,7 @@ public class WhisperContext {
   }
 
   protected static native long initContext(String modelPath);
+  protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
   protected static native int fullTranscribe(
     int job_id,
     long context,

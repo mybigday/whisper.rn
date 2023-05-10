@@ -11,6 +11,7 @@ RCT_EXPORT_MODULE()
 
 RCT_REMAP_METHOD(initContext,
                  withPath:(NSString *)modelPath
+                 withBundleResource:(BOOL)isBundleAsset
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -18,7 +19,12 @@ RCT_REMAP_METHOD(initContext,
         contexts = [[NSMutableDictionary alloc] init];
     }
 
-    RNWhisperContext *context = [RNWhisperContext initWithModelPath:modelPath];
+    NSString *path = modelPath;
+    if (isBundleAsset) {
+        path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
+    }
+
+    RNWhisperContext *context = [RNWhisperContext initWithModelPath:path];
     if ([context getContext] == NULL) {
         reject(@"whisper_cpp_error", @"Failed to load the model", nil);
         return;

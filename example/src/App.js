@@ -140,7 +140,13 @@ export default function App() {
               }
               log('Initialize context...')
               const startTime = Date.now()
-              const ctx = await initWhisper({ filePath: modelFilePath })
+              const ctx = await initWhisper({
+                // Use downloaded modelFilePath
+                filePath: modelFilePath,
+                // Or you can choose to use the asset (Need to add to Xcode project / Android assets), for example:
+                // filePath: 'ggml-base.en-q8_0.bin',
+                // isBundleAsset: true
+              })
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
