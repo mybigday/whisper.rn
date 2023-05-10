@@ -268,3 +268,6 @@ export async function releaseAllWhisper(): Promise<void> {
 
 /** Is use CoreML models on iOS */
 export const isUseCoreML: boolean = !!RNWhisper.WHISPER_USE_COREML
+
+/** Is allow fallback to CPU if load CoreML model failed */
+export const isCoreMLAllowFallback: boolean = !!RNWhisper.WHISPER_COREML_ALLOW_FALLBACK

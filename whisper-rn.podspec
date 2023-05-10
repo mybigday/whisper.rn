@@ -8,7 +8,7 @@ base_optimizer_flags = "-O3 -DNDEBUG"
 
 if ENV['RNWHISPER_DISABLE_COREML'] != '1' then
   base_ld_flags += " -framework CoreML"
-  base_compiler_flags += " -DWHISPER_USE_COREML"
+  base_compiler_flags += " -DWHISPER_USE_COREML -DWHISPER_COREML_ALLOW_FALLBACK"
 end
 
 Pod::Spec.new do |s|
