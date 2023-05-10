@@ -186,8 +186,6 @@ public class WhisperContext {
           if (fullHandler != null) {
             fullHandler.join(); // Wait for full transcribe to finish
           }
-          // Cleanup
-          resetRealtimeTranscribe();
           recorder.stop();
         } catch (Exception e) {
           e.printStackTrace();
@@ -237,12 +235,11 @@ public class WhisperContext {
     }
 
     nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
-    if (
-      isStoppedByAction ||
+    boolean isStopped = isStoppedByAction ||
       !isCapturing &&
       nSamplesTranscribing == nSamplesOfIndex &&
-      sliceIndex == transcribeSliceIndex
-    ) {
+      sliceIndex == transcribeSliceIndex;
+    if (isStopped) {
       payload.putBoolean("isCapturing", false);
       payload.putBoolean("isStoppedByAction", isStoppedByAction);
       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
@@ -266,6 +263,9 @@ public class WhisperContext {
     if (!isCapturing && nSamplesTranscribing != nSamplesOfIndex) {
       // If no more capturing, continue transcribing until all slices are transcribed
       fullTranscribeSamples(options, true);
+    } else if (isStopped) {
+      // No next, cleanup
+      resetRealtimeTranscribe();
     }
     isTranscribing = false;
   }
