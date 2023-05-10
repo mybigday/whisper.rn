@@ -265,3 +265,6 @@ export async function initWhisper(
 export async function releaseAllWhisper(): Promise<void> {
   return RNWhisper.releaseAllContexts()
 }
+
+/** Is use CoreML models on iOS */
+export const isUseCoreML: boolean = !!RNWhisper.WHISPER_USE_COREML
