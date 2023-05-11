@@ -15,6 +15,10 @@ yarn example
 cd whisper.cpp/models
 ./download-ggml-model.sh base.en
 
+# Copy to Android example
+cp ggml-base.en.bin ../../example/android/app/src/main/assets
+echo "Copied ggml-base.en.bin to example/android/app/src/main/assets"
+
 # Check whisper.cpp/models/ggml-base.en-encoder.mlmodelc exist
 if [ ! -d ./ggml-base.en-encoder.mlmodelc ]; then
   mkdir ggml-base.en-encoder.mlmodelc
