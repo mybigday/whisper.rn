@@ -81,7 +81,9 @@ In Android, you may need to request the microphone permission by [`PermissionAnd
 
 The documentation is not ready yet, please see the comments of [index](./src/index.ts) file for more details at the moment.
 
-## Core ML on iOS
+## Core ML support
+
+__*Platform: iOS 15.0+, tvOS 15.0+*__
 
 To use Core ML on iOS, you will need to have the Core ML model files.
 
