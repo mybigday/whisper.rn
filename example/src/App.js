@@ -111,7 +111,7 @@ const downloadModel = async (log, progress) => {
 }
 
 // Set to false to use the model from the bundle resources
-const USE_DOWNLOAD_MODEL = true
+const USE_DOWNLOAD_MODEL = false
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
@@ -153,7 +153,7 @@ export default function App() {
                 }
               } else {
                 options = {
-                  // Use the bundle resource (Need to add to Xcode project / Android assets)
+                  // Use the bundle resource (Need add model to Xcode project / Android assets)
                   filePath: 'ggml-base.en.bin',
                   isBundleAsset: true,
                 }
@@ -173,12 +173,9 @@ export default function App() {
             style={styles.button}
             disabled={!!stopTranscribe?.stop}
             onPress={async () => {
-              if (!whisperContext) {
-                log('No context')
-                return
-              }
-              await createDir()
+              if (!whisperContext) return log('No context')
 
+              await createDir(log)
               if (await RNFS.exists(sampleFilePath)) {
                 log('Sample file already exists:')
                 log(filterPath(sampleFilePath))
@@ -232,10 +229,7 @@ export default function App() {
               stopTranscribe?.stop ? styles.buttonClear : null,
             ]}
             onPress={async () => {
-              if (!whisperContext) {
-                log('No context')
-                return
-              }
+              if (!whisperContext) return log('No context')
               if (stopTranscribe?.stop) {
                 stopTranscribe?.stop()
                 setStopTranscribe(null)
@@ -322,8 +316,7 @@ export default function App() {
           style={[styles.button, styles.buttonClear]}
           title="Clear Download files"
           onPress={async () => {
-            await RNFS.unlink(modelFilePath).catch(() => {})
-            await RNFS.unlink(sampleFilePath).catch(() => {})
+            await RNFS.unlink(fileDir).catch(() => {})
             log('Deleted files')
           }}
         >
