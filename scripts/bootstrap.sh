@@ -13,7 +13,14 @@ yarn example
 
 # Download model for example
 cd whisper.cpp/models
-./download-ggml-model.sh base.en
+
+# If CI env is `true`, use dummy model
+if [ "$CI" = "true" ]; then
+  cp for-tests-ggml-base.en.bin ggml-base.en.bin
+  echo "CI: Copied for-tests-ggml-base.en.bin to ggml-base.en.bin"
+else
+  ./download-ggml-model.sh base.en
+fi
 
 # Copy to Android example
 cp ggml-base.en.bin ../../example/android/app/src/main/assets
