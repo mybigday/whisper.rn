@@ -46,11 +46,12 @@ Add the following line to ```android/app/src/main/AndroidManifest.xml```
 ```js
 import { initWhisper } from 'whisper.rn'
 
-const filePath = 'file://.../ggml-base.en.bin'
+const whisperContext = await initWhisper({
+  filePath: 'file://.../ggml-base.en.bin',
+  isBundleAsset: false, // Set to true if you want to load the model from bundle resources, the filePath will be like `ggml-base.en.bin`
+})
+
 const sampleFilePath = 'file://.../sample.wav'
-
-const whisperContext = await initWhisper({ filePath })
-
 const options = { language: 'en' }
 const { stop, promise } = whisperContext.transcribe(sampleFilePath, options)
 
