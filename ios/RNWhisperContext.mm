@@ -354,12 +354,7 @@ void AudioInputCallback(void * inUserData,
     }
     
     if (options[@"prompt"] != nil) {
-        std::string *prompt = new std::string([options[@"prompt"] UTF8String]);
-        rn_whisper_convert_prompt(
-            self->ctx,
-            params,
-            prompt
-        );
+        params.initial_prompt = [options[@"prompt"] UTF8String];
     }
 
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {

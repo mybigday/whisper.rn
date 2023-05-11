@@ -163,11 +163,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         params.temperature_inc = temperature_inc;
     }
     if (prompt != nullptr) {
-        rn_whisper_convert_prompt(
-            context,
-            params,
-            new std::string(env->GetStringUTFChars(prompt, nullptr))
-        );
+        params.initial_prompt = env->GetStringUTFChars(prompt, nullptr);
     }
 
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
