@@ -111,7 +111,7 @@ const downloadModel = async (log, progress) => {
 }
 
 // Set to false to use the model from the bundle resources
-const USE_DOWNLOAD_MODEL = false
+const USE_DOWNLOAD_MODEL = true
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
