@@ -9,6 +9,9 @@ cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
 cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 
+# Apply patch (ref: https://github.com/ggerganov/whisper.cpp/pull/910)
+patch -p0 -d ./cpp/coreml < ./scripts/whisper-endocder.mm.patch
+
 yarn example
 
 # Download model for example
