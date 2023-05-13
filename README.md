@@ -91,7 +91,7 @@ The `.mlmodelc` model files is load depend on the ggml model file path. For exam
 
 Currently there is no official way to get the Core ML models by URL, you will need to convert the ggml model to Core ML model folder by yourself. Please see [Core ML Support](https://github.com/ggerganov/whisper.cpp#core-ml-support) of whisper.cpp for more details.
 
-During the `.mlmodelc` is a directory, if you are get the model files by download it may not be comfortable, you will need to download 5 files:
+During the `.mlmodelc` is a directory, you will need to download 5 files:
 
 ```json5
 [
@@ -103,7 +103,7 @@ During the `.mlmodelc` is a directory, if you are get the model files by downloa
 ]
 ```
 
-You can consider to use zip and unzip by library like [`react-native-zip-archive`](https://github.com/mockingbot/react-native-zip-archive).
+Or just add them to your app's bundle resourcesas, like the example app does, but this would increase the app size significantly.
 
 ## Run with example
 
