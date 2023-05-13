@@ -81,6 +81,30 @@ In Android, you may need to request the microphone permission by [`PermissionAnd
 
 The documentation is not ready yet, please see the comments of [index](./src/index.ts) file for more details at the moment.
 
+## Core ML support
+
+__*Platform: iOS 15.0+, tvOS 15.0+*__
+
+To use Core ML on iOS, you will need to have the Core ML model files.
+
+The `.mlmodelc` model files is load depend on the ggml model file path. For example, if your ggml model path is `ggml-base.en.bin`, the Core ML model path will be `ggml-base.en-encoder.mlmodelc`. Please note that the ggml model is still needed as decoder or encoder fallback.
+
+Currently there is no official way to get the Core ML models by URL, you will need to convert the ggml model to Core ML model folder by yourself. Please see [Core ML Support](https://github.com/ggerganov/whisper.cpp#core-ml-support) of whisper.cpp for more details.
+
+During the `.mlmodelc` is a directory, you will need to download 5 files:
+
+```json5
+[
+  'model.mil',
+  'metadata.json',
+  'coremldata.bin',
+  'weights/weights.bin',
+  'analysis/coremldata.bin',
+]
+```
+
+Or just add them to your app's bundle resourcesas, like the example app does, but this would increase the app size significantly.
+
 ## Run with example
 
 The example app is using [react-native-fs](https://github.com/itinance/react-native-fs) to download the model file and audio file.

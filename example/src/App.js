@@ -45,20 +45,6 @@ const styles = StyleSheet.create({
   logText: { fontSize: 12, color: '#333' },
 })
 
-const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
-
-const modelURL =
-  'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin'
-const sampleURL =
-  'https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav'
-
-const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
-
-console.log('[App] fileDir', fileDir)
-
-const modelFilePath = `${fileDir}/base.en`
-const sampleFilePath = `${fileDir}/jfk.wav`
-
 function toTimestamp(t, comma = false) {
   let msec = t * 10
   const hr = Math.floor(msec / (1000 * 60 * 60))
@@ -80,8 +66,52 @@ function toTimestamp(t, comma = false) {
   return timestamp
 }
 
+const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
+
+const modelURL =
+  'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin'
+const sampleURL =
+  'https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav'
+
+const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
+
+console.log('[App] fileDir', fileDir)
+
+const modelFilePath = `${fileDir}/ggml-base.en.bin`
+const sampleFilePath = `${fileDir}/jfk.wav`
+
+const createDir = async (log) => {
+  if (!(await RNFS.exists(fileDir))) {
+    log('Create dir', fileDir)
+    await RNFS.mkdir(fileDir)
+  }
+}
+
 const filterPath = (path) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
+
+const downloadModel = async (log, progress) => {
+  await createDir(log)
+  if (await RNFS.exists(modelFilePath)) {
+    log('Model already exists:')
+    log(filterPath(modelFilePath))
+  } else {
+    log('Start Download Model to:')
+    log(filterPath(modelFilePath))
+    await RNFS.downloadFile({
+      fromUrl: modelURL,
+      toFile: modelFilePath,
+      progressInterval: 1000,
+      begin: () => {},
+      progress,
+    }).promise
+    log('Downloaded model file:')
+    log(filterPath(modelFilePath))
+  }
+}
+
+// Set to false to use the model from the bundle resources
+const USE_DOWNLOAD_MODEL = true
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
@@ -92,13 +122,6 @@ export default function App() {
   const log = useCallback((...messages) => {
     setLogs((prev) => [...prev, messages.join(' ')])
   }, [])
-
-  const createDir = useCallback(async () => {
-    if (!(await RNFS.exists(fileDir))) {
-      log('Create dir', fileDir)
-      await RNFS.mkdir(fileDir)
-    }
-  }, [log])
 
   const progress = useCallback(
     ({ contentLength, bytesWritten }) => {
@@ -121,32 +144,23 @@ export default function App() {
                 setWhisperContext(null)
                 log('Released previous context')
               }
-              await createDir()
-              if (await RNFS.exists(modelFilePath)) {
-                log('Model already exists:')
-                log(filterPath(modelFilePath))
+              let options
+              if (USE_DOWNLOAD_MODEL) {
+                await downloadModel(log, progress)
+                options = {
+                  filePath: modelFilePath,
+                  isBundleAsset: false,
+                }
               } else {
-                log('Start Download Model to:')
-                log(filterPath(modelFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: modelURL,
-                  toFile: modelFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded model file:')
-                log(filterPath(modelFilePath))
+                options = {
+                  // Use the bundle resource (Need add model to Xcode project / Android assets)
+                  filePath: 'ggml-base.en.bin',
+                  isBundleAsset: true,
+                }
               }
               log('Initialize context...')
               const startTime = Date.now()
-              const ctx = await initWhisper({
-                // Use downloaded modelFilePath
-                filePath: modelFilePath,
-                // Or you can choose to use the asset (Need to add to Xcode project / Android assets), for example:
-                // filePath: 'ggml-base.en-q8_0.bin',
-                // isBundleAsset: true
-              })
+              const ctx = await initWhisper(options)
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
@@ -159,12 +173,9 @@ export default function App() {
             style={styles.button}
             disabled={!!stopTranscribe?.stop}
             onPress={async () => {
-              if (!whisperContext) {
-                log('No context')
-                return
-              }
-              await createDir()
+              if (!whisperContext) return log('No context')
 
+              await createDir(log)
               if (await RNFS.exists(sampleFilePath)) {
                 log('Sample file already exists:')
                 log(filterPath(sampleFilePath))
@@ -218,10 +229,7 @@ export default function App() {
               stopTranscribe?.stop ? styles.buttonClear : null,
             ]}
             onPress={async () => {
-              if (!whisperContext) {
-                log('No context')
-                return
-              }
+              if (!whisperContext) return log('No context')
               if (stopTranscribe?.stop) {
                 stopTranscribe?.stop()
                 setStopTranscribe(null)
@@ -308,8 +316,7 @@ export default function App() {
           style={[styles.button, styles.buttonClear]}
           title="Clear Download files"
           onPress={async () => {
-            await RNFS.unlink(modelFilePath).catch(() => {})
-            await RNFS.unlink(sampleFilePath).catch(() => {})
+            await RNFS.unlink(fileDir).catch(() => {})
             log('Deleted files')
           }}
         >

@@ -9,6 +9,18 @@ NSMutableDictionary *contexts;
 
 RCT_EXPORT_MODULE()
 
+- (NSDictionary *)constantsToExport
+{
+  return @{
+#if WHISPER_USE_COREML
+    @"WHISPER_USE_COREML": @YES,
+#endif
+#if WHISPER_COREML_ALLOW_FALLBACK
+    @"WHISPER_COREML_ALLOW_FALLBACK": @YES,
+#endif
+  };
+}
+
 RCT_REMAP_METHOD(initContext,
                  withPath:(NSString *)modelPath
                  withBundleResource:(BOOL)isBundleAsset

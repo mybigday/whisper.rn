@@ -1,0 +1,25 @@
+--- whisper-encoder.mm	2023-05-13 12:32:22
++++ whisper-encoder.new.mm	2023-05-13 12:33:42
+@@ -1,6 +1,10 @@
+-#import "coreml/whisper-encoder.h"
+-#import "coreml/whisper-encoder-impl.h"
++#if !__has_feature(objc_arc)
++#error This file must be compiled with automatic reference counting enabled (-fobjc-arc)
++#endif
+ 
++#import "whisper-encoder.h"
++#import "whisper-encoder-impl.h"
++
+ #import <CoreML/CoreML.h>
+ 
+ #include <stdlib.h>
+@@ -52,9 +56,6 @@
+     whisper_encoder_implOutput * outCoreML = [(__bridge id) ctx->data predictionFromLogmel_data:inMultiArray error:nil];
+ 
+     memcpy(out, outCoreML.output.dataPointer, outCoreML.output.count * sizeof(float));
+-
+-    [outCoreML release];
+-    [inMultiArray release];
+ }
+ 
+ #if __cplusplus
