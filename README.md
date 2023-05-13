@@ -98,8 +98,8 @@ During the `.mlmodelc` is a directory, you will need to download 5 files:
   'model.mil',
   'metadata.json',
   'coremldata.bin',
-  'weights/weights.bin',
-  'analysis/coremldata.bin',
+  'weights/weight.bin',
+  'analytics/coremldata.bin',
 ]
 ```
 
