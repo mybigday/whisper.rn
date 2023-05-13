@@ -103,7 +103,7 @@ During the `.mlmodelc` is a directory, you will need to download 5 files:
 ]
 ```
 
-Or just add them to your app's bundle resourcesas, like the example app does, but this would increase the app size significantly.
+Or just add them to your app's bundle resources, like the example app does, but this would increase the app size significantly.
 
 ## Run with example
 
