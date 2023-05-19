@@ -5,6 +5,7 @@ import {
   Platform,
   DeviceEventEmitterStatic,
 } from 'react-native'
+import { version } from './version.json'
 
 const LINKING_ERROR =
   `The package 'whisper.rn' doesn't seem to be linked. Make sure: \n\n${Platform.select({ ios: "- You have run 'pod install'\n", default: '' })
@@ -265,6 +266,9 @@ export async function initWhisper(
 export async function releaseAllWhisper(): Promise<void> {
   return RNWhisper.releaseAllContexts()
 }
+
+/** Current version of whisper.cpp */
+export const libVersion: string = version
 
 /** Is use CoreML models on iOS */
 export const isUseCoreML: boolean = !!RNWhisper.WHISPER_USE_COREML

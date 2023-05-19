@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import RNFS from 'react-native-fs'
 // eslint-disable-next-line import/no-unresolved
-import { initWhisper } from 'whisper.rn'
+import { initWhisper, libVersion } from 'whisper.rn'
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -115,7 +115,7 @@ const USE_DOWNLOAD_MODEL = true
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
-  const [logs, setLogs] = useState([])
+  const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
   const [transcibeResult, setTranscibeResult] = useState(null)
   const [stopTranscribe, setStopTranscribe] = useState(null)
 

@@ -9,6 +9,11 @@ cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
 cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 
+# Parse whisper.cpp/bindings/javascript/package.json version and set to src/version.json
+cd whisper.cpp/bindings/javascript
+node -e "const fs = require('fs'); const package = JSON.parse(fs.readFileSync('package.json')); fs.writeFileSync('../../../src/version.json', JSON.stringify({version: package.version}));"
+cd ../../../
+
 yarn example
 
 # Download model for example
