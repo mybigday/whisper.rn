@@ -128,7 +128,7 @@ export type TranscribeRealtimeNativeEvent = {
   payload: TranscribeRealtimeNativePayload,
 }
 
-class WhisperContext {
+export class WhisperContext {
   id: number
 
   constructor(id: number) {
@@ -251,7 +251,7 @@ class WhisperContext {
     }
   }
 
-  async release() {
+  async release(): Promise<void> {
     return RNWhisper.releaseContext(this.id)
   }
 }

@@ -79,7 +79,7 @@ subscribe(evt => {
 
 In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
-The documentation is not ready yet, please see the comments of [index](./src/index.ts) file for more details at the moment.
+Please visit the [Documentation](docs/) for more details.
 
 ## Core ML support
 
