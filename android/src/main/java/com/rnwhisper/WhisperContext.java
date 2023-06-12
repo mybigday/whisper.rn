@@ -249,7 +249,7 @@ public class WhisperContext {
       nSamplesTranscribing = 0;
     }
 
-    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex
+    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex;
 
     if (isStopped && !continueNeeded) {
       payload.putBoolean("isCapturing", false);
