@@ -416,7 +416,7 @@ PODS:
   - RNFS (2.20.0):
     - React-Core
   - SocketRocket (0.6.0)
-  - whisper-rn (0.3.0-rc.2):
+  - whisper-rn (0.3.0-rc.3):
     - React-Core
   - Yoga (1.14.0)
   - YogaKit (1.18.1):
@@ -626,7 +626,7 @@ SPEC CHECKSUMS:
   ReactCommon: 85c98ab0a509e70bf5ee5d9715cf68dbf495b84c
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
   SocketRocket: fccef3f9c5cedea1353a9ef6ada904fde10d6608
-  whisper-rn: a05d78c47352e885c5d2cf89f095156e39ab837a
+  whisper-rn: 7b95b2e1bca9b3ddd7e8ffbc28ec75cd84c54a94
   Yoga: 065f0b74dba4832d6e328238de46eb72c5de9556
   YogaKit: f782866e155069a2cca2517aafea43200b01fd5a
 

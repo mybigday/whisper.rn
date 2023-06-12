@@ -180,14 +180,26 @@ void AudioInputCallback(void * inUserData,
     }
 
     nSamplesOfIndex = [[state->sliceNSamples objectAtIndex:state->transcribeSliceIndex] intValue];
+
+    bool isStopped = state->isStoppedByAction || (
+        !state->isCapturing &&
+        state->nSamplesTranscribing == nSamplesOfIndex &&
+        state->sliceIndex == state->transcribeSliceIndex
+    );
+
     if (
-        state->isStoppedByAction ||
-        (
-            !state->isCapturing &&
-            state->nSamplesTranscribing == nSamplesOfIndex &&
-            state->sliceIndex == state->transcribeSliceIndex
-        )
+      // If no more samples on current slice, move to next slice
+      state->nSamplesTranscribing == nSamplesOfIndex &&
+      state->transcribeSliceIndex != state->sliceIndex
     ) {
+        state->transcribeSliceIndex++;
+        state->nSamplesTranscribing = 0;
+    }
+
+    bool continueNeeded = !state->isCapturing &&
+        state->nSamplesTranscribing != nSamplesOfIndex;
+
+    if (isStopped && !continueNeeded) {
         NSLog(@"[RNWhisper] Transcribe end");
         result[@"isStoppedByAction"] = @(state->isStoppedByAction);
         result[@"isCapturing"] = @(false);
@@ -200,19 +212,7 @@ void AudioInputCallback(void * inUserData,
         state->transcribeHandler(state->jobId, @"transcribe", result);
     }
 
-    if (
-      // If no more samples on current slice, move to next slice
-      state->nSamplesTranscribing == nSamplesOfIndex &&
-      state->transcribeSliceIndex != state->sliceIndex
-    ) {
-        state->transcribeSliceIndex++;
-        state->nSamplesTranscribing = 0;
-    }
-
-    if (
-        !state->isCapturing &&
-        state->nSamplesTranscribing != nSamplesOfIndex
-    ) {
+    if (continueNeeded) {
         state->isTranscribing = true;
         // Finish transcribing the rest of the samples
         [self fullTranscribeSamples:state];
