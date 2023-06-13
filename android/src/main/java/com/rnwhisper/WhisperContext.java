@@ -239,7 +239,19 @@ public class WhisperContext {
       !isCapturing &&
       nSamplesTranscribing == nSamplesOfIndex &&
       sliceIndex == transcribeSliceIndex;
-    if (isStopped) {
+
+    if (
+      // If no more samples on current slice, move to next slice
+      nSamplesTranscribing == sliceNSamples.get(transcribeSliceIndex) &&
+      transcribeSliceIndex != sliceIndex
+    ) {
+      transcribeSliceIndex++;
+      nSamplesTranscribing = 0;
+    }
+
+    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex;
+
+    if (isStopped && !continueNeeded) {
       payload.putBoolean("isCapturing", false);
       payload.putBoolean("isStoppedByAction", isStoppedByAction);
       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
@@ -251,16 +263,7 @@ public class WhisperContext {
       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
     }
 
-    if (
-      // If no more samples on current slice, move to next slice
-      nSamplesTranscribing == sliceNSamples.get(transcribeSliceIndex) &&
-      transcribeSliceIndex != sliceIndex
-    ) {
-      transcribeSliceIndex++;
-      nSamplesTranscribing = 0;
-    }
-
-    if (!isCapturing && nSamplesTranscribing != nSamplesOfIndex) {
+    if (continueNeeded) {
       // If no more capturing, continue transcribing until all slices are transcribed
       fullTranscribeSamples(options, true);
     } else if (isStopped) {
@@ -368,7 +371,6 @@ public class WhisperContext {
   public void stopTranscribe(int jobId) {
     abortTranscribe(jobId);
     isCapturing = false;
-    isTranscribing = false;
     isStoppedByAction = true;
   }
 
