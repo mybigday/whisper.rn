@@ -371,7 +371,6 @@ public class WhisperContext {
   public void stopTranscribe(int jobId) {
     abortTranscribe(jobId);
     isCapturing = false;
-    isTranscribing = false;
     isStoppedByAction = true;
   }
 
