@@ -69,7 +69,7 @@ function toTimestamp(t, comma = false) {
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
 const modelURL =
-  'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin'
+  'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin'
 const sampleURL =
   'https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav'
 
@@ -77,7 +77,7 @@ const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
 
-const modelFilePath = `${fileDir}/ggml-base.en.bin`
+const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
 const sampleFilePath = `${fileDir}/jfk.wav`
 
 const createDir = async (log) => {
@@ -154,7 +154,7 @@ export default function App() {
               } else {
                 options = {
                   // Use the bundle resource (Need add model to Xcode project / Android assets)
-                  filePath: 'ggml-base.en.bin',
+                  filePath: 'ggml-tiny.en.bin',
                   isBundleAsset: true,
                 }
               }

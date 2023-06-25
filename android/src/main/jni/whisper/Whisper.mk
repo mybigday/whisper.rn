@@ -3,7 +3,7 @@ LOCAL_LDLIBS    := -landroid -llog
 
 # Make the final output library smaller by only keeping the symbols referenced from the app.
 ifneq ($(APP_OPTIM),debug)
-    LOCAL_CFLAGS += -O3
+    LOCAL_CFLAGS += -O3 -DNDEBUG
     LOCAL_CFLAGS += -fvisibility=hidden -fvisibility-inlines-hidden
     LOCAL_CFLAGS += -ffunction-sections -fdata-sections
     LOCAL_LDFLAGS += -Wl,--gc-sections

@@ -21,19 +21,19 @@ cd whisper.cpp/models
 
 # If CI env is `true`, use dummy model
 if [ "$CI" = "true" ]; then
-  cp for-tests-ggml-base.en.bin ggml-base.en.bin
-  echo "CI: Copied for-tests-ggml-base.en.bin to ggml-base.en.bin"
+  cp for-tests-ggml-tiny.en.bin ggml-tiny.en.bin
+  echo "CI: Copied for-tests-ggml-tiny.en.bin to ggml-tiny.en.bin"
 else
-  ./download-ggml-model.sh base.en
+  ./download-ggml-model.sh tiny.en
 fi
 
 # Copy to Android example
-cp ggml-base.en.bin ../../example/android/app/src/main/assets
-echo "Copied ggml-base.en.bin to example/android/app/src/main/assets"
+cp ggml-tiny.en.bin ../../example/android/app/src/main/assets
+echo "Copied ggml-tiny.en.bin to example/android/app/src/main/assets"
 
-# Check whisper.cpp/models/ggml-base.en-encoder.mlmodelc exist
-if [ ! -d ./ggml-base.en-encoder.mlmodelc ]; then
-  mkdir ggml-base.en-encoder.mlmodelc
-  echo "Created a dummy ggml-base.en-encoder.mlmodelc for testing."
+# Check whisper.cpp/models/ggml-tiny.en-encoder.mlmodelc exist
+if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then
+  mkdir ggml-tiny.en-encoder.mlmodelc
+  echo "Created a dummy ggml-tiny.en-encoder.mlmodelc for testing."
   echo "Please follow https://github.com/ggerganov/whisper.cpp#core-ml-support for convert a real model."
 fi

@@ -47,8 +47,8 @@ Add the following line to ```android/app/src/main/AndroidManifest.xml```
 import { initWhisper } from 'whisper.rn'
 
 const whisperContext = await initWhisper({
-  filePath: 'file://.../ggml-base.en.bin',
-  isBundleAsset: false, // Set to true if you want to load the model from bundle resources, the filePath will be like `ggml-base.en.bin`
+  filePath: 'file://.../ggml-tiny.en.bin',
+  isBundleAsset: false, // Set to true if you want to load the model from bundle resources, the filePath will be like `ggml-tiny.en.bin`
 })
 
 const sampleFilePath = 'file://.../sample.wav'
@@ -87,7 +87,7 @@ __*Platform: iOS 15.0+, tvOS 15.0+*__
 
 To use Core ML on iOS, you will need to have the Core ML model files.
 
-The `.mlmodelc` model files is load depend on the ggml model file path. For example, if your ggml model path is `ggml-base.en.bin`, the Core ML model path will be `ggml-base.en-encoder.mlmodelc`. Please note that the ggml model is still needed as decoder or encoder fallback.
+The `.mlmodelc` model files is load depend on the ggml model file path. For example, if your ggml model path is `ggml-tiny.en.bin`, the Core ML model path will be `ggml-tiny.en-encoder.mlmodelc`. Please note that the ggml model is still needed as decoder or encoder fallback.
 
 Currently there is no official way to get the Core ML models by URL, you will need to convert Core ML models by yourself. Please see [Core ML Support](https://github.com/ggerganov/whisper.cpp#core-ml-support) of whisper.cpp for more details.
 
