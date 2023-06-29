@@ -136,5 +136,10 @@
         }
       ]
     ]
+  },
+  "codegenConfig": {
+    "name": "RNWhisperSpec",
+    "type": "all",
+    "jsSrcsDir": "./src/"
   }
 }

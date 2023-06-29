@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string>
 
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <RNWhisperSpec/RNWhisperSpec.h>
+#endif
+
 @implementation RNWhisper
 
 NSMutableDictionary *contexts;
@@ -207,5 +211,13 @@ RCT_REMAP_METHOD(releaseAllContexts,
     [contexts removeAllObjects];
     contexts = nil;
 }
+
+#ifdef RCT_NEW_ARCH_ENABLED
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+    return std::make_shared<facebook::react::NativeRNWhisperSpecJSI>(params);
+}
+#endif
 
 @end
