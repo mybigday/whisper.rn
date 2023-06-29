@@ -32,7 +32,17 @@
         "@typescript-eslint/no-shadow": 1,
         "no-undef": "off",
         "func-call-spacing": "off",
-        "@typescript-eslint/func-call-spacing": 1
+        "@typescript-eslint/func-call-spacing": 1,
+        "import/extensions": [
+          "error",
+          "ignorePackages",
+          {
+            "js": "never",
+            "jsx": "never",
+            "ts": "never",
+            "tsx": "never"
+          }
+        ]
       }
     }
   ],
