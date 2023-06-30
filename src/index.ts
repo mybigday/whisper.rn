@@ -1,69 +1,26 @@
 import {
   NativeEventEmitter,
   DeviceEventEmitter,
-  NativeModules,
   Platform,
   DeviceEventEmitterStatic,
 } from 'react-native'
+import RNWhisper from './NativeRNWhisper'
+import type { TranscribeOptions, TranscribeResult } from './NativeRNWhisper'
 import { version } from './version.json'
-
-const LINKING_ERROR =
-  `The package 'whisper.rn' doesn't seem to be linked. Make sure: \n\n${Platform.select({ ios: "- You have run 'pod install'\n", default: '' })
-  }- You rebuilt the app after installing the package`
-
-const RNWhisper = NativeModules.RNWhisper
-  ? NativeModules.RNWhisper
-  : new Proxy(
-    {},
-    {
-      get() {
-        throw new Error(LINKING_ERROR)
-      },
-    },
-  )
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
 if (Platform.OS === 'ios') {
+  // @ts-ignore
   EventEmitter = new NativeEventEmitter(RNWhisper)
 }
 if (Platform.OS === 'android') {
   EventEmitter = DeviceEventEmitter
 }
 
+export type { TranscribeOptions, TranscribeResult }
+
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
-
-export type TranscribeOptions = {
-  /** Spoken language (Default: 'auto' for auto-detect) */
-  language?: string,
-  /** Translate from source language to english (Default: false) */
-  translate?: boolean,
-  /** Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) */
-  maxThreads?: number,
-  /** Maximum number of text context tokens to store */
-  maxContext?: number,
-  /** Maximum segment length in characters */
-  maxLen?: number,
-  /** Enable token-level timestamps */
-  tokenTimestamps?: boolean,
-  /** Word timestamp probability threshold */
-  wordThold?: number,
-  /** Time offset in milliseconds */
-  offset?: number,
-  /** Duration of audio to process in milliseconds */
-  duration?: number,
-  /** Tnitial decoding temperature */
-  temperature?: number,
-  temperatureInc?: number,
-  /** Beam size for beam search */
-  beamSize?: number,
-  /** Number of best candidates to keep */
-  bestOf?: number,
-  /** Speed up audio by x2 (reduced accuracy) */
-  speedUp?: boolean,
-  /** Initial Prompt */
-  prompt?: string,
-}
 
 export type TranscribeRealtimeOptions = TranscribeOptions & {
   /**
@@ -78,15 +35,6 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * (Default: Equal to `realtimeMaxAudioSec`)
    */
   realtimeAudioSliceSec?: number
-}
-
-export type TranscribeResult = {
-  result: string,
-  segments: Array<{
-    text: string,
-    t0: number,
-    t1: number,
-  }>,
 }
 
 export type TranscribeRealtimeEvent = {
@@ -257,7 +205,7 @@ export class WhisperContext {
 }
 
 export async function initWhisper(
-  { filePath, isBundleAsset }: { filePath?: string, isBundleAsset?: boolean } = {}
+  { filePath, isBundleAsset }: { filePath: string; isBundleAsset?: boolean }
 ): Promise<WhisperContext> {
   const id = await RNWhisper.initContext(filePath, !!isBundleAsset)
   return new WhisperContext(id)
@@ -270,8 +218,10 @@ export async function releaseAllWhisper(): Promise<void> {
 /** Current version of whisper.cpp */
 export const libVersion: string = version
 
+const { useCoreML, coreMLAllowFallback } = RNWhisper.getConstants?.() || {}
+
 /** Is use CoreML models on iOS */
-export const isUseCoreML: boolean = !!RNWhisper.WHISPER_USE_COREML
+export const isUseCoreML: boolean = !!useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
-export const isCoreMLAllowFallback: boolean = !!RNWhisper.WHISPER_COREML_ALLOW_FALLBACK
+export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback

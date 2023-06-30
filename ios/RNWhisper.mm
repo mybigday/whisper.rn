@@ -3,20 +3,33 @@
 #include <stdlib.h>
 #include <string>
 
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <RNWhisperSpec/RNWhisperSpec.h>
+#endif
+
 @implementation RNWhisper
 
 NSMutableDictionary *contexts;
 
 RCT_EXPORT_MODULE()
 
++ (BOOL)requiresMainQueueSetup
+{
+  return YES;
+}
+
 - (NSDictionary *)constantsToExport
 {
   return @{
 #if WHISPER_USE_COREML
-    @"WHISPER_USE_COREML": @YES,
+    @"useCoreML": @YES,
+#else
+    @"useCoreML": @NO,
 #endif
 #if WHISPER_COREML_ALLOW_FALLBACK
-    @"WHISPER_COREML_ALLOW_FALLBACK": @YES,
+    @"coreMLAllowFallback": @YES,
+#else
+    @"coreMLAllowFallback": @NO,
 #endif
   };
 }
@@ -207,5 +220,13 @@ RCT_REMAP_METHOD(releaseAllContexts,
     [contexts removeAllObjects];
     contexts = nil;
 }
+
+#ifdef RCT_NEW_ARCH_ENABLED
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+    return std::make_shared<facebook::react::NativeRNWhisperSpecJSI>(params);
+}
+#endif
 
 @end
