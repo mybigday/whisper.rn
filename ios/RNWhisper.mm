@@ -17,10 +17,14 @@ RCT_EXPORT_MODULE()
 {
   return @{
 #if WHISPER_USE_COREML
-    @"WHISPER_USE_COREML": @YES,
+    @"useCoreML": @YES,
+#else
+    @"useCoreML": @NO,
 #endif
 #if WHISPER_COREML_ALLOW_FALLBACK
-    @"WHISPER_COREML_ALLOW_FALLBACK": @YES,
+    @"coreMLAllowFallback": @YES,
+#else
+    @"coreMLAllowFallback": @NO,
 #endif
   };
 }

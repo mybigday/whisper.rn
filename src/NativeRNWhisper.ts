@@ -1,5 +1,5 @@
-import type {TurboModule} from 'react-native/Libraries/TurboModule/RCTExport';
-import {TurboModuleRegistry} from 'react-native';
+import type { TurboModule } from 'react-native/Libraries/TurboModule/RCTExport'
+import { TurboModuleRegistry } from 'react-native'
 
 export type TranscribeOptions = {
   /** Spoken language (Default: 'auto' for auto-detect) */
@@ -43,9 +43,10 @@ export type TranscribeResult = {
 }
 
 export interface Spec extends TurboModule {
-  // WHISPER_USE_COREML: boolean;
-  // WHISPER_COREML_ALLOW_FALLBACK: boolean;
-
+  getConstants(): {
+    useCoreML: boolean
+    coreMLAllowFallback: boolean
+  };
   initContext(filePath: string, isBundleAsset: boolean): Promise<number>;
   releaseContext(contextId: number): Promise<void>;
   releaseAllContexts(): Promise<void>;
@@ -55,10 +56,12 @@ export interface Spec extends TurboModule {
     path: string,
     options: TranscribeOptions,
   ): Promise<TranscribeResult>;
-  startRealtimeTranscribe(contextId: number, jobId: number, options: TranscribeOptions): Promise<void>;
+  startRealtimeTranscribe(
+    contextId: number,
+    jobId: number,
+    options: TranscribeOptions,
+  ): Promise<void>;
   abortTranscribe(contextId: number, jobId: number): Promise<void>;
 }
 
-export default TurboModuleRegistry.get<Spec>(
-  'RNWhisper',
-) as Spec;
+export default TurboModuleRegistry.get<Spec>('RNWhisper') as Spec

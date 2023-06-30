@@ -36,6 +36,17 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
     return NAME;
   }
 
+  @Override
+  public HashMap<String, Object> getTypedExportedConstants() {
+    HashMap<String, Object> constants = new HashMap<>();
+
+    // iOS only constants, put for passing type checks
+    constants.put("useCoreML", false);
+    constants.put("coreMLAllowFallback", false);
+
+    return constants;
+  }
+
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
 
   @ReactMethod

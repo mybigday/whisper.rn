@@ -4,11 +4,13 @@ import {
   Platform,
   DeviceEventEmitterStatic,
 } from 'react-native'
-import RNWhisper, { TranscribeOptions, TranscribeResult } from './NativeRNWhisper'
+import RNWhisper from './NativeRNWhisper'
+import type { TranscribeOptions, TranscribeResult } from './NativeRNWhisper'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
 if (Platform.OS === 'ios') {
+  // @ts-ignore
   EventEmitter = new NativeEventEmitter(RNWhisper)
 }
 if (Platform.OS === 'android') {
@@ -203,7 +205,7 @@ export class WhisperContext {
 }
 
 export async function initWhisper(
-  { filePath, isBundleAsset }: { filePath?: string, isBundleAsset?: boolean } = {}
+  { filePath, isBundleAsset }: { filePath: string; isBundleAsset?: boolean }
 ): Promise<WhisperContext> {
   const id = await RNWhisper.initContext(filePath, !!isBundleAsset)
   return new WhisperContext(id)
@@ -216,8 +218,10 @@ export async function releaseAllWhisper(): Promise<void> {
 /** Current version of whisper.cpp */
 export const libVersion: string = version
 
+const { useCoreML, coreMLAllowFallback } = RNWhisper.getConstants?.() || {}
+
 /** Is use CoreML models on iOS */
-export const isUseCoreML: boolean = !!RNWhisper.WHISPER_USE_COREML
+export const isUseCoreML: boolean = !!useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
-export const isCoreMLAllowFallback: boolean = !!RNWhisper.WHISPER_COREML_ALLOW_FALLBACK
+export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
