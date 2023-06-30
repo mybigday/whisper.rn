@@ -146,18 +146,19 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
 
   @ReactMethod
   public void releaseContext(double id, Promise promise) {
+    final int contextId = (int) id;
     new AsyncTask<Void, Void, Void>() {
       private Exception exception;
 
       @Override
       protected Void doInBackground(Void... voids) {
         try {
-          WhisperContext context = contexts.get((int) id);
+          WhisperContext context = contexts.get(contextId);
           if (context == null) {
             throw new Exception("Context " + id + " not found");
           }
           context.release();
-          contexts.remove((int) id);
+          contexts.remove(contextId);
         } catch (Exception e) {
           exception = e;
         }
