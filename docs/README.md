@@ -56,7 +56,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:36](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L36)
+[NativeRNWhisper.ts:4](https://github.com/mybigday/whisper.rn/blob/9b07569/src/NativeRNWhisper.ts#L4)
 
 ___
 
@@ -81,7 +81,7 @@ ___
 
 #### Defined in
 
-[index.ts:92](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L92)
+[index.ts:40](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L40)
 
 ___
 
@@ -99,7 +99,7 @@ ___
 
 #### Defined in
 
-[index.ts:125](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L125)
+[index.ts:73](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L73)
 
 ___
 
@@ -123,7 +123,7 @@ ___
 
 #### Defined in
 
-[index.ts:112](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L112)
+[index.ts:60](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L60)
 
 ___
 
@@ -133,7 +133,7 @@ ___
 
 #### Defined in
 
-[index.ts:68](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L68)
+[index.ts:25](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L25)
 
 ___
 
@@ -150,31 +150,31 @@ ___
 
 #### Defined in
 
-[index.ts:83](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L83)
+[NativeRNWhisper.ts:36](https://github.com/mybigday/whisper.rn/blob/9b07569/src/NativeRNWhisper.ts#L36)
 
 ## Variables
 
 ### isCoreMLAllowFallback
 
-• `Const` **isCoreMLAllowFallback**: `boolean` = `!!RNWhisper.WHISPER_COREML_ALLOW_FALLBACK`
+• `Const` **isCoreMLAllowFallback**: `boolean` = `!!coreMLAllowFallback`
 
 Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:277](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L277)
+[index.ts:227](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L227)
 
 ___
 
 ### isUseCoreML
 
-• `Const` **isUseCoreML**: `boolean` = `!!RNWhisper.WHISPER_USE_COREML`
+• `Const` **isUseCoreML**: `boolean` = `!!useCoreML`
 
 Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:274](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L274)
+[index.ts:224](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L224)
 
 ___
 
@@ -186,20 +186,20 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:271](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L271)
+[index.ts:219](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L219)
 
 ## Functions
 
 ### initWhisper
 
-▸ **initWhisper**(`«destructured»?`): `Promise`<[`WhisperContext`](classes/WhisperContext.md)\>
+▸ **initWhisper**(`«destructured»`): `Promise`<[`WhisperContext`](classes/WhisperContext.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `«destructured»` | `Object` |
-| › `filePath?` | `string` |
+| › `filePath` | `string` |
 | › `isBundleAsset?` | `boolean` |
 
 #### Returns
@@ -208,7 +208,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:259](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L259)
+[index.ts:207](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L207)
 
 ___
 
@@ -222,4 +222,4 @@ ___
 
 #### Defined in
 
-[index.ts:266](https://github.com/mybigday/whisper.rn/blob/e16f2a4/src/index.ts#L266)
+[index.ts:214](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L214)
