@@ -10,7 +10,7 @@ jobs:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3.6.0
+      - uses: actions/setup-node@v3.7.0
         with:
           node-version: 16.x
       - name: Get yarn cache directory path
@@ -49,7 +49,7 @@ jobs:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3.6.0
+      - uses: actions/setup-node@v3.7.0
         with:
           node-version: 16.x
       - name: Get yarn cache directory path
