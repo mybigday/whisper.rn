@@ -32,6 +32,7 @@ yarn example android
 To run the example app on iOS:
 
 ```sh
+yarn example pods
 yarn example ios
 ```
 
