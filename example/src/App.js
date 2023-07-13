@@ -111,7 +111,7 @@ const downloadModel = async (log, progress) => {
 }
 
 // Set to false to use the model from the bundle resources
-const USE_DOWNLOAD_MODEL = true
+const USE_DOWNLOAD_MODEL = false
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
@@ -154,8 +154,8 @@ export default function App() {
               } else {
                 options = {
                   // Use the bundle resource (Need add model to Xcode project / Android assets)
-                  filePath: 'ggml-tiny.en.bin',
-                  isBundleAsset: true,
+                  filePath: require('../assets/ggml-tiny.en.bin'),
+                  // TODO: Support bundle Core ML model files into assets
                 }
               }
               log('Initialize context...')

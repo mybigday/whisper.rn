@@ -23,11 +23,13 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
   public static final String NAME = "RNWhisper";
 
   private ReactApplicationContext reactContext;
+  private SimpleFileDownloader fileDownloader;
 
   public RNWhisperModule(ReactApplicationContext reactContext) {
     super(reactContext);
     reactContext.addLifecycleEventListener(this);
     this.reactContext = reactContext;
+    this.fileDownloader = new SimpleFileDownloader(reactContext);
   }
 
   @Override
@@ -57,11 +59,16 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
       @Override
       protected Integer doInBackground(Void... voids) {
         try {
+          String modelFilePath = modelPath;
+          if (!isBundleAsset && (modelPath.startsWith("http://") || modelPath.startsWith("https://"))) {
+            modelFilePath = fileDownloader.downloadFile(modelPath);
+          }
+
           long context;
           if (isBundleAsset) {
-            context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelPath);
+            context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelFilePath);
           } else {
-            context = WhisperContext.initContext(modelPath);
+            context = WhisperContext.initContext(modelFilePath);
           }
           if (context == 0) {
             throw new Exception("Failed to initialize context");

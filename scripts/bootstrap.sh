@@ -28,8 +28,8 @@ else
 fi
 
 # Copy to Android example
-cp ggml-tiny.en.bin ../../example/android/app/src/main/assets
-echo "Copied ggml-tiny.en.bin to example/android/app/src/main/assets"
+cp ggml-tiny.en.bin ../../example/assets
+echo "Copied ggml-tiny.en.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-tiny.en-encoder.mlmodelc exist
 if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then

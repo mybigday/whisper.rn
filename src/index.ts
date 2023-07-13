@@ -3,6 +3,7 @@ import {
   DeviceEventEmitter,
   Platform,
   DeviceEventEmitterStatic,
+  Image,
 } from 'react-native'
 import RNWhisper from './NativeRNWhisper'
 import type { TranscribeOptions, TranscribeResult } from './NativeRNWhisper'
@@ -205,9 +206,24 @@ export class WhisperContext {
 }
 
 export async function initWhisper(
-  { filePath, isBundleAsset }: { filePath: string; isBundleAsset?: boolean }
+  { filePath, isBundleAsset }: { filePath: string|number; isBundleAsset?: boolean }
 ): Promise<WhisperContext> {
-  const id = await RNWhisper.initContext(filePath, !!isBundleAsset)
+  let path = ''
+  if (typeof filePath === 'number') {
+    try {
+      const asset = Image.resolveAssetSource(filePath)
+      if (asset) {
+        path = asset.uri
+        isBundleAsset = false
+      }
+    } catch (e) {
+      throw new Error(`Invalid asset: ${filePath}`)
+    }
+  } else {
+    path = filePath
+  }
+  console.log(path)
+  const id = await RNWhisper.initContext(path, !!isBundleAsset)
   return new WhisperContext(id)
 }
 
