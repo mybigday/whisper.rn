@@ -11,11 +11,13 @@
 @implementation SimpleFileDownloader
 
 + (NSString *)downloadFile:(NSURL *)url {
-  NSString *dirPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper/"];
-  if (![[NSFileManager defaultManager] fileExistsAtPath:dirPath]) {
-    [[NSFileManager defaultManager] createDirectoryAtPath:dirPath withIntermediateDirectories:YES attributes:nil error:nil];
+  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper/"];
+  filePath = [filePath stringByAppendingPathComponent:[url lastPathComponent]];
+
+  NSString *folderPath = [filePath stringByDeletingLastPathComponent];
+  if (![[NSFileManager defaultManager] fileExistsAtPath:folderPath]) {
+    [[NSFileManager defaultManager] createDirectoryAtPath:folderPath withIntermediateDirectories:YES attributes:nil error:nil];
   }
-  NSString *filePath = [dirPath stringByAppendingPathComponent:[url lastPathComponent]];
   if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
     return filePath;
   }
