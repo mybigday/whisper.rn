@@ -26,10 +26,12 @@ if (Platform.OS === 'android') {
 }
 
 const styles = StyleSheet.create({
+  scrollview: { flexGrow: 1, justifyContent: 'center' },
   container: {
-    flexGrow: 1,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 4,
   },
   buttons: { flexDirection: 'row' },
   button: { margin: 4, backgroundColor: '#333', borderRadius: 4, padding: 8 },
@@ -103,7 +105,10 @@ export default function App() {
   )
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic">
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.scrollview}
+    >
       <SafeAreaView style={styles.container}>
         <View style={styles.buttons}>
           <TouchableOpacity
