@@ -281,5 +281,6 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
       context.release();
     }
     contexts.clear();
+    fileDownloader.clearCache();
   }
 }

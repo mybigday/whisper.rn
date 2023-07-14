@@ -26,12 +26,17 @@ public class SimpleFileDownloader {
   }
 
   private String getDir() {
-    String dir = context.getCacheDir().getAbsolutePath() + "/rnwhisper/";
+    String dir = context.getCacheDir().getAbsolutePath() + "/rnwhisper_debug_assets/";
     File file = new File(dir);
     if (!file.exists()) {
       file.mkdirs();
     }
     return dir;
+  }
+
+  private boolean fileExists(String filename) {
+    File file = new File(getDir() + filename);
+    return file.exists();
   }
 
   public String downloadFile(String urlPath) throws Exception {
@@ -63,8 +68,16 @@ public class SimpleFileDownloader {
     return filepath;
   }
 
-  private boolean fileExists(String filename) {
-    File file = new File(getDir() + filename);
-    return file.exists();
+  private void deleteFile(File fileOrDir) {
+    if (fileOrDir.isDirectory()) {
+      for (File child : fileOrDir.listFiles()) {
+        deleteFile(child);
+      }
+    }
+    fileOrDir.delete();
+  }
+
+  public void clearCache() {
+    deleteFile(new File(getDir()));
   }
 }

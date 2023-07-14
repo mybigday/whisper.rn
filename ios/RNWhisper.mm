@@ -53,18 +53,16 @@ RCT_REMAP_METHOD(initContext,
         NSArray *coreMLAssets = [modelOptions objectForKey:@"coreMLAssets"];
         // Download coreMLAssets ([{ uri, filepath }])
         for (NSDictionary *coreMLAsset in coreMLAssets) {
-            NSURL *url = [NSURL URLWithString:coreMLAsset[@"uri"]];
-            if (url != nil) {
-                [SimpleFileDownloader downloadFile:url toFile:coreMLAsset[@"filepath"]];
+            NSString *path = coreMLAsset[@"uri"];
+            if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+                [SimpleFileDownloader downloadFile:path toFile:coreMLAsset[@"filepath"]];
             }
         }
     }
 
     NSString *path = modelPath;
-
-    NSURL *url = [NSURL URLWithString:modelPath];
-    if (url != nil) {
-        path = [SimpleFileDownloader downloadFile:url toFile:nil];
+    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+        path = [SimpleFileDownloader downloadFile:path toFile:nil];
     }
     if (isBundleAsset) {
         path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
@@ -106,16 +104,12 @@ RCT_REMAP_METHOD(transcribeFile,
     }
 
     NSString *path = waveFilePath;
-
-    NSURL *url = [NSURL URLWithString:path];
-    if (url != nil) {
-        path = [SimpleFileDownloader downloadFile:url toFile:nil];
+    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+        path = [SimpleFileDownloader downloadFile:path toFile:nil];
     }
 
-    url = [NSURL fileURLWithPath:path];
-
     int count = 0;
-    float *waveFile = [self decodeWaveFile:url count:&count];
+    float *waveFile = [self decodeWaveFile:path count:&count];
     if (waveFile == nil) {
         reject(@"whisper_error", @"Invalid file", nil);
         return;
@@ -213,8 +207,9 @@ RCT_REMAP_METHOD(releaseAllContexts,
     resolve(nil);
 }
 
-- (float *)decodeWaveFile:(NSURL*)fileURL count:(int *)count {
-    NSData *fileData = [NSData dataWithContentsOfURL:fileURL];
+- (float *)decodeWaveFile:(NSString*)filePath count:(int *)count {
+    NSURL *url = [NSURL fileURLWithPath:filePath];
+    NSData *fileData = [NSData dataWithContentsOfURL:url];
     if (fileData == nil) {
         return nil;
     }
@@ -247,6 +242,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
 
     [contexts removeAllObjects];
     contexts = nil;
+
+    [SimpleFileDownloader clearCache];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

@@ -10,8 +10,9 @@
  */
 @implementation SimpleFileDownloader
 
-+ (NSString *)downloadFile:(NSURL *)url toFile:(NSString *)path {
-  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper/"];
++ (NSString *)downloadFile:(NSString *)urlString toFile:(NSString *)path {
+  NSURL *url = [NSURL URLWithString:urlString];
+  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper_debug_assets/"];
   if (path) {
     filePath = [filePath stringByAppendingPathComponent:path];
   } else {
@@ -28,6 +29,11 @@
   NSData *urlData = [NSData dataWithContentsOfURL:url];
   [urlData writeToFile:filePath atomically:YES];
   return filePath;
+}
+
++ (void)clearCache {
+  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper_debug_assets/"];
+  [[NSFileManager defaultManager] removeItemAtPath:filePath error:nil];
 }
 
 @end

@@ -270,5 +270,6 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
       context.release();
     }
     contexts.clear();
+    fileDownloader.clearCache();
   }
 }

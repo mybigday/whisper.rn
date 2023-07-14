@@ -2,6 +2,7 @@
 
 @interface SimpleFileDownloader : NSObject
 
-+ (NSString *)downloadFile:(NSURL *)url toFile:(NSString *)path;
++ (NSString *)downloadFile:(NSString *)urlString toFile:(NSString *)path;
++ (void)clearCache;
 
 @end
