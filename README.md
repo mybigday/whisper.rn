@@ -48,7 +48,6 @@ import { initWhisper } from 'whisper.rn'
 
 const whisperContext = await initWhisper({
   filePath: 'file://.../ggml-tiny.en.bin',
-  isBundleAsset: false, // Set to true if you want to load the model from bundle resources, the filePath will be like `ggml-tiny.en.bin`
 })
 
 const sampleFilePath = 'file://.../sample.wav'
@@ -80,6 +79,39 @@ subscribe(evt => {
 In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
 Please visit the [Documentation](docs/) for more details.
+
+## Usage with assets
+
+You can also use the model file / audio file from assets, but it will increase the app size significantly.
+
+```js
+import { initWhisper } from 'whisper.rn'
+
+const whisperContext = await initWhisper({
+  filePath: require('../assets/ggml-tiny.en.bin'),
+})
+
+const { stop, promise } =
+  whisperContext.transcribe(require('../assets/sample.wav'),  options)
+
+// ...
+```
+
+This will required to edit the `metro.config.js` to support assets:
+
+```js
+// ...
+const { extendAssetExts } = require('whisper.rn/extendMetroConfig')
+
+module.exports = {
+  // ...
+  resolver: {
+    // ...
+
+    assetExts: extendAssetExts(), // Or extendAssetExts(yourExtsHere)
+  },
+}
+```
 
 ## Core ML support
 
