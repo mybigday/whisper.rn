@@ -247,6 +247,7 @@ export type ContextOptions = {
 }
 
 const coreMLModelAssetPaths = [
+  'analytics/coremldata.bin',
   'weights/weight.bin',
   'model.mil',
   'coremldata.bin',
