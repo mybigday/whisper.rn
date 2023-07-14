@@ -92,7 +92,7 @@ const whisperContext = await initWhisper({
 })
 
 const { stop, promise } =
-  whisperContext.transcribe(require('../assets/sample.wav'),  options)
+  whisperContext.transcribe(require('../assets/sample.wav'), options)
 
 // ...
 ```
