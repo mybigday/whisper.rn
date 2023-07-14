@@ -36,6 +36,9 @@ public class SimpleFileDownloader {
 
   public String downloadFile(String urlPath) throws Exception {
     String filename = urlPath.substring(urlPath.lastIndexOf('/') + 1);
+    if (filename.contains("?")) {
+      filename = filename.substring(0, filename.indexOf("?"));
+    }
     String filepath = getDir() + filename;
     if (fileExists(filename)) {
       return filepath;
