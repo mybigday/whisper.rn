@@ -111,6 +111,7 @@ export class WhisperContext {
         throw new Error('Transcribe remote file is not supported, please download it first')
       path = filePath
     }
+    if (path.startsWith('file://')) path = path.slice(7)
     const jobId: number = Math.floor(Math.random() * 10000)
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),
@@ -290,6 +291,7 @@ export async function initWhisper({
       throw new Error('Transcribe remote file is not supported, please download it first')
     path = filePath
   }
+  if (path.startsWith('file://')) path = path.slice(7)
   const id = await RNWhisper.initContext({
     filePath: path,
     isBundleAsset: !!isBundleAsset,
