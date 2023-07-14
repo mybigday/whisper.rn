@@ -36,8 +36,7 @@ RCT_EXPORT_MODULE()
 }
 
 RCT_REMAP_METHOD(initContext,
-                 withPath:(NSString *)modelPath
-                 withBundleResource:(BOOL)isBundleAsset
+                 withOptions:(NSDictionary *)modelOptions
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -45,11 +44,27 @@ RCT_REMAP_METHOD(initContext,
         contexts = [[NSMutableDictionary alloc] init];
     }
 
+    NSString *modelPath = [modelOptions objectForKey:@"filePath"];
+    BOOL isBundleAsset = [[modelOptions objectForKey:@"isBundleAsset"] boolValue];
+
+    // For support debug assets in development mode
+    BOOL downloadCoreMLAssets = [[modelOptions objectForKey:@"downloadCoreMLAssets"] boolValue];
+    if (downloadCoreMLAssets) {
+        NSArray *coreMLAssets = [modelOptions objectForKey:@"coreMLAssets"];
+        // Download coreMLAssets ([{ uri, filepath }])
+        for (NSDictionary *coreMLAsset in coreMLAssets) {
+            NSURL *url = [NSURL URLWithString:coreMLAsset[@"uri"]];
+            if (url != nil) {
+                [SimpleFileDownloader downloadFile:url toFile:coreMLAsset[@"filepath"]];
+            }
+        }
+    }
+
     NSString *path = modelPath;
 
     NSURL *url = [NSURL URLWithString:modelPath];
     if (url != nil) {
-        path = [SimpleFileDownloader downloadFile:url];
+        path = [SimpleFileDownloader downloadFile:url toFile:nil];
     }
     if (isBundleAsset) {
         path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];

@@ -52,13 +52,16 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
 
   @ReactMethod
-  public void initContext(final String modelPath, final boolean isBundleAsset, final Promise promise) {
+  public void initContext(final ReadableMap options, final Promise promise) {
     new AsyncTask<Void, Void, Integer>() {
       private Exception exception;
 
       @Override
       protected Integer doInBackground(Void... voids) {
         try {
+          String modelPath = options.getString("filePath");
+          boolean isBundleAsset = options.getBoolean("isBundleAsset");
+
           String modelFilePath = modelPath;
           if (!isBundleAsset && (modelPath.startsWith("http://") || modelPath.startsWith("https://"))) {
             modelFilePath = fileDownloader.downloadFile(modelPath);

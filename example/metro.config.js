@@ -33,6 +33,7 @@ module.exports = {
     assetExts: [
       ...defaultAssetExts,
       'bin',
+      'mil',
     ]
   },
 

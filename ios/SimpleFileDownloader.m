@@ -10,10 +10,14 @@
  */
 @implementation SimpleFileDownloader
 
-+ (NSString *)downloadFile:(NSURL *)url {
++ (NSString *)downloadFile:(NSURL *)url toFile:(NSString *)path {
   NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper/"];
-  filePath = [filePath stringByAppendingPathComponent:[url lastPathComponent]];
-
+  if (path) {
+    filePath = [filePath stringByAppendingPathComponent:path];
+  } else {
+    filePath = [filePath stringByAppendingPathComponent:[url lastPathComponent]];
+  }
+  
   NSString *folderPath = [filePath stringByDeletingLastPathComponent];
   if (![[NSFileManager defaultManager] fileExistsAtPath:folderPath]) {
     [[NSFileManager defaultManager] createDirectoryAtPath:folderPath withIntermediateDirectories:YES attributes:nil error:nil];
@@ -22,6 +26,20 @@
     return filePath;
   }
   NSData *urlData = [NSData dataWithContentsOfURL:url];
+  [urlData writeToFile:filePath atomically:YES];
+  return filePath;
+}
+
++ (NSString *)saveData:(NSString *)data toFile:(NSString *)path {
+  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper/"];
+  filePath = [filePath stringByAppendingPathComponent:path];
+
+  NSString *folderPath = [filePath stringByDeletingLastPathComponent];
+  if (![[NSFileManager defaultManager] fileExistsAtPath:folderPath]) {
+    [[NSFileManager defaultManager] createDirectoryAtPath:folderPath withIntermediateDirectories:YES attributes:nil error:nil];
+  }
+
+  NSData *urlData = [data dataUsingEncoding:NSUTF8StringEncoding];
   [urlData writeToFile:filePath atomically:YES];
   return filePath;
 }

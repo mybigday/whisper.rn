@@ -42,12 +42,24 @@ export type TranscribeResult = {
   }>,
 }
 
+export type CoreMLAsset = {
+  uri: string,
+  filepath: string,
+}
+
+type NativeContextOptions = {
+  filePath: string,
+  isBundleAsset: boolean,
+  downloadCoreMLAssets?: boolean,
+  coreMLAssets?: CoreMLAsset[],
+}
+
 export interface Spec extends TurboModule {
   getConstants(): {
     useCoreML: boolean
     coreMLAllowFallback: boolean
   };
-  initContext(filePath: string, isBundleAsset: boolean): Promise<number>;
+  initContext(options: NativeContextOptions): Promise<number>;
   releaseContext(contextId: number): Promise<void>;
   releaseAllContexts(): Promise<void>;
   transcribeFile(

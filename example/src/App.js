@@ -154,7 +154,14 @@ export default function App() {
               } else {
                 options = {
                   filePath: require('../assets/ggml-tiny.en.bin'),
-                  // TODO: Support bundle Core ML model files into assets
+                  coreMLModel: {
+                    filename: 'ggml-tiny.en-encoder.mlmodelc',
+                    assets: [
+                      require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
+                      require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
+                      require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
+                    ]
+                  }
                 }
               }
               log('Initialize context...')
