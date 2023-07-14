@@ -1,6 +1,6 @@
 #import "RNWhisper.h"
 #import "RNWhisperContext.h"
-#import "SimpleFileDownloader.h"
+#import "RNWhisperDownloader.h"
 #include <stdlib.h>
 #include <string>
 
@@ -55,14 +55,14 @@ RCT_REMAP_METHOD(initContext,
         for (NSDictionary *coreMLAsset in coreMLAssets) {
             NSString *path = coreMLAsset[@"uri"];
             if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-                [SimpleFileDownloader downloadFile:path toFile:coreMLAsset[@"filepath"]];
+                [RNWhisperDownloader downloadFile:path toFile:coreMLAsset[@"filepath"]];
             }
         }
     }
 
     NSString *path = modelPath;
     if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-        path = [SimpleFileDownloader downloadFile:path toFile:nil];
+        path = [RNWhisperDownloader downloadFile:path toFile:nil];
     }
     if (isBundleAsset) {
         path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
@@ -105,7 +105,7 @@ RCT_REMAP_METHOD(transcribeFile,
 
     NSString *path = waveFilePath;
     if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-        path = [SimpleFileDownloader downloadFile:path toFile:nil];
+        path = [RNWhisperDownloader downloadFile:path toFile:nil];
     }
 
     int count = 0;
@@ -243,7 +243,7 @@ RCT_REMAP_METHOD(releaseAllContexts,
     [contexts removeAllObjects];
     contexts = nil;
 
-    [SimpleFileDownloader clearCache];
+    [RNWhisperDownloader clearCache];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

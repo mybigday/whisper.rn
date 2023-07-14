@@ -26,13 +26,13 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
   public static final String NAME = "RNWhisper";
 
   private ReactApplicationContext reactContext;
-  private SimpleFileDownloader fileDownloader;
+  private Downloader downloader;
 
   public RNWhisperModule(ReactApplicationContext reactContext) {
     super(reactContext);
     reactContext.addLifecycleEventListener(this);
     this.reactContext = reactContext;
-    this.fileDownloader = new SimpleFileDownloader(reactContext);
+    this.downloader = new Downloader(reactContext);
   }
 
   @Override
@@ -83,7 +83,7 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
 
           String modelFilePath = modelPath;
           if (!isBundleAsset && (modelPath.startsWith("http://") || modelPath.startsWith("https://"))) {
-            modelFilePath = fileDownloader.downloadFile(modelPath);
+            modelFilePath = downloader.downloadFile(modelPath);
           }
 
           long context;
@@ -145,7 +145,7 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
           String waveFilePath = filePath;
 
           if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-            waveFilePath = fileDownloader.downloadFile(filePath);
+            waveFilePath = downloader.downloadFile(filePath);
           }
 
           int resId = getResourceIdentifier(waveFilePath);
@@ -281,6 +281,6 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
       context.release();
     }
     contexts.clear();
-    fileDownloader.clearCache();
+    downloader.clearCache();
   }
 }

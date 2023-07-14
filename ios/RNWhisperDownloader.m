@@ -1,14 +1,14 @@
-#import "SimpleFileDownloader.h"
+#import "RNWhisperDownloader.h"
 
 /**
- * NOTE: This is simple FileDownloader,
+ * NOTE: This is simple downloader,
  * the main purpose is supported load assets on RN Debug mode,
  * so it's a very crude implementation.
  * 
  * If you want to use file download in production to load model / audio files,
  * I would recommend using react-native-fs or expo-file-system to manage the files.
  */
-@implementation SimpleFileDownloader
+@implementation RNWhisperDownloader
 
 + (NSString *)downloadFile:(NSString *)urlString toFile:(NSString *)path {
   NSURL *url = [NSURL URLWithString:urlString];

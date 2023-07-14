@@ -11,17 +11,17 @@ import java.net.URL;
 import java.net.URLConnection;
 
 /**
- * NOTE: This is simple FileDownloader,
+ * NOTE: This is simple downloader,
  * the main purpose is supported load assets on RN Debug mode,
  * so it's a very crude implementation.
  * 
  * If you want to use file download in production to load model / audio files,
  * I would recommend using react-native-fs or expo-file-system to manage the files.
  */
-public class SimpleFileDownloader {
+public class Downloader {
   private static Context context;
 
-  public SimpleFileDownloader(Context context) {
+  public Downloader(Context context) {
     this.context = context;
   }
 
