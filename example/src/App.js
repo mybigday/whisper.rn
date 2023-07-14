@@ -13,6 +13,7 @@ import RNFS from 'react-native-fs'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper, libVersion } from 'whisper.rn'
 import sampleFile from '../assets/jfk.wav'
+import contextOpts from './context-opts'
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -124,18 +125,7 @@ export default function App() {
               const startTime = Date.now()
               const ctx = await initWhisper({
                 filePath: require('../assets/ggml-tiny.en.bin'),
-                // If you want to use this option, please convert Core ML models by yourself
-                // coreMLModelAsset:
-                //   Platform.OS === 'ios'
-                //     ? {
-                //         filename: 'ggml-tiny.en-encoder.mlmodelc',
-                //         assets: [
-                //           require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
-                //           require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
-                //           require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
-                //         ],
-                //       }
-                //     : undefined,
+                ...contextOpts,
               })
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)

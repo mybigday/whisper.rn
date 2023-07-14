@@ -159,6 +159,8 @@ const whisperContext = await initWhisper({
 })
 ```
 
+In real world, we recommended to split the asset imports into another platform specific file (e.g. `context-opts.ios.js`) to avoid these unused files in the bundle for Android.
+
 ## Run with example
 
 The example app provide a simple UI for testing the functions.
