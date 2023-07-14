@@ -140,7 +140,7 @@ Or just use `require` to bundle that in your app, like the example app does, but
 ```js
 const whisperContext = await initWhisper({
   filePath: require('../assets/ggml-tiny.en.bin')
-  coreMLModelAssets:
+  coreMLModelAsset:
     Platform.OS === 'ios'
       ? {
           filename: 'ggml-tiny.en-encoder.mlmodelc',

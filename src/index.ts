@@ -237,7 +237,7 @@ export type ContextOptions = {
    * use this option is required if you want to enable Core ML,
    * you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require`
    */
-  coreMLModelAssets?: {
+  coreMLModelAsset?: {
     filename: string
     assets: number[]
   }
@@ -253,13 +253,13 @@ const coreMLModelAssetPaths = [
 
 export async function initWhisper({
   filePath,
-  coreMLModelAssets,
+  coreMLModelAsset,
   isBundleAsset,
 }: ContextOptions): Promise<WhisperContext> {
   let path = ''
   let coreMLAssets: CoreMLAsset[] | undefined
-  if (coreMLModelAssets) {
-    const { filename, assets } = coreMLModelAssets
+  if (coreMLModelAsset) {
+    const { filename, assets } = coreMLModelAsset
     if (filename && assets) {
       coreMLAssets = assets
         ?.map((asset) => {

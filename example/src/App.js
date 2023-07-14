@@ -154,7 +154,7 @@ export default function App() {
                 options = {
                   filePath: require('../assets/ggml-tiny.en.bin'),
                   // If you want to use this option, please convert Core ML models by yourself
-                  // coreMLModelAssets:
+                  // coreMLModelAsset:
                   //   Platform.OS === 'ios'
                   //     ? {
                   //         filename: 'ggml-tiny.en-encoder.mlmodelc',
