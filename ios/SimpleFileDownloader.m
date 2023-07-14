@@ -30,18 +30,4 @@
   return filePath;
 }
 
-+ (NSString *)saveData:(NSString *)data toFile:(NSString *)path {
-  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper/"];
-  filePath = [filePath stringByAppendingPathComponent:path];
-
-  NSString *folderPath = [filePath stringByDeletingLastPathComponent];
-  if (![[NSFileManager defaultManager] fileExistsAtPath:folderPath]) {
-    [[NSFileManager defaultManager] createDirectoryAtPath:folderPath withIntermediateDirectories:YES attributes:nil error:nil];
-  }
-
-  NSData *urlData = [data dataUsingEncoding:NSUTF8StringEncoding];
-  [urlData writeToFile:filePath atomically:YES];
-  return filePath;
-}
-
 @end

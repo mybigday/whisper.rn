@@ -6,7 +6,11 @@ import {
   Image,
 } from 'react-native'
 import RNWhisper from './NativeRNWhisper'
-import type { TranscribeOptions, TranscribeResult, CoreMLAsset } from './NativeRNWhisper'
+import type {
+  TranscribeOptions,
+  TranscribeResult,
+  CoreMLAsset,
+} from './NativeRNWhisper'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
@@ -213,32 +217,36 @@ export class WhisperContext {
   }
 }
 
+export type ContextOptions = {
+  filePath: string | number
+  /**
+   * CoreML model assets, if you're using `require` on filePath,
+   * use this option is required if you want to enable Core ML,
+   * you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require`
+   */
+  coreMLModelAssets?: {
+    filename: string
+    assets: number[]
+  }
+  /** Is the file path a bundle asset for pure string filePath */
+  isBundleAsset?: boolean
+}
+
 const coreMLModelAssetPaths = [
   'weights/weight.bin',
   'model.mil',
   'coremldata.bin',
 ]
 
-export type ContextOptions = {
-  filePath: string | number
-  /** Is the file path a bundle asset for pure string filePath */
-  isBundleAsset?: boolean
-  /** CoreML model assets */
-  coreMLModel?: {
-    filename: string
-    assets: number[]
-  }
-}
-
 export async function initWhisper({
   filePath,
-  coreMLModel,
+  coreMLModelAssets,
   isBundleAsset,
 }: ContextOptions): Promise<WhisperContext> {
   let path = ''
   let coreMLAssets: CoreMLAsset[] | undefined
-  if (coreMLModel) {
-    const { filename, assets } = coreMLModel
+  if (coreMLModelAssets) {
+    const { filename, assets } = coreMLModelAssets
     if (filename && assets) {
       coreMLAssets = assets
         ?.map((asset) => {
