@@ -107,6 +107,8 @@ export class WhisperContext {
         throw new Error(`Invalid asset: ${filePath}`)
       }
     } else {
+      if (filePath.startsWith('http'))
+        throw new Error('Transcribe remote file is not supported, please download it first')
       path = filePath
     }
     const jobId: number = Math.floor(Math.random() * 10000)
@@ -285,6 +287,8 @@ export async function initWhisper({
       throw new Error(`Invalid asset: ${filePath}`)
     }
   } else {
+    if (filePath.startsWith('http'))
+      throw new Error('Transcribe remote file is not supported, please download it first')
     path = filePath
   }
   const id = await RNWhisper.initContext({
