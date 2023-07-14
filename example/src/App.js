@@ -12,6 +12,7 @@ import {
 import RNFS from 'react-native-fs'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper, libVersion } from 'whisper.rn'
+import sampleFile from '../assets/jfk.wav'
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -25,8 +26,7 @@ if (Platform.OS === 'android') {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
+  container: {
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -68,22 +68,11 @@ function toTimestamp(t, comma = false) {
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
-// Set to true to use the model from network
-const USE_DOWNLOAD_ASSET = false
-
-const modelURL =
-  'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin'
-const sampleURL =
-  'https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav'
-
 const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
 
 const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
-const sampleFilePath = USE_DOWNLOAD_ASSET
-  ? `${fileDir}/jfk.wav`
-  : require('../assets/jfk.wav')
 
 const createDir = async (log) => {
   if (!(await RNFS.exists(fileDir))) {
@@ -94,26 +83,6 @@ const createDir = async (log) => {
 
 const filterPath = (path) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
-
-const downloadModel = async (log, progress) => {
-  await createDir(log)
-  if (await RNFS.exists(modelFilePath)) {
-    log('Model already exists:')
-    log(filterPath(modelFilePath))
-  } else {
-    log('Start Download Model to:')
-    log(filterPath(modelFilePath))
-    await RNFS.downloadFile({
-      fromUrl: modelURL,
-      toFile: modelFilePath,
-      progressInterval: 1000,
-      begin: () => {},
-      progress,
-    }).promise
-    log('Downloaded model file:')
-    log(filterPath(modelFilePath))
-  }
-}
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
@@ -134,8 +103,8 @@ export default function App() {
   )
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <SafeAreaView style={styles.container}>
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
@@ -146,69 +115,83 @@ export default function App() {
                 setWhisperContext(null)
                 log('Released previous context')
               }
-              let options
-              if (USE_DOWNLOAD_ASSET) {
-                await downloadModel(log, progress)
-                options = { filePath: modelFilePath }
-              } else {
-                options = {
-                  filePath: require('../assets/ggml-tiny.en.bin'),
-                  // If you want to use this option, please convert Core ML models by yourself
-                  // coreMLModelAsset:
-                  //   Platform.OS === 'ios'
-                  //     ? {
-                  //         filename: 'ggml-tiny.en-encoder.mlmodelc',
-                  //         assets: [
-                  //           require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
-                  //           require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
-                  //           require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
-                  //         ],
-                  //       }
-                  //     : undefined,
-                }
-              }
               log('Initialize context...')
               const startTime = Date.now()
-              const ctx = await initWhisper(options)
+              const ctx = await initWhisper({
+                filePath: require('../assets/ggml-tiny.en.bin'),
+                // If you want to use this option, please convert Core ML models by yourself
+                // coreMLModelAsset:
+                //   Platform.OS === 'ios'
+                //     ? {
+                //         filename: 'ggml-tiny.en-encoder.mlmodelc',
+                //         assets: [
+                //           require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
+                //           require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
+                //           require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
+                //         ],
+                //       }
+                //     : undefined,
+              })
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
               setWhisperContext(ctx)
             }}
           >
-            <Text style={styles.buttonText}>Initialize Context</Text>
+            <Text style={styles.buttonText}>Initialize (Use Asset)</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={async () => {
+              if (whisperContext) {
+                log('Found previous context')
+                await whisperContext.release()
+                setWhisperContext(null)
+                log('Released previous context')
+              }
+              await createDir(log)
+              if (await RNFS.exists(modelFilePath)) {
+                log('Model already exists:')
+                log(filterPath(modelFilePath))
+              } else {
+                log('Start Download Model to:')
+                log(filterPath(modelFilePath))
+                await RNFS.downloadFile({
+                  fromUrl:
+                    'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
+                  toFile: modelFilePath,
+                  progressInterval: 1000,
+                  begin: () => {},
+                  progress,
+                }).promise
+                log('Downloaded model file:')
+                log(filterPath(modelFilePath))
+              }
+              log('Initialize context...')
+              const startTime = Date.now()
+              const ctx = await initWhisper({ filePath: modelFilePath })
+              const endTime = Date.now()
+              log('Loaded model, ID:', ctx.id)
+              log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+              setWhisperContext(ctx)
+            }}
+          >
+            <Text style={styles.buttonText}>Initialize (Download)</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
             disabled={!!stopTranscribe?.stop}
             onPress={async () => {
               if (!whisperContext) return log('No context')
 
-              await createDir(log)
-              if (USE_DOWNLOAD_ASSET) {
-                if (await RNFS.exists(sampleFilePath)) {
-                  log('Sample file already exists:')
-                  log(filterPath(sampleFilePath))
-                } else {
-                  log('Start download sample file to:')
-                  log(filterPath(sampleFilePath))
-                  await RNFS.downloadFile({
-                    fromUrl: sampleURL,
-                    toFile: sampleFilePath,
-                    progressInterval: 1000,
-                    begin: () => {},
-                    progress,
-                  }).promise
-                  log('Downloaded sample file:')
-                  log(filterPath(sampleFilePath))
-                }
-              }
               log('Start transcribing...')
               const startTime = Date.now()
               const {
                 // stop,
                 promise,
-              } = whisperContext.transcribe(sampleFilePath, {
+              } = whisperContext.transcribe(sampleFile, {
                 language: 'en',
                 maxLen: 1,
                 tokenTimestamps: true,
@@ -333,7 +316,7 @@ export default function App() {
         >
           <Text style={styles.buttonText}>Clear Download files</Text>
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ScrollView>
   )
 }

@@ -161,9 +161,9 @@ const whisperContext = await initWhisper({
 
 ## Run with example
 
-The example app is using [react-native-fs](https://github.com/itinance/react-native-fs) to download the model file and audio file.
+The example app provide a simple UI for testing the functions.
 
-Model: `base.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp  
+Used Whisper model: `tiny.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp  
 Sample file: `jfk.wav` in https://github.com/ggerganov/whisper.cpp/tree/master/samples
 
 For test better performance on transcribe, you can run the app in Release mode.
