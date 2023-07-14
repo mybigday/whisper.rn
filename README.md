@@ -182,6 +182,10 @@ jest.mock('whisper.rn', () => require('whisper.rn/jest/mock'))
 
 See the [contributing guide](CONTRIBUTING.md) to learn how to contribute to the repository and the development workflow.
 
+## Troubleshooting
+
+See the [troubleshooting](TROUBLESHOOTING.md) if you encounter any problem while using `whisper.rn`.
+
 ## License
 
 MIT
