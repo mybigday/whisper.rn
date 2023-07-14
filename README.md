@@ -82,7 +82,7 @@ Please visit the [Documentation](docs/) for more details.
 
 ## Usage with assets
 
-You can also use the model file / audio file from assets, but it will increase the app size significantly.
+You can also use the model file / audio file from assets:
 
 ```js
 import { initWhisper } from 'whisper.rn'
@@ -97,7 +97,7 @@ const { stop, promise } =
 // ...
 ```
 
-This will required to edit the `metro.config.js` to support assets:
+This requires editing the `metro.config.js` to support assets:
 
 ```js
 // ...
@@ -115,6 +115,8 @@ module.exports = {
   },
 }
 ```
+
+Please note that it will significantly increase the size of the app in release mode.
 
 ## Core ML support
 
