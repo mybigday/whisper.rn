@@ -16,7 +16,6 @@
     "cpp/*.*",
     "cpp/coreml/*.*",
     "*.podspec",
-    "extendMetroConfig.js",
     "!lib/typescript/example",
     "!ios/build",
     "!android/build",

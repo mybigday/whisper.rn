@@ -101,14 +101,17 @@ This will required to edit the `metro.config.js` to support assets:
 
 ```js
 // ...
-const { extendAssetExts } = require('whisper.rn/extendMetroConfig')
+const defaultAssetExts = require('metro-config/src/defaults/defaults').assetExts
 
 module.exports = {
   // ...
   resolver: {
     // ...
-
-    assetExts: extendAssetExts(), // Or extendAssetExts(yourExtsHere)
+    assetExts: [
+      ...defaultAssetExts,
+      'bin', // whisper.rn: ggml model binary
+      'mil', // whisper.rn: CoreML model asset
+    ]
   },
 }
 ```
