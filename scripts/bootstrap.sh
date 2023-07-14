@@ -28,6 +28,7 @@ else
 fi
 
 # Copy to assets
+cp ../samples/jfk.wav ../../example/assets
 cp ggml-tiny.en.bin ../../example/assets
 echo "Copied ggml-tiny.en.bin to example/assets"
 

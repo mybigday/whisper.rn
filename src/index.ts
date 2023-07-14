@@ -90,7 +90,7 @@ export class WhisperContext {
 
   /** Transcribe audio file */
   transcribe(
-    path: string,
+    filePath: string | number,
     options: TranscribeOptions = {},
   ): {
     /** Stop the transcribe */
@@ -98,6 +98,17 @@ export class WhisperContext {
     /** Transcribe result promise */
     promise: Promise<TranscribeResult>
   } {
+    let path = ''
+    if (typeof filePath === 'number') {
+      try {
+        const source = Image.resolveAssetSource(filePath)
+        if (source) path = source.uri
+      } catch (e) {
+        throw new Error(`Invalid asset: ${filePath}`)
+      }
+    } else {
+      path = filePath
+    }
     const jobId: number = Math.floor(Math.random() * 10000)
     return {
       stop: () => RNWhisper.abortTranscribe(this.id, jobId),

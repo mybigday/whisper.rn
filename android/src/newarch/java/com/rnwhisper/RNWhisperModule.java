@@ -118,7 +118,11 @@ public class RNWhisperModule extends NativeRNWhisperSpec implements LifecycleEve
       @Override
       protected WritableMap doInBackground(Void... voids) {
         try {
-          return context.transcribeFile((int) jobId, filePath, options);
+          String waveFilePath = filePath;
+          if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+            waveFilePath = fileDownloader.downloadFile(filePath);
+          }
+          return context.transcribeFile((int) jobId, waveFilePath, options);
         } catch (Exception e) {
           exception = e;
           return null;

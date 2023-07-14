@@ -1,2 +1,3 @@
 *.mlmodelc
 **/assets/*.bin
+**/assets/*.wav

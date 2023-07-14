@@ -105,7 +105,14 @@ RCT_REMAP_METHOD(transcribeFile,
         return;
     }
 
-    NSURL *url = [NSURL fileURLWithPath:waveFilePath];
+    NSString *path = waveFilePath;
+
+    NSURL *url = [NSURL URLWithString:path];
+    if (url != nil) {
+        path = [SimpleFileDownloader downloadFile:url toFile:nil];
+    }
+
+    url = [NSURL fileURLWithPath:path];
 
     int count = 0;
     float *waveFile = [self decodeWaveFile:url count:&count];

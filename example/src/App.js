@@ -68,6 +68,9 @@ function toTimestamp(t, comma = false) {
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
+// Set to true to use the model from network
+const USE_DOWNLOAD_ASSET = false
+
 const modelURL =
   'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin'
 const sampleURL =
@@ -78,7 +81,9 @@ const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 console.log('[App] fileDir', fileDir)
 
 const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
-const sampleFilePath = `${fileDir}/jfk.wav`
+const sampleFilePath = USE_DOWNLOAD_ASSET
+  ? `${fileDir}/jfk.wav`
+  : require('../assets/jfk.wav')
 
 const createDir = async (log) => {
   if (!(await RNFS.exists(fileDir))) {
@@ -109,9 +114,6 @@ const downloadModel = async (log, progress) => {
     log(filterPath(modelFilePath))
   }
 }
-
-// Set to false to use the model from the bundle resources
-const USE_DOWNLOAD_MODEL = false
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
@@ -145,12 +147,9 @@ export default function App() {
                 log('Released previous context')
               }
               let options
-              if (USE_DOWNLOAD_MODEL) {
+              if (USE_DOWNLOAD_ASSET) {
                 await downloadModel(log, progress)
-                options = {
-                  filePath: modelFilePath,
-                  isBundleAsset: false,
-                }
+                options = { filePath: modelFilePath }
               } else {
                 options = {
                   filePath: require('../assets/ggml-tiny.en.bin'),
@@ -185,21 +184,23 @@ export default function App() {
               if (!whisperContext) return log('No context')
 
               await createDir(log)
-              if (await RNFS.exists(sampleFilePath)) {
-                log('Sample file already exists:')
-                log(filterPath(sampleFilePath))
-              } else {
-                log('Start download sample file to:')
-                log(filterPath(sampleFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: sampleURL,
-                  toFile: sampleFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded sample file:')
-                log(filterPath(sampleFilePath))
+              if (USE_DOWNLOAD_ASSET) {
+                if (await RNFS.exists(sampleFilePath)) {
+                  log('Sample file already exists:')
+                  log(filterPath(sampleFilePath))
+                } else {
+                  log('Start download sample file to:')
+                  log(filterPath(sampleFilePath))
+                  await RNFS.downloadFile({
+                    fromUrl: sampleURL,
+                    toFile: sampleFilePath,
+                    progressInterval: 1000,
+                    begin: () => {},
+                    progress,
+                  }).promise
+                  log('Downloaded sample file:')
+                  log(filterPath(sampleFilePath))
+                }
               }
               log('Start transcribing...')
               const startTime = Date.now()
