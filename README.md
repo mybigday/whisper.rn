@@ -91,19 +91,36 @@ The `.mlmodelc` model files is load depend on the ggml model file path. For exam
 
 Currently there is no official way to get the Core ML models by URL, you will need to convert Core ML models by yourself. Please see [Core ML Support](https://github.com/ggerganov/whisper.cpp#core-ml-support) of whisper.cpp for more details.
 
-During the `.mlmodelc` is a directory, you will need to download 5 files:
+During the `.mlmodelc` is a directory, you will need to download 5 files (3 required):
 
 ```json5
 [
   'model.mil',
-  'metadata.json',
   'coremldata.bin',
   'weights/weight.bin',
-  'analytics/coremldata.bin',
+  // Not required:
+  // 'metadata.json', 'analytics/coremldata.bin',
 ]
 ```
 
-Or just add them to your app's bundle resources, like the example app does, but this would increase the app size significantly.
+Or just use `require` to bundle that in your app, like the example app does, but this would increase the app size significantly.
+
+```js
+const whisperContext = await initWhisper({
+  filePath: require('../assets/ggml-tiny.en.bin')
+  coreMLModelAssets:
+    Platform.OS === 'ios'
+      ? {
+          filename: 'ggml-tiny.en-encoder.mlmodelc',
+          assets: [
+            require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
+            require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
+            require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
+          ],
+        }
+      : undefined,
+})
+```
 
 ## Run with example
 
