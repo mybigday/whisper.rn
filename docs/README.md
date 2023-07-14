@@ -47,7 +47,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:233](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L233)
+[index.ts:233](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L233)
 
 ___
 
@@ -77,7 +77,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:4](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/NativeRNWhisper.ts#L4)
+[NativeRNWhisper.ts:4](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/NativeRNWhisper.ts#L4)
 
 ___
 
@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[index.ts:45](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L45)
+[index.ts:45](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L45)
 
 ___
 
@@ -120,7 +120,7 @@ ___
 
 #### Defined in
 
-[index.ts:78](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L78)
+[index.ts:78](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L78)
 
 ___
 
@@ -144,7 +144,7 @@ ___
 
 #### Defined in
 
-[index.ts:65](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L65)
+[index.ts:65](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L65)
 
 ___
 
@@ -154,7 +154,7 @@ ___
 
 #### Defined in
 
-[index.ts:30](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L30)
+[index.ts:30](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L30)
 
 ___
 
@@ -171,7 +171,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:36](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/NativeRNWhisper.ts#L36)
+[NativeRNWhisper.ts:36](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/NativeRNWhisper.ts#L36)
 
 ## Variables
 
@@ -183,7 +183,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:316](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L316)
+[index.ts:316](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L316)
 
 ___
 
@@ -195,7 +195,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:313](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L313)
+[index.ts:313](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L313)
 
 ___
 
@@ -207,7 +207,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:308](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L308)
+[index.ts:308](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L308)
 
 ## Functions
 
@@ -227,7 +227,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:254](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L254)
+[index.ts:254](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L254)
 
 ___
 
@@ -241,4 +241,4 @@ ___
 
 #### Defined in
 
-[index.ts:303](https://github.com/mybigday/whisper.rn/blob/99bdfec/src/index.ts#L303)
+[index.ts:303](https://github.com/mybigday/whisper.rn/blob/6ddd42b/src/index.ts#L303)
