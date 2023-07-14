@@ -286,7 +286,7 @@ export async function initWhisper({
       throw new Error(`Invalid asset: ${filePath}`)
     }
   } else {
-    if (filePath.startsWith('http'))
+    if (!isBundleAsset && filePath.startsWith('http'))
       throw new Error('Transcribe remote file is not supported, please download it first')
     path = filePath
   }
