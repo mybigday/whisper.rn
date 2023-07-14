@@ -281,7 +281,6 @@ export async function initWhisper({
       const source = Image.resolveAssetSource(filePath)
       if (source) {
         path = source.uri
-        isBundleAsset = false
       }
     } catch (e) {
       throw new Error(`Invalid asset: ${filePath}`)

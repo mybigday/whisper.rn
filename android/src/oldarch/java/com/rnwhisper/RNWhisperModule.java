@@ -18,6 +18,9 @@ import com.facebook.react.module.annotations.ReactModule;
 
 import java.util.HashMap;
 import java.util.Random;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.PushbackInputStream;
 
 @ReactModule(name = RNWhisperModule.NAME)
 public class RNWhisperModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
@@ -41,6 +44,22 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
 
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
 
+  private int getResourceIdentifier(String filePath) {
+    int identifier = reactContext.getResources().getIdentifier(
+      filePath,
+      "drawable",
+      reactContext.getPackageName()
+    );
+    if (identifier == 0) {
+      identifier = reactContext.getResources().getIdentifier(
+        filePath,
+        "raw",
+        reactContext.getPackageName()
+      );
+    }
+    return identifier;
+  }
+
   @ReactMethod
   public void initContext(final ReadableMap options, final Promise promise) {
     new AsyncTask<Void, Void, Integer>() {
@@ -58,7 +77,12 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
           }
 
           long context;
-          if (isBundleAsset) {
+          int resId = getResourceIdentifier(modelFilePath);
+          if (resId > 0) {
+            context = WhisperContext.initContextWithInputStream(
+              new PushbackInputStream(reactContext.getResources().openRawResource(resId))
+            );
+          } else if (isBundleAsset) {
             context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelFilePath);
           } else {
             context = WhisperContext.initContext(modelFilePath);
@@ -108,7 +132,26 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
       @Override
       protected WritableMap doInBackground(Void... voids) {
         try {
-          return context.transcribeFile(jobId, filePath, options);
+          String waveFilePath = filePath;
+
+          if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+            waveFilePath = fileDownloader.downloadFile(filePath);
+          }
+
+          int resId = getResourceIdentifier(waveFilePath);
+          if (resId > 0) {
+            return context.transcribeInputStream(
+              (int) jobId,
+              reactContext.getResources().openRawResource(resId),
+              options
+            );
+          }
+
+          return context.transcribeInputStream(
+            (int) jobId,
+            new FileInputStream(new File(waveFilePath)),
+            options
+          );
         } catch (Exception e) {
           exception = e;
           return null;

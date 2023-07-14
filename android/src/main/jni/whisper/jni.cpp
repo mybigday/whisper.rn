@@ -20,6 +20,86 @@ static inline int min(int a, int b) {
     return (a < b) ? a : b;
 }
 
+// Load model from input stream (used for drawable / raw resources)
+struct InputStreamContext {
+    JNIEnv *env;
+    jobject input_stream;
+};
+
+static size_t input_stream_read(void *ctx, void *output, size_t read_size) {
+    InputStreamContext *context = (InputStreamContext *)ctx;
+    JNIEnv *env = context->env;
+    jobject input_stream = context->input_stream;
+
+    jclass inputStreamClass = env->GetObjectClass(input_stream);
+
+    jbyteArray buffer = env->NewByteArray(read_size);
+    jmethodID gInputStream_readMethod = env->GetMethodID(inputStreamClass, "read", "([B)I");
+    jint bytesRead = env->CallIntMethod(input_stream, gInputStream_readMethod, buffer);
+
+    if (bytesRead > 0) {
+        env->GetByteArrayRegion(buffer, 0, bytesRead, (jbyte *) output);
+    }
+
+    env->DeleteLocalRef(buffer);
+
+    return bytesRead;
+}
+
+static bool input_stream_is_eof(void *ctx) {
+    InputStreamContext *context = (InputStreamContext *)ctx;
+    JNIEnv *env = context->env;
+    jobject input_stream = context->input_stream;
+
+    jclass inputStreamClass = env->GetObjectClass(input_stream);
+
+    jbyteArray buffer = env->NewByteArray(1);
+    jmethodID gInputStream_readMethod = env->GetMethodID(inputStreamClass, "read", "([B)I");
+    jint bytesRead = env->CallIntMethod(input_stream, gInputStream_readMethod, buffer);
+
+    bool isEof = (bytesRead == -1);
+    if (!isEof) {
+        // If we successfully read a byte, "unread" it by pushing it back into the stream.
+        jmethodID gPushbackInputStream_unreadMethod = env->GetMethodID(inputStreamClass, "unread", "([BII)V");
+        env->CallVoidMethod(input_stream, gPushbackInputStream_unreadMethod, buffer, 0, 1);
+    }
+
+    env->DeleteLocalRef(buffer);
+
+    return isEof;
+}
+
+static void input_stream_close(void *ctx) {
+    InputStreamContext *context = (InputStreamContext *)ctx;
+    JNIEnv *env = context->env;
+    jobject input_stream = context->input_stream;
+
+    jclass inputStreamClass = env->GetObjectClass(input_stream);
+    
+    jmethodID gInputStream_closeMethod = env->GetMethodID(inputStreamClass, "close", "()V");
+    env->CallVoidMethod(input_stream, gInputStream_closeMethod);
+    env->DeleteGlobalRef(input_stream);
+}
+
+static struct whisper_context *whisper_init_from_input_stream(
+    JNIEnv *env,
+    jobject input_stream
+) {
+    
+    InputStreamContext *context = new InputStreamContext;
+    context->env = env;
+    context->input_stream = env->NewGlobalRef(input_stream);
+
+    whisper_model_loader loader = {
+        .context = context,
+        .read = &input_stream_read,
+        .eof = &input_stream_is_eof,
+        .close = &input_stream_close
+    };
+    return whisper_init(&loader);
+}
+
+// Load model from asset
 static size_t asset_read(void *ctx, void *output, size_t read_size) {
     return AAsset_read((AAsset *) ctx, output, read_size);
 }
@@ -81,6 +161,17 @@ Java_com_rnwhisper_WhisperContext_initContextWithAsset(
     return reinterpret_cast<jlong>(context);
 }
 
+JNIEXPORT jlong JNICALL
+Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
+    JNIEnv *env,
+    jobject thiz,
+    jobject input_stream
+) {
+    UNUSED(thiz);
+    struct whisper_context *context = nullptr;
+    context = whisper_init_from_input_stream(env, input_stream);
+    return reinterpret_cast<jlong>(context);
+}
 
 JNIEXPORT jint JNICALL
 Java_com_rnwhisper_WhisperContext_fullTranscribe(
