@@ -1,5 +1,6 @@
 #import "RNWhisper.h"
 #import "RNWhisperContext.h"
+#import "SimpleFileDownloader.h"
 #include <stdlib.h>
 #include <string>
 
@@ -45,6 +46,11 @@ RCT_REMAP_METHOD(initContext,
     }
 
     NSString *path = modelPath;
+
+    NSURL *url = [NSURL URLWithString:modelPath];
+    if (url != nil) {
+        path = [SimpleFileDownloader downloadFile:url];
+    }
     if (isBundleAsset) {
         path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
     }

@@ -153,7 +153,6 @@ export default function App() {
                 }
               } else {
                 options = {
-                  // Use the bundle resource (Need add model to Xcode project / Android assets)
                   filePath: require('../assets/ggml-tiny.en.bin'),
                   // TODO: Support bundle Core ML model files into assets
                 }
