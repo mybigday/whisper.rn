@@ -36,6 +36,10 @@ yarn example pods
 yarn example ios
 ```
 
+For test better performance on transcribe, you can run the app in Release mode:
+- iOS: `yarn example ios --mode Release`
+- Android: `yarn example android --mode release`
+
 Make sure your code passes TypeScript and ESLint. Run the following to verify:
 
 ```sh

@@ -173,10 +173,6 @@ The example app provide a simple UI for testing the functions.
 Used Whisper model: `tiny.en` in https://huggingface.co/ggerganov/whisper.cpp  
 Sample file: `jfk.wav` in https://github.com/ggerganov/whisper.cpp/tree/master/samples
 
-For test better performance on transcribe, you can run the app in Release mode.
-  - iOS: `yarn example ios --mode Release`
-  - Android: `yarn example android --mode release`
-
 Please follow the [Development Workflow section of contributing guide](./CONTRIBUTING.md#development-workflow) to run the example app.
 
 ## Mock `whisper.rn`
