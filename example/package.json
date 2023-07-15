@@ -11,7 +11,8 @@
   "dependencies": {
     "react": "18.2.0",
     "react-native": "0.71.11",
-    "react-native-fs": "^2.20.0"
+    "react-native-fs": "^2.20.0",
+    "react-native-zip-archive": "^6.0.9"
   },
   "devDependencies": {
     "@babel/core": "^7.22.9",
