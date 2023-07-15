@@ -1,3 +1,5 @@
+// import { Platform } from 'react-native'
+
 export default {
   // If you want to use this option, please convert Core ML models by yourself
   // coreMLModelAsset:
