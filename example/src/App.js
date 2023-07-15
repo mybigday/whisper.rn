@@ -75,8 +75,6 @@ const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
 
-const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
-
 const createDir = async (log) => {
   if (!(await RNFS.exists(fileDir))) {
     log('Create dir', fileDir)
@@ -145,6 +143,7 @@ export default function App() {
                 log('Released previous context')
               }
               await createDir(log)
+              const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
               if (await RNFS.exists(modelFilePath)) {
                 log('Model already exists:')
                 log(filterPath(modelFilePath))
@@ -153,7 +152,7 @@ export default function App() {
                 log(filterPath(modelFilePath))
                 await RNFS.downloadFile({
                   fromUrl:
-                    'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
+                    'https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-tiny.en.bin',
                   toFile: modelFilePath,
                   progressInterval: 1000,
                   begin: () => {},
