@@ -13,7 +13,7 @@ React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/2fea7b2d-c911-44fb-9afc-8efc7b594446" width="300" /> | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/a5005a6c-44f7-4db9-95e8-0fd951a2e147" width="300" /> |
 | :------------------------------------------: | :------------------------------------------: |
 | iOS: Tested on iPhone 13 Pro Max | Android: Tested on Pixel 6 |
-| (tiny.en, Core ML enabled) | (tiny.en, armv8.2-a+fp16) |
+| (tiny.en, Core ML enabled, release mode + archive) | (tiny.en, armv8.2-a+fp16, release mode) |
 
 ## Installation
 
@@ -170,11 +170,11 @@ In real world, we recommended to split the asset imports into another platform s
 
 The example app provide a simple UI for testing the functions.
 
-Used Whisper model: `tiny.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp  
+Used Whisper model: `tiny.en` in https://huggingface.co/ggerganov/whisper.cpp  
 Sample file: `jfk.wav` in https://github.com/ggerganov/whisper.cpp/tree/master/samples
 
 For test better performance on transcribe, you can run the app in Release mode.
-  - iOS: `yarn example ios --configuration Release`
+  - iOS: `yarn example ios --mode Release`
   - Android: `yarn example android --mode release`
 
 Please follow the [Development Workflow section of contributing guide](./CONTRIBUTING.md#development-workflow) to run the example app.
