@@ -34,13 +34,10 @@ echo "Copied ggml-tiny.en.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-tiny.en-encoder.mlmodelc exist
 if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then
-  mkdir ggml-tiny.en-encoder.mlmodelc
-  echo "Created a dummy ggml-tiny.en-encoder.mlmodelc for testing."
-  echo "Please follow https://github.com/ggerganov/whisper.cpp#core-ml-support for convert a real model."
+  ./download-coreml-model.sh tiny.en
+  cp -r ./ggml-tiny.en-encoder.mlmodelc ../../example/assets/
 fi
 
 if [ ! -d ../../example/assets/ggml-tiny.en-encoder.mlmodelc ]; then
-  mkdir ../../example/assets/ggml-tiny.en-encoder.mlmodelc
-  echo "Created a dummy ./example/assets/ggml-tiny.en-encoder.mlmodelc for testing."
-  echo "Please follow https://github.com/ggerganov/whisper.cpp#core-ml-support for convert a real model."
+  cp -r ./ggml-tiny.en-encoder.mlmodelc ../../example/assets/
 fi

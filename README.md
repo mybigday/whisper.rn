@@ -129,9 +129,11 @@ To use Core ML on iOS, you will need to have the Core ML model files.
 
 The `.mlmodelc` model files is load depend on the ggml model file path. For example, if your ggml model path is `ggml-tiny.en.bin`, the Core ML model path will be `ggml-tiny.en-encoder.mlmodelc`. Please note that the ggml model is still needed as decoder or encoder fallback.
 
-Currently there is no official way to get the Core ML models by URL, you will need to convert Core ML models by yourself. Please see [Core ML Support](https://github.com/ggerganov/whisper.cpp#core-ml-support) of whisper.cpp for more details.
+The Core ML models are hosted here: https://huggingface.co/ggerganov/whisper.cpp/tree/main
 
-During the `.mlmodelc` is a directory, you will need to download 5 files (3 required):
+If you want to download model at runtime, during the host file is archive, you will need to unzip the file to get the `.mlmodelc` directory, you can use library like [react-native-zip-archive](https://github.com/mockingbot/react-native-zip-archive), or host those individual files to download yourself.
+
+The `.mlmodelc` is a directory, usually it includes 5 files (3 required):
 
 ```json5
 [

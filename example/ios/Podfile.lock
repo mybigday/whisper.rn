@@ -750,8 +750,16 @@ PODS:
     - React-perflogger (= 0.71.11)
   - RNFS (2.20.0):
     - React-Core
+  - RNZipArchive (6.0.9):
+    - React-Core
+    - RNZipArchive/Core (= 6.0.9)
+    - SSZipArchive (~> 2.2)
+  - RNZipArchive/Core (6.0.9):
+    - React-Core
+    - SSZipArchive (~> 2.2)
   - SocketRocket (0.6.0)
-  - whisper-rn (0.3.0-rc.5):
+  - SSZipArchive (2.4.3)
+  - whisper-rn (0.3.0-rc.6):
     - RCT-Folly
     - RCTRequired
     - RCTTypeSafety
@@ -827,6 +835,7 @@ DEPENDENCIES:
   - React-runtimeexecutor (from `../node_modules/react-native/ReactCommon/runtimeexecutor`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - RNFS (from `../node_modules/react-native-fs`)
+  - RNZipArchive (from `../node_modules/react-native-zip-archive`)
   - whisper-rn (from `../..`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
@@ -846,6 +855,7 @@ SPEC REPOS:
     - libevent
     - OpenSSL-Universal
     - SocketRocket
+    - SSZipArchive
     - YogaKit
 
 EXTERNAL SOURCES:
@@ -925,6 +935,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNFS:
     :path: "../node_modules/react-native-fs"
+  RNZipArchive:
+    :path: "../node_modules/react-native-zip-archive"
   whisper-rn:
     :path: "../.."
   Yoga:
@@ -982,8 +994,10 @@ SPEC CHECKSUMS:
   React-runtimeexecutor: 4817d63dbc9d658f8dc0ec56bd9b83ce531129f0
   ReactCommon: 08723d2ed328c5cbcb0de168f231bc7bae7f8aa1
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
+  RNZipArchive: 68a0c6db4b1c103f846f1559622050df254a3ade
   SocketRocket: fccef3f9c5cedea1353a9ef6ada904fde10d6608
-  whisper-rn: 208608140f4ff37edc397ec47d99b16dc6db81dd
+  SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
+  whisper-rn: c437aa26163e9285e2a0d48866c49650c176de7f
   Yoga: f7decafdc5e8c125e6fa0da38a687e35238420fa
   YogaKit: f782866e155069a2cca2517aafea43200b01fd5a
 

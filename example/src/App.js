@@ -10,6 +10,7 @@ import {
   PermissionsAndroid,
 } from 'react-native'
 import RNFS from 'react-native-fs'
+import { unzip } from 'react-native-zip-archive'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper, libVersion } from 'whisper.rn'
 import sampleFile from '../assets/jfk.wav'
@@ -74,6 +75,8 @@ const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
+
+const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
 
 const createDir = async (log) => {
   if (!(await RNFS.exists(fileDir))) {
@@ -151,8 +154,7 @@ export default function App() {
                 log('Start Download Model to:')
                 log(filterPath(modelFilePath))
                 await RNFS.downloadFile({
-                  fromUrl:
-                    'https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-tiny.en.bin',
+                  fromUrl: `${modelHost}/ggml-tiny.en.bin`,
                   toFile: modelFilePath,
                   progressInterval: 1000,
                   begin: () => {},
@@ -161,6 +163,28 @@ export default function App() {
                 log('Downloaded model file:')
                 log(filterPath(modelFilePath))
               }
+
+              // If you don't want to enable Core ML, you can remove this
+              const coremlModelFilePath = `${fileDir}/ggml-tiny.en-encoder.mlmodelc.zip`
+              if (Platform.OS === 'ios' && await RNFS.exists(coremlModelFilePath)) {
+                log('Model already exists:')
+                log(filterPath(coremlModelFilePath))
+              } else if (Platform.OS === 'ios') {
+                log('Start Download Core ML Model to:')
+                log(filterPath(coremlModelFilePath))
+                await RNFS.downloadFile({
+                  fromUrl: `${modelHost}/ggml-tiny.en-encoder.mlmodelc.zip`,
+                  toFile: coremlModelFilePath,
+                  progressInterval: 1000,
+                  begin: () => {},
+                  progress,
+                }).promise
+                log('Downloaded Core ML Model model file:')
+                log(filterPath(modelFilePath))
+                await unzip(coremlModelFilePath, fileDir)
+                log('Unzipped Core ML Model model successfully.')
+              }
+
               log('Initialize context...')
               const startTime = Date.now()
               const ctx = await initWhisper({ filePath: modelFilePath })
