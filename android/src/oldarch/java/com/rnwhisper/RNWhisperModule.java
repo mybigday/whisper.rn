@@ -18,17 +18,22 @@ import com.facebook.react.module.annotations.ReactModule;
 
 import java.util.HashMap;
 import java.util.Random;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.PushbackInputStream;
 
 @ReactModule(name = RNWhisperModule.NAME)
 public class RNWhisperModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
   public static final String NAME = "RNWhisper";
 
   private ReactApplicationContext reactContext;
+  private Downloader downloader;
 
   public RNWhisperModule(ReactApplicationContext reactContext) {
     super(reactContext);
     reactContext.addLifecycleEventListener(this);
     this.reactContext = reactContext;
+    this.downloader = new Downloader(reactContext);
   }
 
   @Override
@@ -39,19 +44,48 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
 
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
 
+  private int getResourceIdentifier(String filePath) {
+    int identifier = reactContext.getResources().getIdentifier(
+      filePath,
+      "drawable",
+      reactContext.getPackageName()
+    );
+    if (identifier == 0) {
+      identifier = reactContext.getResources().getIdentifier(
+        filePath,
+        "raw",
+        reactContext.getPackageName()
+      );
+    }
+    return identifier;
+  }
+
   @ReactMethod
-  public void initContext(final String modelPath, final boolean isBundleAsset, final Promise promise) {
+  public void initContext(final ReadableMap options, final Promise promise) {
     new AsyncTask<Void, Void, Integer>() {
       private Exception exception;
 
       @Override
       protected Integer doInBackground(Void... voids) {
         try {
+          String modelPath = options.getString("filePath");
+          boolean isBundleAsset = options.getBoolean("isBundleAsset");
+
+          String modelFilePath = modelPath;
+          if (!isBundleAsset && (modelPath.startsWith("http://") || modelPath.startsWith("https://"))) {
+            modelFilePath = downloader.downloadFile(modelPath);
+          }
+
           long context;
-          if (isBundleAsset) {
-            context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelPath);
+          int resId = getResourceIdentifier(modelFilePath);
+          if (resId > 0) {
+            context = WhisperContext.initContextWithInputStream(
+              new PushbackInputStream(reactContext.getResources().openRawResource(resId))
+            );
+          } else if (isBundleAsset) {
+            context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelFilePath);
           } else {
-            context = WhisperContext.initContext(modelPath);
+            context = WhisperContext.initContext(modelFilePath);
           }
           if (context == 0) {
             throw new Exception("Failed to initialize context");
@@ -98,7 +132,26 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
       @Override
       protected WritableMap doInBackground(Void... voids) {
         try {
-          return context.transcribeFile(jobId, filePath, options);
+          String waveFilePath = filePath;
+
+          if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+            waveFilePath = downloader.downloadFile(filePath);
+          }
+
+          int resId = getResourceIdentifier(waveFilePath);
+          if (resId > 0) {
+            return context.transcribeInputStream(
+              (int) jobId,
+              reactContext.getResources().openRawResource(resId),
+              options
+            );
+          }
+
+          return context.transcribeInputStream(
+            (int) jobId,
+            new FileInputStream(new File(waveFilePath)),
+            options
+          );
         } catch (Exception e) {
           exception = e;
           return null;
@@ -217,5 +270,6 @@ public class RNWhisperModule extends ReactContextBaseJavaModule implements Lifec
       context.release();
     }
     contexts.clear();
+    downloader.clearCache();
   }
 }

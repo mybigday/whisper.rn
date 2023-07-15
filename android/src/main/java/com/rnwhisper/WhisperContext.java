@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -281,10 +282,10 @@ public class WhisperContext {
     eventEmitter.emit(eventName, event);
   }
 
-  public WritableMap transcribeFile(int jobId, String filePath, ReadableMap options) throws IOException, Exception {
+  public WritableMap transcribeInputStream(int jobId, InputStream inputStream, ReadableMap options) throws IOException, Exception {
     this.jobId = jobId;
     isTranscribing = true;
-    float[] audioData = decodeWaveFile(new File(filePath));
+    float[] audioData = decodeWaveFile(inputStream);
     int code = full(jobId, options, audioData, audioData.length);
     isTranscribing = false;
     this.jobId = -1;
@@ -383,14 +384,12 @@ public class WhisperContext {
     freeContext(context);
   }
 
-  public static float[] decodeWaveFile(File file) throws IOException {
+  public static float[] decodeWaveFile(InputStream inputStream) throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    try (InputStream inputStream = new FileInputStream(file)) {
-      byte[] buffer = new byte[1024];
-      int bytesRead;
-      while ((bytesRead = inputStream.read(buffer)) != -1) {
-        baos.write(buffer, 0, bytesRead);
-      }
+    byte[] buffer = new byte[1024];
+    int bytesRead;
+    while ((bytesRead = inputStream.read(buffer)) != -1) {
+      baos.write(buffer, 0, bytesRead);
     }
     ByteBuffer byteBuffer = ByteBuffer.wrap(baos.toByteArray());
     byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -472,6 +471,7 @@ public class WhisperContext {
 
   protected static native long initContext(String modelPath);
   protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
+  protected static native long initContextWithInputStream(PushbackInputStream inputStream);
   protected static native int fullTranscribe(
     int job_id,
     long context,

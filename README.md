@@ -8,9 +8,12 @@ React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 
 [whisper.cpp](https://github.com/ggerganov/whisper.cpp): High-performance inference of [OpenAI's Whisper](https://github.com/openai/whisper) automatic speech recognition (ASR) model
 
-<img src="https://user-images.githubusercontent.com/3001525/225511664-8b2ba3ec-864d-4f55-bcb0-447aef168a32.jpeg" width="500" />
+## Screenshots
 
-> Run example with release mode on iPhone 13 Pro Max
+| <img src="https://github.com/mybigday/whisper.rn/assets/3001525/2fea7b2d-c911-44fb-9afc-8efc7b594446" width="300" /> | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/a5005a6c-44f7-4db9-95e8-0fd951a2e147" width="300" /> |
+| :------------------------------------------: | :------------------------------------------: |
+| iOS: Tested on iPhone 13 Pro Max | Android: Tested on Pixel 6 |
+| (tiny.en, Core ML enabled) | (tiny.en, armv8.2-a+fp16) |
 
 ## Installation
 
@@ -48,7 +51,6 @@ import { initWhisper } from 'whisper.rn'
 
 const whisperContext = await initWhisper({
   filePath: 'file://.../ggml-tiny.en.bin',
-  isBundleAsset: false, // Set to true if you want to load the model from bundle resources, the filePath will be like `ggml-tiny.en.bin`
 })
 
 const sampleFilePath = 'file://.../sample.wav'
@@ -81,6 +83,44 @@ In Android, you may need to request the microphone permission by [`PermissionAnd
 
 Please visit the [Documentation](docs/) for more details.
 
+## Usage with assets
+
+You can also use the model file / audio file from assets:
+
+```js
+import { initWhisper } from 'whisper.rn'
+
+const whisperContext = await initWhisper({
+  filePath: require('../assets/ggml-tiny.en.bin'),
+})
+
+const { stop, promise } =
+  whisperContext.transcribe(require('../assets/sample.wav'), options)
+
+// ...
+```
+
+This requires editing the `metro.config.js` to support assets:
+
+```js
+// ...
+const defaultAssetExts = require('metro-config/src/defaults/defaults').assetExts
+
+module.exports = {
+  // ...
+  resolver: {
+    // ...
+    assetExts: [
+      ...defaultAssetExts,
+      'bin', // whisper.rn: ggml model binary
+      'mil', // whisper.rn: CoreML model asset
+    ]
+  },
+}
+```
+
+Please note that it will significantly increase the size of the app in release mode.
+
 ## Core ML support
 
 __*Platform: iOS 15.0+, tvOS 15.0+*__
@@ -91,25 +131,44 @@ The `.mlmodelc` model files is load depend on the ggml model file path. For exam
 
 Currently there is no official way to get the Core ML models by URL, you will need to convert Core ML models by yourself. Please see [Core ML Support](https://github.com/ggerganov/whisper.cpp#core-ml-support) of whisper.cpp for more details.
 
-During the `.mlmodelc` is a directory, you will need to download 5 files:
+During the `.mlmodelc` is a directory, you will need to download 5 files (3 required):
 
 ```json5
 [
   'model.mil',
-  'metadata.json',
   'coremldata.bin',
   'weights/weight.bin',
-  'analytics/coremldata.bin',
+  // Not required:
+  // 'metadata.json', 'analytics/coremldata.bin',
 ]
 ```
 
-Or just add them to your app's bundle resources, like the example app does, but this would increase the app size significantly.
+Or just use `require` to bundle that in your app, like the example app does, but this would increase the app size significantly.
+
+```js
+const whisperContext = await initWhisper({
+  filePath: require('../assets/ggml-tiny.en.bin')
+  coreMLModelAsset:
+    Platform.OS === 'ios'
+      ? {
+          filename: 'ggml-tiny.en-encoder.mlmodelc',
+          assets: [
+            require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
+            require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
+            require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
+          ],
+        }
+      : undefined,
+})
+```
+
+In real world, we recommended to split the asset imports into another platform specific file (e.g. `context-opts.ios.js`) to avoid these unused files in the bundle for Android.
 
 ## Run with example
 
-The example app is using [react-native-fs](https://github.com/itinance/react-native-fs) to download the model file and audio file.
+The example app provide a simple UI for testing the functions.
 
-Model: `base.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp  
+Used Whisper model: `tiny.en` in https://huggingface.co/datasets/ggerganov/whisper.cpp  
 Sample file: `jfk.wav` in https://github.com/ggerganov/whisper.cpp/tree/master/samples
 
 For test better performance on transcribe, you can run the app in Release mode.

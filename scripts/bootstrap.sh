@@ -27,13 +27,20 @@ else
   ./download-ggml-model.sh tiny.en
 fi
 
-# Copy to Android example
-cp ggml-tiny.en.bin ../../example/android/app/src/main/assets
-echo "Copied ggml-tiny.en.bin to example/android/app/src/main/assets"
+# Copy to assets
+cp ../samples/jfk.wav ../../example/assets
+cp ggml-tiny.en.bin ../../example/assets
+echo "Copied ggml-tiny.en.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-tiny.en-encoder.mlmodelc exist
 if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then
   mkdir ggml-tiny.en-encoder.mlmodelc
   echo "Created a dummy ggml-tiny.en-encoder.mlmodelc for testing."
+  echo "Please follow https://github.com/ggerganov/whisper.cpp#core-ml-support for convert a real model."
+fi
+
+if [ ! -d ../../example/assets/ggml-tiny.en-encoder.mlmodelc ]; then
+  mkdir ../../example/assets/ggml-tiny.en-encoder.mlmodelc
+  echo "Created a dummy ./example/assets/ggml-tiny.en-encoder.mlmodelc for testing."
   echo "Please follow https://github.com/ggerganov/whisper.cpp#core-ml-support for convert a real model."
 fi

@@ -10,6 +10,7 @@ whisper.rn
 
 ### Type Aliases
 
+- [ContextOptions](README.md#contextoptions)
 - [TranscribeOptions](README.md#transcribeoptions)
 - [TranscribeRealtimeEvent](README.md#transcriberealtimeevent)
 - [TranscribeRealtimeNativeEvent](README.md#transcriberealtimenativeevent)
@@ -29,6 +30,26 @@ whisper.rn
 - [releaseAllWhisper](README.md#releaseallwhisper)
 
 ## Type Aliases
+
+### ContextOptions
+
+Ƭ **ContextOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `coreMLModelAsset?` | { `assets`: `number`[] ; `filename`: `string`  } | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
+| `coreMLModelAsset.assets` | `number`[] | - |
+| `coreMLModelAsset.filename` | `string` | - |
+| `filePath` | `string` \| `number` | - |
+| `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
+
+#### Defined in
+
+[index.ts:233](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L233)
+
+___
 
 ### TranscribeOptions
 
@@ -56,7 +77,7 @@ whisper.rn
 
 #### Defined in
 
-[NativeRNWhisper.ts:4](https://github.com/mybigday/whisper.rn/blob/9b07569/src/NativeRNWhisper.ts#L4)
+[NativeRNWhisper.ts:4](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/NativeRNWhisper.ts#L4)
 
 ___
 
@@ -81,7 +102,7 @@ ___
 
 #### Defined in
 
-[index.ts:40](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L40)
+[index.ts:45](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L45)
 
 ___
 
@@ -99,7 +120,7 @@ ___
 
 #### Defined in
 
-[index.ts:73](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L73)
+[index.ts:78](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L78)
 
 ___
 
@@ -123,7 +144,7 @@ ___
 
 #### Defined in
 
-[index.ts:60](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L60)
+[index.ts:65](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L65)
 
 ___
 
@@ -133,7 +154,7 @@ ___
 
 #### Defined in
 
-[index.ts:25](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L25)
+[index.ts:30](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L30)
 
 ___
 
@@ -150,7 +171,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:36](https://github.com/mybigday/whisper.rn/blob/9b07569/src/NativeRNWhisper.ts#L36)
+[NativeRNWhisper.ts:36](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/NativeRNWhisper.ts#L36)
 
 ## Variables
 
@@ -162,7 +183,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:227](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L227)
+[index.ts:316](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L316)
 
 ___
 
@@ -174,7 +195,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:224](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L224)
+[index.ts:313](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L313)
 
 ___
 
@@ -186,7 +207,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:219](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L219)
+[index.ts:308](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L308)
 
 ## Functions
 
@@ -198,9 +219,7 @@ Current version of whisper.cpp
 
 | Name | Type |
 | :------ | :------ |
-| `«destructured»` | `Object` |
-| › `filePath` | `string` |
-| › `isBundleAsset?` | `boolean` |
+| `«destructured»` | [`ContextOptions`](README.md#contextoptions) |
 
 #### Returns
 
@@ -208,7 +227,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:207](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L207)
+[index.ts:254](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L254)
 
 ___
 
@@ -222,4 +241,4 @@ ___
 
 #### Defined in
 
-[index.ts:214](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L214)
+[index.ts:303](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L303)

@@ -12,6 +12,8 @@ import {
 import RNFS from 'react-native-fs'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper, libVersion } from 'whisper.rn'
+import sampleFile from '../assets/jfk.wav'
+import contextOpts from './context-opts'
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -25,11 +27,12 @@ if (Platform.OS === 'android') {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
-    flexGrow: 1,
+  scrollview: { flexGrow: 1, justifyContent: 'center' },
+  container: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 4,
   },
   buttons: { flexDirection: 'row' },
   button: { margin: 4, backgroundColor: '#333', borderRadius: 4, padding: 8 },
@@ -68,17 +71,11 @@ function toTimestamp(t, comma = false) {
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
-const modelURL =
-  'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin'
-const sampleURL =
-  'https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav'
-
 const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
 
 const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
-const sampleFilePath = `${fileDir}/jfk.wav`
 
 const createDir = async (log) => {
   if (!(await RNFS.exists(fileDir))) {
@@ -89,29 +86,6 @@ const createDir = async (log) => {
 
 const filterPath = (path) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
-
-const downloadModel = async (log, progress) => {
-  await createDir(log)
-  if (await RNFS.exists(modelFilePath)) {
-    log('Model already exists:')
-    log(filterPath(modelFilePath))
-  } else {
-    log('Start Download Model to:')
-    log(filterPath(modelFilePath))
-    await RNFS.downloadFile({
-      fromUrl: modelURL,
-      toFile: modelFilePath,
-      progressInterval: 1000,
-      begin: () => {},
-      progress,
-    }).promise
-    log('Downloaded model file:')
-    log(filterPath(modelFilePath))
-  }
-}
-
-// Set to false to use the model from the bundle resources
-const USE_DOWNLOAD_MODEL = true
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState(null)
@@ -132,8 +106,11 @@ export default function App() {
   )
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.scrollview}
+    >
+      <SafeAreaView style={styles.container}>
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
@@ -144,60 +121,72 @@ export default function App() {
                 setWhisperContext(null)
                 log('Released previous context')
               }
-              let options
-              if (USE_DOWNLOAD_MODEL) {
-                await downloadModel(log, progress)
-                options = {
-                  filePath: modelFilePath,
-                  isBundleAsset: false,
-                }
-              } else {
-                options = {
-                  // Use the bundle resource (Need add model to Xcode project / Android assets)
-                  filePath: 'ggml-tiny.en.bin',
-                  isBundleAsset: true,
-                }
-              }
               log('Initialize context...')
               const startTime = Date.now()
-              const ctx = await initWhisper(options)
+              const ctx = await initWhisper({
+                filePath: require('../assets/ggml-tiny.en.bin'),
+                ...contextOpts,
+              })
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
               setWhisperContext(ctx)
             }}
           >
-            <Text style={styles.buttonText}>Initialize Context</Text>
+            <Text style={styles.buttonText}>Initialize (Use Asset)</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={async () => {
+              if (whisperContext) {
+                log('Found previous context')
+                await whisperContext.release()
+                setWhisperContext(null)
+                log('Released previous context')
+              }
+              await createDir(log)
+              if (await RNFS.exists(modelFilePath)) {
+                log('Model already exists:')
+                log(filterPath(modelFilePath))
+              } else {
+                log('Start Download Model to:')
+                log(filterPath(modelFilePath))
+                await RNFS.downloadFile({
+                  fromUrl:
+                    'https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
+                  toFile: modelFilePath,
+                  progressInterval: 1000,
+                  begin: () => {},
+                  progress,
+                }).promise
+                log('Downloaded model file:')
+                log(filterPath(modelFilePath))
+              }
+              log('Initialize context...')
+              const startTime = Date.now()
+              const ctx = await initWhisper({ filePath: modelFilePath })
+              const endTime = Date.now()
+              log('Loaded model, ID:', ctx.id)
+              log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+              setWhisperContext(ctx)
+            }}
+          >
+            <Text style={styles.buttonText}>Initialize (Download)</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
             disabled={!!stopTranscribe?.stop}
             onPress={async () => {
               if (!whisperContext) return log('No context')
 
-              await createDir(log)
-              if (await RNFS.exists(sampleFilePath)) {
-                log('Sample file already exists:')
-                log(filterPath(sampleFilePath))
-              } else {
-                log('Start download sample file to:')
-                log(filterPath(sampleFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: sampleURL,
-                  toFile: sampleFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded sample file:')
-                log(filterPath(sampleFilePath))
-              }
               log('Start transcribing...')
               const startTime = Date.now()
               const {
                 // stop,
                 promise,
-              } = whisperContext.transcribe(sampleFilePath, {
+              } = whisperContext.transcribe(sampleFile, {
                 language: 'en',
                 maxLen: 1,
                 tokenTimestamps: true,
@@ -322,7 +311,7 @@ export default function App() {
         >
           <Text style={styles.buttonText}>Clear Download files</Text>
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ScrollView>
   )
 }

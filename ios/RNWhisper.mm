@@ -1,5 +1,6 @@
 #import "RNWhisper.h"
 #import "RNWhisperContext.h"
+#import "RNWhisperDownloader.h"
 #include <stdlib.h>
 #include <string>
 
@@ -35,8 +36,7 @@ RCT_EXPORT_MODULE()
 }
 
 RCT_REMAP_METHOD(initContext,
-                 withPath:(NSString *)modelPath
-                 withBundleResource:(BOOL)isBundleAsset
+                 withOptions:(NSDictionary *)modelOptions
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -44,7 +44,26 @@ RCT_REMAP_METHOD(initContext,
         contexts = [[NSMutableDictionary alloc] init];
     }
 
+    NSString *modelPath = [modelOptions objectForKey:@"filePath"];
+    BOOL isBundleAsset = [[modelOptions objectForKey:@"isBundleAsset"] boolValue];
+
+    // For support debug assets in development mode
+    BOOL downloadCoreMLAssets = [[modelOptions objectForKey:@"downloadCoreMLAssets"] boolValue];
+    if (downloadCoreMLAssets) {
+        NSArray *coreMLAssets = [modelOptions objectForKey:@"coreMLAssets"];
+        // Download coreMLAssets ([{ uri, filepath }])
+        for (NSDictionary *coreMLAsset in coreMLAssets) {
+            NSString *path = coreMLAsset[@"uri"];
+            if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+                [RNWhisperDownloader downloadFile:path toFile:coreMLAsset[@"filepath"]];
+            }
+        }
+    }
+
     NSString *path = modelPath;
+    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+        path = [RNWhisperDownloader downloadFile:path toFile:nil];
+    }
     if (isBundleAsset) {
         path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
     }
@@ -84,10 +103,13 @@ RCT_REMAP_METHOD(transcribeFile,
         return;
     }
 
-    NSURL *url = [NSURL fileURLWithPath:waveFilePath];
+    NSString *path = waveFilePath;
+    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+        path = [RNWhisperDownloader downloadFile:path toFile:nil];
+    }
 
     int count = 0;
-    float *waveFile = [self decodeWaveFile:url count:&count];
+    float *waveFile = [self decodeWaveFile:path count:&count];
     if (waveFile == nil) {
         reject(@"whisper_error", @"Invalid file", nil);
         return;
@@ -185,8 +207,9 @@ RCT_REMAP_METHOD(releaseAllContexts,
     resolve(nil);
 }
 
-- (float *)decodeWaveFile:(NSURL*)fileURL count:(int *)count {
-    NSData *fileData = [NSData dataWithContentsOfURL:fileURL];
+- (float *)decodeWaveFile:(NSString*)filePath count:(int *)count {
+    NSURL *url = [NSURL fileURLWithPath:filePath];
+    NSData *fileData = [NSData dataWithContentsOfURL:url];
     if (fileData == nil) {
         return nil;
     }
@@ -219,6 +242,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
 
     [contexts removeAllObjects];
     contexts = nil;
+
+    [RNWhisperDownloader clearCache];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

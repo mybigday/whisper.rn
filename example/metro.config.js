@@ -2,6 +2,7 @@
 const path = require('path')
 const escape = require('escape-string-regexp')
 const exclusionList = require('metro-config/src/defaults/exclusionList')
+const defaultAssetExts = require('metro-config/src/defaults/defaults').assetExts
 const pak = require('../package.json')
 
 const root = path.resolve(__dirname, '..')
@@ -28,6 +29,12 @@ module.exports = {
       acc[name] = path.join(__dirname, 'node_modules', name)
       return acc
     }, {}),
+
+    assetExts: [
+      ...defaultAssetExts,
+      'bin', // ggml model binary
+      'mil', // CoreML model asset
+    ]
   },
 
   transformer: {

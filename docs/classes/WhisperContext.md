@@ -32,7 +32,7 @@
 
 #### Defined in
 
-[index.ts:82](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L82)
+[index.ts:87](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L87)
 
 ## Properties
 
@@ -42,7 +42,7 @@
 
 #### Defined in
 
-[index.ts:80](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L80)
+[index.ts:85](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L85)
 
 ## Methods
 
@@ -56,13 +56,13 @@
 
 #### Defined in
 
-[index.ts:202](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L202)
+[index.ts:228](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L228)
 
 ___
 
 ### transcribe
 
-▸ **transcribe**(`path`, `options?`): `Object`
+▸ **transcribe**(`filePath`, `options?`): `Object`
 
 Transcribe audio file
 
@@ -70,7 +70,7 @@ Transcribe audio file
 
 | Name | Type |
 | :------ | :------ |
-| `path` | `string` |
+| `filePath` | `string` \| `number` |
 | `options` | [`TranscribeOptions`](../README.md#transcribeoptions) |
 
 #### Returns
@@ -84,7 +84,7 @@ Transcribe audio file
 
 #### Defined in
 
-[index.ts:87](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L87)
+[index.ts:92](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L92)
 
 ___
 
@@ -106,4 +106,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:101](https://github.com/mybigday/whisper.rn/blob/9b07569/src/index.ts#L101)
+[index.ts:122](https://github.com/mybigday/whisper.rn/blob/e2b7e12/src/index.ts#L122)
