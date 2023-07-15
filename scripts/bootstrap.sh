@@ -34,8 +34,20 @@ echo "Copied ggml-tiny.en.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-tiny.en-encoder.mlmodelc exist
 if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then
-  ./download-coreml-model.sh tiny.en
-  cp -r ./ggml-tiny.en-encoder.mlmodelc ../../example/assets/
+  URL=https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-encoder.mlmodelc.zip
+  FILE=ggml-tiny.en-encoder.mlmodelc.zip
+
+  if [ -x "$(command -v wget)" ]; then
+    wget --no-config --quiet --show-progress -O $FILE $URL
+  elif [ -x "$(command -v curl)" ]; then
+    curl -L --output $FILE $URL
+  else
+    printf "Either wget or curl is required to download models.\n"
+    exit 1
+  fi
+
+  unzip $FILE
+  rm $FILE
 fi
 
 if [ ! -d ../../example/assets/ggml-tiny.en-encoder.mlmodelc ]; then
