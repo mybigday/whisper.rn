@@ -167,7 +167,7 @@ export default function App() {
               // If you don't want to enable Core ML, you can remove this
               const coremlModelFilePath = `${fileDir}/ggml-tiny.en-encoder.mlmodelc.zip`
               if (Platform.OS === 'ios' && await RNFS.exists(coremlModelFilePath)) {
-                log('Model already exists:')
+                log('Core ML Model already exists:')
                 log(filterPath(coremlModelFilePath))
               } else if (Platform.OS === 'ios') {
                 log('Start Download Core ML Model to:')
