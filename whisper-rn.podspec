@@ -4,7 +4,12 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 base_ld_flags = "-framework Accelerate"
 base_compiler_flags = "-DGGML_USE_ACCELERATE -Wno-shorten-64-to-32"
 folly_compiler_flags = "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma"
-base_optimizer_flags = "-O3 -DNDEBUG"
+
+# Use base_optimizer_flags = "" for debug builds
+# base_optimizer_flags = ""
+base_optimizer_flags = "-O3 -DNDEBUG" +
+ " -fvisibility=hidden -fvisibility-inlines-hidden" +
+ " -ffunction-sections -fdata-sections"
 
 if ENV['RNWHISPER_DISABLE_COREML'] != '1' then
   base_ld_flags += " -framework CoreML"
@@ -29,8 +34,8 @@ Pod::Spec.new do |s|
   s.compiler_flags = base_compiler_flags
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS" => base_ld_flags,
-    "OTHER_CFLAGS[config=Release]" => base_optimizer_flags,
-    "OTHER_CPLUSPLUSFLAGS[config=Release]" => base_optimizer_flags
+    "OTHER_CFLAGS" => base_optimizer_flags,
+    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags
   }
 
   # Don't install the dependencies when we run `pod install` in the old architecture.
@@ -41,9 +46,8 @@ Pod::Spec.new do |s|
       "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
       "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
       "OTHER_LDFLAGS" => "-framework Accelerate",
-      "OTHER_CFLAGS[config=Release]" => base_optimizer_flags,
-      "OTHER_CPLUSPLUSFLAGS[config=Debug]" => new_arch_cpp_flags,
-      "OTHER_CPLUSPLUSFLAGS[config=Release]" => new_arch_cpp_flags + " " + base_optimizer_flags
+      "OTHER_CFLAGS" => base_optimizer_flags,
+      "OTHER_CPLUSPLUSFLAGS" => new_arch_cpp_flags + " " + base_optimizer_flags
     }
     s.dependency "React-Codegen"
     s.dependency "RCT-Folly"
