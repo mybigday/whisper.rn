@@ -21,7 +21,9 @@ React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 npm install whisper.rn
 ```
 
-Then re-run `npx pod-install` again for iOS.
+For iOS, please re-run `npx pod-install` again.
+
+For Android, it's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
 For Expo, you will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
 
