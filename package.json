@@ -30,7 +30,7 @@
   ],
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
-    "docgen": "typedoc src/index.ts --plugin typedoc-plugin-markdown --readme none",
+    "docgen": "typedoc src/index.ts --plugin typedoc-plugin-markdown --readme none --out docs/API",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "prepack": "yarn docgen && bob build",

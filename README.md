@@ -191,7 +191,7 @@ See the [contributing guide](CONTRIBUTING.md) to learn how to contribute to the 
 
 ## Troubleshooting
 
-See the [troubleshooting](TROUBLESHOOTING.md) if you encounter any problem while using `whisper.rn`.
+See the [troubleshooting](docs/TROUBLESHOOTING.md) if you encounter any problem while using `whisper.rn`.
 
 ## License
 
