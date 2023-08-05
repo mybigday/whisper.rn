@@ -46,6 +46,8 @@ Add the following line to ```android/app/src/main/AndroidManifest.xml```
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
 
+If you want to use `medium` or `large` model, the [Extended Virtual Addressing](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_kernel_extended-virtual-addressing) capability is recommended to enable on iOS project.
+
 ## Usage
 
 ```js
@@ -121,7 +123,9 @@ module.exports = {
 }
 ```
 
-Please note that it will significantly increase the size of the app in release mode.
+Please note that:
+- It will significantly increase the size of the app in release mode.
+- The RN packager is not allowed file size larger than 2GB, so it not able to use original f16 `large` model (2.9GB), you can use quantized models instead.
 
 ## Core ML support
 
