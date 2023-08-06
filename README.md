@@ -48,6 +48,10 @@ Add the following line to ```android/app/src/main/AndroidManifest.xml```
 
 If you want to use `medium` or `large` model, the [Extended Virtual Addressing](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_kernel_extended-virtual-addressing) capability is recommended to enable on iOS project.
 
+## Tips & Tricks
+
+The [Tips & Tricks](docs/TIPS.md) document is a collection of tips and tricks for using `whisper.rn`.
+
 ## Usage
 
 ```js
