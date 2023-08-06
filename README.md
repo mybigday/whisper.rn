@@ -40,14 +40,14 @@ Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
 
 For tvOS, please note that the microphone is not supported.
 
+If you want to use `medium` or `large` model, the [Extended Virtual Addressing](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_kernel_extended-virtual-addressing) capability is recommended to enable on iOS project.
+
+
 ### Android
 Add the following line to ```android/app/src/main/AndroidManifest.xml```
 ```xml
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
-
-If you want to use `medium` or `large` model, the [Extended Virtual Addressing](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_kernel_extended-virtual-addressing) capability is recommended to enable on iOS project.
-
 ## Tips & Tricks
 
 The [Tips & Tricks](docs/TIPS.md) document is a collection of tips and tricks for using `whisper.rn`.
