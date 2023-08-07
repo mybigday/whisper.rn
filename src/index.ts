@@ -24,9 +24,26 @@ if (Platform.OS === 'android') {
 
 export type { TranscribeOptions, TranscribeResult }
 
+
+const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
+
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
 
+export type TranscribeFileOptions = TranscribeOptions & {
+  /**
+   * Progress callback, the progress is between 0 and 1
+   */
+  onProgress?: (progress: number) => void
+}
+
+export type TranscribeProgressNativeEvent = {
+  contextId: number
+  jobId: number
+  progress: number
+}
+
+// NOTE: codegen missing TSIntersectionType support so we dont put it into the native spec
 export type TranscribeRealtimeOptions = TranscribeOptions & {
   /**
    * Realtime record max duration in seconds.
@@ -91,7 +108,7 @@ export class WhisperContext {
   /** Transcribe audio file */
   transcribe(
     filePath: string | number,
-    options: TranscribeOptions = {},
+    options: TranscribeFileOptions = {},
   ): {
     /** Stop the transcribe */
     stop: () => void
@@ -113,9 +130,31 @@ export class WhisperContext {
     }
     if (path.startsWith('file://')) path = path.slice(7)
     const jobId: number = Math.floor(Math.random() * 10000)
+
+    const { onProgress, ...rest } = options
+    let progressListener: any
+    if (onProgress) {
+      progressListener = EventEmitter.addListener(
+        EVENT_ON_TRANSCRIBE_PROGRESS,
+        (evt: TranscribeProgressNativeEvent) => {
+          const { contextId, progress } = evt
+          if (contextId !== this.id || evt.jobId !== jobId) return
+          onProgress(progress)
+        },
+      )
+    }
     return {
-      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
-      promise: RNWhisper.transcribeFile(this.id, jobId, path, options),
+      stop: () => {
+        progressListener?.remove()
+        return RNWhisper.abortTranscribe(this.id, jobId)
+      },
+      promise: RNWhisper.transcribeFile(this.id, jobId, path, {
+        ...rest,
+        onProgress: !!onProgress
+      }).then((result) => {
+        progressListener?.remove()
+        return result
+      }),
     }
   }
 
