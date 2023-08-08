@@ -154,6 +154,9 @@ export class WhisperContext {
       }).then((result) => {
         progressListener?.remove()
         return result
+      }).catch((e) => {
+        progressListener?.remove()
+        throw e
       }),
     }
   }
