@@ -25,6 +25,13 @@ void rn_whisper_abort_transcribe(int job_id) {
   }
 }
 
+bool rn_whisper_transcribe_is_aborted(int job_id) {
+  if (abort_map.find(job_id) != abort_map.end()) {
+    return abort_map[job_id];
+  }
+  return false;
+}
+
 void rn_whisper_abort_all_transcribe() {
   for (auto it = abort_map.begin(); it != abort_map.end(); ++it) {
     it->second = true;

@@ -144,9 +144,9 @@ export class WhisperContext {
       )
     }
     return {
-      stop: () => {
+      stop: async () => {
+        await RNWhisper.abortTranscribe(this.id, jobId)
         progressListener?.remove()
-        return RNWhisper.abortTranscribe(this.id, jobId)
       },
       promise: RNWhisper.transcribeFile(this.id, jobId, path, {
         ...rest,
