@@ -282,6 +282,26 @@ public class WhisperContext {
     eventEmitter.emit(eventName, event);
   }
 
+  private void emitProgress(int progress) {
+    WritableMap event = Arguments.createMap();
+    event.putInt("contextId", WhisperContext.this.id);
+    event.putInt("jobId", jobId);
+    event.putInt("progress", progress);
+    eventEmitter.emit("@RNWhisper_onTranscribeProgress", event);
+  }
+
+  private static class ProgressCallback {
+    WhisperContext context;
+
+    public ProgressCallback(WhisperContext context) {
+      this.context = context;
+    }
+
+    void onProgress(int progress) {
+      context.emitProgress(progress);
+    }
+  }
+
   public WritableMap transcribeInputStream(int jobId, InputStream inputStream, ReadableMap options) throws IOException, Exception {
     this.jobId = jobId;
     isTranscribing = true;
@@ -334,7 +354,9 @@ public class WhisperContext {
       // jstring language,
       options.hasKey("language") ? options.getString("language") : "auto",
       // jstring prompt
-      options.hasKey("prompt") ? options.getString("prompt") : null
+      options.hasKey("prompt") ? options.getString("prompt") : null,
+      // ProgressCallback progressCallback
+      options.hasKey("onProgress") && options.getBoolean("onProgress") ? new ProgressCallback(this) : null
     );
   }
 
@@ -469,6 +491,7 @@ public class WhisperContext {
     }
   }
 
+
   protected static native long initContext(String modelPath);
   protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
   protected static native long initContextWithInputStream(PushbackInputStream inputStream);
@@ -491,7 +514,8 @@ public class WhisperContext {
     boolean speed_up,
     boolean translate,
     String language,
-    String prompt
+    String prompt,
+    ProgressCallback progressCallback
   );
   protected static native void abortTranscribe(int jobId);
   protected static native void abortAllTranscribe();

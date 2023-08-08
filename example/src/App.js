@@ -207,15 +207,20 @@ export default function App() {
               log('Start transcribing...')
               const startTime = Date.now()
               const {
-                // stop,
+                stop,
                 promise,
               } = whisperContext.transcribe(sampleFile, {
                 language: 'en',
                 maxLen: 1,
                 tokenTimestamps: true,
+                onProgress: cur => {
+                  log(`Transcribing progress: ${cur}%`)
+                }
               })
+              setStopTranscribe({ stop })
               const { result, segments } = await promise
               const endTime = Date.now()
+              setStopTranscribe(null)
               setTranscibeResult(
                 `Transcribed result: ${result}\n` +
                   `Transcribed in ${endTime - startTime}ms in ${mode} mode` +

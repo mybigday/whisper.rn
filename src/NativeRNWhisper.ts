@@ -31,6 +31,8 @@ export type TranscribeOptions = {
   speedUp?: boolean,
   /** Initial Prompt */
   prompt?: string,
+  /** Register onProgress event for transcribe file */
+  onProgress?: boolean
 }
 
 export type TranscribeResult = {
