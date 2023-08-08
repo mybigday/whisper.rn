@@ -32,7 +32,7 @@ const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
 
 export type TranscribeFileOptions = TranscribeOptions & {
   /**
-   * Progress callback, the progress is between 0 and 1
+   * Progress callback, the progress is between 0 and 100
    */
   onProgress?: (progress: number) => void
 }
