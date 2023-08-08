@@ -80,6 +80,14 @@ RCT_REMAP_METHOD(initContext,
     resolve([NSNumber numberWithInt:contextId]);
 }
 
+- (NSArray *)supportedEvents {
+  return@[
+    @"@RNWhisper_onTranscribeProgress",
+    @"@RNWhisper_onRealtimeTranscribe",
+    @"@RNWhisper_onRealtimeTranscribeEnd",
+  ];
+}
+
 RCT_REMAP_METHOD(transcribeFile,
                  withContextId:(int)contextId
                  withJobId:(int)jobId
@@ -114,7 +122,20 @@ RCT_REMAP_METHOD(transcribeFile,
         reject(@"whisper_error", @"Invalid file", nil);
         return;
     }
-    int code = [context transcribeFile:jobId audioData:waveFile audioDataCount:count options:options];
+    int code = [context transcribeFile:jobId
+        audioData:waveFile
+        audioDataCount:count
+        options:options
+        onProgress: ^(int progress) {
+            [self sendEventWithName:@"@RNWhisper_onTranscribeProgress"
+                body:@{
+                    @"contextId": [NSNumber numberWithInt:contextId],
+                    @"jobId": [NSNumber numberWithInt:jobId],
+                    @"progress": [NSNumber numberWithInt:progress]
+                }
+            ];
+        }
+    ];
     if (code != 0) {
         free(waveFile);
         reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
@@ -122,13 +143,6 @@ RCT_REMAP_METHOD(transcribeFile,
     }
     free(waveFile);
     resolve([context getTextSegments]);
-}
-
-- (NSArray *)supportedEvents {
-  return@[
-    @"@RNWhisper_onRealtimeTranscribe",
-    @"@RNWhisper_onRealtimeTranscribeEnd",
-  ];
 }
 
 RCT_REMAP_METHOD(startRealtimeTranscribe,

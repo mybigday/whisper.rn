@@ -48,7 +48,8 @@ typedef struct {
 - (int)transcribeFile:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
-    options:(NSDictionary *)options;
+    options:(NSDictionary *)options
+    onProgress:(void (^)(int))onProgress;
 - (void)stopTranscribe:(int)jobId;
 - (bool)isCapturing;
 - (bool)isTranscribing;

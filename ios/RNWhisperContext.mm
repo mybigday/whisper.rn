@@ -263,10 +263,11 @@ void AudioInputCallback(void * inUserData,
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
+    onProgress:(void (^)(int))onProgress
 {
     self->recordState.isTranscribing = true;
     self->recordState.jobId = jobId;
-    int code = [self fullTranscribe:jobId audioData:audioData audioDataCount:audioDataCount options:options];
+    int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
     self->recordState.jobId = -1;
     self->recordState.isTranscribing = false;
     return code;
@@ -297,7 +298,7 @@ void AudioInputCallback(void * inUserData,
     [self stopTranscribe:self->recordState.jobId];
 }
 
-- (int)fullTranscribe:(int)jobId audioData:(float *)audioData audioDataCount:(int)audioDataCount options:(NSDictionary *)options {
+- (struct whisper_full_params)getParams:(NSDictionary *)options jobId:(int)jobId {
     struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 
     const int n_threads = options[@"maxThreads"] != nil ?
@@ -362,6 +363,39 @@ void AudioInputCallback(void * inUserData,
     };
     params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(jobId);
 
+    return params;
+}
+
+- (int)fullTranscribeWithProgress:(void (^)(int))onProgress
+  jobId:(int)jobId
+  audioData:(float *)audioData
+  audioDataCount:(int)audioDataCount
+  options:(NSDictionary *)options
+{
+    struct whisper_full_params params = [self getParams:options jobId:jobId];
+    if (options[@"onProgress"] && [options[@"onProgress"] boolValue]) {
+        params.progress_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int progress, void * user_data) {
+            void (^onProgress)(int) = (__bridge void (^)(int))user_data;
+            onProgress(progress);
+        };
+        params.progress_callback_user_data = (__bridge void *)(onProgress);
+    }
+    whisper_reset_timings(self->ctx);
+
+    int code = whisper_full(self->ctx, params, audioData, audioDataCount);
+    rn_whisper_remove_abort_map(jobId);
+    // if (code == 0) {
+    //     whisper_print_timings(self->ctx);
+    // }
+    return code;
+}
+
+- (int)fullTranscribe:(int)jobId
+  audioData:(float *)audioData
+  audioDataCount:(int)audioDataCount
+  options:(NSDictionary *)options
+{
+    struct whisper_full_params params = [self getParams:options jobId:jobId];
     whisper_reset_timings(self->ctx);
 
     int code = whisper_full(self->ctx, params, audioData, audioDataCount);

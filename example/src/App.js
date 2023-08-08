@@ -13,7 +13,7 @@ import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
 // eslint-disable-next-line import/no-unresolved
 import { initWhisper, libVersion } from 'whisper.rn'
-import sampleFile from '../assets/output.wav'
+import sampleFile from '../assets/jfk.wav'
 import contextOpts from './context-opts'
 
 if (Platform.OS === 'android') {
