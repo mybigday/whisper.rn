@@ -46,7 +46,7 @@ jobs:
           cd example
           xcodebuild -workspace ios/RNWhisperExample.xcworkspace -scheme RNWhisperExample -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build
   test-android:
-    runs-on: macOS-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3.7.0
