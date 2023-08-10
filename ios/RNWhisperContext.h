@@ -53,7 +53,8 @@ typedef struct {
 - (void)stopTranscribe:(int)jobId;
 - (bool)isCapturing;
 - (bool)isTranscribing;
-- (NSDictionary *)getTextSegments;
+- (bool)isStoppedByAction;
+- (NSMutableDictionary *)getTextSegments;
 - (void)invalidate;
 
 @end

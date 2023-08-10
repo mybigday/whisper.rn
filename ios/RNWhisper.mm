@@ -148,7 +148,9 @@ RCT_REMAP_METHOD(transcribeFile,
             return;
         }
         free(waveFile);
-        resolve([context getTextSegments]);
+        NSMutableDictionary *result = [context getTextSegments];
+        result[@"isAborted"] = @([context isStoppedByAction]);
+        resolve(result);
     });
 }
 

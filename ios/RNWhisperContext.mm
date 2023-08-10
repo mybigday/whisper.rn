@@ -228,6 +228,10 @@ void AudioInputCallback(void * inUserData,
     return self->recordState.isTranscribing;
 }
 
+- (bool)isStoppedByAction {
+    return self->recordState.isStoppedByAction;
+}
+
 - (OSStatus)transcribeRealtime:(int)jobId
     options:(NSDictionary *)options
     onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe
@@ -265,6 +269,7 @@ void AudioInputCallback(void * inUserData,
     options:(NSDictionary *)options
     onProgress:(void (^)(int))onProgress
 {
+    self->recordState.isStoppedByAction = false;
     self->recordState.isTranscribing = true;
     self->recordState.jobId = jobId;
     int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
@@ -283,12 +288,11 @@ void AudioInputCallback(void * inUserData,
 
 - (void)stopTranscribe:(int)jobId {
     rn_whisper_abort_transcribe(jobId);
-    if (!self->recordState.isRealtime || !self->recordState.isCapturing) {
-        return;
-    }
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = true;
-    [self stopAudio];
+    if (self->recordState.isRealtime && self->recordState.isCapturing) {
+        [self stopAudio];
+    }
 }
 
 - (void)stopCurrentTranscribe {
@@ -406,14 +410,14 @@ void AudioInputCallback(void * inUserData,
     return code;
 }
 
-- (NSDictionary *)getTextSegments {
-    NSString *result = @"";
+- (NSMutableDictionary *)getTextSegments {
+    NSString *text = @"";
     int n_segments = whisper_full_n_segments(self->ctx);
 
     NSMutableArray *segments = [[NSMutableArray alloc] init];
     for (int i = 0; i < n_segments; i++) {
         const char * text_cur = whisper_full_get_segment_text(self->ctx, i);
-        result = [result stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
+        text = [text stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
 
         const int64_t t0 = whisper_full_get_segment_t0(self->ctx, i);
         const int64_t t1 = whisper_full_get_segment_t1(self->ctx, i);
@@ -424,10 +428,10 @@ void AudioInputCallback(void * inUserData,
         };
         [segments addObject:segment];
     }
-    return @{
-        @"result": result,
-        @"segments": segments
-    };
+    NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
+    result[@"result"] = text;
+    result[@"segments"] = segments;
+    return result;
 }
 
 - (void)invalidate {

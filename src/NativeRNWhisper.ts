@@ -42,6 +42,7 @@ export type TranscribeResult = {
     t0: number,
     t1: number,
   }>,
+  isAborted: boolean,
 }
 
 export type CoreMLAsset = {

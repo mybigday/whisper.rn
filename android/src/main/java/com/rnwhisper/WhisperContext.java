@@ -71,7 +71,7 @@ public class WhisperContext {
     bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
   }
 
-  private void resetRealtimeTranscribe() {
+  private void rewind() {
     shortBufferSlices = null;
     sliceNSamples = null;
     sliceIndex = 0;
@@ -97,7 +97,7 @@ public class WhisperContext {
       return state;
     }
 
-    resetRealtimeTranscribe();
+    rewind();
 
     this.jobId = jobId;
 
@@ -269,7 +269,7 @@ public class WhisperContext {
       fullTranscribeSamples(options, true);
     } else if (isStopped) {
       // No next, cleanup
-      resetRealtimeTranscribe();
+      rewind();
     }
     isTranscribing = false;
   }
@@ -303,6 +303,11 @@ public class WhisperContext {
   }
 
   public WritableMap transcribeInputStream(int jobId, InputStream inputStream, ReadableMap options) throws IOException, Exception {
+    if (isCapturing || isTranscribing) {
+      throw new Exception("Context is already in capturing or transcribing");
+    }
+    rewind();
+
     this.jobId = jobId;
     isTranscribing = true;
     float[] audioData = decodeWaveFile(inputStream);
@@ -312,7 +317,9 @@ public class WhisperContext {
     if (code != 0) {
       throw new Exception("Failed to transcribe the file. Code: " + code);
     }
-    return getTextSegments();
+    WritableMap result = getTextSegments();
+    result.putBoolean("isAborted", isStoppedByAction);
+    return result;
   }
 
   private int full(int jobId, ReadableMap options, float[] audioData, int audioDataLen) {
