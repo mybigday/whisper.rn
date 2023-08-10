@@ -2,7 +2,7 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 base_ld_flags = "-framework Accelerate"
-base_compiler_flags = "-DGGML_USE_ACCELERATE -Wno-shorten-64-to-32"
+base_compiler_flags = "-DWSP_GGML_USE_ACCELERATE -Wno-shorten-64-to-32"
 folly_compiler_flags = "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma"
 
 # Use base_optimizer_flags = "" for debug builds

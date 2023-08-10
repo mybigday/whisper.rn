@@ -7,6 +7,17 @@ cp ./whisper.cpp/ggml.h ./cpp/ggml.h
 cp ./whisper.cpp/ggml.c ./cpp/ggml.c
 cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
+
+# Add prefix to avoid redefinition with other libraries using ggml like llama.rn
+sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/ggml.h
+sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/ggml.h
+sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/ggml.c
+sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/ggml.c
+sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/whisper.h
+sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/whisper.h
+sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/whisper.cpp
+sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/whisper.cpp
+
 cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 
 # Parse whisper.cpp/bindings/javascript/package.json version and set to src/version.json
