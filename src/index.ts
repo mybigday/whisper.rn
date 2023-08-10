@@ -133,29 +133,41 @@ export class WhisperContext {
 
     const { onProgress, ...rest } = options
     let progressListener: any
+    let lastProgress: number = 0
     if (onProgress) {
       progressListener = EventEmitter.addListener(
         EVENT_ON_TRANSCRIBE_PROGRESS,
         (evt: TranscribeProgressNativeEvent) => {
           const { contextId, progress } = evt
           if (contextId !== this.id || evt.jobId !== jobId) return
+          lastProgress = progress
           onProgress(progress)
         },
       )
     }
+    const removeProgressListener = () => {
+      if (progressListener) {
+        progressListener.remove()
+        progressListener = null
+      }
+    }
     return {
       stop: async () => {
         await RNWhisper.abortTranscribe(this.id, jobId)
-        progressListener?.remove()
+        removeProgressListener()
       },
       promise: RNWhisper.transcribeFile(this.id, jobId, path, {
         ...rest,
         onProgress: !!onProgress
       }).then((result) => {
-        progressListener?.remove()
+        removeProgressListener()
+        if (!result.isAborted && lastProgress !== 100) {
+          // Handle the case that the last progress event is not triggered
+          onProgress?.(100)
+        }
         return result
       }).catch((e) => {
-        progressListener?.remove()
+        removeProgressListener()
         throw e
       }),
     }
