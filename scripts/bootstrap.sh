@@ -10,16 +10,6 @@ cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
 
 cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 
-# Add prefix to avoid redefinition with other libraries using ggml like llama.rn
-sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/ggml.h
-sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/ggml.h
-sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/ggml.c
-sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/ggml.c
-sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/whisper.h
-sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/whisper.h
-sed -i '' 's/GGML_/WSP_GGML_/g' ./cpp/whisper.cpp
-sed -i '' 's/ggml_/wsp_ggml_/g' ./cpp/whisper.cpp
-
 # List of files to process
 files=(
   "./cpp/ggml.h"
@@ -31,13 +21,13 @@ files=(
 # Loop through each file and run the sed commands
 OS=$(uname)
 for file in "${files[@]}"; do
-  # Add prefix to avoid redefinition with other libraries using ggml like whisper.rn
+  # Add prefix to avoid redefinition with other libraries using ggml like llama.rn
   if [ "$OS" = "Darwin" ]; then
-    sed -i '' 's/GGML_/LM_GGML_/g' $file
-    sed -i '' 's/ggml_/lm_ggml_/g' $file
+    sed -i '' 's/GGML_/WSP_GGML_/g' $file
+    sed -i '' 's/ggml_/wsp_ggml_/g' $file
   else
-    sed -i 's/GGML_/LM_GGML_/g' $file
-    sed -i 's/ggml_/lm_ggml_/g' $file
+    sed -i 's/GGML_/WSP_GGML_/g' $file
+    sed -i 's/ggml_/wsp_ggml_/g' $file
   fi
 done
 
