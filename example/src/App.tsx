@@ -11,14 +11,16 @@ import {
 } from 'react-native'
 import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
-// eslint-disable-next-line import/no-unresolved
-import { initWhisper, libVersion } from 'whisper.rn'
-import sampleFile from '../assets/jfk.wav'
+import { initWhisper, libVersion } from '../../src' // whisper.rn
+import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
+
+const sampleFile = require('../assets/jfk.wav')
 
 if (Platform.OS === 'android') {
   // Request record audio permission
-  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
+  // @ts-ignore
+  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, { 
     title: 'Whisper Audio Permission',
     message: 'Whisper needs access to your microphone',
     buttonNeutral: 'Ask Me Later',
@@ -49,7 +51,7 @@ const styles = StyleSheet.create({
   logText: { fontSize: 12, color: '#333' },
 })
 
-function toTimestamp(t, comma = false) {
+function toTimestamp(t: number, comma = false) {
   let msec = t * 10
   const hr = Math.floor(msec / (1000 * 60 * 60))
   msec -= hr * (1000 * 60 * 60)
@@ -78,21 +80,21 @@ console.log('[App] fileDir', fileDir)
 
 const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
 
-const createDir = async (log) => {
+const createDir = async (log: any) => {
   if (!(await RNFS.exists(fileDir))) {
     log('Create dir', fileDir)
     await RNFS.mkdir(fileDir)
   }
 }
 
-const filterPath = (path) =>
+const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
 export default function App() {
-  const [whisperContext, setWhisperContext] = useState(null)
+  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(null)
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
-  const [transcibeResult, setTranscibeResult] = useState(null)
-  const [stopTranscribe, setStopTranscribe] = useState(null)
+  const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
+  const [stopTranscribe, setStopTranscribe] = useState<{ stop: () => void } | null>(null)
 
   const log = useCallback((...messages) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -166,7 +168,10 @@ export default function App() {
 
               // If you don't want to enable Core ML, you can remove this
               const coremlModelFilePath = `${fileDir}/ggml-tiny.en-encoder.mlmodelc.zip`
-              if (Platform.OS === 'ios' && await RNFS.exists(coremlModelFilePath)) {
+              if (
+                Platform.OS === 'ios' &&
+                (await RNFS.exists(coremlModelFilePath))
+              ) {
                 log('Core ML Model already exists:')
                 log(filterPath(coremlModelFilePath))
               } else if (Platform.OS === 'ios') {
@@ -206,16 +211,13 @@ export default function App() {
 
               log('Start transcribing...')
               const startTime = Date.now()
-              const {
-                stop,
-                promise,
-              } = whisperContext.transcribe(sampleFile, {
+              const { stop, promise } = whisperContext.transcribe(sampleFile, {
                 language: 'en',
                 maxLen: 1,
                 tokenTimestamps: true,
-                onProgress: cur => {
+                onProgress: (cur) => {
                   log(`Transcribing progress: ${cur}%`)
-                }
+                },
               })
               setStopTranscribe({ stop })
               const { result, segments } = await promise
@@ -267,12 +269,12 @@ export default function App() {
                   const { isCapturing, data, processTime, recordingTime } = evt
                   setTranscibeResult(
                     `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
-                      `Result: ${data.result}\n\n` +
+                      `Result: ${data?.result}\n\n` +
                       `Process time: ${processTime}ms\n` +
                       `Recording time: ${recordingTime}ms` +
                       `\n` +
                       `Segments:` +
-                      `\n${data.segments
+                      `\n${data?.segments
                         .map(
                           (segment) =>
                             `[${toTimestamp(segment.t0)} --> ${toTimestamp(
@@ -331,7 +333,6 @@ export default function App() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.buttonClear]}
-          title="Clear Download files"
           onPress={async () => {
             await RNFS.unlink(fileDir).catch(() => {})
             log('Deleted files')
