@@ -34,11 +34,6 @@ export type TranscribeOptions = {
   prompt?: string,
 }
 
-export type TranscribeFileNativeOptions = TranscribeOptions & {
-  /** Register onProgress event for transcribe file */
-  onProgress?: boolean
-}
-
 export type TranscribeResult = {
   result: string,
   segments: Array<{
@@ -73,7 +68,7 @@ export interface Spec extends TurboModule {
     contextId: number,
     jobId: number,
     path: string,
-    options: TranscribeFileNativeOptions,
+    options: {}, // TranscribeOptions & { onProgress?: boolean }
   ): Promise<TranscribeResult>;
   startRealtimeTranscribe(
     contextId: number,
