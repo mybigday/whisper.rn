@@ -30,6 +30,7 @@ const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
 
+// Fn -> Boolean in TranscribeFileNativeOptions
 export type TranscribeFileOptions = TranscribeOptions & {
   /**
    * Progress callback, the progress is between 0 and 100
@@ -43,7 +44,7 @@ export type TranscribeProgressNativeEvent = {
   progress: number
 }
 
-// NOTE: codegen missing TSIntersectionType support so we dont put it into the native spec
+// Codegen missing TSIntersectionType support so we dont put it into the native spec
 export type TranscribeRealtimeOptions = TranscribeOptions & {
   /**
    * Realtime record max duration in seconds.

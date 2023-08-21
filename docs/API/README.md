@@ -49,7 +49,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:276](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L276)
+[index.ts:289](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L289)
 
 ___
 
@@ -59,7 +59,7 @@ ___
 
 #### Defined in
 
-[index.ts:33](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L33)
+[index.ts:34](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L34)
 
 ___
 
@@ -79,7 +79,6 @@ ___
 | `maxLen?` | `number` | Maximum segment length in characters |
 | `maxThreads?` | `number` | Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) |
 | `offset?` | `number` | Time offset in milliseconds |
-| `onProgress?` | `boolean` | Register onProgress event for transcribe file |
 | `prompt?` | `string` | Initial Prompt |
 | `speedUp?` | `boolean` | Speed up audio by x2 (reduced accuracy) |
 | `temperature?` | `number` | Tnitial decoding temperature |
@@ -90,7 +89,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:4](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/NativeRNWhisper.ts#L4)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/296d30b/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -108,7 +107,7 @@ ___
 
 #### Defined in
 
-[index.ts:40](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L40)
+[index.ts:41](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L41)
 
 ___
 
@@ -133,7 +132,7 @@ ___
 
 #### Defined in
 
-[index.ts:62](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L62)
+[index.ts:63](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L63)
 
 ___
 
@@ -151,7 +150,7 @@ ___
 
 #### Defined in
 
-[index.ts:95](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L95)
+[index.ts:96](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L96)
 
 ___
 
@@ -175,7 +174,7 @@ ___
 
 #### Defined in
 
-[index.ts:82](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L82)
+[index.ts:83](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L83)
 
 ___
 
@@ -185,7 +184,7 @@ ___
 
 #### Defined in
 
-[index.ts:47](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L47)
+[index.ts:48](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L48)
 
 ___
 
@@ -203,7 +202,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:38](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/NativeRNWhisper.ts#L38)
+[NativeRNWhisper.ts:42](https://github.com/mybigday/whisper.rn/blob/296d30b/src/NativeRNWhisper.ts#L42)
 
 ## Variables
 
@@ -215,7 +214,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:361](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L361)
+[index.ts:374](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L374)
 
 ___
 
@@ -227,7 +226,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:358](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L358)
+[index.ts:371](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L371)
 
 ___
 
@@ -239,7 +238,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:353](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L353)
+[index.ts:366](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L366)
 
 ## Functions
 
@@ -259,7 +258,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:298](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L298)
+[index.ts:311](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L311)
 
 ___
 
@@ -273,4 +272,4 @@ ___
 
 #### Defined in
 
-[index.ts:348](https://github.com/mybigday/whisper.rn/blob/22cc9a8/src/index.ts#L348)
+[index.ts:361](https://github.com/mybigday/whisper.rn/blob/296d30b/src/index.ts#L361)

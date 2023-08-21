@@ -1,6 +1,7 @@
 import type { TurboModule } from 'react-native/Libraries/TurboModule/RCTExport'
 import { TurboModuleRegistry } from 'react-native'
 
+// Common transcribe options
 export type TranscribeOptions = {
   /** Spoken language (Default: 'auto' for auto-detect) */
   language?: string,
@@ -31,6 +32,9 @@ export type TranscribeOptions = {
   speedUp?: boolean,
   /** Initial Prompt */
   prompt?: string,
+}
+
+export type TranscribeFileNativeOptions = TranscribeOptions & {
   /** Register onProgress event for transcribe file */
   onProgress?: boolean
 }
@@ -69,7 +73,7 @@ export interface Spec extends TurboModule {
     contextId: number,
     jobId: number,
     path: string,
-    options: TranscribeOptions,
+    options: TranscribeFileNativeOptions,
   ): Promise<TranscribeResult>;
   startRealtimeTranscribe(
     contextId: number,
