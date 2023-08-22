@@ -21,13 +21,26 @@ React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 npm install whisper.rn
 ```
 
-For iOS, please re-run `npx pod-install` again.
+#### iOS
+
+Please re-run `npx pod-install` again.
+
+#### Android
 
 If you want to use `medium` or `large` model, the [Extended Virtual Addressing](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_kernel_extended-virtual-addressing) capability is recommended to enable on iOS project.
 
 For Android, it's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
-For Expo, you will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
+Don't forget to add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
+
+```proguard
+# whisper.rn
+-keep class com.rnwhisper.** { *; }
+```
+
+#### Expo
+
+You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
 
 ## Add Microphone Permissions (Optional)
 
