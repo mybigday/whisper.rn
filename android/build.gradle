@@ -30,6 +30,11 @@ def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["RNWhisper_" + name]).toInteger()
 }
 
+def reactNativeArchitectures() {
+  def value = project.getProperties().get("reactNativeArchitectures")
+  return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
+}
+
 android {
   ndkVersion getExtOrDefault("ndkVersion")
   compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
@@ -38,8 +43,10 @@ android {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
     buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
-    ndk {
-      abiFilters 'arm64-v8a', 'armeabi-v7a'
+    externalNativeBuild {
+      cmake {
+        abiFilters (*reactNativeArchitectures())
+      }
     }
   }
   externalNativeBuild {
