@@ -141,8 +141,8 @@ export class WhisperContext {
         (evt: TranscribeProgressNativeEvent) => {
           const { contextId, progress } = evt
           if (contextId !== this.id || evt.jobId !== jobId) return
-          lastProgress = progress
-          onProgress(progress)
+          lastProgress = progress > 100 ? 100 : progress
+          onProgress(lastProgress)
         },
       )
     }
