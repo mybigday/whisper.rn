@@ -288,11 +288,11 @@ void AudioInputCallback(void * inUserData,
 
 - (void)stopTranscribe:(int)jobId {
     rn_whisper_abort_transcribe(jobId);
-    self->recordState.isCapturing = false;
-    self->recordState.isStoppedByAction = true;
     if (self->recordState.isRealtime && self->recordState.isCapturing) {
         [self stopAudio];
     }
+    self->recordState.isCapturing = false;
+    self->recordState.isStoppedByAction = true;
 }
 
 - (void)stopCurrentTranscribe {
