@@ -68,13 +68,17 @@ RCT_REMAP_METHOD(initContext,
         path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
     }
 
-    RNWhisperContext *context = [RNWhisperContext initWithModelPath:path];
+    int contextId = arc4random_uniform(1000000);
+
+    RNWhisperContext *context = [RNWhisperContext
+        initWithModelPath:path
+        contextId:contextId
+    ];
     if ([context getContext] == NULL) {
         reject(@"whisper_cpp_error", @"Failed to load the model", nil);
         return;
     }
 
-    int contextId = arc4random_uniform(1000000);
     [contexts setObject:context forKey:[NSNumber numberWithInt:contextId]];
 
     resolve([NSNumber numberWithInt:contextId]);
