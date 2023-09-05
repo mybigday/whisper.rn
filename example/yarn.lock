@@ -4167,10 +4167,10 @@ react-native-gradle-plugin@^0.71.19:
   resolved "https://registry.yarnpkg.com/react-native-gradle-plugin/-/react-native-gradle-plugin-0.71.19.tgz#3379e28341fcd189bc1f4691cefc84c1a4d7d232"
   integrity sha512-1dVk9NwhoyKHCSxcrM6vY6cxmojeATsBobDicX0ZKr7DgUF2cBQRTKsimQFvzH8XhOVXyH8p4HyDSZNIFI8OlQ==
 
-react-native-zip-archive@^6.0.9:
-  version "6.0.9"
-  resolved "https://registry.yarnpkg.com/react-native-zip-archive/-/react-native-zip-archive-6.0.9.tgz#9a1456f1dc6a9d7bb13135a00775e07cda247997"
-  integrity sha512-IYf3yHJ7sHzj9ucO3Amx/TtsZcTgHdfj+Dar8p1e32E+wBsn7mv0PDp2X/oCLGci0nG9i2DBstrnCW74/7NLYQ==
+react-native-zip-archive@^6.1.0:
+  version "6.1.0"
+  resolved "https://registry.yarnpkg.com/react-native-zip-archive/-/react-native-zip-archive-6.1.0.tgz#beed62dea9c7ff1e4fd4b6ce0e496ede5ab2f96f"
+  integrity sha512-FEt6O8YD/Is48HGXuHndFktod7S2cUdf0C+B2XRHWeS3zs/gXlzOGo1gcwUxdMyqQwEwnFuAqlYvUK4BNGQsDg==
 
 react-native@0.71.11:
   version "0.71.11"
