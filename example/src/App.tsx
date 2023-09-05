@@ -250,7 +250,10 @@ export default function App() {
             onPress={async () => {
               if (!whisperContext) return log('No context')
               if (stopTranscribe?.stop) {
-                stopTranscribe?.stop()
+                const t0 = Date.now()
+                await stopTranscribe?.stop()
+                const t1 = Date.now()
+                log('Stopped transcribing in', t1 - t0, 'ms')
                 setStopTranscribe(null)
                 return
               }

@@ -305,6 +305,7 @@ void AudioInputCallback(void * inUserData,
     }
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = true;
+    dispatch_barrier_sync(dQueue, ^{});
 }
 
 - (void)stopCurrentTranscribe {

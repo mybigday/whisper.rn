@@ -55,6 +55,7 @@ typedef struct {
     onProgress:(void (^)(int))onProgress
     onEnd:(void (^)(int))onEnd;
 - (void)stopTranscribe:(int)jobId;
+- (void)stopCurrentTranscribe;
 - (bool)isCapturing;
 - (bool)isTranscribing;
 - (bool)isStoppedByAction;

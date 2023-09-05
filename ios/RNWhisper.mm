@@ -264,7 +264,7 @@ RCT_REMAP_METHOD(releaseAllContexts,
 }
 
 - (void)invalidate {
-    rn_whisper_abort_all_transcribe();
+    [super invalidate];
 
     if (contexts == nil) {
         return;
@@ -274,6 +274,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
         RNWhisperContext *context = contexts[contextId];
         [context invalidate];
     }
+
+    rn_whisper_abort_all_transcribe(); // graceful abort
 
     [contexts removeAllObjects];
     contexts = nil;
