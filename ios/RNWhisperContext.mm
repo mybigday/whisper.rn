@@ -268,14 +268,17 @@ void AudioInputCallback(void * inUserData,
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
     onProgress:(void (^)(int))onProgress
+    onEnd:(void (^)(int))onEnd
 {
-    self->recordState.isStoppedByAction = false;
-    self->recordState.isTranscribing = true;
-    self->recordState.jobId = jobId;
-    int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
-    self->recordState.jobId = -1;
-    self->recordState.isTranscribing = false;
-    return code;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        self->recordState.isStoppedByAction = false;
+        self->recordState.isTranscribing = true;
+        self->recordState.jobId = jobId;
+        int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
+        self->recordState.jobId = -1;
+        self->recordState.isTranscribing = false;
+        onEnd(code);
+    });
 }
 
 - (void)stopAudio {

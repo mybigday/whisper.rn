@@ -122,36 +122,36 @@ RCT_REMAP_METHOD(transcribeFile,
         reject(@"whisper_error", @"Invalid file", nil);
         return;
     }
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        int code = [context transcribeFile:jobId
-            audioData:waveFile
-            audioDataCount:count
-            options:options
-            onProgress: ^(int progress) {
-                if (rn_whisper_transcribe_is_aborted(jobId)) {
-                    return;
-                }
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self sendEventWithName:@"@RNWhisper_onTranscribeProgress"
-                        body:@{
-                            @"contextId": [NSNumber numberWithInt:contextId],
-                            @"jobId": [NSNumber numberWithInt:jobId],
-                            @"progress": [NSNumber numberWithInt:progress]
-                        }
-                    ];
-                });
+    [context transcribeFile:jobId
+        audioData:waveFile
+        audioDataCount:count
+        options:options
+        onProgress: ^(int progress) {
+            if (rn_whisper_transcribe_is_aborted(jobId)) {
+                return;
             }
-        ];
-        if (code != 0) {
-            free(waveFile);
-            reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
-            return;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self sendEventWithName:@"@RNWhisper_onTranscribeProgress"
+                    body:@{
+                        @"contextId": [NSNumber numberWithInt:contextId],
+                        @"jobId": [NSNumber numberWithInt:jobId],
+                        @"progress": [NSNumber numberWithInt:progress]
+                    }
+                ];
+            });
         }
-        free(waveFile);
-        NSMutableDictionary *result = [context getTextSegments];
-        result[@"isAborted"] = @([context isStoppedByAction]);
-        resolve(result);
-    });
+        onEnd: ^(int code) {
+            if (code != 0) {
+                free(waveFile);
+                reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
+                return;
+            }
+            free(waveFile);
+            NSMutableDictionary *result = [context getTextSegments];
+            result[@"isAborted"] = @([context isStoppedByAction]);
+            resolve(result);
+        }
+    ];
 }
 
 RCT_REMAP_METHOD(startRealtimeTranscribe,
