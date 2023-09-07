@@ -61,6 +61,7 @@ public class WhisperContext {
   private boolean isCapturing = false;
   private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
+  private Thread rootFullHandler = null;
   private Thread fullHandler = null;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
@@ -81,6 +82,7 @@ public class WhisperContext {
     isCapturing = false;
     isStoppedByAction = false;
     isTranscribing = false;
+    rootFullHandler = null;
     fullHandler = null;
   }
 
@@ -117,7 +119,7 @@ public class WhisperContext {
     isCapturing = true;
     recorder.startRecording();
 
-    new Thread(new Runnable() {
+    rootFullHandler = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -195,7 +197,8 @@ public class WhisperContext {
           recorder = null;
         }
       }
-    }).start();
+    });
+    rootFullHandler.start();
     return state;
   }
 
@@ -402,6 +405,14 @@ public class WhisperContext {
     abortTranscribe(jobId);
     isCapturing = false;
     isStoppedByAction = true;
+    if (rootFullHandler != null) {
+      try {
+        rootFullHandler.join();
+      } catch (Exception e) {
+        Log.e(NAME, "Error joining rootFullHandler: " + e.getMessage());
+      }
+      rootFullHandler = null;
+    }
   }
 
   public void stopCurrentTranscribe() {
