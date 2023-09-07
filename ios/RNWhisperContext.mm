@@ -4,14 +4,23 @@
 
 @implementation RNWhisperContext
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath {
++ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId {
     RNWhisperContext *context = [[RNWhisperContext alloc] init];
+    context->contextId = contextId;
     context->ctx = whisper_init_from_file([modelPath UTF8String]);
+    context->dQueue = dispatch_queue_create(
+        [[NSString stringWithFormat:@"RNWhisperContext-%d", contextId] UTF8String],
+        DISPATCH_QUEUE_SERIAL
+    );
     return context;
 }
 
 - (struct whisper_context *)getContext {
     return self->ctx;
+}
+
+- (dispatch_queue_t)getDispatchQueue {
+    return self->dQueue;
 }
 
 - (void)prepareRealtime:(NSDictionary *)options {
@@ -109,7 +118,7 @@ void AudioInputCallback(void * inUserData,
             nSamples != state->nSamplesTranscribing
         ) {
             state->isTranscribing = true;
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            dispatch_async([state->mSelf getDispatchQueue], ^{
                 [state->mSelf fullTranscribeSamples:state];
             });
         }
@@ -140,7 +149,7 @@ void AudioInputCallback(void * inUserData,
 
     if (!state->isTranscribing) {
         state->isTranscribing = true;
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        dispatch_async([state->mSelf getDispatchQueue], ^{
             [state->mSelf fullTranscribeSamples:state];
         });
     }
@@ -263,19 +272,22 @@ void AudioInputCallback(void * inUserData,
     return status;
 }
 
-- (int)transcribeFile:(int)jobId
+- (void)transcribeFile:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
     onProgress:(void (^)(int))onProgress
+    onEnd:(void (^)(int))onEnd
 {
-    self->recordState.isStoppedByAction = false;
-    self->recordState.isTranscribing = true;
-    self->recordState.jobId = jobId;
-    int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
-    self->recordState.jobId = -1;
-    self->recordState.isTranscribing = false;
-    return code;
+    dispatch_async(dQueue, ^{
+        self->recordState.isStoppedByAction = false;
+        self->recordState.isTranscribing = true;
+        self->recordState.jobId = jobId;
+        int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
+        self->recordState.jobId = -1;
+        self->recordState.isTranscribing = false;
+        onEnd(code);
+    });
 }
 
 - (void)stopAudio {
@@ -293,6 +305,7 @@ void AudioInputCallback(void * inUserData,
     }
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = true;
+    dispatch_barrier_sync(dQueue, ^{});
 }
 
 - (void)stopCurrentTranscribe {

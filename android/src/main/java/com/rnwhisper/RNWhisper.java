@@ -21,6 +21,8 @@ import java.io.FileInputStream;
 import java.io.PushbackInputStream;
 
 public class RNWhisper implements LifecycleEventListener {
+  public static final String NAME = "RNWhisper";
+
   private ReactApplicationContext reactContext;
   private Downloader downloader;
 
@@ -39,6 +41,8 @@ public class RNWhisper implements LifecycleEventListener {
 
     return constants;
   }
+
+  private HashMap<AsyncTask, String> tasks = new HashMap<>();
 
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
 
@@ -59,7 +63,7 @@ public class RNWhisper implements LifecycleEventListener {
   }
 
   public void initContext(final ReadableMap options, final Promise promise) {
-    new AsyncTask<Void, Void, Integer>() {
+    AsyncTask task = new AsyncTask<Void, Void, Integer>() {
       private Exception exception;
 
       @Override
@@ -104,8 +108,10 @@ public class RNWhisper implements LifecycleEventListener {
           return;
         }
         promise.resolve(id);
+        tasks.remove(this);
       }
     }.execute();
+    tasks.put(task, "initContext");
   }
 
   public void transcribeFile(double id, double jobId, String filePath, ReadableMap options, Promise promise) {
@@ -122,7 +128,7 @@ public class RNWhisper implements LifecycleEventListener {
       promise.reject("Context is already transcribing");
       return;
     }
-    new AsyncTask<Void, Void, WritableMap>() {
+    AsyncTask task = new AsyncTask<Void, Void, WritableMap>() {
       private Exception exception;
 
       @Override
@@ -161,8 +167,10 @@ public class RNWhisper implements LifecycleEventListener {
           return;
         }
         promise.resolve(data);
+        tasks.remove(this);
       }
     }.execute();
+    tasks.put(task, "transcribeFile-" + id);
   }
 
   public void startRealtimeTranscribe(double id, double jobId, ReadableMap options, Promise promise) {
@@ -183,18 +191,48 @@ public class RNWhisper implements LifecycleEventListener {
     promise.reject("Failed to start realtime transcribe. State: " + state);
   }
 
-  public void abortTranscribe(double contextId, double jobId, Promise promise) {
-    WhisperContext context = contexts.get((int) contextId);
+  public void abortTranscribe(double id, double jobId, Promise promise) {
+    WhisperContext context = contexts.get((int) id);
     if (context == null) {
       promise.reject("Context not found");
       return;
     }
-    context.stopTranscribe((int) jobId);
+    AsyncTask task = new AsyncTask<Void, Void, Void>() {
+      private Exception exception;
+
+      @Override
+      protected Void doInBackground(Void... voids) {
+        try {
+          context.stopTranscribe((int) jobId);
+          AsyncTask completionTask = null;
+          for (AsyncTask task : tasks.keySet()) {
+            if (tasks.get(task).equals("transcribeFile-" + id)) {
+              task.get();
+              break;
+            }
+          }
+        } catch (Exception e) {
+          exception = e;
+        }
+        return null;
+      }
+
+      @Override
+      protected void onPostExecute(Void result) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(null);
+        tasks.remove(this);
+      }
+    }.execute();
+    tasks.put(task, "abortTranscribe-" + id);
   }
 
   public void releaseContext(double id, Promise promise) {
     final int contextId = (int) id;
-    new AsyncTask<Void, Void, Void>() {
+    AsyncTask task = new AsyncTask<Void, Void, Void>() {
       private Exception exception;
 
       @Override
@@ -203,6 +241,14 @@ public class RNWhisper implements LifecycleEventListener {
           WhisperContext context = contexts.get(contextId);
           if (context == null) {
             throw new Exception("Context " + id + " not found");
+          }
+          context.stopCurrentTranscribe();
+          AsyncTask completionTask = null;
+          for (AsyncTask task : tasks.keySet()) {
+            if (tasks.get(task).equals("transcribeFile-" + contextId)) {
+              task.get();
+              break;
+            }
           }
           context.release();
           contexts.remove(contextId);
@@ -219,12 +265,14 @@ public class RNWhisper implements LifecycleEventListener {
           return;
         }
         promise.resolve(null);
+        tasks.remove(this);
       }
     }.execute();
+    tasks.put(task, "releaseContext-" + id);
   }
 
   public void releaseAllContexts(Promise promise) {
-    new AsyncTask<Void, Void, Void>() {
+    AsyncTask task = new AsyncTask<Void, Void, Void>() {
       private Exception exception;
 
       @Override
@@ -244,8 +292,10 @@ public class RNWhisper implements LifecycleEventListener {
           return;
         }
         promise.resolve(null);
+        tasks.remove(this);
       }
     }.execute();
+    tasks.put(task, "releaseAllContexts");
   }
 
   @Override
@@ -258,10 +308,20 @@ public class RNWhisper implements LifecycleEventListener {
 
   @Override
   public void onHostDestroy() {
-    WhisperContext.abortAllTranscribe();
+    for (WhisperContext context : contexts.values()) {
+      context.stopCurrentTranscribe();
+    }
+    for (AsyncTask task : tasks.keySet()) {
+      try {
+        task.get();
+      } catch (Exception e) {
+        Log.e(NAME, "Failed to wait for task", e);
+      }
+    }
     for (WhisperContext context : contexts.values()) {
       context.release();
     }
+    WhisperContext.abortAllTranscribe(); // graceful abort
     contexts.clear();
     downloader.clearCache();
   }

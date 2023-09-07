@@ -36,21 +36,26 @@ typedef struct {
 } RNWhisperContextRecordState;
 
 @interface RNWhisperContext : NSObject {
+    int contextId;
+    dispatch_queue_t dQueue;
     struct whisper_context * ctx;
     RNWhisperContextRecordState recordState;
 }
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath;
++ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId;
 - (struct whisper_context *)getContext;
+- (dispatch_queue_t)getDispatchQueue;
 - (OSStatus)transcribeRealtime:(int)jobId
     options:(NSDictionary *)options
     onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe;
-- (int)transcribeFile:(int)jobId
+- (void)transcribeFile:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
-    onProgress:(void (^)(int))onProgress;
+    onProgress:(void (^)(int))onProgress
+    onEnd:(void (^)(int))onEnd;
 - (void)stopTranscribe:(int)jobId;
+- (void)stopCurrentTranscribe;
 - (bool)isCapturing;
 - (bool)isTranscribing;
 - (bool)isStoppedByAction;
