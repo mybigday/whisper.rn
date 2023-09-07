@@ -80,7 +80,7 @@ Transcribe audio file
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `promise` | `Promise`<[`TranscribeResult`](../README.md#transcriberesult)\> | Transcribe result promise |
-| `stop` | () => `void` | Stop the transcribe |
+| `stop` | () => `Promise<void>` | Stop the transcribe |
 
 #### Defined in
 
@@ -90,7 +90,7 @@ ___
 
 ### transcribeRealtime
 
-▸ **transcribeRealtime**(`options?`): `Promise`<{ `stop`: () => `void` ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+▸ **transcribeRealtime**(`options?`): `Promise`<{ `stop`: () => `Promise<void>` ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 Transcribe the microphone audio stream, the microphone user permission is required
 
@@ -102,7 +102,7 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Returns
 
-`Promise`<{ `stop`: () => `void` ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+`Promise`<{ `stop`: () => `Promise<void>` ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 #### Defined in
 

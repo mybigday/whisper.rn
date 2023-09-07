@@ -112,7 +112,7 @@ export class WhisperContext {
     options: TranscribeFileOptions = {},
   ): {
     /** Stop the transcribe */
-    stop: () => void
+    stop: () => Promise<void>
     /** Transcribe result promise */
     promise: Promise<TranscribeResult>
   } {
@@ -177,7 +177,7 @@ export class WhisperContext {
   /** Transcribe the microphone audio stream, the microphone user permission is required */
   async transcribeRealtime(options: TranscribeRealtimeOptions = {}): Promise<{
     /** Stop the realtime transcribe */
-    stop: () => void
+    stop: () => Promise<void>
     /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
   }> {
