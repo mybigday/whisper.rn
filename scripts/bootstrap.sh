@@ -49,6 +49,9 @@ cd ../../../
 
 yarn example
 
+# Apply patch
+patch -p0 -d ./cpp < ./scripts/ggml-metal.m.patch
+
 # Download model for example
 cd whisper.cpp/models
 

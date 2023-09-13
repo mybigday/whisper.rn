@@ -191,7 +191,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
 #define WSP_GGML_METAL_ADD_KERNEL(name) \
         ctx->function_##name = [ctx->library newFunctionWithName:@"kernel_"#name]; \
         ctx->pipeline_##name = [ctx->device newComputePipelineStateWithFunction:ctx->function_##name error:&error]; \
-        metal_printf("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (void *) ctx->pipeline_##name, \
+        metal_printf("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (__bridge void *) ctx->pipeline_##name, \
                 (int) ctx->pipeline_##name.maxTotalThreadsPerThreadgroup, \
                 (int) ctx->pipeline_##name.threadExecutionWidth); \
         if (error) { \
@@ -262,9 +262,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
 
 void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     metal_printf("%s: deallocating\n", __func__);
-#define WSP_GGML_METAL_DEL_KERNEL(name) \
-    [ctx->function_##name release]; \
-    [ctx->pipeline_##name release];
+#define WSP_GGML_METAL_DEL_KERNEL(name)
 
     WSP_GGML_METAL_DEL_KERNEL(add);
     WSP_GGML_METAL_DEL_KERNEL(add_row);
@@ -314,16 +312,6 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(cpy_f16_f16);
 
 #undef WSP_GGML_METAL_DEL_KERNEL
-
-    for (int i = 0; i < ctx->n_buffers; ++i) {
-        [ctx->buffers[i].metal release];
-    }
-
-    [ctx->library release];
-    [ctx->queue release];
-    [ctx->device release];
-
-    dispatch_release(ctx->d_queue);
 
     free(ctx);
 }
