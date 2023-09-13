@@ -5,6 +5,11 @@ git submodule update --recursive
 
 cp ./whisper.cpp/ggml.h ./cpp/ggml.h
 cp ./whisper.cpp/ggml.c ./cpp/ggml.c
+cp ./whisper.cpp/ggml-alloc.h ./cpp/ggml-alloc.h
+cp ./whisper.cpp/ggml-alloc.c ./cpp/ggml-alloc.c
+cp ./whisper.cpp/ggml-metal.h ./cpp/ggml-metal.h
+cp ./whisper.cpp/ggml-metal.m ./cpp/ggml-metal.m
+cp ./whisper.cpp/ggml-metal.metal ./cpp/ggml-metal.metal
 cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
 
@@ -14,6 +19,10 @@ cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 files=(
   "./cpp/ggml.h"
   "./cpp/ggml.c"
+  "./cpp/ggml-alloc.h"
+  "./cpp/ggml-alloc.c"
+  "./cpp/ggml-metal.h"
+  "./cpp/ggml-metal.m"
   "./cpp/whisper.h"
   "./cpp/whisper.cpp"
 )
