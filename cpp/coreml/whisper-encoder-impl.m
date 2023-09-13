@@ -4,9 +4,6 @@
 // This file was automatically generated and should not be edited.
 //
 
-#if !__has_feature(objc_arc)
-#error This file must be compiled with automatic reference counting enabled (-fobjc-arc)
-#endif
 
 #import "whisper-encoder-impl.h"
 

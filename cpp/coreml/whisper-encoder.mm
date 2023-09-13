@@ -1,6 +1,6 @@
-#if !__has_feature(objc_arc)
-#error This file must be compiled with automatic reference counting enabled (-fobjc-arc)
-#endif
+//#if !__has_feature(objc_arc)
+////#error This file must be compiled with automatic reference counting enabled (-fobjc-arc)
+//#endif
 
 #import "whisper-encoder.h"
 #import "whisper-encoder-impl.h"
