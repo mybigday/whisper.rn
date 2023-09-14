@@ -63,7 +63,9 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(relu);
     WSP_GGML_METAL_DECL_KERNEL(gelu);
     WSP_GGML_METAL_DECL_KERNEL(soft_max);
+    WSP_GGML_METAL_DECL_KERNEL(soft_max_4);
     WSP_GGML_METAL_DECL_KERNEL(diag_mask_inf);
+    WSP_GGML_METAL_DECL_KERNEL(diag_mask_inf_8);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_f32);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_f16);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q4_0);
@@ -78,6 +80,7 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(norm);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32_1row);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32_l4);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_q4_0_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_q4_1_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_q8_0_f32);
@@ -118,14 +121,17 @@ static NSString * const msl_library_source = @"see metal.metal";
 struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
     metal_printf("%s: allocating\n", __func__);
 
-    // Show all the Metal device instances in the system
-//    NSArray * devices = MTLCopyAllDevices();
     id <MTLDevice> device;
     NSString * s;
-//    for (device in devices) {
-//        s = [device name];
-//        metal_printf("%s: found device: %s\n", __func__, [s UTF8String]);
-//    }
+
+#if TARGET_OS_OSX
+    // Show all the Metal device instances in the system
+    NSArray * devices = MTLCopyAllDevices();
+    for (device in devices) {
+        s = [device name];
+        metal_printf("%s: found device: %s\n", __func__, [s UTF8String]);
+    }
+#endif
 
     // Pick and show default Metal device
     device = MTLCreateSystemDefaultDevice();
@@ -140,14 +146,22 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
     ctx->n_buffers = 0;
     ctx->concur_list_len = 0;
 
-    ctx->d_queue = dispatch_queue_create("llama.cpp", DISPATCH_QUEUE_CONCURRENT);
+    ctx->d_queue = dispatch_queue_create("ggml-metal", DISPATCH_QUEUE_CONCURRENT);
 
-#if 0
-    // compile from source string and show compile log
+#ifdef WSP_GGML_SWIFT
+    // load the default.metallib file
     {
         NSError * error = nil;
 
-        ctx->library = [ctx->device newLibraryWithSource:msl_library_source options:nil error:&error];
+        NSBundle * bundle = [NSBundle bundleForClass:[GGMLMetalClass class]];
+        NSString * llamaBundlePath = [bundle pathForResource:@"llama_llama" ofType:@"bundle"];
+        NSBundle * llamaBundle = [NSBundle bundleWithPath:llamaBundlePath];
+        NSString * libPath = [llamaBundle pathForResource:@"default" ofType:@"metallib"];
+        NSURL * libURL = [NSURL fileURLWithPath:libPath];
+
+        // Load the metallib file into a Metal library
+        ctx->library = [ctx->device newLibraryWithURL:libURL error:&error];
+
         if (error) {
             metal_printf("%s: error: %s\n", __func__, [[error description] UTF8String]);
             return NULL;
@@ -162,7 +176,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
 
         //NSString * path = [[NSBundle mainBundle] pathForResource:@"../../examples/metal/metal" ofType:@"metal"];
         NSBundle * bundle = [NSBundle bundleForClass:[GGMLMetalClass class]];
-        NSString * path = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
+        NSString * path   = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
         metal_printf("%s: loading '%s'\n", __func__, [path UTF8String]);
 
         NSString * src  = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
@@ -208,7 +222,9 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(relu);
         WSP_GGML_METAL_ADD_KERNEL(gelu);
         WSP_GGML_METAL_ADD_KERNEL(soft_max);
+        WSP_GGML_METAL_ADD_KERNEL(soft_max_4);
         WSP_GGML_METAL_ADD_KERNEL(diag_mask_inf);
+        WSP_GGML_METAL_ADD_KERNEL(diag_mask_inf_8);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_f32);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_f16);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q4_0);
@@ -223,6 +239,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(norm);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32_1row);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32_l4);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_q4_0_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_q4_1_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_q8_0_f32);
@@ -249,20 +266,22 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
 #undef WSP_GGML_METAL_ADD_KERNEL
     }
 
-//    metal_printf("%s: recommendedMaxWorkingSetSize  = %8.2f MB\n", __func__, ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
-//    metal_printf("%s: hasUnifiedMemory              = %s\n",       __func__, ctx->device.hasUnifiedMemory ? "true" : "false");
-//    if (ctx->device.maxTransferRate != 0) {
-//        metal_printf("%s: maxTransferRate               = %8.2f MB/s\n", __func__, ctx->device.maxTransferRate / 1024.0 / 1024.0);
-//    } else {
-//        metal_printf("%s: maxTransferRate               = built-in GPU\n", __func__);
-//    }
+    metal_printf("%s: hasUnifiedMemory              = %s\n",       __func__, ctx->device.hasUnifiedMemory ? "true" : "false");
+#if TARGET_OS_OSX
+    metal_printf("%s: recommendedMaxWorkingSetSize  = %8.2f MB\n", __func__, ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
+    if (ctx->device.maxTransferRate != 0) {
+        metal_printf("%s: maxTransferRate               = %8.2f MB/s\n", __func__, ctx->device.maxTransferRate / 1024.0 / 1024.0);
+    } else {
+        metal_printf("%s: maxTransferRate               = built-in GPU\n", __func__);
+    }
+#endif
 
     return ctx;
 }
 
 void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     metal_printf("%s: deallocating\n", __func__);
-#define WSP_GGML_METAL_DEL_KERNEL(name)
+#define WSP_GGML_METAL_DEL_KERNEL(name) \
 
     WSP_GGML_METAL_DEL_KERNEL(add);
     WSP_GGML_METAL_DEL_KERNEL(add_row);
@@ -273,7 +292,9 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(relu);
     WSP_GGML_METAL_DEL_KERNEL(gelu);
     WSP_GGML_METAL_DEL_KERNEL(soft_max);
+    WSP_GGML_METAL_DEL_KERNEL(soft_max_4);
     WSP_GGML_METAL_DEL_KERNEL(diag_mask_inf);
+    WSP_GGML_METAL_DEL_KERNEL(diag_mask_inf_8);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_f32);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_f16);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q4_0);
@@ -288,6 +309,7 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(norm);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32_1row);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32_l4);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_q4_0_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_q4_1_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_q8_0_f32);
@@ -446,15 +468,19 @@ bool wsp_ggml_metal_add_buffer(
             }
         }
 
-//        metal_printf(", (%8.2f / %8.2f)",
-//                ctx->device.currentAllocatedSize / 1024.0 / 1024.0,
-//                ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
-//
-//        if (ctx->device.currentAllocatedSize > ctx->device.recommendedMaxWorkingSetSize) {
-//            metal_printf(", warning: current allocated size is greater than the recommended max working set size\n");
-//        } else {
-//            metal_printf("\n");
-//        }
+#if TARGET_OS_OSX
+        metal_printf(", (%8.2f / %8.2f)",
+                ctx->device.currentAllocatedSize / 1024.0 / 1024.0,
+                ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
+
+        if (ctx->device.currentAllocatedSize > ctx->device.recommendedMaxWorkingSetSize) {
+            metal_printf(", warning: current allocated size is greater than the recommended max working set size\n");
+        } else {
+            metal_printf("\n");
+        }
+#else
+        metal_printf(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1024.0 / 1024.0);
+#endif
     }
 
     return true;
@@ -748,7 +774,7 @@ void wsp_ggml_metal_graph_compute(
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
                             [encoder setBytes:&scale length:sizeof(scale) atIndex:2];
 
-                            const int64_t n = wsp_ggml_nelements(dst);
+                            const int64_t n = wsp_ggml_nelements(dst)/4;
 
                             [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                         } break;
@@ -760,7 +786,7 @@ void wsp_ggml_metal_graph_compute(
                                     [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                                     [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
 
-                                    const int64_t n = wsp_ggml_nelements(dst);
+                                    const int64_t n = wsp_ggml_nelements(dst)/4;
 
                                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                                 } break;
@@ -780,7 +806,7 @@ void wsp_ggml_metal_graph_compute(
                                     [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                                     [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
 
-                                    const int64_t n = wsp_ggml_nelements(dst);
+                                    const int64_t n = wsp_ggml_nelements(dst)/4;
 
                                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                                 } break;
@@ -794,7 +820,11 @@ void wsp_ggml_metal_graph_compute(
                         {
                             const int nth = 32;
 
-                            [encoder setComputePipelineState:ctx->pipeline_soft_max];
+                            if (ne00%4 == 0) {
+                                [encoder setComputePipelineState:ctx->pipeline_soft_max_4];
+                            } else {
+                                [encoder setComputePipelineState:ctx->pipeline_soft_max];
+                            }
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
                             [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:2];
@@ -807,14 +837,23 @@ void wsp_ggml_metal_graph_compute(
                         {
                             const int n_past = ((int32_t *)(dst->op_params))[0];
 
-                            [encoder setComputePipelineState:ctx->pipeline_diag_mask_inf];
+                            if (ne00%8 == 0) {
+                                [encoder setComputePipelineState:ctx->pipeline_diag_mask_inf_8];
+                            } else {
+                                [encoder setComputePipelineState:ctx->pipeline_diag_mask_inf];
+                            }
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
                             [encoder setBytes:&ne00   length:sizeof(ne00) atIndex:2];
                             [encoder setBytes:&ne01   length:sizeof(ne01) atIndex:3];
                             [encoder setBytes:&n_past length:sizeof(int)  atIndex:4];
 
-                            [encoder dispatchThreadgroups:MTLSizeMake(ne00, ne01, ne02) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                            if (ne00%8 == 0) {
+                                [encoder dispatchThreadgroups:MTLSizeMake(ne00*ne01*ne02/8, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                            }
+                            else {
+                                [encoder dispatchThreadgroups:MTLSizeMake(ne00, ne01, ne02) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                            }
                         } break;
                     case WSP_GGML_OP_MUL_MAT:
                         {
@@ -827,8 +866,7 @@ void wsp_ggml_metal_graph_compute(
 
                             // for now the matrix-matrix multiplication kernel only works on A14+/M1+ SoCs
                             // AMD GPU and older A-chips will reuse matrix-vector multiplication kernel
-                            if (wsp_ggml_is_contiguous(src0) &&
-                                wsp_ggml_is_contiguous(src1) &&
+                            if (wsp_ggml_is_contiguous(src1) &&
                                 src1t == WSP_GGML_TYPE_F32 &&
                                 [ctx->device supportsFamily:MTLGPUFamilyApple7] &&
                                 ne00%32 == 0 &&
@@ -861,6 +899,7 @@ void wsp_ggml_metal_graph_compute(
                             } else {
                                 int nth0 = 32;
                                 int nth1 = 1;
+                                int nrows = 1;
 
                                 // use custom matrix x vector kernel
                                 switch (src0t) {
@@ -870,8 +909,14 @@ void wsp_ggml_metal_graph_compute(
                                             nth1 = 1;
                                             if (ne11 * ne12 < 4) {
                                                 [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32_1row];
+                                            //} else if (ne00 >= 128 && ne01 >= 8 && ne00%4 == 0) {
+                                            } else if (false) {
+                                                // TODO: with the wsp_ggml_cont(ctx0, Q), this kernel is no longer useful
+                                                [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32_l4];
+                                                nrows = ne11;
                                             } else {
                                                 [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32];
+                                                nrows = 4;
                                             }
                                         } break;
                                     case WSP_GGML_TYPE_Q4_0:
@@ -992,7 +1037,7 @@ void wsp_ggml_metal_graph_compute(
                                 else if (src0t == WSP_GGML_TYPE_Q6_K) {
                                     [encoder dispatchThreadgroups:MTLSizeMake((ne01 + 1)/2, ne11, ne12) threadsPerThreadgroup:MTLSizeMake(nth0, nth1, 1)];
                                 } else {
-                                    int64_t ny = (ne11 + 3)/4;
+                                    int64_t ny = (ne11 + nrows - 1)/nrows;
                                     [encoder dispatchThreadgroups:MTLSizeMake(ne01, ny, ne12) threadsPerThreadgroup:MTLSizeMake(nth0, nth1, 1)];
                                 }
                             }

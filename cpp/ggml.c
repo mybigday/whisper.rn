@@ -4303,41 +4303,19 @@ int64_t wsp_ggml_nrows(const struct wsp_ggml_tensor * tensor) {
 }
 
 size_t wsp_ggml_nbytes(const struct wsp_ggml_tensor * tensor) {
-    // original:
-    //size_t nbytes = tensor->ne[0]*tensor->nb[0]/wsp_ggml_blck_size(tensor->type);
-    //for (int i = 1; i < WSP_GGML_MAX_DIMS; ++i) {
-    //    nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
-    //}
-    //return nbytes;
-
-    // TODO: the imlpementation below is stupid - need something better
-
-    // sort ne and nb
-    int64_t sne[WSP_GGML_MAX_DIMS];
-    size_t  snb[WSP_GGML_MAX_DIMS];
-
-    for (int i = 0; i < WSP_GGML_MAX_DIMS; ++i) {
-        sne[i] = tensor->ne[i];
-        snb[i] = tensor->nb[i];
-    }
-
-    for (int i = 0; i < WSP_GGML_MAX_DIMS; ++i) {
-        for (int j = i + 1; j < WSP_GGML_MAX_DIMS; ++j) {
-            if ((snb[i] > snb[j]) || (snb[i] == snb[j] && sne[i] < sne[j])) {
-                size_t tmp = snb[i];
-                snb[i] = snb[j];
-                snb[j] = tmp;
-
-                int64_t tmp2 = sne[i];
-                sne[i] = sne[j];
-                sne[j] = tmp2;
-            }
+    size_t nbytes;
+    size_t blck_size = wsp_ggml_blck_size(tensor->type);
+    if (blck_size == 1) {
+        nbytes = wsp_ggml_type_size(tensor->type);
+        for (int i = 0; i < WSP_GGML_MAX_DIMS; ++i) {
+            nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
         }
     }
-
-    size_t nbytes = (sne[0]/wsp_ggml_blck_size(tensor->type))*snb[0];
-    for (int i = 1; i < WSP_GGML_MAX_DIMS; ++i) {
-        nbytes += (sne[i] - 1)*snb[i];
+    else {
+        nbytes = tensor->ne[0]*tensor->nb[0]/blck_size;
+        for (int i = 1; i < WSP_GGML_MAX_DIMS; ++i) {
+            nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
+        }
     }
 
     return nbytes;

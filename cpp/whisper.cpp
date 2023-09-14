@@ -29,6 +29,7 @@
 #include <vector>
 #include <regex>
 #include <random>
+#include <functional>
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -596,6 +597,46 @@ struct kv_buf {
     std::vector<uint8_t> v;
 };
 
+// wsp_ggml_allocr wrapper for whisper usage
+struct whisper_allocr {
+    wsp_ggml_allocr * alloc = nullptr;
+
+    std::vector<uint8_t> meta;
+    std::vector<uint8_t> data;
+};
+
+static size_t whisper_allocr_size(struct whisper_allocr & allocr) {
+    return allocr.meta.size() + allocr.data.size();
+}
+
+// measure the memory usage of a graph and prepare the allocr's internal data buffer
+static void whisper_allocr_graph_init(struct whisper_allocr & allocr, std::function<struct wsp_ggml_cgraph *()> && get_graph) {
+    const int tensor_alignment = 32;
+
+    auto & alloc = allocr.alloc;
+    auto & meta  = allocr.meta;
+    auto & data  = allocr.data;
+
+    meta.resize(wsp_ggml_tensor_overhead()*WSP_GGML_MAX_NODES + wsp_ggml_graph_overhead());
+
+    alloc = wsp_ggml_allocr_new_measure(tensor_alignment);
+
+    const size_t alloc_size = wsp_ggml_allocr_alloc_graph(alloc, get_graph()) + tensor_alignment;
+
+    wsp_ggml_allocr_free(alloc);
+
+    data.resize(alloc_size);
+
+    alloc = wsp_ggml_allocr_new(data.data(), data.size(), tensor_alignment);
+}
+
+static void whisper_allocr_free(struct whisper_allocr & allocr) {
+    if (allocr.alloc) {
+        wsp_ggml_allocr_free(allocr.alloc);
+        allocr.alloc = nullptr;
+    }
+}
+
 struct whisper_state {
     int64_t t_sample_us = 0;
     int64_t t_encode_us = 0;
@@ -622,25 +663,12 @@ struct whisper_state {
     std::vector<uint8_t> work_buffer;
 
     // ggml-alloc:
-    // - stores meta info about the intermediate tensors into the `meta_*` buffers
-    // - stores the actual tensor data into the `data_*` buffers
-
-    wsp_ggml_allocr * alloc_conv = nullptr;
-    wsp_ggml_allocr * alloc_encode = nullptr;
-    wsp_ggml_allocr * alloc_cross  = nullptr;
-    wsp_ggml_allocr * alloc_decode = nullptr;
-
-    // meta data
-    std::vector<uint8_t> meta_conv;
-    std::vector<uint8_t> meta_encode;
-    std::vector<uint8_t> meta_cross;
-    std::vector<uint8_t> meta_decode;
-
-    // tensor data
-    std::vector<uint8_t> data_conv;
-    std::vector<uint8_t> data_encode;
-    std::vector<uint8_t> data_cross;
-    std::vector<uint8_t> data_decode;
+    // - stores meta info about the intermediate tensors into the `meta` buffers
+    // - stores the actual tensor data into the `data` buffers
+    whisper_allocr alloc_conv;
+    whisper_allocr alloc_encode;
+    whisper_allocr alloc_cross;
+    whisper_allocr alloc_decode;
 
     // result of the encoder
     struct wsp_ggml_tensor * embd_conv = nullptr;
@@ -1406,6 +1434,8 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
 }
 
 static bool whisper_encode_external(const whisper_state & wstate) {
+    WSP_GGML_UNUSED(wstate);
+
 #ifndef WHISPER_USE_COREML
     const bool use_coreml = false;
 #else
@@ -1435,8 +1465,8 @@ static struct wsp_ggml_cgraph * whisper_build_graph_conv(
     const int n_mels = hparams.n_mels;
 
     struct wsp_ggml_init_params params = {
-        /*.mem_size   =*/ wstate.meta_conv.size(),
-        /*.mem_buffer =*/ wstate.meta_conv.data(),
+        /*.mem_size   =*/ wstate.alloc_conv.meta.size(),
+        /*.mem_buffer =*/ wstate.alloc_conv.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
@@ -1444,7 +1474,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_conv(
 
     wsp_ggml_cgraph * gf = wsp_ggml_new_graph(ctx0);
 
-    wsp_ggml_allocr * alloc = wstate.alloc_conv;
+    wsp_ggml_allocr * alloc = wstate.alloc_conv.alloc;
 
     struct wsp_ggml_tensor * mel = wsp_ggml_new_tensor_2d(ctx0, WSP_GGML_TYPE_F32, 2*n_ctx, n_mels);
     wsp_ggml_allocr_alloc(alloc, mel);
@@ -1531,8 +1561,8 @@ static struct wsp_ggml_cgraph * whisper_build_graph_encoder(
     const int n_layer = hparams.n_audio_layer;
 
     struct wsp_ggml_init_params params = {
-        /*.mem_size   =*/ wstate.meta_encode.size(),
-        /*.mem_buffer =*/ wstate.meta_encode.data(),
+        /*.mem_size   =*/ wstate.alloc_encode.meta.size(),
+        /*.mem_buffer =*/ wstate.alloc_encode.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
@@ -1540,7 +1570,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_encoder(
 
     wsp_ggml_cgraph * gf = wsp_ggml_new_graph(ctx0);
 
-    wsp_ggml_allocr * alloc = wstate.alloc_encode;
+    wsp_ggml_allocr * alloc = wstate.alloc_encode.alloc;
 
     struct wsp_ggml_tensor * KQscale = wsp_ggml_new_tensor_1d(ctx0, WSP_GGML_TYPE_F32, 1);
     wsp_ggml_allocr_alloc(alloc, KQscale);
@@ -1658,7 +1688,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_encoder(
                         0, 2, 1, 3);
 
             // K * Q
-            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, Q);
+            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, wsp_ggml_cont(ctx0, Q));
 
             struct wsp_ggml_tensor * KQ_scaled = wsp_ggml_scale(ctx0, KQ, KQscale);
 
@@ -1780,8 +1810,8 @@ static struct wsp_ggml_cgraph * whisper_build_graph_cross(
     const int n_head  = hparams.n_audio_head;
 
     struct wsp_ggml_init_params params = {
-        /*.mem_size   =*/ wstate.meta_cross.size(),
-        /*.mem_buffer =*/ wstate.meta_cross.data(),
+        /*.mem_size   =*/ wstate.alloc_cross.meta.size(),
+        /*.mem_buffer =*/ wstate.alloc_cross.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
@@ -1789,7 +1819,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_cross(
 
     wsp_ggml_cgraph * gf = wsp_ggml_new_graph(ctx0);
 
-    wsp_ggml_allocr * alloc = wstate.alloc_cross;
+    wsp_ggml_allocr * alloc = wstate.alloc_cross.alloc;
 
     struct wsp_ggml_tensor * cur = wsp_ggml_view_tensor(ctx0, wstate.embd_enc);
 
@@ -1857,7 +1887,7 @@ static bool whisper_encode_internal(
 
     // conv
     {
-        auto & alloc = wstate.alloc_conv;
+        auto & alloc = wstate.alloc_conv.alloc;
 
         wsp_ggml_allocr_reset(alloc);
 
@@ -1872,7 +1902,7 @@ static bool whisper_encode_internal(
 
     // encoder
     if (!whisper_encode_external(wstate)) {
-        auto & alloc = wstate.alloc_encode;
+        auto & alloc = wstate.alloc_encode.alloc;
 
         wsp_ggml_allocr_reset(alloc);
 
@@ -1894,7 +1924,7 @@ static bool whisper_encode_internal(
 
     // cross
     {
-        auto & alloc = wstate.alloc_cross;
+        auto & alloc = wstate.alloc_cross.alloc;
 
         wsp_ggml_allocr_reset(alloc);
 
@@ -1947,8 +1977,8 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
     //WHISPER_PRINT_DEBUG("%s: n_past = %d, N = %d, M = %d, n_ctx = %d\n", __func__, n_past, N, M, n_ctx);
 
     struct wsp_ggml_init_params params = {
-        /*.mem_size   =*/ wstate.meta_decode.size(),
-        /*.mem_buffer =*/ wstate.meta_decode.data(),
+        /*.mem_size   =*/ wstate.alloc_decode.meta.size(),
+        /*.mem_buffer =*/ wstate.alloc_decode.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
@@ -1956,7 +1986,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
 
     wsp_ggml_cgraph * gf = wsp_ggml_new_graph(ctx0);
 
-    wsp_ggml_allocr * alloc = wstate.alloc_decode;
+    wsp_ggml_allocr * alloc = wstate.alloc_decode.alloc;
 
     struct wsp_ggml_tensor * embd = wsp_ggml_new_tensor_1d(ctx0, WSP_GGML_TYPE_I32, N);
     wsp_ggml_allocr_alloc(alloc, embd);
@@ -2059,7 +2089,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
                         wsp_ggml_element_size(kv_self.k)*n_state*n_ctx*il);
 
             // K * Q
-            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, Q);
+            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, wsp_ggml_cont(ctx0, Q));
 
             //struct wsp_ggml_tensor * KQ_scaled = wsp_ggml_scale(ctx0, KQ, KQ_scale);
 
@@ -2154,7 +2184,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
                         0, 2, 1, 3);
 
             // K * Q
-            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, Kcross, Q);
+            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, Kcross, wsp_ggml_cont(ctx0, Q));
 
             //struct wsp_ggml_tensor * KQ_scaled =
             //    wsp_ggml_scale(ctx0,
@@ -2290,7 +2320,7 @@ static bool whisper_decode_internal(
 
     // decoder
     {
-        auto & alloc = wstate.alloc_decode;
+        auto & alloc = wstate.alloc_decode.alloc;
 
         wsp_ggml_allocr_reset(alloc);
 
@@ -2795,100 +2825,50 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
     state->decoders[0].logits.reserve  (ctx->vocab.n_vocab);
     state->decoders[0].logprobs.reserve(ctx->vocab.n_vocab);
 
-    static const size_t tensor_alignment = 32;
-
     // conv allocator
     {
-        auto & alloc = state->alloc_conv;
-        auto & meta  = state->meta_conv;
-        auto & data  = state->data_conv;
+        whisper_allocr_graph_init(state->alloc_conv,
+                [&]() {
+                    return whisper_build_graph_conv(*ctx, *state, 0);
+                });
 
-        meta.resize(wsp_ggml_tensor_overhead()*WSP_GGML_MAX_NODES + wsp_ggml_graph_overhead());
-
-        alloc = wsp_ggml_allocr_new_measure(tensor_alignment);
-
-        wsp_ggml_cgraph * gf = whisper_build_graph_conv(*ctx, *state, 0);
-
-        const size_t alloc_size = wsp_ggml_allocr_alloc_graph(alloc, gf) + tensor_alignment;
-
-        wsp_ggml_allocr_free(alloc);
-
-        log("%s: compute buffer (conv)   = %7.2f MB\n", __func__, (meta.size() + alloc_size) / 1024.0 / 1024.0);
-
-        data.resize(alloc_size);
-        alloc = wsp_ggml_allocr_new(data.data(), data.size(), tensor_alignment);
+        log("%s: compute buffer (conv)   = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_conv) / 1024.0 / 1024.0);
     }
 
     // encoder allocator
     if (!whisper_encode_external(*state)) {
-        auto & alloc = state->alloc_encode;
-        auto & meta  = state->meta_encode;
-        auto & data  = state->data_encode;
+        whisper_allocr_graph_init(state->alloc_encode,
+                [&]() {
+                    return whisper_build_graph_encoder(*ctx, *state);
+                });
 
-        meta.resize(wsp_ggml_tensor_overhead()*WSP_GGML_MAX_NODES + wsp_ggml_graph_overhead());
-
-        alloc = wsp_ggml_allocr_new_measure(tensor_alignment);
-
-        wsp_ggml_cgraph * gf = whisper_build_graph_encoder(*ctx, *state);
-
-        const size_t alloc_size = wsp_ggml_allocr_alloc_graph(alloc, gf) + tensor_alignment;
-
-        wsp_ggml_allocr_free(alloc);
-
-        log("%s: compute buffer (encode) = %7.2f MB\n", __func__, (meta.size() + alloc_size) / 1024.0 / 1024.0);
-
-        data.resize(alloc_size);
-        alloc = wsp_ggml_allocr_new(data.data(), data.size(), tensor_alignment);
+        log("%s: compute buffer (encode) = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_encode) / 1024.0 / 1024.0);
     }
 
     // cross allocator
     {
-        auto & alloc = state->alloc_cross;
-        auto & meta  = state->meta_cross;
-        auto & data  = state->data_cross;
+        whisper_allocr_graph_init(state->alloc_cross,
+                [&]() {
+                    return whisper_build_graph_cross(*ctx, *state);
+                });
 
-        meta.resize(wsp_ggml_tensor_overhead()*WSP_GGML_MAX_NODES + wsp_ggml_graph_overhead());
-
-        alloc = wsp_ggml_allocr_new_measure(tensor_alignment);
-
-        wsp_ggml_cgraph * gf = whisper_build_graph_cross(*ctx, *state);
-
-        const size_t alloc_size = wsp_ggml_allocr_alloc_graph(alloc, gf) + tensor_alignment;
-
-        wsp_ggml_allocr_free(alloc);
-
-        log("%s: compute buffer (cross)  = %7.2f MB\n", __func__, (meta.size() + alloc_size) / 1024.0 / 1024.0);
-
-        data.resize(alloc_size);
-        alloc = wsp_ggml_allocr_new(data.data(), data.size(), tensor_alignment);
+        log("%s: compute buffer (cross)  = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_cross) / 1024.0 / 1024.0);
     }
 
     // decoder allocator
     {
-        auto & alloc = state->alloc_decode;
-        auto & meta  = state->meta_decode;
-        auto & data  = state->data_decode;
+        whisper_allocr_graph_init(state->alloc_decode,
+                [&]() {
+                    const auto & hparams = ctx->model.hparams;
 
-        meta.resize(wsp_ggml_tensor_overhead()*WSP_GGML_MAX_NODES + wsp_ggml_graph_overhead());
+                    // TODO: make sure this is the worst-case scenario
+                    const int n_tokens = hparams.n_text_ctx;
+                    const int n_past   = 0;
 
-        alloc = wsp_ggml_allocr_new_measure(tensor_alignment);
+                    return whisper_build_graph_decoder(*ctx, *state, state->decoders[0], nullptr, n_tokens, n_past);
+                });
 
-        const auto & hparams = ctx->model.hparams;
-
-        // TODO: make sure this is the worst-case scenario
-        const int n_tokens = hparams.n_text_ctx;
-        const int n_past   = 0;
-
-        wsp_ggml_cgraph * gf = whisper_build_graph_decoder(*ctx, *state, state->decoders[0], nullptr, n_tokens, n_past);
-
-        const size_t alloc_size = wsp_ggml_allocr_alloc_graph(alloc, gf) + tensor_alignment;
-
-        wsp_ggml_allocr_free(alloc);
-
-        log("%s: compute buffer (decode) = %7.2f MB\n", __func__, (meta.size() + alloc_size) / 1024.0 / 1024.0);
-
-        data.resize(alloc_size);
-        alloc = wsp_ggml_allocr_new(data.data(), data.size(), tensor_alignment);
+        log("%s: compute buffer (decode) = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_decode) / 1024.0 / 1024.0);
     }
 
 #ifdef WSP_GGML_USE_METAL
@@ -2931,19 +2911,18 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
     WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data", data_ptr, data_size, max_size));
 
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_conv",   state->meta_conv.data(),   state->meta_conv.size(), 0));
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_encode", state->meta_encode.data(), state->meta_encode.size(), 0));
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_cross",  state->meta_cross.data(),  state->meta_cross.size(),  0));
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_decode", state->meta_decode.data(), state->meta_decode.size(), 0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_conv",   state->alloc_conv.meta.data(),   state->alloc_conv.meta.size(),   0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_encode", state->alloc_encode.meta.data(), state->alloc_encode.meta.size(), 0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_cross",  state->alloc_cross.meta.data(),  state->alloc_cross.meta.size(),  0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "meta_decode", state->alloc_decode.meta.data(), state->alloc_decode.meta.size(), 0));
 
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_conv",   state->data_conv.data(),   state->data_conv.size(), 0));
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_encode", state->data_encode.data(), state->data_encode.size(), 0));
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_cross",  state->data_cross.data(),  state->data_cross.size(),  0));
-    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_decode", state->data_decode.data(), state->data_decode.size(), 0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_conv",   state->alloc_conv.data.data(),   state->alloc_conv.data.size(),   0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_encode", state->alloc_encode.data.data(), state->alloc_encode.data.size(), 0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_cross",  state->alloc_cross.data.data(),  state->alloc_cross.data.size(),  0));
+    WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "data_decode", state->alloc_decode.data.data(), state->alloc_decode.data.size(), 0));
 
     WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "kv_cross",  state->kv_cross.buf.data(), state->kv_cross.buf.size(), 0));
 
-    // TODO: handle multiple decoders
     WHISPER_METAL_CHECK_BUF(wsp_ggml_metal_add_buffer(state->ctx_metal, "kv_self_0", state->decoders[0].kv_self.buf.data(), state->decoders[0].kv_self.buf.size(), 0));
 #undef WHISPER_METAL_CHECK_BUF
 #endif
@@ -3169,17 +3148,10 @@ void whisper_free_state(struct whisper_state * state)
         }
 #endif
 
-        if (state->alloc_encode) {
-            wsp_ggml_allocr_free(state->alloc_encode);
-        }
-
-        if (state->alloc_cross) {
-            wsp_ggml_allocr_free(state->alloc_cross);
-        }
-
-        if (state->alloc_decode) {
-            wsp_ggml_allocr_free(state->alloc_decode);
-        }
+        whisper_allocr_free(state->alloc_conv);
+        whisper_allocr_free(state->alloc_decode);
+        whisper_allocr_free(state->alloc_cross);
+        whisper_allocr_free(state->alloc_encode);
 
         delete state;
     }
@@ -3616,6 +3588,9 @@ void whisper_reset_timings(struct whisper_context * ctx) {
         ctx->state->t_sample_us = 0;
         ctx->state->t_encode_us = 0;
         ctx->state->t_decode_us = 0;
+        ctx->state->n_sample = 0;
+        ctx->state->n_encode = 0;
+        ctx->state->n_decode = 0;
     }
 }
 
