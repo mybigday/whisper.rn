@@ -136,6 +136,44 @@ static void wsp_ggml_graph_compute_helper(std::vector<uint8_t> & buf, wsp_ggml_c
     wsp_ggml_graph_compute(graph, &plan);
 }
 
+// faster matrix multiplications for tensors that do not have dimension 0 divisible by "pad"
+// the idea is to represent the original matrix multiplication:
+//
+//   Z = X @ Y
+//
+// with the sum of two matrix multiplications:
+//
+//   Z = (X_0 @ Y_0) + (X_1 @ Y_1)
+//
+// here X_0 and Y_0 are views of X and Y that have dimension 0 divisible by "pad"
+// and X_1 and Y_1 are the remaining views. X_1 and Y_1 end up being small matrices that can be processed with more
+// general-purpose kernels
+//
+static struct wsp_ggml_tensor * wsp_ggml_mul_mat_pad(struct wsp_ggml_context * ctx, struct wsp_ggml_tensor * x, struct wsp_ggml_tensor * y, int pad = 32) {
+    // use padding only if dimension 0 is at least 8 times larger than the padding
+    // else we won't get much benefit from the optimization
+    const int n_pad_req = 8;
+
+    if (x->ne[0] % pad == 0 || x->ne[0] / pad < n_pad_req) {
+        return wsp_ggml_mul_mat(ctx, x, y);
+    }
+
+    struct wsp_ggml_tensor * x_0 = wsp_ggml_view_3d(ctx, x, (x->ne[0]/pad)*pad, x->ne[1], x->ne[2], x->nb[1], x->nb[2], 0);
+    struct wsp_ggml_tensor * x_1 = wsp_ggml_view_3d(ctx, x,  x->ne[0]%pad,      x->ne[1], x->ne[2], x->nb[1], x->nb[2], x_0->ne[0]*x_0->nb[0]);
+
+    struct wsp_ggml_tensor * y_0 = wsp_ggml_view_3d(ctx, y, (y->ne[0]/pad)*pad, y->ne[1], y->ne[2], y->nb[1], y->nb[2], 0);
+    struct wsp_ggml_tensor * y_1 = wsp_ggml_view_3d(ctx, y,  y->ne[0]%pad,      y->ne[1], y->ne[2], y->nb[1], y->nb[2], y_0->ne[0]*y_0->nb[0]);
+
+    return wsp_ggml_add(ctx,
+            wsp_ggml_mul_mat(ctx, x_0, y_0),
+            wsp_ggml_mul_mat(ctx, x_1, y_1));
+}
+
+// TODO: check if other platforms can benefit from this optimization
+#if defined(WSP_GGML_USE_METAL)
+#define wsp_ggml_mul_mat wsp_ggml_mul_mat_pad
+#endif
+
 // available whisper models
 enum e_model {
     MODEL_UNKNOWN,
@@ -641,11 +679,13 @@ struct whisper_state {
     int64_t t_sample_us = 0;
     int64_t t_encode_us = 0;
     int64_t t_decode_us = 0;
+    int64_t t_prompt_us = 0;
     int64_t t_mel_us = 0;
 
     int32_t n_sample = 0; // number of tokens sampled
     int32_t n_encode = 0; // number of encoder calls
-    int32_t n_decode = 0; // number of decoder calls
+    int32_t n_decode = 0; // number of decoder calls with n_tokens == 1 (text-generation)
+    int32_t n_prompt = 0; // number of decoder calls with n_tokens >  1 (prompt encoding)
     int32_t n_fail_p = 0; // number of logprob threshold failures
     int32_t n_fail_h = 0; // number of entropy threshold failures
 
@@ -1688,7 +1728,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_encoder(
                         0, 2, 1, 3);
 
             // K * Q
-            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, wsp_ggml_cont(ctx0, Q));
+            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, Q);
 
             struct wsp_ggml_tensor * KQ_scaled = wsp_ggml_scale(ctx0, KQ, KQscale);
 
@@ -2089,7 +2129,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
                         wsp_ggml_element_size(kv_self.k)*n_state*n_ctx*il);
 
             // K * Q
-            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, wsp_ggml_cont(ctx0, Q));
+            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, K, Q);
 
             //struct wsp_ggml_tensor * KQ_scaled = wsp_ggml_scale(ctx0, KQ, KQ_scale);
 
@@ -2184,7 +2224,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
                         0, 2, 1, 3);
 
             // K * Q
-            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, Kcross, wsp_ggml_cont(ctx0, Q));
+            struct wsp_ggml_tensor * KQ = wsp_ggml_mul_mat(ctx0, Kcross, Q);
 
             //struct wsp_ggml_tensor * KQ_scaled =
             //    wsp_ggml_scale(ctx0,
@@ -2359,8 +2399,13 @@ static bool whisper_decode_internal(
         //        wstate.get_buf_max_mem(3)/1024.0/1024.0);
     }
 
-    wstate.t_decode_us += wsp_ggml_time_us() - t_start_us;
-    wstate.n_decode++;
+    if (n_tokens == 1) {
+        wstate.t_decode_us += wsp_ggml_time_us() - t_start_us;
+        wstate.n_decode++;
+    } else {
+        wstate.t_prompt_us += wsp_ggml_time_us() - t_start_us;
+        wstate.n_prompt++;
+    }
 
     return true;
 }
@@ -3573,12 +3618,14 @@ void whisper_print_timings(struct whisper_context * ctx) {
         const int32_t n_sample = std::max(1, ctx->state->n_sample);
         const int32_t n_encode = std::max(1, ctx->state->n_encode);
         const int32_t n_decode = std::max(1, ctx->state->n_decode);
+        const int32_t n_prompt = std::max(1, ctx->state->n_prompt);
 
         log("%s:     fallbacks = %3d p / %3d h\n", __func__, ctx->state->n_fail_p, ctx->state->n_fail_h);
         log("%s:      mel time = %8.2f ms\n", __func__, ctx->state->t_mel_us / 1000.0f);
         log("%s:   sample time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_sample_us, n_sample, 1e-3f * ctx->state->t_sample_us / n_sample);
         log("%s:   encode time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_encode_us, n_encode, 1e-3f * ctx->state->t_encode_us / n_encode);
         log("%s:   decode time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_decode_us, n_decode, 1e-3f * ctx->state->t_decode_us / n_decode);
+        log("%s:   prompt time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_prompt_us, n_prompt, 1e-3f * ctx->state->t_prompt_us / n_prompt);
     }
     log("%s:    total time = %8.2f ms\n", __func__, (t_end_us - ctx->t_start_us)/1000.0f);
 }
@@ -3588,9 +3635,11 @@ void whisper_reset_timings(struct whisper_context * ctx) {
         ctx->state->t_sample_us = 0;
         ctx->state->t_encode_us = 0;
         ctx->state->t_decode_us = 0;
+        ctx->state->t_prompt_us = 0;
         ctx->state->n_sample = 0;
         ctx->state->n_encode = 0;
         ctx->state->n_decode = 0;
+        ctx->state->n_prompt = 0;
     }
 }
 
@@ -5161,6 +5210,12 @@ int whisper_full_parallel(
         ctx->state->t_sample_us += states[i]->t_sample_us;
         ctx->state->t_encode_us += states[i]->t_encode_us;
         ctx->state->t_decode_us += states[i]->t_decode_us;
+        ctx->state->t_prompt_us += states[i]->t_prompt_us;
+
+        ctx->state->n_sample += states[i]->n_sample;
+        ctx->state->n_encode += states[i]->n_encode;
+        ctx->state->n_decode += states[i]->n_decode;
+        ctx->state->n_prompt += states[i]->n_prompt;
 
         whisper_free_state(states[i]);
     }
