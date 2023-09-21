@@ -58,6 +58,13 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * (Default: Equal to `realtimeMaxAudioSec`)
    */
   realtimeAudioSliceSec?: number
+  /**
+   * Output path for audio file. If not set, the audio file will not be saved
+   * If set but does not end with `.wav`, `.wav` will be appended
+   * TODO: Support iOS
+   * (Default: Undefined)
+   */
+  audioOutputPath?: string
 }
 
 export type TranscribeRealtimeEvent = {
