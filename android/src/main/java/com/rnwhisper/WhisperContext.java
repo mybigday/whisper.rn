@@ -410,16 +410,16 @@ public class WhisperContext {
 
   private int full(int jobId, ReadableMap options, float[] audioData, int audioDataLen) {
     return fullTranscribe(
-        jobId,
-        context,
-        // float[] audio_data,
-        audioData,
-        // jint audio_data_len,
-        audioDataLen,
-        // jint n_threads,
-        options.hasKey("maxThreads") ? options.getInt("maxThreads") : -1,
-        // jint max_context,
-        options.hasKey("maxContext") ? options.getInt("maxContext") : -1,
+      jobId,
+      context,
+      // float[] audio_data,
+      audioData,
+      // jint audio_data_len,
+      audioDataLen,
+      // jint n_threads,
+      options.hasKey("maxThreads") ? options.getInt("maxThreads") : -1,
+      // jint max_context,
+      options.hasKey("maxContext") ? options.getInt("maxContext") : -1,
 
       // jint word_thold,
       options.hasKey("wordThold") ? options.getInt("wordThold") : -1,
