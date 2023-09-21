@@ -58,6 +58,12 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * (Default: Equal to `realtimeMaxAudioSec`)
    */
   realtimeAudioSliceSec?: number
+  /**
+   * Start transcribe on recording when the audio volume is greater than the threshold by using VAD (Voice Activity Detection).
+   * The first VAD will be triggered after 2 second of recording.
+   * (Default: false)
+   */
+  useVad?: boolean
 }
 
 export type TranscribeRealtimeEvent = {

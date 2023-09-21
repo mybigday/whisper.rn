@@ -1,4 +1,5 @@
 #import "RNWhisperContext.h"
+#include <vector>
 
 #define NUM_BYTES_PER_BUFFER 16 * 1024
 
@@ -142,10 +143,27 @@ void AudioInputCallback(void * inUserData,
     for (int i = 0; i < n; i++) {
         audioBufferI16[nSamples + i] = ((short*)inBuffer->mAudioData)[i];
     }
+
+    bool isSpeech = true;
+    if (state->options[@"useVad"]) {
+        if (nSamples + n > WHISPER_SAMPLE_RATE * 2) {
+            int start = nSamples + n - WHISPER_SAMPLE_RATE * 2;
+            std::vector<float> audioBufferF32Vec(WHISPER_SAMPLE_RATE * 2);
+            for (int i = 0; i < WHISPER_SAMPLE_RATE * 2; i++) {
+                audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
+            }
+            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, 0.6f, 100.0f, false);
+            NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
+        } else {
+            isSpeech = false;
+        }
+    }
     nSamples += n;
     state->sliceNSamples[state->sliceIndex] = [NSNumber numberWithInt:nSamples];
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
+
+    if (!isSpeech) return;
 
     if (!state->isTranscribing) {
         state->isTranscribing = true;

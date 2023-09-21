@@ -266,6 +266,8 @@ export default function App() {
                     realtimeAudioSec: 60,
                     // Slice audio into 25 (or < 30) sec chunks for better performance
                     realtimeAudioSliceSec: 25,
+                    // 
+                    useVad: true,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {
