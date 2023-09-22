@@ -187,10 +187,7 @@ public class WhisperContext {
 
     isUseSlices = audioSliceSec < audioSec;
 
-    String audioOutputPath = options.hasKey("audioOutputPath")
-        ? options.getString("audioOutputPath").endsWith(".wav") ? options.getString("audioOutputPath")
-            : options.getString("audioOutputPath") + ".wav"
-        : null;
+    String audioOutputPath = options.hasKey("audioOutputPath") ? options.getString("audioOutputPath") : null;
 
     shortBufferSlices = new ArrayList<short[]>();
     shortBufferSlices.add(new short[audioSliceSec * SAMPLE_RATE]);
