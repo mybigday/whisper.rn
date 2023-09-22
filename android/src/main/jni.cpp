@@ -6,6 +6,7 @@
 #include <sys/sysinfo.h>
 #include <string>
 #include <thread>
+#include <vector>
 #include "whisper.h"
 #include "rn-whisper.h"
 #include "ggml.h"
@@ -182,6 +183,27 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
     struct whisper_context *context = nullptr;
     context = whisper_init_from_input_stream(env, input_stream);
     return reinterpret_cast<jlong>(context);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_rnwhisper_WhisperContext_vadSimple(
+    JNIEnv *env,
+    jobject thiz,
+    jfloatArray audio_data,
+    jint audio_data_len,
+    jfloat vad_thold,
+    jfloat vad_freq_thold
+) {
+    UNUSED(thiz);
+
+    std::vector<float> samples(audio_data_len);
+    jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
+    for (int i = 0; i < audio_data_len; i++) {
+        samples[i] = audio_data_arr[i];
+    }
+    bool is_speech = rn_whisper_vad_simple(samples, WHISPER_SAMPLE_RATE, 1000, vad_thold, vad_freq_thold, false);
+    env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
+    return is_speech;
 }
 
 struct progress_callback_context {
