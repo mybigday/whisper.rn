@@ -145,7 +145,7 @@ void AudioInputCallback(void * inUserData,
     }
 
     bool isSpeech = true;
-    if (state->options[@"useVad"]) {
+    if (!state->isTranscribing && state->options[@"useVad"]) {
         if (nSamples + n > WHISPER_SAMPLE_RATE * 2) {
             int start = nSamples + n - WHISPER_SAMPLE_RATE * 2;
             std::vector<float> audioBufferF32Vec(WHISPER_SAMPLE_RATE * 2);
