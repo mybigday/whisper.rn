@@ -57,7 +57,6 @@ bool rn_whisper_vad_simple(std::vector<float> & pcmf32, int sample_rate, int las
 
   if (n_samples_last >= n_samples) {
     // not enough samples - assume no speech
-    printf("not enough samples - assume no speech\n");
     return false;
   }
 

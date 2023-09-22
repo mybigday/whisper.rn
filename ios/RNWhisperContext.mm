@@ -146,13 +146,17 @@ void AudioInputCallback(void * inUserData,
 
     bool isSpeech = true;
     if (!state->isTranscribing && state->options[@"useVad"]) {
-        if (nSamples + n > WHISPER_SAMPLE_RATE * 2) {
-            int start = nSamples + n - WHISPER_SAMPLE_RATE * 2;
-            std::vector<float> audioBufferF32Vec(WHISPER_SAMPLE_RATE * 2);
-            for (int i = 0; i < WHISPER_SAMPLE_RATE * 2; i++) {
+        int vadSec = state->options[@"vadMs"] != nil ? [state->options[@"vadMs"] intValue] / 1000 : 2;
+        int sampleSize = vadSec * WHISPER_SAMPLE_RATE;
+        if (nSamples + n > sampleSize) {
+            int start = nSamples + n - sampleSize;
+            std::vector<float> audioBufferF32Vec(sampleSize);
+            for (int i = 0; i < sampleSize; i++) {
                 audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
             }
-            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, 0.6f, 100.0f, false);
+            float vadThold = state->options[@"vadThold"] != nil ? [state->options[@"vadThold"] floatValue] : 0.6f;
+            float vadFreqThold = state->options[@"vadFreqThold"] != nil ? [state->options[@"vadFreqThold"] floatValue] : 100.0f;
+            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, vadThold, vadFreqThold, false);
             NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
         } else {
             isSpeech = false;

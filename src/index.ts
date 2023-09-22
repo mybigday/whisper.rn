@@ -64,6 +64,18 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * (Default: false)
    */
   useVad?: boolean
+  /**
+   * The length of the collected audio is used for VAD. (ms) (Default: 2000)
+   */
+  vadMs?: number
+  /**
+   * VAD threshold. (Default: 0.6)
+   */
+  vadThold?: number
+  /**
+   * Frequency to apply High-pass filter in VAD. (Default: 100.0)
+   */
+  vadFreqThold?: number
 }
 
 export type TranscribeRealtimeEvent = {
