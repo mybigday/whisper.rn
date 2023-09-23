@@ -63,6 +63,24 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * (Default: Undefined)
    */
   audioOutputPath?: string
+  /**
+   * Start transcribe on recording when the audio volume is greater than the threshold by using VAD (Voice Activity Detection).
+   * The first VAD will be triggered after 2 second of recording.
+   * (Default: false)
+   */
+  useVad?: boolean
+  /**
+   * The length of the collected audio is used for VAD. (ms) (Default: 2000)
+   */
+  vadMs?: number
+  /**
+   * VAD threshold. (Default: 0.6)
+   */
+  vadThold?: number
+  /**
+   * Frequency to apply High-pass filter in VAD. (Default: 100.0)
+   */
+  vadFreqThold?: number
 }
 
 export type TranscribeRealtimeEvent = {

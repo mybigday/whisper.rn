@@ -1,5 +1,6 @@
 #import "RNWhisperContext.h"
 #import "RNWhisperAudioUtils.h"
+#include <vector>
 
 #define NUM_BYTES_PER_BUFFER 16 * 1024
 
@@ -78,6 +79,29 @@
     }
 }
 
+bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSamples, int n)
+{
+    bool isSpeech = true;
+    if (!state->isTranscribing && state->options[@"useVad"]) {
+        int vadSec = state->options[@"vadMs"] != nil ? [state->options[@"vadMs"] intValue] / 1000 : 2;
+        int sampleSize = vadSec * WHISPER_SAMPLE_RATE;
+        if (nSamples + n > sampleSize) {
+            int start = nSamples + n - sampleSize;
+            std::vector<float> audioBufferF32Vec(sampleSize);
+            for (int i = 0; i < sampleSize; i++) {
+                audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
+            }
+            float vadThold = state->options[@"vadThold"] != nil ? [state->options[@"vadThold"] floatValue] : 0.6f;
+            float vadFreqThold = state->options[@"vadFreqThold"] != nil ? [state->options[@"vadFreqThold"] floatValue] : 100.0f;
+            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, vadThold, vadFreqThold, false);
+            NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
+        } else {
+            isSpeech = false;
+        }
+    }
+    return isSpeech;
+}
+
 void AudioInputCallback(void * inUserData,
     AudioQueueRef inAQ,
     AudioQueueBufferRef inBuffer,
@@ -118,6 +142,11 @@ void AudioInputCallback(void * inUserData,
             !state->isTranscribing &&
             nSamples != state->nSamplesTranscribing
         ) {
+            int16_t* audioBufferI16 = (int16_t*) [state->shortBufferSlices[state->sliceIndex] pointerValue];
+            if (!vad(state, audioBufferI16, nSamples, 0)) {
+                state->transcribeHandler(state->jobId, @"end", @{});
+                return;
+            }
             state->isTranscribing = true;
             dispatch_async([state->mSelf getDispatchQueue], ^{
                 [state->mSelf fullTranscribeSamples:state];
@@ -143,10 +172,14 @@ void AudioInputCallback(void * inUserData,
     for (int i = 0; i < n; i++) {
         audioBufferI16[nSamples + i] = ((short*)inBuffer->mAudioData)[i];
     }
+
+    bool isSpeech = vad(state, audioBufferI16, nSamples, n);
     nSamples += n;
     state->sliceNSamples[state->sliceIndex] = [NSNumber numberWithInt:nSamples];
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
+
+    if (!isSpeech) return;
 
     if (!state->isTranscribing) {
         state->isTranscribing = true;

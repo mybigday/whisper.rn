@@ -272,6 +272,8 @@ export default function App() {
                     realtimeAudioSliceSec: 25,
                     // Save audio on stop
                     audioOutputPath: recordFile,
+                    // Voice Activity Detection - Start transcribing when speech is detected
+                    // useVad: true,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {
