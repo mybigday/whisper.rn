@@ -162,6 +162,27 @@ public class WhisperContext {
     }
   }
 
+  private boolean vad(ReadableMap options, short[] shortBuffer, int nSamples, int n) {
+    boolean isSpeech = true;
+    if (!isTranscribing && options.hasKey("useVad") && options.getBoolean("useVad")) {
+      int vadSec = options.hasKey("vadMs") ? options.getInt("vadMs") / 1000 : 2;
+      int sampleSize = vadSec * SAMPLE_RATE;
+      if (nSamples + n > sampleSize) {
+        int start = nSamples + n - sampleSize;
+        float[] audioData = new float[sampleSize];
+        for (int i = 0; i < sampleSize; i++) {
+          audioData[i] = shortBuffer[i + start] / 32768.0f;
+        }
+        float vadThold = options.hasKey("vadThold") ? (float) options.getDouble("vadThold") : 0.6f;
+        float vadFreqThold = options.hasKey("vadFreqThold") ? (float) options.getDouble("vadFreqThold") : 0.6f;
+        isSpeech = vadSimple(audioData, sampleSize, vadThold, vadFreqThold);
+      } else {
+        isSpeech = false;
+      }
+    }
+    return isSpeech;
+  }
+
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
     if (isCapturing || isTranscribing) {
       return -100;
@@ -223,6 +244,12 @@ public class WhisperContext {
                 ) {
                   emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
                 } else if (!isTranscribing) {
+                  short[] shortBuffer = shortBufferSlices.get(sliceIndex);
+                  boolean isSpeech = vad(options, shortBuffer, nSamples, 0);
+                  if (!isSpeech) {
+                    emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+                    break;
+                  }
                   isTranscribing = true;
                   fullTranscribeSamples(options, true);
                 }
@@ -245,22 +272,7 @@ public class WhisperContext {
                 shortBuffer[nSamples + i] = buffer[i];
               }
 
-              boolean isSpeech = true;
-              if (!isTranscribing && options.hasKey("useVad") && options.getBoolean("useVad")) {
-                int vadSec = options.hasKey("vadMs") ? options.getInt("vadMs") / 1000 : 2;
-                int sampleSize = vadSec * SAMPLE_RATE;
-                if (nSamples + n > sampleSize) {
-                  float vadThold = options.hasKey("vadThold") ? (float) options.getDouble("vadThold") : 0.6f;
-                  float vadFreqThold = options.hasKey("vadFreqThold") ? (float) options.getDouble("vadFreqThold") : 0.6f;
-                  float[] audioData = new float[sampleSize];
-                  for (int i = 0; i < sampleSize; i++) {
-                    audioData[i] = shortBuffer[nSamples + i] / 32768.0f;
-                  }
-                  isSpeech = vadSample(audioData, sampleSize, vadThold, vadFreqThold);
-                } else {
-                  isSpeech = false;
-                }
-              }
+              boolean isSpeech = vad(options, shortBuffer, nSamples, n);
 
               nSamples += n;
               sliceNSamples.set(sliceIndex, nSamples);
@@ -613,7 +625,7 @@ public class WhisperContext {
   protected static native long initContext(String modelPath);
   protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
   protected static native long initContextWithInputStream(PushbackInputStream inputStream);
-  protected static native boolean vadSample(float[] audio_data, int audio_data_len, float vad_thold, float vad_freq_thold);
+  protected static native boolean vadSimple(float[] audio_data, int audio_data_len, float vad_thold, float vad_freq_thold);
   protected static native int fullTranscribe(
     int job_id,
     long context,

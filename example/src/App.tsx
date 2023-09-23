@@ -266,7 +266,7 @@ export default function App() {
                     realtimeAudioSec: 60,
                     // Slice audio into 25 (or < 30) sec chunks for better performance
                     realtimeAudioSliceSec: 25,
-                    // 
+                    // Voice Activity Detection - Start transcribing when speech is detected
                     useVad: true,
                   })
                 setStopTranscribe({ stop })
