@@ -2,7 +2,7 @@
 
 @interface RNWhisperAudioUtils : NSObject
 
-+ (NSData *)concatShortBuffers:(NSMutableArray<NSValue *> *)buffers sliceSize:(int)sliceSize lastSliceSize:(int)lastSliceSize;
++ (NSData *)concatShortBuffers:(NSMutableArray<NSValue *> *)buffers sliceNSamples:(NSMutableArray<NSNumber *> *)sliceNSamples;
 + (void)saveWavFile:(NSData *)rawData audioOutputFile:(NSString *)audioOutputFile;
 
 @end

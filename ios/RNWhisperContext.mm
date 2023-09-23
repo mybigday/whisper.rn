@@ -251,8 +251,7 @@ void AudioInputCallback(void * inUserData,
         if (state->options[@"audioOutputPath"] != nil) {
             [RNWhisperAudioUtils
                 saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
-                            sliceSize:state->audioSliceSec * WHISPER_SAMPLE_RATE
-                            lastSliceSize:nSamplesOfIndex]
+                                sliceNSamples:state->sliceNSamples]
                 audioOutputFile:state->options[@"audioOutputPath"]
             ];
         }

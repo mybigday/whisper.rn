@@ -3,13 +3,11 @@
 
 @implementation RNWhisperAudioUtils
 
-+ (NSData *)concatShortBuffers:(NSMutableArray<NSValue *> *)buffers sliceSize:(int)sliceSize lastSliceSize:(int)lastSliceSize {
++ (NSData *)concatShortBuffers:(NSMutableArray<NSValue *> *)buffers sliceNSamples:(NSMutableArray<NSNumber *> *)sliceNSamples {
     NSMutableData *outputData = [NSMutableData data];
-    for (NSValue *buffer in buffers) {
-        int size = sliceSize;
-        if (buffer == buffers.lastObject) {
-            size = lastSliceSize;
-        }
+    for (int i = 0; i < buffers.count; i++) {
+        int size = [sliceNSamples objectAtIndex:i].intValue;
+        NSValue *buffer = [buffers objectAtIndex:i];
         short *bufferPtr = buffer.pointerValue;
         [outputData appendBytes:bufferPtr length:size * sizeof(short)];
     }
