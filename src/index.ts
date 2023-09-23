@@ -59,6 +59,12 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    */
   realtimeAudioSliceSec?: number
   /**
+   * Output path for audio file. If not set, the audio file will not be saved
+   * TODO: Support iOS
+   * (Default: Undefined)
+   */
+  audioOutputPath?: string
+  /**
    * Start transcribe on recording when the audio volume is greater than the threshold by using VAD (Voice Activity Detection).
    * The first VAD will be triggered after 2 second of recording.
    * (Default: false)
