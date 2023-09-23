@@ -249,6 +249,7 @@ void AudioInputCallback(void * inUserData,
 
         // Save wav if needed
         if (state->options[@"audioOutputPath"] != nil) {
+            // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
             [RNWhisperAudioUtils
                 saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
                                 sliceNSamples:state->sliceNSamples]

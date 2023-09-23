@@ -293,6 +293,7 @@ public class WhisperContext {
               Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
             }
           }
+          // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
           Log.d(NAME, "Begin saving wav file to " + audioOutputPath);
           saveWavFile(concatShortBuffers(shortBufferSlices), audioOutputPath);
           if (!isTranscribing) {
