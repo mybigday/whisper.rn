@@ -750,16 +750,21 @@ PODS:
     - React-perflogger (= 0.71.11)
   - RNFS (2.20.0):
     - React-Core
-  - RNZipArchive (6.0.9):
+  - RNSound (0.11.2):
     - React-Core
-    - RNZipArchive/Core (= 6.0.9)
+    - RNSound/Core (= 0.11.2)
+  - RNSound/Core (0.11.2):
+    - React-Core
+  - RNZipArchive (6.1.0):
+    - React-Core
+    - RNZipArchive/Core (= 6.1.0)
     - SSZipArchive (~> 2.2)
-  - RNZipArchive/Core (6.0.9):
+  - RNZipArchive/Core (6.1.0):
     - React-Core
     - SSZipArchive (~> 2.2)
   - SocketRocket (0.6.0)
   - SSZipArchive (2.4.3)
-  - whisper-rn (0.3.5):
+  - whisper-rn (0.3.6):
     - RCT-Folly
     - RCTRequired
     - RCTTypeSafety
@@ -835,6 +840,7 @@ DEPENDENCIES:
   - React-runtimeexecutor (from `../node_modules/react-native/ReactCommon/runtimeexecutor`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - RNFS (from `../node_modules/react-native-fs`)
+  - RNSound (from `../node_modules/react-native-sound`)
   - RNZipArchive (from `../node_modules/react-native-zip-archive`)
   - whisper-rn (from `../..`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
@@ -935,6 +941,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNFS:
     :path: "../node_modules/react-native-fs"
+  RNSound:
+    :path: "../node_modules/react-native-sound"
   RNZipArchive:
     :path: "../node_modules/react-native-zip-archive"
   whisper-rn:
@@ -994,10 +1002,11 @@ SPEC CHECKSUMS:
   React-runtimeexecutor: 4817d63dbc9d658f8dc0ec56bd9b83ce531129f0
   ReactCommon: 08723d2ed328c5cbcb0de168f231bc7bae7f8aa1
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
-  RNZipArchive: 68a0c6db4b1c103f846f1559622050df254a3ade
+  RNSound: 6c156f925295bdc83e8e422e7d8b38d33bc71852
+  RNZipArchive: ef9451b849c45a29509bf44e65b788829ab07801
   SocketRocket: fccef3f9c5cedea1353a9ef6ada904fde10d6608
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
-  whisper-rn: 6f293154b175fee138a994fa00d0f414fb1f44e9
+  whisper-rn: e80c0482f6a632faafd601f98f10da0255c1e1ec
   Yoga: f7decafdc5e8c125e6fa0da38a687e35238420fa
   YogaKit: f782866e155069a2cca2517aafea43200b01fd5a
 
