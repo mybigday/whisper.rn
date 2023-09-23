@@ -60,7 +60,6 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
   realtimeAudioSliceSec?: number
   /**
    * Output path for audio file. If not set, the audio file will not be saved
-   * TODO: Support iOS
    * (Default: Undefined)
    */
   audioOutputPath?: string

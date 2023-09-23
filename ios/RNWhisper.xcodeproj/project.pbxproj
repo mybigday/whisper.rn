@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		5E555C0D2413F4C50049A1A2 /* RNWhisper.mm in Sources */ = {isa = PBXBuildFile; fileRef = B3E7B5891CC2AC0600A0062D /* RNWhisper.mm */; };
+		7FE0BBA12ABE6C7B0049B4E4 /* RNWhisperDownloader.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FE0BB9B2ABE6C7B0049B4E4 /* RNWhisperDownloader.m */; };
+		7FE0BBA22ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FE0BB9C2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m */; };
+		7FE0BBA32ABE6C7B0049B4E4 /* RNWhisperContext.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7FE0BBA02ABE6C7B0049B4E4 /* RNWhisperContext.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,6 +27,13 @@
 
 /* Begin PBXFileReference section */
 		134814201AA4EA6300B7C361 /* libRNWhisper.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libRNWhisper.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		7FE0BB9A2ABE6C7B0049B4E4 /* RNWhisper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNWhisper.h; sourceTree = "<group>"; };
+		7FE0BB9B2ABE6C7B0049B4E4 /* RNWhisperDownloader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RNWhisperDownloader.m; sourceTree = "<group>"; };
+		7FE0BB9C2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RNWhisperAudioUtils.m; sourceTree = "<group>"; };
+		7FE0BB9D2ABE6C7B0049B4E4 /* RNWhisperContext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNWhisperContext.h; sourceTree = "<group>"; };
+		7FE0BB9E2ABE6C7B0049B4E4 /* RNWhisperDownloader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNWhisperDownloader.h; sourceTree = "<group>"; };
+		7FE0BB9F2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNWhisperAudioUtils.h; sourceTree = "<group>"; };
+		7FE0BBA02ABE6C7B0049B4E4 /* RNWhisperContext.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = RNWhisperContext.mm; sourceTree = "<group>"; };
 		B3E7B5891CC2AC0600A0062D /* RNWhisper.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = RNWhisper.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -49,6 +59,13 @@
 		58B511D21A9E6C8500147676 = {
 			isa = PBXGroup;
 			children = (
+				7FE0BB9F2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.h */,
+				7FE0BB9C2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m */,
+				7FE0BB9A2ABE6C7B0049B4E4 /* RNWhisper.h */,
+				7FE0BB9D2ABE6C7B0049B4E4 /* RNWhisperContext.h */,
+				7FE0BBA02ABE6C7B0049B4E4 /* RNWhisperContext.mm */,
+				7FE0BB9E2ABE6C7B0049B4E4 /* RNWhisperDownloader.h */,
+				7FE0BB9B2ABE6C7B0049B4E4 /* RNWhisperDownloader.m */,
 				B3E7B5891CC2AC0600A0062D /* RNWhisper.mm */,
 				134814211AA4EA7D00B7C361 /* Products */,
 			);
@@ -112,6 +129,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				5E555C0D2413F4C50049A1A2 /* RNWhisper.mm in Sources */,
+				7FE0BBA22ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m in Sources */,
+				7FE0BBA32ABE6C7B0049B4E4 /* RNWhisperContext.mm in Sources */,
+				7FE0BBA12ABE6C7B0049B4E4 /* RNWhisperDownloader.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -223,9 +243,7 @@
 					"$(SRCROOT)/../../react-native/React/**",
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				OTHER_LDFLAGS = (
-					"-ObjC",
-				);
+				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = RNWhisper;
 				SKIP_INSTALL = YES;
 			};

@@ -1,4 +1,5 @@
 #import "RNWhisperContext.h"
+#import "RNWhisperAudioUtils.h"
 #include <vector>
 
 #define NUM_BYTES_PER_BUFFER 16 * 1024
@@ -245,6 +246,17 @@ void AudioInputCallback(void * inUserData,
         NSLog(@"[RNWhisper] Transcribe end");
         result[@"isStoppedByAction"] = @(state->isStoppedByAction);
         result[@"isCapturing"] = @(false);
+
+        // Save wav if needed
+        if (state->options[@"audioOutputPath"] != nil) {
+            // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
+            [RNWhisperAudioUtils
+                saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
+                                sliceNSamples:state->sliceNSamples]
+                audioOutputFile:state->options[@"audioOutputPath"]
+            ];
+        }
+
         state->transcribeHandler(state->jobId, @"end", result);
     } else if (code == 0) {
         result[@"isCapturing"] = @(true);
