@@ -16,7 +16,7 @@
     "react-native-zip-archive": "^6.1.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.22.20",
+    "@babel/core": "^7.23.0",
     "@babel/preset-env": "^7.22.20",
     "@babel/runtime": "^7.23.1",
     "metro-react-native-babel-preset": "0.73.8"
