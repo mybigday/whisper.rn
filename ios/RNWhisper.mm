@@ -144,6 +144,14 @@ RCT_REMAP_METHOD(transcribeFile,
                 ];
             });
         }
+        onNewSegments: ^(NSDictionary *result) {
+            if (rn_whisper_transcribe_is_aborted(jobId)) {
+                return;
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // TODO
+            });
+        }
         onEnd: ^(int code) {
             if (code != 0) {
                 free(waveFile);

@@ -53,6 +53,7 @@ typedef struct {
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
     onProgress:(void (^)(int))onProgress
+    onNewSegments:(void (^)(NSDictionary *))onNewSegments
     onEnd:(void (^)(int))onEnd;
 - (void)stopTranscribe:(int)jobId;
 - (void)stopCurrentTranscribe;
