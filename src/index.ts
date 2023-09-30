@@ -25,9 +25,23 @@ if (Platform.OS === 'android') {
 export type { TranscribeOptions, TranscribeResult }
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
+const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
 
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
+
+export type TranscribeNewSegmentsResult = {
+  nNew: number
+  totalNNew: number
+  result: string
+  segments: TranscribeResult['segments']
+}
+
+export type TranscribeNewSegmentsNativeEvent = {
+  contextId: number
+  jobId: number
+  result: TranscribeNewSegmentsResult
+}
 
 // Fn -> Boolean in TranscribeFileNativeOptions
 export type TranscribeFileOptions = TranscribeOptions & {
@@ -35,6 +49,10 @@ export type TranscribeFileOptions = TranscribeOptions & {
    * Progress callback, the progress is between 0 and 100
    */
   onProgress?: (progress: number) => void
+  /**
+   * Callback when new segments are transcribed
+   */
+  onNewSegments?: (result: TranscribeNewSegmentsResult) => void
 }
 
 export type TranscribeProgressNativeEvent = {
@@ -156,7 +174,8 @@ export class WhisperContext {
     if (path.startsWith('file://')) path = path.slice(7)
     const jobId: number = Math.floor(Math.random() * 10000)
 
-    const { onProgress, ...rest } = options
+    const { onProgress, onNewSegments, ...rest } = options
+
     let progressListener: any
     let lastProgress: number = 0
     if (onProgress) {
@@ -176,17 +195,39 @@ export class WhisperContext {
         progressListener = null
       }
     }
+
+    let newSegmentsListener: any
+    if (onNewSegments) {
+      newSegmentsListener = EventEmitter.addListener(
+        EVENT_ON_TRANSCRIBE_NEW_SEGMENTS,
+        (evt: TranscribeNewSegmentsNativeEvent) => {
+          const { contextId, result } = evt
+          if (contextId !== this.id || evt.jobId !== jobId) return
+          onNewSegments(result)
+        },
+      )
+    }
+    const removeNewSegmenetsListener = () => {
+      if (newSegmentsListener) {
+        newSegmentsListener.remove()
+        newSegmentsListener = null
+      }
+    }
+
     return {
       stop: async () => {
         await RNWhisper.abortTranscribe(this.id, jobId)
         removeProgressListener()
+        removeNewSegmenetsListener()
       },
       promise: RNWhisper.transcribeFile(this.id, jobId, path, {
         ...rest,
         onProgress: !!onProgress,
+        onNewSegments: !!onNewSegments,
       })
         .then((result) => {
           removeProgressListener()
+          removeNewSegmenetsListener()
           if (!result.isAborted && lastProgress !== 100) {
             // Handle the case that the last progress event is not triggered
             onProgress?.(100)
@@ -195,6 +236,7 @@ export class WhisperContext {
         })
         .catch((e) => {
           removeProgressListener()
+          removeNewSegmenetsListener()
           throw e
         }),
     }

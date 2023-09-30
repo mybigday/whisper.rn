@@ -87,6 +87,7 @@ RCT_REMAP_METHOD(initContext,
 - (NSArray *)supportedEvents {
   return@[
     @"@RNWhisper_onTranscribeProgress",
+    @"@RNWhisper_onTranscribeNewSegments",
     @"@RNWhisper_onRealtimeTranscribe",
     @"@RNWhisper_onRealtimeTranscribeEnd",
   ];
@@ -140,6 +141,20 @@ RCT_REMAP_METHOD(transcribeFile,
                         @"contextId": [NSNumber numberWithInt:contextId],
                         @"jobId": [NSNumber numberWithInt:jobId],
                         @"progress": [NSNumber numberWithInt:progress]
+                    }
+                ];
+            });
+        }
+        onNewSegments: ^(NSDictionary *result) {
+            if (rn_whisper_transcribe_is_aborted(jobId)) {
+                return;
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self sendEventWithName:@"@RNWhisper_onTranscribeNewSegments"
+                    body:@{
+                        @"contextId": [NSNumber numberWithInt:contextId],
+                        @"jobId": [NSNumber numberWithInt:jobId],
+                        @"result": result
                     }
                 ];
             });
