@@ -87,6 +87,7 @@ RCT_REMAP_METHOD(initContext,
 - (NSArray *)supportedEvents {
   return@[
     @"@RNWhisper_onTranscribeProgress",
+    @"@RNWhisper_onTranscribeNewSegments",
     @"@RNWhisper_onRealtimeTranscribe",
     @"@RNWhisper_onRealtimeTranscribeEnd",
   ];
@@ -149,7 +150,13 @@ RCT_REMAP_METHOD(transcribeFile,
                 return;
             }
             dispatch_async(dispatch_get_main_queue(), ^{
-                // TODO
+                [self sendEventWithName:@"@RNWhisper_onTranscribeNewSegments"
+                    body:@{
+                        @"contextId": [NSNumber numberWithInt:contextId],
+                        @"jobId": [NSNumber numberWithInt:jobId],
+                        @"result": result
+                    }
+                ];
             });
         }
         onEnd: ^(int code) {

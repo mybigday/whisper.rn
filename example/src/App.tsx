@@ -221,6 +221,9 @@ export default function App() {
                 onProgress: (cur) => {
                   log(`Transcribing progress: ${cur}%`)
                 },
+                // onNewSegments: (segments) => {
+                //   console.log('New segments:', segments)
+                // },
               })
               setStopTranscribe({ stop })
               const { result, segments } = await promise
