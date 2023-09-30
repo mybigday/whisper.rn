@@ -346,7 +346,7 @@ public class WhisperContext {
     payload.putInt("sliceIndex", transcribeSliceIndex);
 
     if (code == 0) {
-      payload.putMap("data", getTextSegments());
+      payload.putMap("data", getTextSegments(0, getTextSegmentCount(context)));
     } else {
       payload.putString("error", "Transcribe failed with code " + code);
     }
@@ -406,15 +406,40 @@ public class WhisperContext {
     eventEmitter.emit("@RNWhisper_onTranscribeProgress", event);
   }
 
-  private static class ProgressCallback {
-    WhisperContext context;
+  private void emitNewSegments(WritableMap result) {
+    WritableMap event = Arguments.createMap();
+    event.putInt("contextId", WhisperContext.this.id);
+    event.putInt("jobId", jobId);
+    event.putMap("result", result);
+    eventEmitter.emit("@RNWhisper_onTranscribeNewSegments", event);
+  }
 
-    public ProgressCallback(WhisperContext context) {
+  private static class Callback {
+    WhisperContext context;
+    boolean emitProgressNeeded = false;
+    boolean emitNewSegmentsNeeded = false;
+    int totalNNew = 0;
+
+    public Callback(WhisperContext context, boolean emitProgressNeeded, boolean emitNewSegmentsNeeded) {
       this.context = context;
+      this.emitProgressNeeded = emitProgressNeeded;
+      this.emitNewSegmentsNeeded = emitNewSegmentsNeeded;
     }
 
     void onProgress(int progress) {
+      if (!emitProgressNeeded) return;
       context.emitProgress(progress);
+    }
+
+    void onNewSegments(int nNew) {
+      Log.d(NAME, "onNewSegments: " + nNew);
+      totalNNew += nNew;
+      if (!emitNewSegmentsNeeded) return;
+
+      WritableMap result = context.getTextSegments(totalNNew - nNew, totalNNew);
+      result.putInt("nNew", nNew);
+      result.putInt("totalNNew", totalNNew);
+      context.emitNewSegments(result);
     }
   }
 
@@ -433,12 +458,14 @@ public class WhisperContext {
     if (code != 0) {
       throw new Exception("Failed to transcribe the file. Code: " + code);
     }
-    WritableMap result = getTextSegments();
+    WritableMap result = getTextSegments(0, getTextSegmentCount(context));
     result.putBoolean("isAborted", isStoppedByAction);
     return result;
   }
 
   private int full(int jobId, ReadableMap options, float[] audioData, int audioDataLen) {
+    boolean hasProgressCallback = options.hasKey("onProgress") && options.getBoolean("onProgress");
+    boolean hasNewSegmentsCallback = options.hasKey("onNewSegments") && options.getBoolean("onNewSegments");
     return fullTranscribe(
       jobId,
       context,
@@ -478,13 +505,12 @@ public class WhisperContext {
       options.hasKey("language") ? options.getString("language") : "auto",
       // jstring prompt
       options.hasKey("prompt") ? options.getString("prompt") : null,
-      // ProgressCallback progressCallback
-      options.hasKey("onProgress") && options.getBoolean("onProgress") ? new ProgressCallback(this) : null
+      // Callback callback
+      hasProgressCallback || hasNewSegmentsCallback ? new Callback(this, hasProgressCallback, hasNewSegmentsCallback) : null
     );
   }
 
-  private WritableMap getTextSegments() {
-    Integer count = getTextSegmentCount(context);
+  private WritableMap getTextSegments(int start, int count) {
     StringBuilder builder = new StringBuilder();
 
     WritableMap data = Arguments.createMap();
@@ -647,7 +673,7 @@ public class WhisperContext {
     boolean translate,
     String language,
     String prompt,
-    ProgressCallback progressCallback
+    Callback Callback
   );
   protected static native void abortTranscribe(int jobId);
   protected static native void abortAllTranscribe();
