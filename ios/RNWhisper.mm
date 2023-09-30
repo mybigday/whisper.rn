@@ -1,6 +1,7 @@
 #import "RNWhisper.h"
 #import "RNWhisperContext.h"
 #import "RNWhisperDownloader.h"
+#import "RNWhisperAudioSessionUtils.h"
 #include <stdlib.h>
 #include <string>
 
@@ -281,6 +282,69 @@ RCT_REMAP_METHOD(releaseAllContexts,
     contexts = nil;
 
     [RNWhisperDownloader clearCache];
+}
+
+// MARK: - AudioSessionUtils
+
+RCT_EXPORT_METHOD(getAudioSessionCurrentCategory:(RCTPromiseResolveBlock)resolve
+                  withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSString *category = [RNWhisperAudioSessionUtils getCurrentCategory];
+    NSArray *options = [RNWhisperAudioSessionUtils getCurrentOptions];
+    resolve(@{
+        @"category": category,
+        @"options": options
+    });
+}
+
+RCT_EXPORT_METHOD(getAudioSessionCurrentMode:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSString *mode = [RNWhisperAudioSessionUtils getCurrentMode];
+    resolve(mode);
+}
+
+RCT_REMAP_METHOD(setAudioSessionCategory,
+                 withCategory:(NSString *)category
+                 withOptions:(NSArray *)options
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSError *error = nil;
+    [RNWhisperAudioSessionUtils setCategory:category options:options error:&error];
+    if (error != nil) {
+        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set category. Error: %@", error], nil);
+        return;
+    }
+    resolve(nil);
+}
+
+RCT_REMAP_METHOD(setAudioSessionMode,
+                 withMode:(NSString *)mode
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSError *error = nil;
+    [RNWhisperAudioSessionUtils setMode:mode error:&error];
+    if (error != nil) {
+        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set mode. Error: %@", error], nil);
+        return;
+    }
+    resolve(nil);
+}
+
+RCT_REMAP_METHOD(setAudioSessionActive,
+                 withActive:(BOOL)active
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSError *error = nil;
+    [RNWhisperAudioSessionUtils setActive:active error:&error];
+    if (error != nil) {
+        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set active. Error: %@", error], nil);
+        return;
+    }
+    resolve(nil);
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

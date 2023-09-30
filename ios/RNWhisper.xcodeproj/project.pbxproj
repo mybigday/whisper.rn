@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5E555C0D2413F4C50049A1A2 /* RNWhisper.mm in Sources */ = {isa = PBXBuildFile; fileRef = B3E7B5891CC2AC0600A0062D /* RNWhisper.mm */; };
+		7F458E922AC7DC74007045F6 /* RNWhisperAudioSessionUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F458E912AC7DC74007045F6 /* RNWhisperAudioSessionUtils.m */; };
 		7FE0BBA12ABE6C7B0049B4E4 /* RNWhisperDownloader.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FE0BB9B2ABE6C7B0049B4E4 /* RNWhisperDownloader.m */; };
 		7FE0BBA22ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 7FE0BB9C2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m */; };
 		7FE0BBA32ABE6C7B0049B4E4 /* RNWhisperContext.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7FE0BBA02ABE6C7B0049B4E4 /* RNWhisperContext.mm */; };
@@ -27,6 +28,8 @@
 
 /* Begin PBXFileReference section */
 		134814201AA4EA6300B7C361 /* libRNWhisper.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libRNWhisper.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		7F458E902AC7DC74007045F6 /* RNWhisperAudioSessionUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNWhisperAudioSessionUtils.h; sourceTree = "<group>"; };
+		7F458E912AC7DC74007045F6 /* RNWhisperAudioSessionUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RNWhisperAudioSessionUtils.m; sourceTree = "<group>"; };
 		7FE0BB9A2ABE6C7B0049B4E4 /* RNWhisper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNWhisper.h; sourceTree = "<group>"; };
 		7FE0BB9B2ABE6C7B0049B4E4 /* RNWhisperDownloader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RNWhisperDownloader.m; sourceTree = "<group>"; };
 		7FE0BB9C2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RNWhisperAudioUtils.m; sourceTree = "<group>"; };
@@ -59,6 +62,8 @@
 		58B511D21A9E6C8500147676 = {
 			isa = PBXGroup;
 			children = (
+				7F458E902AC7DC74007045F6 /* RNWhisperAudioSessionUtils.h */,
+				7F458E912AC7DC74007045F6 /* RNWhisperAudioSessionUtils.m */,
 				7FE0BB9F2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.h */,
 				7FE0BB9C2ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m */,
 				7FE0BB9A2ABE6C7B0049B4E4 /* RNWhisper.h */,
@@ -132,6 +137,7 @@
 				7FE0BBA22ABE6C7B0049B4E4 /* RNWhisperAudioUtils.m in Sources */,
 				7FE0BBA32ABE6C7B0049B4E4 /* RNWhisperContext.mm in Sources */,
 				7FE0BBA12ABE6C7B0049B4E4 /* RNWhisperDownloader.m in Sources */,
+				7F458E922AC7DC74007045F6 /* RNWhisperAudioSessionUtils.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
