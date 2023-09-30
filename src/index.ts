@@ -24,7 +24,6 @@ if (Platform.OS === 'android') {
 
 export type { TranscribeOptions, TranscribeResult }
 
-
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
 const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
 
@@ -167,7 +166,9 @@ export class WhisperContext {
       }
     } else {
       if (filePath.startsWith('http'))
-        throw new Error('Transcribe remote file is not supported, please download it first')
+        throw new Error(
+          'Transcribe remote file is not supported, please download it first',
+        )
       path = filePath
     }
     if (path.startsWith('file://')) path = path.slice(7)
@@ -222,20 +223,22 @@ export class WhisperContext {
       promise: RNWhisper.transcribeFile(this.id, jobId, path, {
         ...rest,
         onProgress: !!onProgress,
-        onNewSegments: !!onNewSegments
-      }).then((result) => {
-        removeProgressListener()
-        removeNewSegmenetsListener()
-        if (!result.isAborted && lastProgress !== 100) {
-          // Handle the case that the last progress event is not triggered
-          onProgress?.(100)
-        }
-        return result
-      }).catch((e) => {
-        removeProgressListener()
-        removeNewSegmenetsListener()
-        throw e
-      }),
+        onNewSegments: !!onNewSegments,
+      })
+        .then((result) => {
+          removeProgressListener()
+          removeNewSegmenetsListener()
+          if (!result.isAborted && lastProgress !== 100) {
+            // Handle the case that the last progress event is not triggered
+            onProgress?.(100)
+          }
+          return result
+        })
+        .catch((e) => {
+          removeProgressListener()
+          removeNewSegmenetsListener()
+          throw e
+        }),
     }
   }
 
@@ -360,7 +363,7 @@ export type ContextOptions = {
    */
   coreMLModelAsset?: {
     filename: string
-    assets: number[]
+    assets: string[] | number[]
   }
   /** Is the file path a bundle asset for pure string filePath */
   isBundleAsset?: boolean
@@ -385,12 +388,19 @@ export async function initWhisper({
     if (filename && assets) {
       coreMLAssets = assets
         ?.map((asset) => {
-          const { uri } = Image.resolveAssetSource(asset)
-          const filepath = coreMLModelAssetPaths.find((p) => uri.includes(p))
-          if (filepath) {
+          if (typeof asset === 'number') {
+            const { uri } = Image.resolveAssetSource(asset)
+            const filepath = coreMLModelAssetPaths.find((p) => uri.includes(p))
+            if (filepath) {
+              return {
+                uri,
+                filepath: `${filename}/${filepath}`,
+              }
+            }
+          } else if (typeof asset === 'string') {
             return {
-              uri,
-              filepath: `${filename}/${filepath}`,
+              uri: asset,
+              filepath: `${filename}/${asset}`,
             }
           }
           return undefined
@@ -409,7 +419,9 @@ export async function initWhisper({
     }
   } else {
     if (!isBundleAsset && filePath.startsWith('http'))
-      throw new Error('Transcribe remote file is not supported, please download it first')
+      throw new Error(
+        'Transcribe remote file is not supported, please download it first',
+      )
     path = filePath
   }
   if (path.startsWith('file://')) path = path.slice(7)
