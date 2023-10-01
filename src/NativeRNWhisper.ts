@@ -80,7 +80,7 @@ export interface Spec extends TurboModule {
   // iOS specific
   getAudioSessionCurrentCategory: () => Promise<{
     category: string,
-    options: {},
+    options: Array<string>,
   }>;
   getAudioSessionCurrentMode: () => Promise<string>;
   setAudioSessionCategory: (category: string, options: Array<string>) => Promise<void>;

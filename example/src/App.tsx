@@ -12,7 +12,7 @@ import {
 import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
 import Sound from 'react-native-sound'
-import { initWhisper, libVersion } from '../../src' // whisper.rn
+import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
 
@@ -92,6 +92,28 @@ const createDir = async (log: any) => {
 
 const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
+
+const updateAudioSession = async (log: any) => {
+  if (Platform.OS !== 'ios') return
+
+  // Log current audio session
+  // log('Category & Options:', JSON.stringify(await AudioSessionIos.getCurrentCategory()))
+  // log('Mode:', await AudioSessionIos.getCurrentMode())
+
+  await AudioSessionIos.setCategory(
+    AudioSessionIos.Category.PlayAndRecord, [
+      AudioSessionIos.CategoryOptions.MixWithOthers,
+      AudioSessionIos.CategoryOptions.AllowBluetooth,
+    ],
+  )
+  await AudioSessionIos.setMode(AudioSessionIos.Mode.SpokenAudio)
+  await AudioSessionIos.setActive(true)
+
+  const categoryResult = await AudioSessionIos.getCurrentCategory()
+  log('Category:', categoryResult.category)
+  log('Category Options:', categoryResult.options.join(', '))
+  log('Mode:', await AudioSessionIos.getCurrentMode())
+}
 
 export default function App() {
   const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(null)
@@ -263,6 +285,7 @@ export default function App() {
               log('Start realtime transcribing...')
               try {
                 await createDir(log)
+                await updateAudioSession(log)
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
@@ -358,6 +381,7 @@ export default function App() {
               log('Recorded file does not exist')
               return
             }
+            await updateAudioSession(log)
             const player = new Sound(recordFile, '', (e) => {
               if (e) {
                 log('error', e)

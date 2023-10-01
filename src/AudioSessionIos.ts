@@ -36,22 +36,26 @@ const checkPlatform = () => {
 }
 
 export default {
+  Category: AudioSessionCategory,
+  CategoryOptions: AudioSessionCategoryOptions,
+  Mode: AudioSessionMode,
+
   getCurrentCategory: async (): Promise<{
     category: AudioSessionCategory,
     options: AudioSessionCategoryOptions[],
   }> => {
     checkPlatform()
-    const { category, options } = await RNWhisper.getAudioSessionCurrentCategory()
+    const result = await RNWhisper.getAudioSessionCurrentCategory()
     return {
-      category: category as AudioSessionCategory,
-      options: options as AudioSessionCategoryOptions[],
+      category: (result.category.replace('AVAudioSessionCategory', '') as AudioSessionCategory),
+      options: result.options?.map((option: string) => (option.replace('AVAudioSessionCategoryOptions', '') as AudioSessionCategoryOptions)),
     }
   },
   
   getCurrentMode: async (): Promise<AudioSessionMode> => {
     checkPlatform()
     const mode = await RNWhisper.getAudioSessionCurrentMode()
-    return mode as AudioSessionMode
+    return (mode.replace('AVAudioSessionMode', '') as AudioSessionMode)
   },
 
   setCategory: async (
