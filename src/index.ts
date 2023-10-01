@@ -11,6 +11,7 @@ import type {
   TranscribeResult,
   CoreMLAsset,
 } from './NativeRNWhisper'
+import AudioSessionIos from './AudioSessionIos'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
@@ -407,3 +408,5 @@ export const isUseCoreML: boolean = !!useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
 export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
+
+export { AudioSessionIos }
