@@ -10,7 +10,7 @@ export enum AudioSessionCategory {
   MultiRoute = 'MultiRoute',
 }
 
-export enum AudioSessionCategoryOptions {
+export enum AudioSessionCategoryOption {
   MixWithOthers = 'MixWithOthers',
   DuckOthers = 'DuckOthers',
   InterruptSpokenAudioAndMixWithOthers = 'InterruptSpokenAudioAndMixWithOthers',
@@ -40,18 +40,18 @@ const checkPlatform = () => {
  */
 export default {
   Category: AudioSessionCategory,
-  CategoryOptions: AudioSessionCategoryOptions,
+  CategoryOption: AudioSessionCategoryOption,
   Mode: AudioSessionMode,
 
   getCurrentCategory: async (): Promise<{
     category: AudioSessionCategory,
-    options: AudioSessionCategoryOptions[],
+    options: AudioSessionCategoryOption[],
   }> => {
     checkPlatform()
     const result = await RNWhisper.getAudioSessionCurrentCategory()
     return {
       category: (result.category.replace('AVAudioSessionCategory', '') as AudioSessionCategory),
-      options: result.options?.map((option: string) => (option.replace('AVAudioSessionCategoryOptions', '') as AudioSessionCategoryOptions)),
+      options: result.options?.map((option: string) => (option.replace('AVAudioSessionCategoryOption', '') as AudioSessionCategoryOption)),
     }
   },
   
@@ -63,7 +63,7 @@ export default {
 
   setCategory: async (
     category: AudioSessionCategory,
-    options: AudioSessionCategoryOptions[],
+    options: AudioSessionCategoryOption[],
   ): Promise<void> => {
     checkPlatform()
     await RNWhisper.setAudioSessionCategory(category, options)

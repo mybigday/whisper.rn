@@ -58,6 +58,14 @@ static NSDictionary *_modes;
     return session.mode;
 }
 
++(AVAudioSessionCategoryOptions)getOptions:(NSArray *)options {
+    AVAudioSessionCategoryOptions result = 0;
+    for (NSString *option in options) {
+        result |= [[_options objectForKey:option] unsignedIntegerValue];
+    }
+    return result;
+}
+
 +(void)setCategory:(NSString *)category options:(NSArray *)options error:(NSError **)error {
     AVAudioSession *session = [AVAudioSession sharedInstance];
     [session setCategory:[_categories objectForKey:category] withOptions:[self getOptions:options] error:error];
@@ -73,12 +81,5 @@ static NSDictionary *_modes;
     [session setActive:active error:error];
 }
 
-+(AVAudioSessionCategoryOptions)getOptions:(NSArray *)options {
-    AVAudioSessionCategoryOptions result = 0;
-    for (NSString *option in options) {
-        result |= [[_options objectForKey:option] unsignedIntegerValue];
-    }
-    return result;
-}
 
 @end
