@@ -106,7 +106,7 @@ const updateAudioSession = async (log: any) => {
       AudioSessionIos.CategoryOption.AllowBluetooth,
     ],
   )
-  await AudioSessionIos.setMode(AudioSessionIos.Mode.SpokenAudio)
+  await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
   await AudioSessionIos.setActive(true)
 
   const categoryResult = await AudioSessionIos.getCurrentCategory()

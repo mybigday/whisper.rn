@@ -99,6 +99,21 @@ subscribe(evt => {
 })
 ```
 
+In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
+
+```js
+import { AudioSessionIos } from 'whisper.rn'
+
+await AudioSessionIos.setCategory(
+  AudioSessionIos.Category.PlayAndRecord, [
+    AudioSessionIos.CategoryOption.MixWithOthers,
+  ],
+)
+await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
+await AudioSessionIos.setActive(true)
+// Then you can start the realtime transcribe
+```
+
 In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
 Please visit the [Documentation](docs/) for more details.
