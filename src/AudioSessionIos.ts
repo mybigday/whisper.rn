@@ -35,6 +35,9 @@ const checkPlatform = () => {
   if (Platform.OS !== 'ios') throw new Error('Only supported on iOS')
 }
 
+/**
+ * AudioSession Utility, iOS only.
+ */
 export default {
   Category: AudioSessionCategory,
   CategoryOptions: AudioSessionCategoryOptions,
