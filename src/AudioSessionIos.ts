@@ -1,7 +1,10 @@
 import { Platform } from 'react-native'
 import RNWhisper from './NativeRNWhisper'
 
-export enum AudioSessionCategory {
+/**
+ * @see https://developer.apple.com/documentation/avfaudio/avaudiosessioncategory?language=objc
+ */
+export enum AudioSessionCategoryIos {
   Ambient = 'Ambient',
   SoloAmbient = 'SoloAmbient',
   Playback = 'Playback',
@@ -10,7 +13,10 @@ export enum AudioSessionCategory {
   MultiRoute = 'MultiRoute',
 }
 
-export enum AudioSessionCategoryOption {
+/**
+ * @see https://developer.apple.com/documentation/avfaudio/avaudiosessioncategoryoptions?language=objc
+ */
+export enum AudioSessionCategoryOptionIos {
   MixWithOthers = 'MixWithOthers',
   DuckOthers = 'DuckOthers',
   InterruptSpokenAudioAndMixWithOthers = 'InterruptSpokenAudioAndMixWithOthers',
@@ -20,7 +26,10 @@ export enum AudioSessionCategoryOption {
   DefaultToSpeaker = 'DefaultToSpeaker',
 }
 
-export enum AudioSessionMode {
+/**
+ * @see https://developer.apple.com/documentation/avfaudio/avaudiosessionmode?language=objc
+ */
+export enum AudioSessionModeIos {
   Default = 'Default',
   VoiceChat = 'VoiceChat',
   VideoChat = 'VideoChat',
@@ -39,37 +48,37 @@ const checkPlatform = () => {
  * AudioSession Utility, iOS only.
  */
 export default {
-  Category: AudioSessionCategory,
-  CategoryOption: AudioSessionCategoryOption,
-  Mode: AudioSessionMode,
+  Category: AudioSessionCategoryIos,
+  CategoryOption: AudioSessionCategoryOptionIos,
+  Mode: AudioSessionModeIos,
 
   getCurrentCategory: async (): Promise<{
-    category: AudioSessionCategory,
-    options: AudioSessionCategoryOption[],
+    category: AudioSessionCategoryIos,
+    options: AudioSessionCategoryOptionIos[],
   }> => {
     checkPlatform()
     const result = await RNWhisper.getAudioSessionCurrentCategory()
     return {
-      category: (result.category.replace('AVAudioSessionCategory', '') as AudioSessionCategory),
-      options: result.options?.map((option: string) => (option.replace('AVAudioSessionCategoryOption', '') as AudioSessionCategoryOption)),
+      category: (result.category.replace('AVAudioSessionCategory', '') as AudioSessionCategoryIos),
+      options: result.options?.map((option: string) => (option.replace('AVAudioSessionCategoryOption', '') as AudioSessionCategoryOptionIos)),
     }
   },
   
-  getCurrentMode: async (): Promise<AudioSessionMode> => {
+  getCurrentMode: async (): Promise<AudioSessionModeIos> => {
     checkPlatform()
     const mode = await RNWhisper.getAudioSessionCurrentMode()
-    return (mode.replace('AVAudioSessionMode', '') as AudioSessionMode)
+    return (mode.replace('AVAudioSessionMode', '') as AudioSessionModeIos)
   },
 
   setCategory: async (
-    category: AudioSessionCategory,
-    options: AudioSessionCategoryOption[],
+    category: AudioSessionCategoryIos,
+    options: AudioSessionCategoryOptionIos[],
   ): Promise<void> => {
     checkPlatform()
     await RNWhisper.setAudioSessionCategory(category, options)
   },
 
-  setMode: async (mode: AudioSessionMode): Promise<void> => {
+  setMode: async (mode: AudioSessionModeIos): Promise<void> => {
     checkPlatform()
     await RNWhisper.setAudioSessionMode(mode)
   },

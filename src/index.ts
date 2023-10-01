@@ -12,6 +12,11 @@ import type {
   CoreMLAsset,
 } from './NativeRNWhisper'
 import AudioSessionIos from './AudioSessionIos'
+import type {
+  AudioSessionCategoryIos,
+  AudioSessionCategoryOptionIos,
+  AudioSessionModeIos,
+} from './AudioSessionIos'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
@@ -23,7 +28,13 @@ if (Platform.OS === 'android') {
   EventEmitter = DeviceEventEmitter
 }
 
-export type { TranscribeOptions, TranscribeResult }
+export type {
+  TranscribeOptions,
+  TranscribeResult,
+  AudioSessionCategoryIos,
+  AudioSessionCategoryOptionIos,
+  AudioSessionModeIos,
+}
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
 
