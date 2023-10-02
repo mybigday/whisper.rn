@@ -16,8 +16,11 @@ whisper.rn
 
 ### Type Aliases
 
+- [AudioSessionSettingIos](README.md#audiosessionsettingios)
 - [ContextOptions](README.md#contextoptions)
 - [TranscribeFileOptions](README.md#transcribefileoptions)
+- [TranscribeNewSegmentsNativeEvent](README.md#transcribenewsegmentsnativeevent)
+- [TranscribeNewSegmentsResult](README.md#transcribenewsegmentsresult)
 - [TranscribeOptions](README.md#transcribeoptions)
 - [TranscribeProgressNativeEvent](README.md#transcribeprogressnativeevent)
 - [TranscribeRealtimeEvent](README.md#transcriberealtimeevent)
@@ -40,6 +43,25 @@ whisper.rn
 
 ## Type Aliases
 
+### AudioSessionSettingIos
+
+Ƭ **AudioSessionSettingIos**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `active?` | `boolean` |
+| `category` | [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) |
+| `mode?` | [`AudioSessionModeIos`](enums/AudioSessionModeIos.md) |
+| `options?` | [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[] |
+
+#### Defined in
+
+[index.ts:76](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L76)
+
+___
+
 ### ContextOptions
 
 Ƭ **ContextOptions**: `Object`
@@ -56,17 +78,54 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:327](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L327)
+[index.ts:428](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L428)
 
 ___
 
 ### TranscribeFileOptions
 
-Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `onProgress?`: (`progress`: `number`) => `void`  }
+Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `onNewSegments?`: (`result`: [`TranscribeNewSegmentsResult`](README.md#transcribenewsegmentsresult)) => `void` ; `onProgress?`: (`progress`: `number`) => `void`  }
 
 #### Defined in
 
-[index.ts:45](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L45)
+[index.ts:59](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L59)
+
+___
+
+### TranscribeNewSegmentsNativeEvent
+
+Ƭ **TranscribeNewSegmentsNativeEvent**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `contextId` | `number` |
+| `jobId` | `number` |
+| `result` | [`TranscribeNewSegmentsResult`](README.md#transcribenewsegmentsresult) |
+
+#### Defined in
+
+[index.ts:52](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L52)
+
+___
+
+### TranscribeNewSegmentsResult
+
+Ƭ **TranscribeNewSegmentsResult**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `nNew` | `number` |
+| `result` | `string` |
+| `segments` | [`TranscribeResult`](README.md#transcriberesult)[``"segments"``] |
+| `totalNNew` | `number` |
+
+#### Defined in
+
+[index.ts:45](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L45)
 
 ___
 
@@ -96,7 +155,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/493051a/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -114,7 +173,7 @@ ___
 
 #### Defined in
 
-[index.ts:52](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L52)
+[index.ts:70](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L70)
 
 ___
 
@@ -139,7 +198,7 @@ ___
 
 #### Defined in
 
-[index.ts:97](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L97)
+[index.ts:133](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L133)
 
 ___
 
@@ -157,7 +216,7 @@ ___
 
 #### Defined in
 
-[index.ts:130](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L130)
+[index.ts:166](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L166)
 
 ___
 
@@ -181,17 +240,17 @@ ___
 
 #### Defined in
 
-[index.ts:117](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L117)
+[index.ts:153](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L153)
 
 ___
 
 ### TranscribeRealtimeOptions
 
-Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `audioOutputPath?`: `string` ; `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number` ; `useVad?`: `boolean` ; `vadFreqThold?`: `number` ; `vadMs?`: `number` ; `vadThold?`: `number`  }
+Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `audioOutputPath?`: `string` ; `audioSessionOnStartIos?`: [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `audioSessionOnStopIos?`: `string` \| [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number` ; `useVad?`: `boolean` ; `vadFreqThold?`: `number` ; `vadMs?`: `number` ; `vadThold?`: `number`  }
 
 #### Defined in
 
-[index.ts:59](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L59)
+[index.ts:84](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L84)
 
 ___
 
@@ -209,7 +268,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/493051a/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/NativeRNWhisper.ts#L37)
 
 ## Variables
 
@@ -234,7 +293,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/493051a/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -246,7 +305,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:421](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L421)
+[index.ts:522](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L522)
 
 ___
 
@@ -258,7 +317,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:418](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L418)
+[index.ts:519](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L519)
 
 ___
 
@@ -270,7 +329,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:413](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L413)
+[index.ts:514](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L514)
 
 ## Functions
 
@@ -290,7 +349,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:349](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L349)
+[index.ts:450](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L450)
 
 ___
 
@@ -304,4 +363,4 @@ ___
 
 #### Defined in
 
-[index.ts:408](https://github.com/mybigday/whisper.rn/blob/493051a/src/index.ts#L408)
+[index.ts:509](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L509)
