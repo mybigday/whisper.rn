@@ -1,5 +1,9 @@
 #import "RNWhisperAudioSessionUtils.h"
 
+#if defined(TARGET_OS_TV) && TARGET_OS_TV == 1
+#define APPLE_TV
+#endif
+
 @implementation RNWhisperAudioSessionUtils
 
 static NSDictionary *_categories;
@@ -19,10 +23,12 @@ static NSDictionary *_modes;
         @"MixWithOthers": @(AVAudioSessionCategoryOptionMixWithOthers),
         @"DuckOthers": @(AVAudioSessionCategoryOptionDuckOthers),
         @"InterruptSpokenAudioAndMixWithOthers": @(AVAudioSessionCategoryOptionInterruptSpokenAudioAndMixWithOthers),
-        @"AllowBluetooth": @(AVAudioSessionCategoryOptionAllowBluetooth),
         @"AllowBluetoothA2DP": @(AVAudioSessionCategoryOptionAllowBluetoothA2DP),
         @"AllowAirPlay": @(AVAudioSessionCategoryOptionAllowAirPlay),
+#if !defined(APPLE_TV)
+        @"AllowBluetooth": @(AVAudioSessionCategoryOptionAllowBluetooth),
         @"DefaultToSpeaker": @(AVAudioSessionCategoryOptionDefaultToSpeaker)
+#endif
     };
     _modes = @{
         @"Default": AVAudioSessionModeDefault,
