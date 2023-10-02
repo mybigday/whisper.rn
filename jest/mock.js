@@ -48,6 +48,16 @@ if (!NativeModules.RNWhisper) {
     releaseContext: jest.fn(() => Promise.resolve()),
     releaseAllContexts: jest.fn(() => Promise.resolve()),
 
+    // iOS AudioSession utils
+    getAudioSessionCurrentCategory: jest.fn(() => Promise.resolve({ 
+      category: 'AVAudioSessionCategoryPlayAndRecord',
+      options: [],
+    })),
+    getAudioSessionCurrentMode: jest.fn(() => Promise.resolve('')),
+    setAudioSessionCategory: jest.fn(() => Promise.resolve()),
+    setAudioSessionMode: jest.fn(() => Promise.resolve()),
+    setAudioSessionActive: jest.fn(() => Promise.resolve()),
+
     // For NativeEventEmitter
     addListener: jest.fn(),
     removeListeners: jest.fn(),
