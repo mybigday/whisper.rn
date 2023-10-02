@@ -1,6 +1,7 @@
 #import "RNWhisper.h"
 #import "RNWhisperContext.h"
 #import "RNWhisperDownloader.h"
+#import "RNWhisperAudioUtils.h"
 #import "RNWhisperAudioSessionUtils.h"
 #include <stdlib.h>
 #include <string>
@@ -88,6 +89,7 @@ RCT_REMAP_METHOD(initContext,
 - (NSArray *)supportedEvents {
   return@[
     @"@RNWhisper_onTranscribeProgress",
+    @"@RNWhisper_onTranscribeNewSegments",
     @"@RNWhisper_onRealtimeTranscribe",
     @"@RNWhisper_onRealtimeTranscribeEnd",
   ];
@@ -122,7 +124,7 @@ RCT_REMAP_METHOD(transcribeFile,
     }
 
     int count = 0;
-    float *waveFile = [self decodeWaveFile:path count:&count];
+    float *waveFile = [RNWhisperAudioUtils decodeWaveFile:path count:&count];
     if (waveFile == nil) {
         reject(@"whisper_error", @"Invalid file", nil);
         return;
@@ -141,6 +143,20 @@ RCT_REMAP_METHOD(transcribeFile,
                         @"contextId": [NSNumber numberWithInt:contextId],
                         @"jobId": [NSNumber numberWithInt:jobId],
                         @"progress": [NSNumber numberWithInt:progress]
+                    }
+                ];
+            });
+        }
+        onNewSegments: ^(NSDictionary *result) {
+            if (rn_whisper_transcribe_is_aborted(jobId)) {
+                return;
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self sendEventWithName:@"@RNWhisper_onTranscribeNewSegments"
+                    body:@{
+                        @"contextId": [NSNumber numberWithInt:contextId],
+                        @"jobId": [NSNumber numberWithInt:jobId],
+                        @"result": result
                     }
                 ];
             });
@@ -241,27 +257,6 @@ RCT_REMAP_METHOD(releaseAllContexts,
 {
     [self invalidate];
     resolve(nil);
-}
-
-- (float *)decodeWaveFile:(NSString*)filePath count:(int *)count {
-    NSURL *url = [NSURL fileURLWithPath:filePath];
-    NSData *fileData = [NSData dataWithContentsOfURL:url];
-    if (fileData == nil) {
-        return nil;
-    }
-    NSMutableData *waveData = [[NSMutableData alloc] init];
-    [waveData appendData:[fileData subdataWithRange:NSMakeRange(44, [fileData length]-44)]];
-    const short *shortArray = (const short *)[waveData bytes];
-    int shortCount = (int) ([waveData length] / sizeof(short));
-    float *floatArray = (float *) malloc(shortCount * sizeof(float));
-    for (NSInteger i = 0; i < shortCount; i++) {
-        float floatValue = ((float)shortArray[i]) / 32767.0;
-        floatValue = MAX(floatValue, -1.0);
-        floatValue = MIN(floatValue, 1.0);
-        floatArray[i] = floatValue;
-    }
-    *count = shortCount;
-    return floatArray;
 }
 
 - (void)invalidate {

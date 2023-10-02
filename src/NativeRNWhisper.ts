@@ -68,7 +68,7 @@ export interface Spec extends TurboModule {
     contextId: number,
     jobId: number,
     path: string,
-    options: {}, // TranscribeOptions & { onProgress?: boolean }
+    options: {}, // TranscribeOptions & { onProgress?: boolean, onNewSegments?: boolean }
   ): Promise<TranscribeResult>;
   startRealtimeTranscribe(
     contextId: number,
