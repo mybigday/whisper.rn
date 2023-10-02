@@ -93,28 +93,6 @@ const createDir = async (log: any) => {
 const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
-const updateAudioSession = async (log: any) => {
-  if (Platform.OS !== 'ios') return
-
-  // Log current audio session
-  // log('Category & Options:', JSON.stringify(await AudioSessionIos.getCurrentCategory()))
-  // log('Mode:', await AudioSessionIos.getCurrentMode())
-
-  await AudioSessionIos.setCategory(
-    AudioSessionIos.Category.PlayAndRecord, [
-      AudioSessionIos.CategoryOption.MixWithOthers,
-      AudioSessionIos.CategoryOption.AllowBluetooth,
-    ],
-  )
-  await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
-  await AudioSessionIos.setActive(true)
-
-  const categoryResult = await AudioSessionIos.getCurrentCategory()
-  log('Category:', categoryResult.category)
-  log('Category Options:', categoryResult.options.join(', '))
-  log('Mode:', await AudioSessionIos.getCurrentMode())
-}
-
 export default function App() {
   const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(null)
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
@@ -288,7 +266,6 @@ export default function App() {
               log('Start realtime transcribing...')
               try {
                 await createDir(log)
-                await updateAudioSession(log)
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
@@ -298,6 +275,16 @@ export default function App() {
                     realtimeAudioSliceSec: 25,
                     // Save audio on stop
                     audioOutputPath: recordFile,
+                    // iOS Audio Session
+                    audioSessionOnStartIos: {
+                      category: AudioSessionIos.Category.PlayAndRecord,
+                      options: [
+                        AudioSessionIos.CategoryOption.MixWithOthers,
+                        AudioSessionIos.CategoryOption.AllowBluetooth,
+                      ],
+                      mode: AudioSessionIos.Mode.Default,
+                    },
+                    audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
                     // Voice Activity Detection - Start transcribing when speech is detected
                     // useVad: true,
                   })
@@ -384,7 +371,6 @@ export default function App() {
               log('Recorded file does not exist')
               return
             }
-            await updateAudioSession(log)
             const player = new Sound(recordFile, '', (e) => {
               if (e) {
                 log('error', e)
