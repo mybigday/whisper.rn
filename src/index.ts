@@ -11,6 +11,12 @@ import type {
   TranscribeResult,
   CoreMLAsset,
 } from './NativeRNWhisper'
+import AudioSessionIos from './AudioSessionIos'
+import type {
+  AudioSessionCategoryIos,
+  AudioSessionCategoryOptionIos,
+  AudioSessionModeIos,
+} from './AudioSessionIos'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
@@ -22,7 +28,13 @@ if (Platform.OS === 'android') {
   EventEmitter = DeviceEventEmitter
 }
 
-export type { TranscribeOptions, TranscribeResult }
+export type {
+  TranscribeOptions,
+  TranscribeResult,
+  AudioSessionCategoryIos,
+  AudioSessionCategoryOptionIos,
+  AudioSessionModeIos,
+}
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
 const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
@@ -59,6 +71,13 @@ export type TranscribeProgressNativeEvent = {
   contextId: number
   jobId: number
   progress: number
+}
+
+export type AudioSessionSettingIos = {
+  category: AudioSessionCategoryIos
+  options?: AudioSessionCategoryOptionIos[]
+  mode?: AudioSessionModeIos
+  active?: boolean
 }
 
 // Codegen missing TSIntersectionType support so we dont put it into the native spec
@@ -98,6 +117,17 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * Frequency to apply High-pass filter in VAD. (Default: 100.0)
    */
   vadFreqThold?: number
+  /**
+   * iOS: Audio session settings when start transcribe
+   * Keep empty to use current audio session state
+   */
+  audioSessionOnStartIos?: AudioSessionSettingIos
+  /**
+   * iOS: Audio session settings when stop transcribe
+   * - Keep empty to use last audio session state
+   * - Use `restore` to restore audio session state before start transcribe
+   */
+  audioSessionOnStopIos?: string | AudioSessionSettingIos
 }
 
 export type TranscribeRealtimeEvent = {
@@ -137,6 +167,17 @@ export type TranscribeRealtimeNativeEvent = {
   contextId: number
   jobId: number
   payload: TranscribeRealtimeNativePayload
+}
+
+const updateAudioSession = async (setting: AudioSessionSettingIos) => {
+  await AudioSessionIos.setCategory(
+    setting.category,
+    setting.options || [],
+  )
+  if (setting.mode) {
+    await AudioSessionIos.setMode(setting.mode)
+  }
+  await AudioSessionIos.setActive(setting.active ?? true)
 }
 
 export class WhisperContext {
@@ -249,8 +290,6 @@ export class WhisperContext {
     /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
   }> {
-    const jobId: number = Math.floor(Math.random() * 10000)
-    await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
     let lastTranscribePayload: TranscribeRealtimeNativePayload
 
     const slices: TranscribeRealtimeNativePayload[] = []
@@ -302,8 +341,40 @@ export class WhisperContext {
       return { ...payload, ...mergedPayload, slices }
     }
 
+    let prevAudioSession: AudioSessionSettingIos | undefined
+    if (Platform.OS === 'ios' && options?.audioSessionOnStartIos) {
+      // iOS: Remember current audio session state
+      if (options?.audioSessionOnStopIos === 'restore') {
+        const categoryResult = await AudioSessionIos.getCurrentCategory()
+        const mode = await AudioSessionIos.getCurrentMode()
+
+        prevAudioSession = {
+          ...categoryResult,
+          mode,
+          active: false, // TODO: Need to check isOtherAudioPlaying to set active
+        }
+      }
+
+      // iOS: Update audio session state
+      await updateAudioSession(options?.audioSessionOnStartIos)
+    }
+    if (Platform.OS === 'ios' && typeof options?.audioSessionOnStopIos === 'object') {
+      prevAudioSession = options?.audioSessionOnStopIos
+    }
+
+    const jobId: number = Math.floor(Math.random() * 10000)
+    try {
+      await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
+    } catch (e) {
+      if (prevAudioSession) await updateAudioSession(prevAudioSession)
+      throw e
+    }
+
     return {
-      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
+      stop: async () => {
+        await RNWhisper.abortTranscribe(this.id, jobId)
+        if (prevAudioSession) await updateAudioSession(prevAudioSession)
+      },
       subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
         let transcribeListener: any = EventEmitter.addListener(
           EVENT_ON_REALTIME_TRANSCRIBE,
@@ -449,3 +520,5 @@ export const isUseCoreML: boolean = !!useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
 export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
+
+export { AudioSessionIos }

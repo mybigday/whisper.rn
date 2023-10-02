@@ -12,7 +12,7 @@ import {
 import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
 import Sound from 'react-native-sound'
-import { initWhisper, libVersion } from '../../src' // whisper.rn
+import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
 
@@ -275,6 +275,16 @@ export default function App() {
                     realtimeAudioSliceSec: 25,
                     // Save audio on stop
                     audioOutputPath: recordFile,
+                    // iOS Audio Session
+                    audioSessionOnStartIos: {
+                      category: AudioSessionIos.Category.PlayAndRecord,
+                      options: [
+                        AudioSessionIos.CategoryOption.MixWithOthers,
+                        AudioSessionIos.CategoryOption.AllowBluetooth,
+                      ],
+                      mode: AudioSessionIos.Mode.Default,
+                    },
+                    audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
                     // Voice Activity Detection - Start transcribing when speech is detected
                     // useVad: true,
                   })
