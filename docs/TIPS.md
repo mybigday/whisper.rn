@@ -28,6 +28,22 @@ The default `realtimeAudioSec` value of TranscribeOptions is `30` (seconds). If 
 
 However, setting slice might result in truncated words, which is not ideal. In the future, we plan to use audio processing tricks like pitch detection to dynamically adjust the timing of slices. Further details are provided in the next section.
 
+## transcribeRealtime: Use Voice Activity Detection (VAD)
+
+In recording, you can use VAD (option: `useVad`) to detect voice activity to determine when to start transcribing. This can help in some situations, like avoid high CPU usage, or avoid the unnecessary transcribe events trigger often.
+
+Currently the VAD implementation is simply using `vad_simple` from whisper.cpp. If you want to quickly test how it performs, you can try `stream` example from whisper.cpp:
+
+```bash
+git clone https://github.com/ggerganov/whisper.cpp
+cd whisper.cpp
+./models/download-ggml-model.sh base
+make -j
+./stream -m ./models/ggml-base.bin
+```
+
+It is currently disabled by default (useVad: false). We will use it for a while to decide whether it should be enabled by default.
+
 ## transcribeRealtime: Stop recording by audio processing (Work in Progress)
 
 For instance, you might want to stop recording when a specific audio pitch is detected.
