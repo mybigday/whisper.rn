@@ -13,6 +13,7 @@ cp ./whisper.cpp/ggml-metal.metal ./cpp/ggml-metal.metal
 cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
 
+rm -rf ./cpp/coreml/
 cp -R ./whisper.cpp/coreml/ ./cpp/coreml/
 
 # List of files to process
@@ -51,6 +52,7 @@ yarn example
 
 # Apply patch
 patch -p0 -d ./cpp < ./scripts/ggml-metal.m.patch
+patch -p0 -d ./cpp/coreml < ./scripts/whisper-encoder.mm.patch
 
 # Download model for example
 cd whisper.cpp/models
