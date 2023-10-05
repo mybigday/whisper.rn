@@ -6,6 +6,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.module.annotations.ReactModule;
 
 import java.util.HashMap;
@@ -64,5 +65,30 @@ public class RNWhisperModule extends NativeRNWhisperSpec {
   @ReactMethod
   public void releaseAllContexts(Promise promise) {
     rnwhisper.releaseAllContexts(promise);
+  }
+
+  /*
+   * iOS Specific methods, left here for make the turbo module happy:
+   */
+
+  @ReactMethod
+  public void getAudioSessionCurrentCategory(Promise promise) {
+    promise.resolve(null);
+  }
+  @ReactMethod
+  public void getAudioSessionCurrentMode(Promise promise) {
+    promise.resolve(null);
+  }
+  @ReactMethod
+  public void setAudioSessionCategory(String category, ReadableArray options, Promise promise) {
+    promise.resolve(null);
+  }
+  @ReactMethod
+  public void setAudioSessionMode(String mode, Promise promise) {
+    promise.resolve(null);
+  }
+  @ReactMethod
+  public void setAudioSessionActive(boolean active, Promise promise) {
+    promise.resolve(null);
   }
 }

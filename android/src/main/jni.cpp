@@ -6,6 +6,7 @@
 #include <sys/sysinfo.h>
 #include <string>
 #include <thread>
+#include <vector>
 #include "whisper.h"
 #include "rn-whisper.h"
 #include "ggml.h"
@@ -184,9 +185,30 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
     return reinterpret_cast<jlong>(context);
 }
 
-struct progress_callback_context {
+JNIEXPORT jboolean JNICALL
+Java_com_rnwhisper_WhisperContext_vadSimple(
+    JNIEnv *env,
+    jobject thiz,
+    jfloatArray audio_data,
+    jint audio_data_len,
+    jfloat vad_thold,
+    jfloat vad_freq_thold
+) {
+    UNUSED(thiz);
+
+    std::vector<float> samples(audio_data_len);
+    jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
+    for (int i = 0; i < audio_data_len; i++) {
+        samples[i] = audio_data_arr[i];
+    }
+    bool is_speech = rn_whisper_vad_simple(samples, WHISPER_SAMPLE_RATE, 1000, vad_thold, vad_freq_thold, false);
+    env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
+    return is_speech;
+}
+
+struct callback_context {
     JNIEnv *env;
-    jobject progress_callback_instance;
+    jobject callback_instance;
 };
 
 JNIEXPORT jint JNICALL
@@ -212,7 +234,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jboolean translate,
     jstring language,
     jstring prompt,
-    jobject progress_callback_instance
+    jobject callback_instance
 ) {
     UNUSED(thiz);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
@@ -280,19 +302,30 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     };
     params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
 
-    if (progress_callback_instance != nullptr) {
-        params.progress_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int progress, void * user_data) {
-            progress_callback_context *cb_ctx = (progress_callback_context *)user_data;
-            JNIEnv *env = cb_ctx->env;
-            jobject progress_callback_instance = cb_ctx->progress_callback_instance;
-            jclass progress_callback_class = env->GetObjectClass(progress_callback_instance);
-            jmethodID onProgress = env->GetMethodID(progress_callback_class, "onProgress", "(I)V");
-            env->CallVoidMethod(progress_callback_instance, onProgress, progress);
-        };
-        progress_callback_context *cb_ctx = new progress_callback_context;
+    if (callback_instance != nullptr) {
+        callback_context *cb_ctx = new callback_context;
         cb_ctx->env = env;
-        cb_ctx->progress_callback_instance = env->NewGlobalRef(progress_callback_instance);
+        cb_ctx->callback_instance = env->NewGlobalRef(callback_instance);
+
+        params.progress_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int progress, void * user_data) {
+            callback_context *cb_ctx = (callback_context *)user_data;
+            JNIEnv *env = cb_ctx->env;
+            jobject callback_instance = cb_ctx->callback_instance;
+            jclass callback_class = env->GetObjectClass(callback_instance);
+            jmethodID onProgress = env->GetMethodID(callback_class, "onProgress", "(I)V");
+            env->CallVoidMethod(callback_instance, onProgress, progress);
+        };
         params.progress_callback_user_data = cb_ctx;
+
+        params.new_segment_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int n_new, void * user_data) {
+            callback_context *cb_ctx = (callback_context *)user_data;
+            JNIEnv *env = cb_ctx->env;
+            jobject callback_instance = cb_ctx->callback_instance;
+            jclass callback_class = env->GetObjectClass(callback_instance);
+            jmethodID onNewSegments = env->GetMethodID(callback_class, "onNewSegments", "(I)V");
+            env->CallVoidMethod(callback_instance, onNewSegments, n_new);
+        };
+        params.new_segment_callback_user_data = cb_ctx;
     }
 
     LOGI("About to reset timings");

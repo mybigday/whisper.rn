@@ -1,4 +1,6 @@
 #import "RNWhisperContext.h"
+#import "RNWhisperAudioUtils.h"
+#include <vector>
 
 #define NUM_BYTES_PER_BUFFER 16 * 1024
 
@@ -77,6 +79,29 @@
     }
 }
 
+bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSamples, int n)
+{
+    bool isSpeech = true;
+    if (!state->isTranscribing && state->options[@"useVad"]) {
+        int vadSec = state->options[@"vadMs"] != nil ? [state->options[@"vadMs"] intValue] / 1000 : 2;
+        int sampleSize = vadSec * WHISPER_SAMPLE_RATE;
+        if (nSamples + n > sampleSize) {
+            int start = nSamples + n - sampleSize;
+            std::vector<float> audioBufferF32Vec(sampleSize);
+            for (int i = 0; i < sampleSize; i++) {
+                audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
+            }
+            float vadThold = state->options[@"vadThold"] != nil ? [state->options[@"vadThold"] floatValue] : 0.6f;
+            float vadFreqThold = state->options[@"vadFreqThold"] != nil ? [state->options[@"vadFreqThold"] floatValue] : 100.0f;
+            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, vadThold, vadFreqThold, false);
+            NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
+        } else {
+            isSpeech = false;
+        }
+    }
+    return isSpeech;
+}
+
 void AudioInputCallback(void * inUserData,
     AudioQueueRef inAQ,
     AudioQueueBufferRef inBuffer,
@@ -117,6 +142,11 @@ void AudioInputCallback(void * inUserData,
             !state->isTranscribing &&
             nSamples != state->nSamplesTranscribing
         ) {
+            int16_t* audioBufferI16 = (int16_t*) [state->shortBufferSlices[state->sliceIndex] pointerValue];
+            if (!vad(state, audioBufferI16, nSamples, 0)) {
+                state->transcribeHandler(state->jobId, @"end", @{});
+                return;
+            }
             state->isTranscribing = true;
             dispatch_async([state->mSelf getDispatchQueue], ^{
                 [state->mSelf fullTranscribeSamples:state];
@@ -142,10 +172,14 @@ void AudioInputCallback(void * inUserData,
     for (int i = 0; i < n; i++) {
         audioBufferI16[nSamples + i] = ((short*)inBuffer->mAudioData)[i];
     }
+
+    bool isSpeech = vad(state, audioBufferI16, nSamples, n);
     nSamples += n;
     state->sliceNSamples[state->sliceIndex] = [NSNumber numberWithInt:nSamples];
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
+
+    if (!isSpeech) return;
 
     if (!state->isTranscribing) {
         state->isTranscribing = true;
@@ -167,7 +201,8 @@ void AudioInputCallback(void * inUserData,
         audioBufferF32[i] = (float)audioBufferI16[i] / 32768.0f;
     }
     CFTimeInterval timeStart = CACurrentMediaTime();
-    int code = [state->mSelf fullTranscribe:state->jobId audioData:audioBufferF32 audioDataCount:state->nSamplesTranscribing options:state->options];
+    struct whisper_full_params params = [state->mSelf getParams:state->options jobId:state->jobId];
+    int code = [state->mSelf fullTranscribe:state->jobId params:params audioData:audioBufferF32 audioDataCount:state->nSamplesTranscribing];
     free(audioBufferF32);
     CFTimeInterval timeEnd = CACurrentMediaTime();
     const float timeRecording = (float) state->nSamplesTranscribing / (float) state->dataFormat.mSampleRate;
@@ -212,6 +247,17 @@ void AudioInputCallback(void * inUserData,
         NSLog(@"[RNWhisper] Transcribe end");
         result[@"isStoppedByAction"] = @(state->isStoppedByAction);
         result[@"isCapturing"] = @(false);
+
+        // Save wav if needed
+        if (state->options[@"audioOutputPath"] != nil) {
+            // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
+            [RNWhisperAudioUtils
+                saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
+                                sliceNSamples:state->sliceNSamples]
+                audioOutputFile:state->options[@"audioOutputPath"]
+            ];
+        }
+
         state->transcribeHandler(state->jobId, @"end", result);
     } else if (code == 0) {
         result[@"isCapturing"] = @(true);
@@ -272,18 +318,70 @@ void AudioInputCallback(void * inUserData,
     return status;
 }
 
+struct rnwhisper_segments_callback_data {
+    void (^onNewSegments)(NSDictionary *);
+    int total_n_new;
+};
+
 - (void)transcribeFile:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
     onProgress:(void (^)(int))onProgress
+    onNewSegments:(void (^)(NSDictionary *))onNewSegments
     onEnd:(void (^)(int))onEnd
 {
     dispatch_async(dQueue, ^{
         self->recordState.isStoppedByAction = false;
         self->recordState.isTranscribing = true;
         self->recordState.jobId = jobId;
-        int code = [self fullTranscribeWithProgress:onProgress jobId:jobId audioData:audioData audioDataCount:audioDataCount options:options];
+
+        whisper_full_params params = [self getParams:options jobId:jobId];
+        if (options[@"onProgress"] && [options[@"onProgress"] boolValue]) {
+            params.progress_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int progress, void * user_data) {
+                void (^onProgress)(int) = (__bridge void (^)(int))user_data;
+                onProgress(progress);
+            };
+            params.progress_callback_user_data = (__bridge void *)(onProgress);
+        }
+
+        if (options[@"onNewSegments"] && [options[@"onNewSegments"] boolValue]) {
+            params.new_segment_callback = [](struct whisper_context * ctx, struct whisper_state * /*state*/, int n_new, void * user_data) {
+                struct rnwhisper_segments_callback_data *data = (struct rnwhisper_segments_callback_data *)user_data;
+                data->total_n_new += n_new;
+                
+                NSString *text = @"";
+                NSMutableArray *segments = [[NSMutableArray alloc] init];
+                for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
+                    const char * text_cur = whisper_full_get_segment_text(ctx, i);
+                    text = [text stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
+
+                    const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
+                    const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
+                    NSDictionary *segment = @{
+                        @"text": [NSString stringWithUTF8String:text_cur],
+                        @"t0": [NSNumber numberWithLongLong:t0],
+                        @"t1": [NSNumber numberWithLongLong:t1]
+                    };
+                    [segments addObject:segment];
+                }
+
+                NSDictionary *result = @{
+                    @"nNew": [NSNumber numberWithInt:n_new],
+                    @"totalNNew": [NSNumber numberWithInt:data->total_n_new],
+                    @"result": text,
+                    @"segments": segments
+                };
+                void (^onNewSegments)(NSDictionary *) = (void (^)(NSDictionary *))data->onNewSegments;
+                onNewSegments(result);
+            };
+            struct rnwhisper_segments_callback_data user_data = {
+                .onNewSegments = onNewSegments,
+                .total_n_new = 0
+            };
+            params.new_segment_callback_user_data = &user_data;
+        }
+        int code = [self fullTranscribe:jobId params:params audioData:audioData audioDataCount:audioDataCount];
         self->recordState.jobId = -1;
         self->recordState.isTranscribing = false;
         onEnd(code);
@@ -383,36 +481,11 @@ void AudioInputCallback(void * inUserData,
     return params;
 }
 
-- (int)fullTranscribeWithProgress:(void (^)(int))onProgress
-  jobId:(int)jobId
-  audioData:(float *)audioData
-  audioDataCount:(int)audioDataCount
-  options:(NSDictionary *)options
-{
-    struct whisper_full_params params = [self getParams:options jobId:jobId];
-    if (options[@"onProgress"] && [options[@"onProgress"] boolValue]) {
-        params.progress_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int progress, void * user_data) {
-            void (^onProgress)(int) = (__bridge void (^)(int))user_data;
-            onProgress(progress);
-        };
-        params.progress_callback_user_data = (__bridge void *)(onProgress);
-    }
-    whisper_reset_timings(self->ctx);
-
-    int code = whisper_full(self->ctx, params, audioData, audioDataCount);
-    rn_whisper_remove_abort_map(jobId);
-    // if (code == 0) {
-    //     whisper_print_timings(self->ctx);
-    // }
-    return code;
-}
-
 - (int)fullTranscribe:(int)jobId
+  params:(struct whisper_full_params)params
   audioData:(float *)audioData
   audioDataCount:(int)audioDataCount
-  options:(NSDictionary *)options
 {
-    struct whisper_full_params params = [self getParams:options jobId:jobId];
     whisper_reset_timings(self->ctx);
 
     int code = whisper_full(self->ctx, params, audioData, audioDataCount);

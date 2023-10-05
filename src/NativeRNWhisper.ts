@@ -68,7 +68,7 @@ export interface Spec extends TurboModule {
     contextId: number,
     jobId: number,
     path: string,
-    options: {}, // TranscribeOptions & { onProgress?: boolean }
+    options: {}, // TranscribeOptions & { onProgress?: boolean, onNewSegments?: boolean }
   ): Promise<TranscribeResult>;
   startRealtimeTranscribe(
     contextId: number,
@@ -76,6 +76,16 @@ export interface Spec extends TurboModule {
     options: TranscribeOptions,
   ): Promise<void>;
   abortTranscribe(contextId: number, jobId: number): Promise<void>;
+
+  // iOS specific
+  getAudioSessionCurrentCategory: () => Promise<{
+    category: string,
+    options: Array<string>,
+  }>;
+  getAudioSessionCurrentMode: () => Promise<string>;
+  setAudioSessionCategory: (category: string, options: Array<string>) => Promise<void>;
+  setAudioSessionMode: (mode: string) => Promise<void>;
+  setAudioSessionActive: (active: boolean) => Promise<void>;
 }
 
 export default TurboModuleRegistry.get<Spec>('RNWhisper') as Spec

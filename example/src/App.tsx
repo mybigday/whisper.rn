@@ -11,7 +11,8 @@ import {
 } from 'react-native'
 import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
-import { initWhisper, libVersion } from '../../src' // whisper.rn
+import Sound from 'react-native-sound'
+import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
 
@@ -77,6 +78,8 @@ const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
+
+const recordFile = `${fileDir}/realtime.wav`
 
 const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
 
@@ -218,6 +221,9 @@ export default function App() {
                 onProgress: (cur) => {
                   log(`Transcribing progress: ${cur}%`)
                 },
+                // onNewSegments: (segments) => {
+                //   console.log('New segments:', segments)
+                // },
               })
               setStopTranscribe({ stop })
               const { result, segments } = await promise
@@ -259,6 +265,7 @@ export default function App() {
               }
               log('Start realtime transcribing...')
               try {
+                await createDir(log)
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     language: 'en',
@@ -266,6 +273,20 @@ export default function App() {
                     realtimeAudioSec: 60,
                     // Slice audio into 25 (or < 30) sec chunks for better performance
                     realtimeAudioSliceSec: 25,
+                    // Save audio on stop
+                    audioOutputPath: recordFile,
+                    // iOS Audio Session
+                    audioSessionOnStartIos: {
+                      category: AudioSessionIos.Category.PlayAndRecord,
+                      options: [
+                        AudioSessionIos.CategoryOption.MixWithOthers,
+                        AudioSessionIos.CategoryOption.AllowBluetooth,
+                      ],
+                      mode: AudioSessionIos.Mode.Default,
+                    },
+                    audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
+                    // Voice Activity Detection - Start transcribing when speech is detected
+                    // useVad: true,
                   })
                 setStopTranscribe({ stop })
                 subscribe((evt) => {
@@ -342,6 +363,31 @@ export default function App() {
           }}
         >
           <Text style={styles.buttonText}>Clear Download files</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonClear]}
+          onPress={async () => {
+            if (!await RNFS.exists(recordFile)) {
+              log('Recorded file does not exist')
+              return
+            }
+            const player = new Sound(recordFile, '', (e) => {
+              if (e) {
+                log('error', e)
+                return
+              }
+              player.play((success) => {
+                if (success) {
+                  log('successfully finished playing');
+                } else {
+                  log('playback failed due to audio decoding errors');
+                }
+                player.release();
+              });
+            })
+          }}
+        >
+          <Text style={styles.buttonText}>Play Recorded file</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </ScrollView>

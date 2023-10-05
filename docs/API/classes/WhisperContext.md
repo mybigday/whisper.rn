@@ -32,7 +32,7 @@
 
 #### Defined in
 
-[index.ts:105](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L105)
+[index.ts:186](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L186)
 
 ## Properties
 
@@ -42,7 +42,7 @@
 
 #### Defined in
 
-[index.ts:103](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L103)
+[index.ts:184](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L184)
 
 ## Methods
 
@@ -56,7 +56,7 @@
 
 #### Defined in
 
-[index.ts:284](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L284)
+[index.ts:423](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L423)
 
 ___
 
@@ -80,17 +80,17 @@ Transcribe audio file
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `promise` | `Promise`<[`TranscribeResult`](../README.md#transcriberesult)\> | Transcribe result promise |
-| `stop` | () => `Promise<void>` | Stop the transcribe |
+| `stop` | () => `Promise`<`void`\> | Stop the transcribe |
 
 #### Defined in
 
-[index.ts:110](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L110)
+[index.ts:191](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L191)
 
 ___
 
 ### transcribeRealtime
 
-▸ **transcribeRealtime**(`options?`): `Promise`<{ `stop`: () => `Promise<void>` ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+▸ **transcribeRealtime**(`options?`): `Promise`<{ `stop`: () => `Promise`<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 Transcribe the microphone audio stream, the microphone user permission is required
 
@@ -102,8 +102,8 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Returns
 
-`Promise`<{ `stop`: () => `Promise<void>` ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+`Promise`<{ `stop`: () => `Promise`<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 #### Defined in
 
-[index.ts:178](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L178)
+[index.ts:287](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L287)

@@ -11,6 +11,12 @@ import type {
   TranscribeResult,
   CoreMLAsset,
 } from './NativeRNWhisper'
+import AudioSessionIos from './AudioSessionIos'
+import type {
+  AudioSessionCategoryIos,
+  AudioSessionCategoryOptionIos,
+  AudioSessionModeIos,
+} from './AudioSessionIos'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
@@ -22,13 +28,32 @@ if (Platform.OS === 'android') {
   EventEmitter = DeviceEventEmitter
 }
 
-export type { TranscribeOptions, TranscribeResult }
-
+export type {
+  TranscribeOptions,
+  TranscribeResult,
+  AudioSessionCategoryIos,
+  AudioSessionCategoryOptionIos,
+  AudioSessionModeIos,
+}
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
+const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
 
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
+
+export type TranscribeNewSegmentsResult = {
+  nNew: number
+  totalNNew: number
+  result: string
+  segments: TranscribeResult['segments']
+}
+
+export type TranscribeNewSegmentsNativeEvent = {
+  contextId: number
+  jobId: number
+  result: TranscribeNewSegmentsResult
+}
 
 // Fn -> Boolean in TranscribeFileNativeOptions
 export type TranscribeFileOptions = TranscribeOptions & {
@@ -36,12 +61,23 @@ export type TranscribeFileOptions = TranscribeOptions & {
    * Progress callback, the progress is between 0 and 100
    */
   onProgress?: (progress: number) => void
+  /**
+   * Callback when new segments are transcribed
+   */
+  onNewSegments?: (result: TranscribeNewSegmentsResult) => void
 }
 
 export type TranscribeProgressNativeEvent = {
   contextId: number
   jobId: number
   progress: number
+}
+
+export type AudioSessionSettingIos = {
+  category: AudioSessionCategoryIos
+  options?: AudioSessionCategoryOptionIos[]
+  mode?: AudioSessionModeIos
+  active?: boolean
 }
 
 // Codegen missing TSIntersectionType support so we dont put it into the native spec
@@ -58,6 +94,40 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    * (Default: Equal to `realtimeMaxAudioSec`)
    */
   realtimeAudioSliceSec?: number
+  /**
+   * Output path for audio file. If not set, the audio file will not be saved
+   * (Default: Undefined)
+   */
+  audioOutputPath?: string
+  /**
+   * Start transcribe on recording when the audio volume is greater than the threshold by using VAD (Voice Activity Detection).
+   * The first VAD will be triggered after 2 second of recording.
+   * (Default: false)
+   */
+  useVad?: boolean
+  /**
+   * The length of the collected audio is used for VAD. (ms) (Default: 2000)
+   */
+  vadMs?: number
+  /**
+   * VAD threshold. (Default: 0.6)
+   */
+  vadThold?: number
+  /**
+   * Frequency to apply High-pass filter in VAD. (Default: 100.0)
+   */
+  vadFreqThold?: number
+  /**
+   * iOS: Audio session settings when start transcribe
+   * Keep empty to use current audio session state
+   */
+  audioSessionOnStartIos?: AudioSessionSettingIos
+  /**
+   * iOS: Audio session settings when stop transcribe
+   * - Keep empty to use last audio session state
+   * - Use `restore` to restore audio session state before start transcribe
+   */
+  audioSessionOnStopIos?: string | AudioSessionSettingIos
 }
 
 export type TranscribeRealtimeEvent = {
@@ -99,6 +169,17 @@ export type TranscribeRealtimeNativeEvent = {
   payload: TranscribeRealtimeNativePayload
 }
 
+const updateAudioSession = async (setting: AudioSessionSettingIos) => {
+  await AudioSessionIos.setCategory(
+    setting.category,
+    setting.options || [],
+  )
+  if (setting.mode) {
+    await AudioSessionIos.setMode(setting.mode)
+  }
+  await AudioSessionIos.setActive(setting.active ?? true)
+}
+
 export class WhisperContext {
   id: number
 
@@ -126,13 +207,16 @@ export class WhisperContext {
       }
     } else {
       if (filePath.startsWith('http'))
-        throw new Error('Transcribe remote file is not supported, please download it first')
+        throw new Error(
+          'Transcribe remote file is not supported, please download it first',
+        )
       path = filePath
     }
     if (path.startsWith('file://')) path = path.slice(7)
     const jobId: number = Math.floor(Math.random() * 10000)
 
-    const { onProgress, ...rest } = options
+    const { onProgress, onNewSegments, ...rest } = options
+
     let progressListener: any
     let lastProgress: number = 0
     if (onProgress) {
@@ -152,25 +236,50 @@ export class WhisperContext {
         progressListener = null
       }
     }
+
+    let newSegmentsListener: any
+    if (onNewSegments) {
+      newSegmentsListener = EventEmitter.addListener(
+        EVENT_ON_TRANSCRIBE_NEW_SEGMENTS,
+        (evt: TranscribeNewSegmentsNativeEvent) => {
+          const { contextId, result } = evt
+          if (contextId !== this.id || evt.jobId !== jobId) return
+          onNewSegments(result)
+        },
+      )
+    }
+    const removeNewSegmenetsListener = () => {
+      if (newSegmentsListener) {
+        newSegmentsListener.remove()
+        newSegmentsListener = null
+      }
+    }
+
     return {
       stop: async () => {
         await RNWhisper.abortTranscribe(this.id, jobId)
         removeProgressListener()
+        removeNewSegmenetsListener()
       },
       promise: RNWhisper.transcribeFile(this.id, jobId, path, {
         ...rest,
-        onProgress: !!onProgress
-      }).then((result) => {
-        removeProgressListener()
-        if (!result.isAborted && lastProgress !== 100) {
-          // Handle the case that the last progress event is not triggered
-          onProgress?.(100)
-        }
-        return result
-      }).catch((e) => {
-        removeProgressListener()
-        throw e
-      }),
+        onProgress: !!onProgress,
+        onNewSegments: !!onNewSegments,
+      })
+        .then((result) => {
+          removeProgressListener()
+          removeNewSegmenetsListener()
+          if (!result.isAborted && lastProgress !== 100) {
+            // Handle the case that the last progress event is not triggered
+            onProgress?.(100)
+          }
+          return result
+        })
+        .catch((e) => {
+          removeProgressListener()
+          removeNewSegmenetsListener()
+          throw e
+        }),
     }
   }
 
@@ -181,8 +290,6 @@ export class WhisperContext {
     /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
   }> {
-    const jobId: number = Math.floor(Math.random() * 10000)
-    await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
     let lastTranscribePayload: TranscribeRealtimeNativePayload
 
     const slices: TranscribeRealtimeNativePayload[] = []
@@ -234,8 +341,40 @@ export class WhisperContext {
       return { ...payload, ...mergedPayload, slices }
     }
 
+    let prevAudioSession: AudioSessionSettingIos | undefined
+    if (Platform.OS === 'ios' && options?.audioSessionOnStartIos) {
+      // iOS: Remember current audio session state
+      if (options?.audioSessionOnStopIos === 'restore') {
+        const categoryResult = await AudioSessionIos.getCurrentCategory()
+        const mode = await AudioSessionIos.getCurrentMode()
+
+        prevAudioSession = {
+          ...categoryResult,
+          mode,
+          active: false, // TODO: Need to check isOtherAudioPlaying to set active
+        }
+      }
+
+      // iOS: Update audio session state
+      await updateAudioSession(options?.audioSessionOnStartIos)
+    }
+    if (Platform.OS === 'ios' && typeof options?.audioSessionOnStopIos === 'object') {
+      prevAudioSession = options?.audioSessionOnStopIos
+    }
+
+    const jobId: number = Math.floor(Math.random() * 10000)
+    try {
+      await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
+    } catch (e) {
+      if (prevAudioSession) await updateAudioSession(prevAudioSession)
+      throw e
+    }
+
     return {
-      stop: () => RNWhisper.abortTranscribe(this.id, jobId),
+      stop: async () => {
+        await RNWhisper.abortTranscribe(this.id, jobId)
+        if (prevAudioSession) await updateAudioSession(prevAudioSession)
+      },
       subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
         let transcribeListener: any = EventEmitter.addListener(
           EVENT_ON_REALTIME_TRANSCRIBE,
@@ -295,7 +434,7 @@ export type ContextOptions = {
    */
   coreMLModelAsset?: {
     filename: string
-    assets: number[]
+    assets: string[] | number[]
   }
   /** Is the file path a bundle asset for pure string filePath */
   isBundleAsset?: boolean
@@ -320,12 +459,19 @@ export async function initWhisper({
     if (filename && assets) {
       coreMLAssets = assets
         ?.map((asset) => {
-          const { uri } = Image.resolveAssetSource(asset)
-          const filepath = coreMLModelAssetPaths.find((p) => uri.includes(p))
-          if (filepath) {
+          if (typeof asset === 'number') {
+            const { uri } = Image.resolveAssetSource(asset)
+            const filepath = coreMLModelAssetPaths.find((p) => uri.includes(p))
+            if (filepath) {
+              return {
+                uri,
+                filepath: `${filename}/${filepath}`,
+              }
+            }
+          } else if (typeof asset === 'string') {
             return {
-              uri,
-              filepath: `${filename}/${filepath}`,
+              uri: asset,
+              filepath: `${filename}/${asset}`,
             }
           }
           return undefined
@@ -344,7 +490,9 @@ export async function initWhisper({
     }
   } else {
     if (!isBundleAsset && filePath.startsWith('http'))
-      throw new Error('Transcribe remote file is not supported, please download it first')
+      throw new Error(
+        'Transcribe remote file is not supported, please download it first',
+      )
     path = filePath
   }
   if (path.startsWith('file://')) path = path.slice(7)
@@ -372,3 +520,5 @@ export const isUseCoreML: boolean = !!useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
 export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
+
+export { AudioSessionIos }

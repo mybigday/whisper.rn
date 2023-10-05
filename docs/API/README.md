@@ -4,14 +4,23 @@ whisper.rn
 
 ## Table of contents
 
+### Enumerations
+
+- [AudioSessionCategoryIos](enums/AudioSessionCategoryIos.md)
+- [AudioSessionCategoryOptionIos](enums/AudioSessionCategoryOptionIos.md)
+- [AudioSessionModeIos](enums/AudioSessionModeIos.md)
+
 ### Classes
 
 - [WhisperContext](classes/WhisperContext.md)
 
 ### Type Aliases
 
+- [AudioSessionSettingIos](README.md#audiosessionsettingios)
 - [ContextOptions](README.md#contextoptions)
 - [TranscribeFileOptions](README.md#transcribefileoptions)
+- [TranscribeNewSegmentsNativeEvent](README.md#transcribenewsegmentsnativeevent)
+- [TranscribeNewSegmentsResult](README.md#transcribenewsegmentsresult)
 - [TranscribeOptions](README.md#transcribeoptions)
 - [TranscribeProgressNativeEvent](README.md#transcribeprogressnativeevent)
 - [TranscribeRealtimeEvent](README.md#transcriberealtimeevent)
@@ -22,6 +31,7 @@ whisper.rn
 
 ### Variables
 
+- [AudioSessionIos](README.md#audiosessionios)
 - [isCoreMLAllowFallback](README.md#iscoremlallowfallback)
 - [isUseCoreML](README.md#isusecoreml)
 - [libVersion](README.md#libversion)
@@ -33,6 +43,25 @@ whisper.rn
 
 ## Type Aliases
 
+### AudioSessionSettingIos
+
+Ƭ **AudioSessionSettingIos**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `active?` | `boolean` |
+| `category` | [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) |
+| `mode?` | [`AudioSessionModeIos`](enums/AudioSessionModeIos.md) |
+| `options?` | [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[] |
+
+#### Defined in
+
+[index.ts:76](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L76)
+
+___
+
 ### ContextOptions
 
 Ƭ **ContextOptions**: `Object`
@@ -41,25 +70,62 @@ whisper.rn
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `coreMLModelAsset?` | { `assets`: `number`[] ; `filename`: `string`  } | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
-| `coreMLModelAsset.assets` | `number`[] | - |
+| `coreMLModelAsset?` | { `assets`: `string`[] \| `number`[] ; `filename`: `string`  } | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
+| `coreMLModelAsset.assets` | `string`[] \| `number`[] | - |
 | `coreMLModelAsset.filename` | `string` | - |
 | `filePath` | `string` \| `number` | - |
 | `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
 
 #### Defined in
 
-[index.ts:289](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L289)
+[index.ts:428](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L428)
 
 ___
 
 ### TranscribeFileOptions
 
-Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `onProgress?`: (`progress`: `number`) => `void`  }
+Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `onNewSegments?`: (`result`: [`TranscribeNewSegmentsResult`](README.md#transcribenewsegmentsresult)) => `void` ; `onProgress?`: (`progress`: `number`) => `void`  }
 
 #### Defined in
 
-[index.ts:34](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L34)
+[index.ts:59](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L59)
+
+___
+
+### TranscribeNewSegmentsNativeEvent
+
+Ƭ **TranscribeNewSegmentsNativeEvent**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `contextId` | `number` |
+| `jobId` | `number` |
+| `result` | [`TranscribeNewSegmentsResult`](README.md#transcribenewsegmentsresult) |
+
+#### Defined in
+
+[index.ts:52](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L52)
+
+___
+
+### TranscribeNewSegmentsResult
+
+Ƭ **TranscribeNewSegmentsResult**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `nNew` | `number` |
+| `result` | `string` |
+| `segments` | [`TranscribeResult`](README.md#transcriberesult)[``"segments"``] |
+| `totalNNew` | `number` |
+
+#### Defined in
+
+[index.ts:45](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L45)
 
 ___
 
@@ -89,7 +155,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/2aed191/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -107,7 +173,7 @@ ___
 
 #### Defined in
 
-[index.ts:41](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L41)
+[index.ts:70](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L70)
 
 ___
 
@@ -132,7 +198,7 @@ ___
 
 #### Defined in
 
-[index.ts:63](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L63)
+[index.ts:133](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L133)
 
 ___
 
@@ -150,7 +216,7 @@ ___
 
 #### Defined in
 
-[index.ts:96](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L96)
+[index.ts:166](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L166)
 
 ___
 
@@ -174,17 +240,17 @@ ___
 
 #### Defined in
 
-[index.ts:83](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L83)
+[index.ts:153](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L153)
 
 ___
 
 ### TranscribeRealtimeOptions
 
-Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number`  }
+Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `audioOutputPath?`: `string` ; `audioSessionOnStartIos?`: [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `audioSessionOnStopIos?`: `string` \| [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number` ; `useVad?`: `boolean` ; `vadFreqThold?`: `number` ; `vadMs?`: `number` ; `vadThold?`: `number`  }
 
 #### Defined in
 
-[index.ts:48](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L48)
+[index.ts:84](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L84)
 
 ___
 
@@ -202,9 +268,34 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/2aed191/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/NativeRNWhisper.ts#L37)
 
 ## Variables
+
+### AudioSessionIos
+
+• **AudioSessionIos**: `Object`
+
+AudioSession Utility, iOS only.
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `Category` | typeof [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) |
+| `CategoryOption` | typeof [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md) |
+| `Mode` | typeof [`AudioSessionModeIos`](enums/AudioSessionModeIos.md) |
+| `getCurrentCategory` | () => `Promise`<{ `category`: [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) ; `options`: [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[]  }\> |
+| `getCurrentMode` | () => `Promise`<[`AudioSessionModeIos`](enums/AudioSessionModeIos.md)\> |
+| `setActive` | (`active`: `boolean`) => `Promise`<`void`\> |
+| `setCategory` | (`category`: [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md), `options`: [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[]) => `Promise`<`void`\> |
+| `setMode` | (`mode`: [`AudioSessionModeIos`](enums/AudioSessionModeIos.md)) => `Promise`<`void`\> |
+
+#### Defined in
+
+[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/AudioSessionIos.ts#L50)
+
+___
 
 ### isCoreMLAllowFallback
 
@@ -214,7 +305,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:374](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L374)
+[index.ts:522](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L522)
 
 ___
 
@@ -226,7 +317,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:371](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L371)
+[index.ts:519](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L519)
 
 ___
 
@@ -238,7 +329,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:366](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L366)
+[index.ts:514](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L514)
 
 ## Functions
 
@@ -258,7 +349,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:311](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L311)
+[index.ts:450](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L450)
 
 ___
 
@@ -272,4 +363,4 @@ ___
 
 #### Defined in
 
-[index.ts:361](https://github.com/mybigday/whisper.rn/blob/2aed191/src/index.ts#L361)
+[index.ts:509](https://github.com/mybigday/whisper.rn/blob/ca8e344/src/index.ts#L509)

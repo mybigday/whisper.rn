@@ -1,4 +1,4 @@
-import { initWhisper, releaseAllWhisper } from '..'
+import { initWhisper, releaseAllWhisper, AudioSessionIos } from '..'
 
 jest.mock('..', () => require('../../jest/mock'))
 
@@ -16,7 +16,17 @@ test('Mock', async () => {
     segments: [{ text: ' Test', t0: 0, t1: 33 }],
   })
 
-  const { subscribe } = await context.transcribeRealtime()
+  const { subscribe } = await context.transcribeRealtime({
+    audioSessionOnStartIos: {
+      category: AudioSessionIos.Category.PlayAndRecord,
+      options: [
+        AudioSessionIos.CategoryOption.MixWithOthers,
+        AudioSessionIos.CategoryOption.AllowBluetooth,
+      ],
+      mode: AudioSessionIos.Mode.Default,
+    },
+    audioSessionOnStopIos: 'restore',
+  })
   const events: any[] = []
   subscribe((event) => events.push(event))
   await new Promise((resolve) => setTimeout(resolve, 0))
