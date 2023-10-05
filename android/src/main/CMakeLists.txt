@@ -8,6 +8,7 @@ set(RNWHISPER_LIB_DIR ${CMAKE_SOURCE_DIR}/../../../cpp)
 set(
     SOURCE_FILES
     ${RNWHISPER_LIB_DIR}/ggml.c
+    ${RNWHISPER_LIB_DIR}/ggml-alloc.c
     ${RNWHISPER_LIB_DIR}/whisper.cpp
     ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp
@@ -21,7 +22,7 @@ function(build_library target_name)
         SHARED
         ${SOURCE_FILES}
     )
-    
+
     target_link_libraries(${target_name} ${LOG_LIB} android)
 
     if (${target_name} STREQUAL "whisper_v8fp16_va")

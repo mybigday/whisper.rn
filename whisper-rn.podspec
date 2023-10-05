@@ -1,7 +1,7 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
-base_ld_flags = "-framework Accelerate"
+base_ld_flags = "-framework Accelerate -framework Foundation -framework Metal -framework MetalKit"
 base_compiler_flags = "-DWSP_GGML_USE_ACCELERATE -Wno-shorten-64-to-32"
 folly_compiler_flags = "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma"
 
@@ -16,6 +16,11 @@ if ENV['RNWHISPER_DISABLE_COREML'] != '1' then
   base_compiler_flags += " -DWHISPER_USE_COREML -DWHISPER_COREML_ALLOW_FALLBACK"
 end
 
+# TODO: Enable Metal
+# if ENV["RNWHISPER_DISABLE_METAL"] != "1" then
+#   base_compiler_flags += " -DWSP_GGML_USE_METAL" # -DWSP_GGML_METAL_NDEBUG
+# end
+
 Pod::Spec.new do |s|
   s.name         = "whisper-rn"
   s.version      = package["version"]
@@ -28,6 +33,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/mybigday/whisper.rn.git", :tag => "#{s.version}" }
 
   s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,c,m,mm}"
+  s.resources = "cpp/**/*.{metal}"
 
   s.dependency "React-Core"
 
@@ -45,7 +51,7 @@ Pod::Spec.new do |s|
     s.pod_target_xcconfig = {
       "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
       "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
-      "OTHER_LDFLAGS" => "-framework Accelerate",
+      "OTHER_LDFLAGS" => base_ld_flags,
       "OTHER_CFLAGS" => base_optimizer_flags,
       "OTHER_CPLUSPLUSFLAGS" => new_arch_cpp_flags + " " + base_optimizer_flags
     }
