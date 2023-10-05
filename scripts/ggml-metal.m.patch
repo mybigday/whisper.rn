@@ -1,6 +1,6 @@
---- ggml-metal.m.orig	2023-09-14 10:11:00
-+++ ggml-metal.m	2023-09-14 10:10:44
-@@ -205,7 +205,7 @@
+--- ggml-metal.m.orig	2023-10-05 09:26:55
++++ ggml-metal.m	2023-10-05 09:26:56
+@@ -207,7 +207,7 @@
  #define WSP_GGML_METAL_ADD_KERNEL(name) \
          ctx->function_##name = [ctx->library newFunctionWithName:@"kernel_"#name]; \
          ctx->pipeline_##name = [ctx->device newComputePipelineStateWithFunction:ctx->function_##name error:&error]; \
@@ -9,7 +9,7 @@
                  (int) ctx->pipeline_##name.maxTotalThreadsPerThreadgroup, \
                  (int) ctx->pipeline_##name.threadExecutionWidth); \
          if (error) { \
-@@ -282,8 +282,6 @@
+@@ -286,8 +286,6 @@
  void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
      metal_printf("%s: deallocating\n", __func__);
  #define WSP_GGML_METAL_DEL_KERNEL(name) \
@@ -18,7 +18,7 @@
  
      WSP_GGML_METAL_DEL_KERNEL(add);
      WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -336,16 +334,6 @@
+@@ -342,16 +340,6 @@
      WSP_GGML_METAL_DEL_KERNEL(cpy_f16_f16);
  
  #undef WSP_GGML_METAL_DEL_KERNEL

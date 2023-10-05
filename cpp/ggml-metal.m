@@ -78,6 +78,7 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q6_K);
     WSP_GGML_METAL_DECL_KERNEL(rms_norm);
     WSP_GGML_METAL_DECL_KERNEL(norm);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mat_f32_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32_1row);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32_l4);
@@ -89,6 +90,7 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_q4_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_q5_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mat_q6_K_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mm_f32_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_f16_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q4_0_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q4_1_f32);
@@ -237,6 +239,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q6_K);
         WSP_GGML_METAL_ADD_KERNEL(rms_norm);
         WSP_GGML_METAL_ADD_KERNEL(norm);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mat_f32_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32_1row);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32_l4);
@@ -248,6 +251,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_q4_K_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_q5_K_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mat_q6_K_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mm_f32_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mm_f16_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_0_f32);
         WSP_GGML_METAL_ADD_KERNEL(mul_mm_q8_0_f32);
@@ -307,6 +311,7 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q6_K);
     WSP_GGML_METAL_DEL_KERNEL(rms_norm);
     WSP_GGML_METAL_DEL_KERNEL(norm);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mat_f32_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32_1row);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32_l4);
@@ -318,6 +323,7 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_q4_K_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_q5_K_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mat_q6_K_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mm_f32_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mm_f16_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_0_f32);
     WSP_GGML_METAL_DEL_KERNEL(mul_mm_q8_0_f32);
@@ -873,6 +879,7 @@ void wsp_ggml_metal_graph_compute(
                                 ne00%32 == 0 &&
                                 ne11 > 1) {
                                 switch (src0->type) {
+                                    case WSP_GGML_TYPE_F32:  [encoder setComputePipelineState:ctx->pipeline_mul_mm_f32_f32];  break;
                                     case WSP_GGML_TYPE_F16:  [encoder setComputePipelineState:ctx->pipeline_mul_mm_f16_f32];  break;
                                     case WSP_GGML_TYPE_Q4_0: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q4_0_f32]; break;
                                     case WSP_GGML_TYPE_Q4_1: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q4_1_f32]; break;
@@ -907,15 +914,18 @@ void wsp_ggml_metal_graph_compute(
 
                                 // use custom matrix x vector kernel
                                 switch (src0t) {
+                                    case WSP_GGML_TYPE_F32:
+                                        {
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_f32_f32];
+                                            nrows = 4;
+                                        } break;
                                     case WSP_GGML_TYPE_F16:
                                         {
                                             nth0 = 32;
                                             nth1 = 1;
                                             if (ne11 * ne12 < 4) {
                                                 [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32_1row];
-                                            //} else if (ne00 >= 128 && ne01 >= 8 && ne00%4 == 0) {
-                                            } else if (false) {
-                                                // TODO: with wsp_ggml_mul_mat_pad this kernel no longer seems to be needed
+                                            } else if (ne00 >= 128 && ne01 >= 8 && ne00%4 == 0) {
                                                 [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32_l4];
                                                 nrows = ne11;
                                             } else {
