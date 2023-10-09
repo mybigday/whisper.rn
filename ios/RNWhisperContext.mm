@@ -349,7 +349,7 @@ struct rnwhisper_segments_callback_data {
             params.new_segment_callback = [](struct whisper_context * ctx, struct whisper_state * /*state*/, int n_new, void * user_data) {
                 struct rnwhisper_segments_callback_data *data = (struct rnwhisper_segments_callback_data *)user_data;
                 data->total_n_new += n_new;
-                
+
                 NSString *text = @"";
                 NSMutableArray *segments = [[NSMutableArray alloc] init];
                 for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
@@ -451,7 +451,7 @@ struct rnwhisper_segments_callback_data {
     if (options[@"maxContext"] != nil) {
         params.n_max_text_ctx = [options[@"maxContext"] intValue];
     }
-    
+
     if (options[@"offset"] != nil) {
         params.offset_ms = [options[@"offset"] intValue];
     }
@@ -467,16 +467,22 @@ struct rnwhisper_segments_callback_data {
     if (options[@"temperatureInc"] != nil) {
         params.temperature_inc = [options[@"temperature_inc"] floatValue];
     }
-    
+
     if (options[@"prompt"] != nil) {
         params.initial_prompt = [options[@"prompt"] UTF8String];
     }
 
+    // abort handler
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return !is_aborted;
     };
     params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(jobId);
+    params.abort_callback = [](void * user_data) {
+        bool is_aborted = *(bool*)user_data;
+        return is_aborted;
+    };
+    params.abort_callback_user_data = rn_whisper_assign_abort_map(jobId);
 
     return params;
 }
