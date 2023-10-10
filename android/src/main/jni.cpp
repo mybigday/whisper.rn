@@ -85,7 +85,7 @@ static void input_stream_close(void *ctx) {
     JNIEnv *env = context->env;
     jobject input_stream = context->input_stream;
     jclass input_stream_class = env->GetObjectClass(input_stream);
-    
+
     env->CallVoidMethod(
         input_stream,
         env->GetMethodID(input_stream_class, "close", "()V")
@@ -296,11 +296,17 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         params.initial_prompt = env->GetStringUTFChars(prompt, nullptr);
     }
 
+    // abort handlers
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return !is_aborted;
     };
     params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
+    params.abort_callback = [](void * user_data) {
+        bool is_aborted = *(bool*)user_data;
+        return is_aborted;
+    };
+    params.abort_callback_user_data = rn_whisper_assign_abort_map(job_id);
 
     if (callback_instance != nullptr) {
         callback_context *cb_ctx = new callback_context;
