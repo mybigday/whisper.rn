@@ -738,7 +738,6 @@ struct whisper_state {
     std::string path_model; // populated by whisper_init_from_file()
 #ifdef WHISPER_USE_COREML
     whisper_coreml_context * ctx_coreml = nullptr;
-    bool load_coreml = true;
 #endif
 
 #ifdef WSP_GGML_USE_METAL
@@ -771,6 +770,9 @@ struct whisper_context {
     whisper_state * state = nullptr;
 
     std::string path_model; // populated by whisper_init_from_file()
+#ifdef WHISPER_USE_COREML
+    bool load_coreml = true;
+#endif
 };
 
 static void whisper_default_log(const char * text) {
