@@ -52,6 +52,8 @@ yarn example
 
 # Apply patch
 patch -p0 -d ./cpp < ./scripts/ggml-metal.m.patch
+patch -p0 -d ./cpp < ./scripts/whisper.h.patch
+patch -p0 -d ./cpp < ./scripts/whisper.cpp.patch
 patch -p0 -d ./cpp/coreml < ./scripts/whisper-encoder.mm.patch
 
 # Download model for example

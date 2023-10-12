@@ -1,0 +1,12 @@
+--- whisper.h.orig	2023-10-12 10:41:41
++++ whisper.h	2023-10-12 10:38:11
+@@ -99,6 +99,9 @@
+     // Various functions for loading a ggml whisper model.
+     // Allocate (almost) all memory needed for the model.
+     // Return NULL on failure
++#ifdef WHISPER_USE_COREML
++    WHISPER_API struct whisper_context * whisper_init_from_file_no_coreml(const char * path_model);
++#endif
+     WHISPER_API struct whisper_context * whisper_init_from_file(const char * path_model);
+     WHISPER_API struct whisper_context * whisper_init_from_buffer(void * buffer, size_t buffer_size);
+     WHISPER_API struct whisper_context * whisper_init(struct whisper_model_loader * loader);

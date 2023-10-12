@@ -48,6 +48,7 @@ RCT_REMAP_METHOD(initContext,
 
     NSString *modelPath = [modelOptions objectForKey:@"filePath"];
     BOOL isBundleAsset = [[modelOptions objectForKey:@"isBundleAsset"] boolValue];
+    BOOL useCoreMLIos = [[modelOptions objectForKey:@"useCoreMLIos"] boolValue];
 
     // For support debug assets in development mode
     BOOL downloadCoreMLAssets = [[modelOptions objectForKey:@"downloadCoreMLAssets"] boolValue];
@@ -75,6 +76,7 @@ RCT_REMAP_METHOD(initContext,
     RNWhisperContext *context = [RNWhisperContext
         initWithModelPath:path
         contextId:contextId
+        noCoreML:!useCoreMLIos
     ];
     if ([context getContext] == NULL) {
         reject(@"whisper_cpp_error", @"Failed to load the model", nil);

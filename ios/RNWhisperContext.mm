@@ -6,10 +6,14 @@
 
 @implementation RNWhisperContext
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId {
++ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML {
     RNWhisperContext *context = [[RNWhisperContext alloc] init];
     context->contextId = contextId;
-    context->ctx = whisper_init_from_file([modelPath UTF8String]);
+    if (noCoreML) {
+       context->ctx = whisper_init_from_file_no_coreml([modelPath UTF8String]);
+    } else {
+       context->ctx = whisper_init_from_file([modelPath UTF8String]);
+    }
     context->dQueue = dispatch_queue_create(
         [[NSString stringWithFormat:@"RNWhisperContext-%d", contextId] UTF8String],
         DISPATCH_QUEUE_SERIAL

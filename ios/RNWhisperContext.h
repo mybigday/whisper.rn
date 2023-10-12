@@ -42,7 +42,7 @@ typedef struct {
     RNWhisperContextRecordState recordState;
 }
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId;
++ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML;
 - (struct whisper_context *)getContext;
 - (dispatch_queue_t)getDispatchQueue;
 - (OSStatus)transcribeRealtime:(int)jobId
