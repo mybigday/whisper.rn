@@ -770,6 +770,9 @@ struct whisper_context {
     whisper_state * state = nullptr;
 
     std::string path_model; // populated by whisper_init_from_file()
+#ifdef WHISPER_USE_COREML
+    bool load_coreml = true;
+#endif
 };
 
 static void whisper_default_log(const char * text) {
@@ -2854,6 +2857,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
     }
 
 #ifdef WHISPER_USE_COREML
+if (ctx->load_coreml) { // Not in correct layer for easy patch
     const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
 
     log("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
@@ -2869,6 +2873,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
     } else {
         log("%s: Core ML model loaded\n", __func__);
     }
+}
 #endif
 
     state->logits.reserve(ctx->vocab.n_vocab * ctx->model.hparams.n_text_ctx);
@@ -2988,6 +2993,23 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
     return state;
 }
+
+#ifdef WHISPER_USE_COREML
+struct whisper_context * whisper_init_from_file_no_coreml(const char * path_model) {
+    whisper_context * ctx = whisper_init_from_file_no_state(path_model);
+    if (!ctx) {
+        return nullptr;
+    }
+    ctx->load_coreml = false;
+    ctx->state = whisper_init_state(ctx);
+    if (!ctx->state) {
+        whisper_free(ctx);
+        return nullptr;
+    }
+
+    return ctx;
+}
+#endif
 
 int whisper_ctx_init_openvino_encoder(
         struct whisper_context * ctx,

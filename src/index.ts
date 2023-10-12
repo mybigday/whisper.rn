@@ -438,6 +438,8 @@ export type ContextOptions = {
   }
   /** Is the file path a bundle asset for pure string filePath */
   isBundleAsset?: boolean
+  /** Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. */
+  useCoreMLIos?: boolean
 }
 
 const coreMLModelAssetPaths = [
@@ -451,6 +453,7 @@ export async function initWhisper({
   filePath,
   coreMLModelAsset,
   isBundleAsset,
+  useCoreMLIos = true,
 }: ContextOptions): Promise<WhisperContext> {
   let path = ''
   let coreMLAssets: CoreMLAsset[] | undefined
@@ -499,6 +502,7 @@ export async function initWhisper({
   const id = await RNWhisper.initContext({
     filePath: path,
     isBundleAsset: !!isBundleAsset,
+    useCoreMLIos,
     // Only development mode need download Core ML model assets (from packager server)
     downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
     coreMLAssets,
