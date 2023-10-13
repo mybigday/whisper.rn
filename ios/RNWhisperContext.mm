@@ -90,7 +90,7 @@
 bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSamples, int n)
 {
     bool isSpeech = true;
-    if (!state->isTranscribing && state->options[@"useVad"]) {
+    if (!state->isTranscribing && state->options[@"useVad"] != nil && [state->options[@"useVad"] boolValue]) {
         int vadSec = state->options[@"vadMs"] != nil ? [state->options[@"vadMs"] intValue] / 1000 : 2;
         int sampleSize = vadSec * WHISPER_SAMPLE_RATE;
         if (nSamples + n > sampleSize) {
