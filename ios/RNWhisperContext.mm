@@ -53,6 +53,13 @@
     int realtimeAudioSliceSec = options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0;
     int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < maxAudioSec ? realtimeAudioSliceSec : maxAudioSec;
 
+    self->recordState.audioOutputPath = options[@"audioOutputPath"];
+
+    self->recordState.useVad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false;
+    self->recordState.vadSec = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] / 1000 : 2;
+    self->recordState.vadThold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f;
+    self->recordState.vadFreqThold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f;
+
     self->recordState.audioSliceSec = audioSliceSec;
     self->recordState.isUseSlices = audioSliceSec < maxAudioSec;
 
@@ -90,18 +97,15 @@
 bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSamples, int n)
 {
     bool isSpeech = true;
-    if (!state->isTranscribing && state->options[@"useVad"] != nil && [state->options[@"useVad"] boolValue]) {
-        int vadSec = state->options[@"vadMs"] != nil ? [state->options[@"vadMs"] intValue] / 1000 : 2;
-        int sampleSize = vadSec * WHISPER_SAMPLE_RATE;
+    if (!state->isTranscribing && state->useVad) {
+        int sampleSize = state->vadSec * WHISPER_SAMPLE_RATE;
         if (nSamples + n > sampleSize) {
             int start = nSamples + n - sampleSize;
             std::vector<float> audioBufferF32Vec(sampleSize);
             for (int i = 0; i < sampleSize; i++) {
                 audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
             }
-            float vadThold = state->options[@"vadThold"] != nil ? [state->options[@"vadThold"] floatValue] : 0.6f;
-            float vadFreqThold = state->options[@"vadFreqThold"] != nil ? [state->options[@"vadFreqThold"] floatValue] : 100.0f;
-            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, vadThold, vadFreqThold, false);
+            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, state->vadThold, state->vadFreqThold, false);
             NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
         } else {
             isSpeech = false;
@@ -257,12 +261,12 @@ void AudioInputCallback(void * inUserData,
         result[@"isCapturing"] = @(false);
 
         // Save wav if needed
-        if (state->options[@"audioOutputPath"] != nil) {
+        if (state->audioOutputPath != nil) {
             // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
             [RNWhisperAudioUtils
                 saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
                                 sliceNSamples:state->sliceNSamples]
-                audioOutputFile:state->options[@"audioOutputPath"]
+                audioOutputFile:state->audioOutputPath
             ];
         }
 
