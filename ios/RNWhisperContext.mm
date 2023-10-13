@@ -408,6 +408,10 @@ struct rnwhisper_segments_callback_data {
     rn_whisper_abort_transcribe(jobId);
     if (self->recordState.isRealtime && self->recordState.isCapturing) {
         [self stopAudio];
+        if (!self->recordState.isTranscribing) {
+            // Handle for VAD case
+            self->recordState.transcribeHandler(jobId, @"end", @{});
+        }
     }
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = true;
