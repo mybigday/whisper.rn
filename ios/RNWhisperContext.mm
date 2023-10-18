@@ -57,6 +57,8 @@
 
     self->recordState.useVad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false;
     self->recordState.vadSec = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] / 1000 : 2;
+    if (self->recordState.vadSec < 2) self->recordState.vadSec = 2;
+
     self->recordState.vadThold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f;
     self->recordState.vadFreqThold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f;
 

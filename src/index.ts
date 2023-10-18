@@ -106,7 +106,7 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    */
   useVad?: boolean
   /**
-   * The length of the collected audio is used for VAD. (ms) (Default: 2000)
+   * The length of the collected audio is used for VAD, cannot be less than 2000ms. (ms) (Default: 2000)
    */
   vadMs?: number
   /**

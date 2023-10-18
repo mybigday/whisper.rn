@@ -83,6 +83,7 @@ public class WhisperContext {
     boolean isSpeech = true;
     if (!isTranscribing && options.hasKey("useVad") && options.getBoolean("useVad")) {
       int vadSec = options.hasKey("vadMs") ? options.getInt("vadMs") / 1000 : 2;
+      if (vadSec < 2) vadSec = 2;
       int sampleSize = vadSec * SAMPLE_RATE;
       if (nSamples + n > sampleSize) {
         int start = nSamples + n - sampleSize;
