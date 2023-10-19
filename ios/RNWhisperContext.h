@@ -30,7 +30,7 @@ typedef struct {
     NSString* audioOutputPath;
 
     bool useVad;
-    int vadSec;
+    int vadMs;
     float vadThold;
     float vadFreqThold;
 

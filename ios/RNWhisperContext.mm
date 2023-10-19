@@ -56,8 +56,8 @@
     self->recordState.audioOutputPath = options[@"audioOutputPath"];
 
     self->recordState.useVad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false;
-    self->recordState.vadSec = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] / 1000 : 2;
-    if (self->recordState.vadSec < 2) self->recordState.vadSec = 2;
+    self->recordState.vadMs = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] : 2000;
+    if (self->recordState.vadMs < 2000) self->recordState.vadMs = 2000;
 
     self->recordState.vadThold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f;
     self->recordState.vadFreqThold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f;
@@ -100,7 +100,7 @@ bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSampl
 {
     bool isSpeech = true;
     if (!state->isTranscribing && state->useVad) {
-        int sampleSize = state->vadSec * WHISPER_SAMPLE_RATE;
+        int sampleSize = (int) (WHISPER_SAMPLE_RATE * state->vadMs / 1000);
         if (nSamples + n > sampleSize) {
             int start = nSamples + n - sampleSize;
             std::vector<float> audioBufferF32Vec(sampleSize);

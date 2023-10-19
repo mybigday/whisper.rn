@@ -82,9 +82,9 @@ public class WhisperContext {
   private boolean vad(ReadableMap options, short[] shortBuffer, int nSamples, int n) {
     boolean isSpeech = true;
     if (!isTranscribing && options.hasKey("useVad") && options.getBoolean("useVad")) {
-      int vadSec = options.hasKey("vadMs") ? options.getInt("vadMs") / 1000 : 2;
-      if (vadSec < 2) vadSec = 2;
-      int sampleSize = vadSec * SAMPLE_RATE;
+      int vadMs = options.hasKey("vadMs") ? options.getInt("vadMs") : 2000;
+      if (vadMs < 2000) vadMs = 2000;
+      int sampleSize = (int) (SAMPLE_RATE * vadMs / 1000);
       if (nSamples + n > sampleSize) {
         int start = nSamples + n - sampleSize;
         float[] audioData = new float[sampleSize];
