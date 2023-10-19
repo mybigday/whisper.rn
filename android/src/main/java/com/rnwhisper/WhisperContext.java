@@ -101,6 +101,21 @@ public class WhisperContext {
     return isSpeech;
   }
 
+  private void finishRealtimeTranscribe(ReadableMap options, WritableMap result) {
+    String audioOutputPath = options.hasKey("audioOutputPath") ? options.getString("audioOutputPath") : null;
+    if (audioOutputPath != null) {
+       // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
+      Log.d(NAME, "Begin saving wav file to " + audioOutputPath);
+      try {
+        AudioUtils.saveWavFile(AudioUtils.concatShortBuffers(shortBufferSlices), audioOutputPath);
+      } catch (IOException e) {
+        Log.e(NAME, "Error saving wav file: " + e.getMessage());
+      }
+    }
+
+    emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+  }
+
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
     if (isCapturing || isTranscribing) {
       return -100;
@@ -132,7 +147,7 @@ public class WhisperContext {
     shortBufferSlices.add(new short[audioSliceSec * SAMPLE_RATE]);
     sliceNSamples = new ArrayList<Integer>();
     sliceNSamples.add(0);
-  
+
     isCapturing = true;
     recorder.startRecording();
 
@@ -160,12 +175,12 @@ public class WhisperContext {
                   nSamples == nSamplesTranscribing &&
                   sliceIndex == transcribeSliceIndex
                 ) {
-                  emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+                  finishRealtimeTranscribe(options, Arguments.createMap());
                 } else if (!isTranscribing) {
                   short[] shortBuffer = shortBufferSlices.get(sliceIndex);
                   boolean isSpeech = vad(options, shortBuffer, nSamples, 0);
                   if (!isSpeech) {
-                    emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+                    finishRealtimeTranscribe(options, Arguments.createMap());
                     break;
                   }
                   isTranscribing = true;
@@ -211,11 +226,9 @@ public class WhisperContext {
               Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
             }
           }
-          // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-          Log.d(NAME, "Begin saving wav file to " + audioOutputPath);
-          AudioUtils.saveWavFile(AudioUtils.concatShortBuffers(shortBufferSlices), audioOutputPath);
+
           if (!isTranscribing) {
-            emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+            finishRealtimeTranscribe(options, Arguments.createMap());
           }
           if (fullHandler != null) {
             fullHandler.join(); // Wait for full transcribe to finish
@@ -289,7 +302,7 @@ public class WhisperContext {
     if (isStopped && !continueNeeded) {
       payload.putBoolean("isCapturing", false);
       payload.putBoolean("isStoppedByAction", isStoppedByAction);
-      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", payload);
+      finishRealtimeTranscribe(options, payload);
     } else if (code == 0) {
       payload.putBoolean("isCapturing", true);
       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
@@ -402,7 +415,7 @@ public class WhisperContext {
       options.hasKey("maxLen") ? options.getInt("maxLen") : -1,
       // jboolean token_timestamps,
       options.hasKey("tokenTimestamps") ? options.getBoolean("tokenTimestamps") : false,
-  
+
       // jint offset,
       options.hasKey("offset") ? options.getInt("offset") : -1,
       // jint duration,

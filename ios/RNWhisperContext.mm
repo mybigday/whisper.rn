@@ -128,7 +128,7 @@ void AudioInputCallback(void * inUserData,
     if (!state->isCapturing) {
         NSLog(@"[RNWhisper] Not capturing, ignoring audio");
         if (!state->isTranscribing) {
-            state->transcribeHandler(state->jobId, @"end", @{});
+            [state->mSelf finishRealtimeTranscribe:state result:@{}];
         }
         return;
     }
@@ -151,14 +151,14 @@ void AudioInputCallback(void * inUserData,
             nSamples == state->nSamplesTranscribing &&
             state->sliceIndex == state->transcribeSliceIndex
         ) {
-            state->transcribeHandler(state->jobId, @"end", @{});
+            [state->mSelf finishRealtimeTranscribe:state result:@{}];
         } else if (
             !state->isTranscribing &&
             nSamples != state->nSamplesTranscribing
         ) {
             int16_t* audioBufferI16 = (int16_t*) [state->shortBufferSlices[state->sliceIndex] pointerValue];
             if (!vad(state, audioBufferI16, nSamples, 0)) {
-                state->transcribeHandler(state->jobId, @"end", @{});
+                [state->mSelf finishRealtimeTranscribe:state result:@{}];
                 return;
             }
             state->isTranscribing = true;
@@ -201,6 +201,19 @@ void AudioInputCallback(void * inUserData,
             [state->mSelf fullTranscribeSamples:state];
         });
     }
+}
+
+- (void)finishRealtimeTranscribe:(RNWhisperContextRecordState*) state result:(NSDictionary*)result {
+    // Save wav if needed
+    if (state->audioOutputPath != nil) {
+        // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
+        [RNWhisperAudioUtils
+            saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
+                            sliceNSamples:state->sliceNSamples]
+            audioOutputFile:state->audioOutputPath
+        ];
+    }
+    state->transcribeHandler(state->jobId, @"end", result);
 }
 
 - (void)fullTranscribeSamples:(RNWhisperContextRecordState*) state {
@@ -262,17 +275,7 @@ void AudioInputCallback(void * inUserData,
         result[@"isStoppedByAction"] = @(state->isStoppedByAction);
         result[@"isCapturing"] = @(false);
 
-        // Save wav if needed
-        if (state->audioOutputPath != nil) {
-            // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-            [RNWhisperAudioUtils
-                saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
-                                sliceNSamples:state->sliceNSamples]
-                audioOutputFile:state->audioOutputPath
-            ];
-        }
-
-        state->transcribeHandler(state->jobId, @"end", result);
+        [state->mSelf finishRealtimeTranscribe:state result:result];
     } else if (code == 0) {
         result[@"isCapturing"] = @(true);
         state->transcribeHandler(state->jobId, @"transcribe", result);
