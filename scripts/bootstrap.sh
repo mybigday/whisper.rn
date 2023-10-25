@@ -9,7 +9,7 @@ cp ./whisper.cpp/ggml-alloc.h ./cpp/ggml-alloc.h
 cp ./whisper.cpp/ggml-alloc.c ./cpp/ggml-alloc.c
 cp ./whisper.cpp/ggml-metal.h ./cpp/ggml-metal.h
 cp ./whisper.cpp/ggml-metal.m ./cpp/ggml-metal.m
-cp ./whisper.cpp/ggml-metal.metal ./cpp/ggml-metal.metal
+cp ./whisper.cpp/ggml-metal.metal ./cpp/ggml-metal-whisper.metal
 cp ./whisper.cpp/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/whisper.cpp ./cpp/whisper.cpp
 
@@ -35,10 +35,14 @@ for file in "${files[@]}"; do
   if [ "$OS" = "Darwin" ]; then
     sed -i '' 's/GGML_/WSP_GGML_/g' $file
     sed -i '' 's/ggml_/wsp_ggml_/g' $file
+    sed -i '' 's/GGUF_/WSP_GGUF_/g' $file
+    sed -i '' 's/gguf_/wsp_gguf_/g' $file
     sed -i '' 's/GGMLMetalClass/WSPGGMLMetalClass/g' $file
   else
     sed -i 's/GGML_/WSP_GGML_/g' $file
     sed -i 's/ggml_/wsp_ggml_/g' $file
+    sed -i 's/GGUF_/WSP_GGUF_/g' $file
+    sed -i 's/gguf_/wsp_gguf_/g' $file
     sed -i 's/GGMLMetalClass/WSPGGMLMetalClass/g' $file
   fi
 done

@@ -1,5 +1,14 @@
---- ggml-metal.m.orig	2023-10-05 09:26:55
-+++ ggml-metal.m	2023-10-05 09:26:56
+--- ggml-metal.m.orig	2023-10-25 17:55:09
++++ ggml-metal.m	2023-10-25 17:55:42
+@@ -178,7 +178,7 @@
+ 
+         //NSString * path = [[NSBundle mainBundle] pathForResource:@"../../examples/metal/metal" ofType:@"metal"];
+         NSBundle * bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
+-        NSString * path   = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
++        NSString * path   = [bundle pathForResource:@"ggml-metal-whisper" ofType:@"metal"];
+         metal_printf("%s: loading '%s'\n", __func__, [path UTF8String]);
+ 
+         NSString * src  = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
 @@ -207,7 +207,7 @@
  #define WSP_GGML_METAL_ADD_KERNEL(name) \
          ctx->function_##name = [ctx->library newFunctionWithName:@"kernel_"#name]; \
@@ -18,7 +27,7 @@
  
      WSP_GGML_METAL_DEL_KERNEL(add);
      WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -342,16 +340,6 @@
+@@ -342,17 +340,7 @@
      WSP_GGML_METAL_DEL_KERNEL(cpy_f16_f16);
  
  #undef WSP_GGML_METAL_DEL_KERNEL
@@ -26,12 +35,13 @@
 -    for (int i = 0; i < ctx->n_buffers; ++i) {
 -        [ctx->buffers[i].metal release];
 -    }
--
+ 
 -    [ctx->library release];
 -    [ctx->queue release];
 -    [ctx->device release];
 -
 -    dispatch_release(ctx->d_queue);
- 
+-
      free(ctx);
  }
+ 

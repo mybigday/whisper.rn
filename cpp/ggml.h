@@ -231,10 +231,10 @@
 #define WSP_GGML_EXIT_SUCCESS 0
 #define WSP_GGML_EXIT_ABORTED 1
 
-#define GGUF_MAGIC   0x46554747 // "GGUF"
-#define GGUF_VERSION 2
+#define WSP_GGUF_MAGIC   0x46554747 // "GGUF"
+#define WSP_GGUF_VERSION 2
 
-#define GGUF_DEFAULT_ALIGNMENT 32
+#define WSP_GGUF_DEFAULT_ALIGNMENT 32
 
 #define WSP_GGML_UNUSED(x) (void)(x)
 
@@ -1841,122 +1841,122 @@ extern "C" {
     // gguf
     //
 
-    enum gguf_type {
-        GGUF_TYPE_UINT8   = 0,
-        GGUF_TYPE_INT8    = 1,
-        GGUF_TYPE_UINT16  = 2,
-        GGUF_TYPE_INT16   = 3,
-        GGUF_TYPE_UINT32  = 4,
-        GGUF_TYPE_INT32   = 5,
-        GGUF_TYPE_FLOAT32 = 6,
-        GGUF_TYPE_BOOL    = 7,
-        GGUF_TYPE_STRING  = 8,
-        GGUF_TYPE_ARRAY   = 9,
-        GGUF_TYPE_UINT64  = 10,
-        GGUF_TYPE_INT64   = 11,
-        GGUF_TYPE_FLOAT64 = 12,
-        GGUF_TYPE_COUNT,       // marks the end of the enum
+    enum wsp_gguf_type {
+        WSP_GGUF_TYPE_UINT8   = 0,
+        WSP_GGUF_TYPE_INT8    = 1,
+        WSP_GGUF_TYPE_UINT16  = 2,
+        WSP_GGUF_TYPE_INT16   = 3,
+        WSP_GGUF_TYPE_UINT32  = 4,
+        WSP_GGUF_TYPE_INT32   = 5,
+        WSP_GGUF_TYPE_FLOAT32 = 6,
+        WSP_GGUF_TYPE_BOOL    = 7,
+        WSP_GGUF_TYPE_STRING  = 8,
+        WSP_GGUF_TYPE_ARRAY   = 9,
+        WSP_GGUF_TYPE_UINT64  = 10,
+        WSP_GGUF_TYPE_INT64   = 11,
+        WSP_GGUF_TYPE_FLOAT64 = 12,
+        WSP_GGUF_TYPE_COUNT,       // marks the end of the enum
     };
 
-    struct gguf_context;
+    struct wsp_gguf_context;
 
-    struct gguf_init_params {
+    struct wsp_gguf_init_params {
         bool no_alloc;
 
         // if not NULL, create a wsp_ggml_context and allocate the tensor data in it
         struct wsp_ggml_context ** ctx;
     };
 
-    WSP_GGML_API struct gguf_context * gguf_init_empty(void);
-    WSP_GGML_API struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_params params);
-    //WSP_GGML_API struct gguf_context * gguf_init_from_buffer(..);
+    WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_empty(void);
+    WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_file(const char * fname, struct wsp_gguf_init_params params);
+    //WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_buffer(..);
 
-    WSP_GGML_API void gguf_free(struct gguf_context * ctx);
+    WSP_GGML_API void wsp_gguf_free(struct wsp_gguf_context * ctx);
 
-    WSP_GGML_API const char * gguf_type_name(enum gguf_type type);
+    WSP_GGML_API const char * wsp_gguf_type_name(enum wsp_gguf_type type);
 
-    WSP_GGML_API int    gguf_get_version    (const struct gguf_context * ctx);
-    WSP_GGML_API size_t gguf_get_alignment  (const struct gguf_context * ctx);
-    WSP_GGML_API size_t gguf_get_data_offset(const struct gguf_context * ctx);
-    WSP_GGML_API void * gguf_get_data       (const struct gguf_context * ctx);
+    WSP_GGML_API int    wsp_gguf_get_version    (const struct wsp_gguf_context * ctx);
+    WSP_GGML_API size_t wsp_gguf_get_alignment  (const struct wsp_gguf_context * ctx);
+    WSP_GGML_API size_t wsp_gguf_get_data_offset(const struct wsp_gguf_context * ctx);
+    WSP_GGML_API void * wsp_gguf_get_data       (const struct wsp_gguf_context * ctx);
 
-    WSP_GGML_API int          gguf_get_n_kv(const struct gguf_context * ctx);
-    WSP_GGML_API int          gguf_find_key(const struct gguf_context * ctx, const char * key);
-    WSP_GGML_API const char * gguf_get_key (const struct gguf_context * ctx, int i);
+    WSP_GGML_API int          wsp_gguf_get_n_kv(const struct wsp_gguf_context * ctx);
+    WSP_GGML_API int          wsp_gguf_find_key(const struct wsp_gguf_context * ctx, const char * key);
+    WSP_GGML_API const char * wsp_gguf_get_key (const struct wsp_gguf_context * ctx, int i);
 
-    WSP_GGML_API enum gguf_type gguf_get_kv_type (const struct gguf_context * ctx, int i);
-    WSP_GGML_API enum gguf_type gguf_get_arr_type(const struct gguf_context * ctx, int i);
+    WSP_GGML_API enum wsp_gguf_type wsp_gguf_get_kv_type (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API enum wsp_gguf_type wsp_gguf_get_arr_type(const struct wsp_gguf_context * ctx, int i);
 
     // results are undefined if the wrong type is used for the key
-    WSP_GGML_API uint8_t      gguf_get_val_u8  (const struct gguf_context * ctx, int i);
-    WSP_GGML_API int8_t       gguf_get_val_i8  (const struct gguf_context * ctx, int i);
-    WSP_GGML_API uint16_t     gguf_get_val_u16 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API int16_t      gguf_get_val_i16 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API uint32_t     gguf_get_val_u32 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API int32_t      gguf_get_val_i32 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API float        gguf_get_val_f32 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API uint64_t     gguf_get_val_u64 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API int64_t      gguf_get_val_i64 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API double       gguf_get_val_f64 (const struct gguf_context * ctx, int i);
-    WSP_GGML_API bool         gguf_get_val_bool(const struct gguf_context * ctx, int i);
-    WSP_GGML_API const char * gguf_get_val_str (const struct gguf_context * ctx, int i);
-    WSP_GGML_API int          gguf_get_arr_n   (const struct gguf_context * ctx, int i);
-    WSP_GGML_API const void * gguf_get_arr_data(const struct gguf_context * ctx, int i);
-    WSP_GGML_API const char * gguf_get_arr_str (const struct gguf_context * ctx, int key_id, int i);
+    WSP_GGML_API uint8_t      wsp_gguf_get_val_u8  (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API int8_t       wsp_gguf_get_val_i8  (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API uint16_t     wsp_gguf_get_val_u16 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API int16_t      wsp_gguf_get_val_i16 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API uint32_t     wsp_gguf_get_val_u32 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API int32_t      wsp_gguf_get_val_i32 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API float        wsp_gguf_get_val_f32 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API uint64_t     wsp_gguf_get_val_u64 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API int64_t      wsp_gguf_get_val_i64 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API double       wsp_gguf_get_val_f64 (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API bool         wsp_gguf_get_val_bool(const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API const char * wsp_gguf_get_val_str (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API int          wsp_gguf_get_arr_n   (const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API const void * wsp_gguf_get_arr_data(const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API const char * wsp_gguf_get_arr_str (const struct wsp_gguf_context * ctx, int key_id, int i);
 
-    WSP_GGML_API int    gguf_get_n_tensors    (const struct gguf_context * ctx);
-    WSP_GGML_API int    gguf_find_tensor      (const struct gguf_context * ctx, const char * name);
-    WSP_GGML_API size_t gguf_get_tensor_offset(const struct gguf_context * ctx, int i);
-    WSP_GGML_API char * gguf_get_tensor_name  (const struct gguf_context * ctx, int i);
+    WSP_GGML_API int    wsp_gguf_get_n_tensors    (const struct wsp_gguf_context * ctx);
+    WSP_GGML_API int    wsp_gguf_find_tensor      (const struct wsp_gguf_context * ctx, const char * name);
+    WSP_GGML_API size_t wsp_gguf_get_tensor_offset(const struct wsp_gguf_context * ctx, int i);
+    WSP_GGML_API char * wsp_gguf_get_tensor_name  (const struct wsp_gguf_context * ctx, int i);
 
     // overrides existing values or adds a new one
-    WSP_GGML_API void gguf_set_val_u8  (struct gguf_context * ctx, const char * key, uint8_t  val);
-    WSP_GGML_API void gguf_set_val_i8  (struct gguf_context * ctx, const char * key, int8_t   val);
-    WSP_GGML_API void gguf_set_val_u16 (struct gguf_context * ctx, const char * key, uint16_t val);
-    WSP_GGML_API void gguf_set_val_i16 (struct gguf_context * ctx, const char * key, int16_t  val);
-    WSP_GGML_API void gguf_set_val_u32 (struct gguf_context * ctx, const char * key, uint32_t val);
-    WSP_GGML_API void gguf_set_val_i32 (struct gguf_context * ctx, const char * key, int32_t  val);
-    WSP_GGML_API void gguf_set_val_f32 (struct gguf_context * ctx, const char * key, float    val);
-    WSP_GGML_API void gguf_set_val_u64 (struct gguf_context * ctx, const char * key, uint64_t val);
-    WSP_GGML_API void gguf_set_val_i64 (struct gguf_context * ctx, const char * key, int64_t  val);
-    WSP_GGML_API void gguf_set_val_f64 (struct gguf_context * ctx, const char * key, double   val);
-    WSP_GGML_API void gguf_set_val_bool(struct gguf_context * ctx, const char * key, bool     val);
-    WSP_GGML_API void gguf_set_val_str (struct gguf_context * ctx, const char * key, const char * val);
-    WSP_GGML_API void gguf_set_arr_data(struct gguf_context * ctx, const char * key, enum gguf_type type, const void * data, int n);
-    WSP_GGML_API void gguf_set_arr_str (struct gguf_context * ctx, const char * key, const char ** data, int n);
+    WSP_GGML_API void wsp_gguf_set_val_u8  (struct wsp_gguf_context * ctx, const char * key, uint8_t  val);
+    WSP_GGML_API void wsp_gguf_set_val_i8  (struct wsp_gguf_context * ctx, const char * key, int8_t   val);
+    WSP_GGML_API void wsp_gguf_set_val_u16 (struct wsp_gguf_context * ctx, const char * key, uint16_t val);
+    WSP_GGML_API void wsp_gguf_set_val_i16 (struct wsp_gguf_context * ctx, const char * key, int16_t  val);
+    WSP_GGML_API void wsp_gguf_set_val_u32 (struct wsp_gguf_context * ctx, const char * key, uint32_t val);
+    WSP_GGML_API void wsp_gguf_set_val_i32 (struct wsp_gguf_context * ctx, const char * key, int32_t  val);
+    WSP_GGML_API void wsp_gguf_set_val_f32 (struct wsp_gguf_context * ctx, const char * key, float    val);
+    WSP_GGML_API void wsp_gguf_set_val_u64 (struct wsp_gguf_context * ctx, const char * key, uint64_t val);
+    WSP_GGML_API void wsp_gguf_set_val_i64 (struct wsp_gguf_context * ctx, const char * key, int64_t  val);
+    WSP_GGML_API void wsp_gguf_set_val_f64 (struct wsp_gguf_context * ctx, const char * key, double   val);
+    WSP_GGML_API void wsp_gguf_set_val_bool(struct wsp_gguf_context * ctx, const char * key, bool     val);
+    WSP_GGML_API void wsp_gguf_set_val_str (struct wsp_gguf_context * ctx, const char * key, const char * val);
+    WSP_GGML_API void wsp_gguf_set_arr_data(struct wsp_gguf_context * ctx, const char * key, enum wsp_gguf_type type, const void * data, int n);
+    WSP_GGML_API void wsp_gguf_set_arr_str (struct wsp_gguf_context * ctx, const char * key, const char ** data, int n);
 
     // set or add KV pairs from another context
-    WSP_GGML_API void gguf_set_kv(struct gguf_context * ctx, struct gguf_context * src);
+    WSP_GGML_API void wsp_gguf_set_kv(struct wsp_gguf_context * ctx, struct wsp_gguf_context * src);
 
     // manage tensor info
-    WSP_GGML_API void gguf_add_tensor(struct gguf_context * ctx, const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API void gguf_set_tensor_type(struct gguf_context * ctx, const char * name, enum wsp_ggml_type type);
-    WSP_GGML_API void gguf_set_tensor_data(struct gguf_context * ctx, const char * name, const void * data, size_t size);
+    WSP_GGML_API void wsp_gguf_add_tensor(struct wsp_gguf_context * ctx, const struct wsp_ggml_tensor * tensor);
+    WSP_GGML_API void wsp_gguf_set_tensor_type(struct wsp_gguf_context * ctx, const char * name, enum wsp_ggml_type type);
+    WSP_GGML_API void wsp_gguf_set_tensor_data(struct wsp_gguf_context * ctx, const char * name, const void * data, size_t size);
 
     // writing gguf files can be done in 2 ways:
     //
-    // - write the entire gguf_context to a binary file in a single pass:
+    // - write the entire wsp_gguf_context to a binary file in a single pass:
     //
-    //   gguf_write_to_file(ctx, fname);
+    //   wsp_gguf_write_to_file(ctx, fname);
     //
     // - first prepare a file with a placeholder for the meta data, write the tensor data, then write the meta data:
     //
     //   FILE * f = fopen(fname, "wb");
-    //   fseek(f, gguf_get_meta_size(ctx), SEEK_SET);
+    //   fseek(f, wsp_gguf_get_meta_size(ctx), SEEK_SET);
     //   fwrite(f, ...);
-    //   void * data = gguf_meta_get_meta_data(ctx);
+    //   void * data = wsp_gguf_meta_get_meta_data(ctx);
     //   fseek(f, 0, SEEK_SET);
-    //   fwrite(f, data, gguf_get_meta_size(ctx));
+    //   fwrite(f, data, wsp_gguf_get_meta_size(ctx));
     //   free(data);
     //   fclose(f);
     //
 
     // write the entire context to a binary file
-    WSP_GGML_API void gguf_write_to_file(const struct gguf_context * ctx, const char * fname, bool only_meta);
+    WSP_GGML_API void wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fname, bool only_meta);
 
     // get the size in bytes of the meta data (header, kv pairs, tensor info) including padding
-    WSP_GGML_API size_t gguf_get_meta_size(const struct gguf_context * ctx);
-    WSP_GGML_API void   gguf_get_meta_data(const struct gguf_context * ctx, void * data);
+    WSP_GGML_API size_t wsp_gguf_get_meta_size(const struct wsp_gguf_context * ctx);
+    WSP_GGML_API void   wsp_gguf_get_meta_data(const struct wsp_gguf_context * ctx, void * data);
 
     //
     // system info

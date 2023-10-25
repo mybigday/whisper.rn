@@ -115,9 +115,9 @@ struct wsp_ggml_metal_context {
 static NSString * const msl_library_source = @"see metal.metal";
 
 // Here to assist with NSBundle Path Hack
-@interface GGMLMetalClass : NSObject
+@interface WSPGGMLMetalClass : NSObject
 @end
-@implementation GGMLMetalClass
+@implementation WSPGGMLMetalClass
 @end
 
 struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
@@ -155,7 +155,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
     {
         NSError * error = nil;
 
-        NSBundle * bundle = [NSBundle bundleForClass:[GGMLMetalClass class]];
+        NSBundle * bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
         NSString * llamaBundlePath = [bundle pathForResource:@"llama_llama" ofType:@"bundle"];
         NSBundle * llamaBundle = [NSBundle bundleWithPath:llamaBundlePath];
         NSString * libPath = [llamaBundle pathForResource:@"default" ofType:@"metallib"];
@@ -177,8 +177,8 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         NSError * error = nil;
 
         //NSString * path = [[NSBundle mainBundle] pathForResource:@"../../examples/metal/metal" ofType:@"metal"];
-        NSBundle * bundle = [NSBundle bundleForClass:[GGMLMetalClass class]];
-        NSString * path   = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
+        NSBundle * bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
+        NSString * path   = [bundle pathForResource:@"ggml-metal-whisper" ofType:@"metal"];
         metal_printf("%s: loading '%s'\n", __func__, [path UTF8String]);
 
         NSString * src  = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
