@@ -1,5 +1,6 @@
 #import "ggml-metal.h"
 
+#import "ggml-backend-impl.h"
 #import "ggml.h"
 
 #import <Foundation/Foundation.h>
@@ -11,16 +12,19 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-// TODO: temporary - reuse llama.cpp logging
 #ifdef WSP_GGML_METAL_NDEBUG
-#define metal_printf(...)
+#define WSP_GGML_METAL_LOG_INFO(...)
+#define WSP_GGML_METAL_LOG_WARN(...)
+#define WSP_GGML_METAL_LOG_ERROR(...)
 #else
-#define metal_printf(...) fprintf(stderr, __VA_ARGS__)
+#define WSP_GGML_METAL_LOG_INFO(...)  wsp_ggml_metal_log(WSP_GGML_LOG_LEVEL_INFO, __VA_ARGS__)
+#define WSP_GGML_METAL_LOG_WARN(...)  wsp_ggml_metal_log(WSP_GGML_LOG_LEVEL_WARN, __VA_ARGS__)
+#define WSP_GGML_METAL_LOG_ERROR(...) wsp_ggml_metal_log(WSP_GGML_LOG_LEVEL_ERROR, __VA_ARGS__)
 #endif
 
 #define UNUSED(x) (void)(x)
 
-#define WSP_GGML_MAX_CONCUR (2*WSP_GGML_MAX_NODES)
+#define WSP_GGML_MAX_CONCUR (2*WSP_GGML_DEFAULT_GRAPH_SIZE)
 
 struct wsp_ggml_metal_buffer {
     const char * name;
@@ -59,6 +63,7 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(mul);
     WSP_GGML_METAL_DECL_KERNEL(mul_row); // TODO: avoid this extra kernel, instead extend the "mul" kernel to support broadcast
     WSP_GGML_METAL_DECL_KERNEL(scale);
+    WSP_GGML_METAL_DECL_KERNEL(scale_4);
     WSP_GGML_METAL_DECL_KERNEL(silu);
     WSP_GGML_METAL_DECL_KERNEL(relu);
     WSP_GGML_METAL_DECL_KERNEL(gelu);
@@ -70,6 +75,8 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(get_rows_f16);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q4_0);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q4_1);
+    WSP_GGML_METAL_DECL_KERNEL(get_rows_q5_0);
+    WSP_GGML_METAL_DECL_KERNEL(get_rows_q5_1);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q8_0);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q2_K);
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q3_K);
@@ -78,33 +85,40 @@ struct wsp_ggml_metal_context {
     WSP_GGML_METAL_DECL_KERNEL(get_rows_q6_K);
     WSP_GGML_METAL_DECL_KERNEL(rms_norm);
     WSP_GGML_METAL_DECL_KERNEL(norm);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_f32_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32_1row);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_f16_f32_l4);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q4_0_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q4_1_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q8_0_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q2_K_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q3_K_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q4_K_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q5_K_f32);
-    WSP_GGML_METAL_DECL_KERNEL(mul_mat_q6_K_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_f32_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_f16_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_f16_f32_1row);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_f16_f32_l4);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q4_0_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q4_1_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q5_0_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q5_1_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q8_0_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q2_K_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q3_K_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q4_K_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q5_K_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mv_q6_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_f32_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_f16_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q4_0_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q4_1_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mm_q5_0_f32);
+    WSP_GGML_METAL_DECL_KERNEL(mul_mm_q5_1_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q8_0_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q2_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q3_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q4_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q5_K_f32);
     WSP_GGML_METAL_DECL_KERNEL(mul_mm_q6_K_f32);
-    WSP_GGML_METAL_DECL_KERNEL(rope);
+    WSP_GGML_METAL_DECL_KERNEL(rope_f32);
+    WSP_GGML_METAL_DECL_KERNEL(rope_f16);
     WSP_GGML_METAL_DECL_KERNEL(alibi_f32);
     WSP_GGML_METAL_DECL_KERNEL(cpy_f32_f16);
     WSP_GGML_METAL_DECL_KERNEL(cpy_f32_f32);
     WSP_GGML_METAL_DECL_KERNEL(cpy_f16_f16);
+    WSP_GGML_METAL_DECL_KERNEL(concat);
+    WSP_GGML_METAL_DECL_KERNEL(sqr);
 
 #undef WSP_GGML_METAL_DECL_KERNEL
 };
@@ -120,8 +134,37 @@ static NSString * const msl_library_source = @"see metal.metal";
 @implementation WSPGGMLMetalClass
 @end
 
+wsp_ggml_log_callback wsp_ggml_metal_log_callback = NULL;
+void * wsp_ggml_metal_log_user_data = NULL;
+
+void wsp_ggml_metal_log_set_callback(wsp_ggml_log_callback log_callback, void * user_data) {
+    wsp_ggml_metal_log_callback  = log_callback;
+    wsp_ggml_metal_log_user_data = user_data;
+}
+
+static void wsp_ggml_metal_log(enum wsp_ggml_log_level level, const char* format, ...){
+    if (wsp_ggml_metal_log_callback != NULL) {
+        va_list args;
+        va_start(args, format);
+        char buffer[128];
+        int len = vsnprintf(buffer, 128, format, args);
+        if (len < 128) {
+            wsp_ggml_metal_log_callback(level, buffer, wsp_ggml_metal_log_user_data);
+        } else {
+            char* buffer2 = malloc(len+1);
+            vsnprintf(buffer2, len+1, format, args);
+            buffer2[len] = 0;
+            wsp_ggml_metal_log_callback(level, buffer2, wsp_ggml_metal_log_user_data);
+            free(buffer2);
+        }
+        va_end(args);
+    }
+}
+
+
+
 struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
-    metal_printf("%s: allocating\n", __func__);
+    WSP_GGML_METAL_LOG_INFO("%s: allocating\n", __func__);
 
     id <MTLDevice> device;
     NSString * s;
@@ -131,14 +174,14 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
     NSArray * devices = MTLCopyAllDevices();
     for (device in devices) {
         s = [device name];
-        metal_printf("%s: found device: %s\n", __func__, [s UTF8String]);
+        WSP_GGML_METAL_LOG_INFO("%s: found device: %s\n", __func__, [s UTF8String]);
     }
 #endif
 
     // Pick and show default Metal device
     device = MTLCreateSystemDefaultDevice();
     s = [device name];
-    metal_printf("%s: picking default device: %s\n", __func__, [s UTF8String]);
+    WSP_GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
 
     // Configure context
     struct wsp_ggml_metal_context * ctx = malloc(sizeof(struct wsp_ggml_metal_context));
@@ -150,68 +193,69 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
 
     ctx->d_queue = dispatch_queue_create("ggml-metal", DISPATCH_QUEUE_CONCURRENT);
 
-#ifdef WSP_GGML_SWIFT
-    // load the default.metallib file
+    // load library
     {
-        NSError * error = nil;
-
-        NSBundle * bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
-        NSString * llamaBundlePath = [bundle pathForResource:@"llama_llama" ofType:@"bundle"];
-        NSBundle * llamaBundle = [NSBundle bundleWithPath:llamaBundlePath];
-        NSString * libPath = [llamaBundle pathForResource:@"default" ofType:@"metallib"];
-        NSURL * libURL = [NSURL fileURLWithPath:libPath];
-
-        // Load the metallib file into a Metal library
-        ctx->library = [ctx->device newLibraryWithURL:libURL error:&error];
-
-        if (error) {
-            metal_printf("%s: error: %s\n", __func__, [[error description] UTF8String]);
-            return NULL;
-        }
-    }
+        NSBundle * bundle = nil;
+#ifdef SWIFT_PACKAGE
+        bundle = SWIFTPM_MODULE_BUNDLE;
 #else
-    UNUSED(msl_library_source);
-
-    // read the source from "ggml-metal.metal" into a string and use newLibraryWithSource
-    {
+        bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
+#endif
         NSError * error = nil;
+        NSString * libPath = [bundle pathForResource:@"default" ofType:@"metallib"];
+        if (libPath != nil) {
+            NSURL * libURL = [NSURL fileURLWithPath:libPath];
+            WSP_GGML_METAL_LOG_INFO("%s: loading '%s'\n", __func__, [libPath UTF8String]);
+            ctx->library = [ctx->device newLibraryWithURL:libURL error:&error];
+        } else {
+            WSP_GGML_METAL_LOG_INFO("%s: default.metallib not found, loading from source\n", __func__);
 
-        //NSString * path = [[NSBundle mainBundle] pathForResource:@"../../examples/metal/metal" ofType:@"metal"];
-        NSBundle * bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
-        NSString * path   = [bundle pathForResource:@"ggml-metal-whisper" ofType:@"metal"];
-        metal_printf("%s: loading '%s'\n", __func__, [path UTF8String]);
+            NSString * sourcePath;
+            NSString * ggmlMetalPathResources = [[NSProcessInfo processInfo].environment objectForKey:@"WSP_GGML_METAL_PATH_RESOURCES"];
+            if (ggmlMetalPathResources) {
+                sourcePath = [ggmlMetalPathResources stringByAppendingPathComponent:@"ggml-metal.metal"];
+            } else {
+                sourcePath = [bundle pathForResource:@"ggml-metal-whisper" ofType:@"metal"];
+            }
+            if (sourcePath == nil) {
+                WSP_GGML_METAL_LOG_WARN("%s: error: could not use bundle path to find ggml-metal.metal, falling back to trying cwd\n", __func__);
+                sourcePath = @"ggml-metal.metal";
+            }
+            WSP_GGML_METAL_LOG_INFO("%s: loading '%s'\n", __func__, [sourcePath UTF8String]);
+            NSString * src = [NSString stringWithContentsOfFile:sourcePath encoding:NSUTF8StringEncoding error:&error];
+            if (error) {
+                WSP_GGML_METAL_LOG_ERROR("%s: error: %s\n", __func__, [[error description] UTF8String]);
+                return NULL;
+            }
 
-        NSString * src  = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
-        if (error) {
-            metal_printf("%s: error: %s\n", __func__, [[error description] UTF8String]);
-            return NULL;
-        }
-
+            MTLCompileOptions* options = nil;
 #ifdef WSP_GGML_QKK_64
-        MTLCompileOptions* options = [MTLCompileOptions new];
-        options.preprocessorMacros = @{ @"QK_K" : @(64) };
-        ctx->library = [ctx->device newLibraryWithSource:src options:options error:&error];
-#else
-        ctx->library = [ctx->device newLibraryWithSource:src options:nil error:&error];
+            options = [MTLCompileOptions new];
+            options.preprocessorMacros = @{ @"QK_K" : @(64) };
 #endif
+            ctx->library = [ctx->device newLibraryWithSource:src options:options error:&error];
+        }
+
         if (error) {
-            metal_printf("%s: error: %s\n", __func__, [[error description] UTF8String]);
+            WSP_GGML_METAL_LOG_ERROR("%s: error: %s\n", __func__, [[error description] UTF8String]);
             return NULL;
         }
     }
-#endif
 
     // load kernels
     {
         NSError * error = nil;
+
+        /*
+        WSP_GGML_METAL_LOG_INFO("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (void *) ctx->pipeline_##name, \
+                (int) ctx->pipeline_##name.maxTotalThreadsPerThreadgroup, \
+                (int) ctx->pipeline_##name.threadExecutionWidth); \
+        */
 #define WSP_GGML_METAL_ADD_KERNEL(name) \
         ctx->function_##name = [ctx->library newFunctionWithName:@"kernel_"#name]; \
         ctx->pipeline_##name = [ctx->device newComputePipelineStateWithFunction:ctx->function_##name error:&error]; \
-        metal_printf("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (__bridge void *) ctx->pipeline_##name, \
-                (int) ctx->pipeline_##name.maxTotalThreadsPerThreadgroup, \
-                (int) ctx->pipeline_##name.threadExecutionWidth); \
         if (error) { \
-            metal_printf("%s: load pipeline error: %s\n", __func__, [[error description] UTF8String]); \
+            WSP_GGML_METAL_LOG_ERROR("%s: error: load pipeline error: %s\n", __func__, [[error description] UTF8String]); \
             return NULL; \
         }
 
@@ -220,6 +264,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(mul);
         WSP_GGML_METAL_ADD_KERNEL(mul_row);
         WSP_GGML_METAL_ADD_KERNEL(scale);
+        WSP_GGML_METAL_ADD_KERNEL(scale_4);
         WSP_GGML_METAL_ADD_KERNEL(silu);
         WSP_GGML_METAL_ADD_KERNEL(relu);
         WSP_GGML_METAL_ADD_KERNEL(gelu);
@@ -231,6 +276,8 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(get_rows_f16);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q4_0);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q4_1);
+        WSP_GGML_METAL_ADD_KERNEL(get_rows_q5_0);
+        WSP_GGML_METAL_ADD_KERNEL(get_rows_q5_1);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q8_0);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q2_K);
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q3_K);
@@ -239,44 +286,66 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
         WSP_GGML_METAL_ADD_KERNEL(get_rows_q6_K);
         WSP_GGML_METAL_ADD_KERNEL(rms_norm);
         WSP_GGML_METAL_ADD_KERNEL(norm);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_f32_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32_1row);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_f16_f32_l4);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q4_0_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q4_1_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q8_0_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q2_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q3_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q4_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q5_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mat_q6_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_f32_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_f16_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_0_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q8_0_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_1_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q2_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q3_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q5_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(mul_mm_q6_K_f32);
-        WSP_GGML_METAL_ADD_KERNEL(rope);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_f32_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_f16_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_f16_f32_1row);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_f16_f32_l4);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q4_0_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q4_1_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q5_0_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q5_1_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q8_0_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q2_K_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q3_K_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q4_K_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q5_K_f32);
+        WSP_GGML_METAL_ADD_KERNEL(mul_mv_q6_K_f32);
+        if ([ctx->device supportsFamily:MTLGPUFamilyApple7]) {
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_f32_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_f16_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_0_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_1_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q5_0_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q5_1_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q8_0_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q2_K_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q3_K_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q4_K_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q5_K_f32);
+            WSP_GGML_METAL_ADD_KERNEL(mul_mm_q6_K_f32);
+        }
+        WSP_GGML_METAL_ADD_KERNEL(rope_f32);
+        WSP_GGML_METAL_ADD_KERNEL(rope_f16);
         WSP_GGML_METAL_ADD_KERNEL(alibi_f32);
         WSP_GGML_METAL_ADD_KERNEL(cpy_f32_f16);
         WSP_GGML_METAL_ADD_KERNEL(cpy_f32_f32);
         WSP_GGML_METAL_ADD_KERNEL(cpy_f16_f16);
+        WSP_GGML_METAL_ADD_KERNEL(concat);
+        WSP_GGML_METAL_ADD_KERNEL(sqr);
 
 #undef WSP_GGML_METAL_ADD_KERNEL
     }
 
-    metal_printf("%s: hasUnifiedMemory              = %s\n",       __func__, ctx->device.hasUnifiedMemory ? "true" : "false");
 #if TARGET_OS_OSX
-    metal_printf("%s: recommendedMaxWorkingSetSize  = %8.2f MB\n", __func__, ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
+    // print MTL GPU family:
+    WSP_GGML_METAL_LOG_INFO("%s: GPU name:   %s\n", __func__, [[ctx->device name] UTF8String]);
+
+    // determine max supported GPU family
+    // https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf
+    // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
+    for (int i = MTLGPUFamilyApple1 + 20; i >= MTLGPUFamilyApple1; --i) {
+        if ([ctx->device supportsFamily:i]) {
+            WSP_GGML_METAL_LOG_INFO("%s: GPU family: MTLGPUFamilyApple%d (%d)\n", __func__, i - MTLGPUFamilyApple1 + 1, i);
+            break;
+        }
+    }
+
+    WSP_GGML_METAL_LOG_INFO("%s: hasUnifiedMemory              = %s\n",       __func__, ctx->device.hasUnifiedMemory ? "true" : "false");
+    WSP_GGML_METAL_LOG_INFO("%s: recommendedMaxWorkingSetSize  = %8.2f MB\n", __func__, ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
     if (ctx->device.maxTransferRate != 0) {
-        metal_printf("%s: maxTransferRate               = %8.2f MB/s\n", __func__, ctx->device.maxTransferRate / 1024.0 / 1024.0);
+        WSP_GGML_METAL_LOG_INFO("%s: maxTransferRate               = %8.2f MB/s\n", __func__, ctx->device.maxTransferRate / 1024.0 / 1024.0);
     } else {
-        metal_printf("%s: maxTransferRate               = built-in GPU\n", __func__);
+        WSP_GGML_METAL_LOG_INFO("%s: maxTransferRate               = built-in GPU\n", __func__);
     }
 #endif
 
@@ -284,7 +353,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
 }
 
 void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
-    metal_printf("%s: deallocating\n", __func__);
+    WSP_GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
 #define WSP_GGML_METAL_DEL_KERNEL(name) \
 
     WSP_GGML_METAL_DEL_KERNEL(add);
@@ -292,6 +361,7 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(mul);
     WSP_GGML_METAL_DEL_KERNEL(mul_row);
     WSP_GGML_METAL_DEL_KERNEL(scale);
+    WSP_GGML_METAL_DEL_KERNEL(scale_4);
     WSP_GGML_METAL_DEL_KERNEL(silu);
     WSP_GGML_METAL_DEL_KERNEL(relu);
     WSP_GGML_METAL_DEL_KERNEL(gelu);
@@ -303,6 +373,8 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(get_rows_f16);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q4_0);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q4_1);
+    WSP_GGML_METAL_DEL_KERNEL(get_rows_q5_0);
+    WSP_GGML_METAL_DEL_KERNEL(get_rows_q5_1);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q8_0);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q2_K);
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q3_K);
@@ -311,33 +383,42 @@ void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
     WSP_GGML_METAL_DEL_KERNEL(get_rows_q6_K);
     WSP_GGML_METAL_DEL_KERNEL(rms_norm);
     WSP_GGML_METAL_DEL_KERNEL(norm);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_f32_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32_1row);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_f16_f32_l4);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q4_0_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q4_1_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q8_0_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q2_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q3_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q4_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q5_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mat_q6_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_f32_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_f16_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_0_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q8_0_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_1_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q2_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q3_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q5_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(mul_mm_q6_K_f32);
-    WSP_GGML_METAL_DEL_KERNEL(rope);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_f32_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_f16_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_f16_f32_1row);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_f16_f32_l4);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q4_0_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q4_1_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q5_0_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q5_1_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q8_0_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q2_K_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q3_K_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q4_K_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q5_K_f32);
+    WSP_GGML_METAL_DEL_KERNEL(mul_mv_q6_K_f32);
+    if ([ctx->device supportsFamily:MTLGPUFamilyApple7]) {
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_f32_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_f16_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_0_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_1_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q5_0_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q5_1_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q8_0_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q2_K_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q3_K_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q4_K_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q5_K_f32);
+        WSP_GGML_METAL_DEL_KERNEL(mul_mm_q6_K_f32);
+    }
+    WSP_GGML_METAL_DEL_KERNEL(rope_f32);
+    WSP_GGML_METAL_DEL_KERNEL(rope_f16);
     WSP_GGML_METAL_DEL_KERNEL(alibi_f32);
     WSP_GGML_METAL_DEL_KERNEL(cpy_f32_f16);
     WSP_GGML_METAL_DEL_KERNEL(cpy_f32_f32);
     WSP_GGML_METAL_DEL_KERNEL(cpy_f16_f16);
+    WSP_GGML_METAL_DEL_KERNEL(concat);
+    WSP_GGML_METAL_DEL_KERNEL(sqr);
 
 #undef WSP_GGML_METAL_DEL_KERNEL
 
@@ -348,7 +429,7 @@ void * wsp_ggml_metal_host_malloc(size_t n) {
     void * data = NULL;
     const int result = posix_memalign((void **) &data, sysconf(_SC_PAGESIZE), n);
     if (result != 0) {
-        metal_printf("%s: error: posix_memalign failed\n", __func__);
+        WSP_GGML_METAL_LOG_ERROR("%s: error: posix_memalign failed\n", __func__);
         return NULL;
     }
 
@@ -376,7 +457,7 @@ int * wsp_ggml_metal_get_concur_list(struct wsp_ggml_metal_context * ctx) {
 // Metal buffer based on the host memory pointer
 //
 static id<MTLBuffer> wsp_ggml_metal_get_buffer(struct wsp_ggml_metal_context * ctx, struct wsp_ggml_tensor * t, size_t * offs) {
-    //metal_printf("%s: data tensor '%16s', offs_data = %8ld, offs_eval = %8ld, offs_cach = %8ld\n", __func__, t->name, offs_data, offs_eval, offs_cach);
+    //WSP_GGML_METAL_LOG_INFO("%s: data tensor '%16s', offs_data = %8ld, offs_eval = %8ld, offs_cach = %8ld\n", __func__, t->name, offs_data, offs_eval, offs_cach);
 
     const int64_t tsize = wsp_ggml_nbytes(t);
 
@@ -384,17 +465,17 @@ static id<MTLBuffer> wsp_ggml_metal_get_buffer(struct wsp_ggml_metal_context * c
     for (int i = 0; i < ctx->n_buffers; ++i) {
         const int64_t ioffs = (int64_t) t->data - (int64_t) ctx->buffers[i].data;
 
-        //metal_printf("ioffs = %10ld, tsize = %10ld, sum = %10ld, ctx->buffers[%d].size = %10ld, name = %s\n", ioffs, tsize, ioffs + tsize, i, ctx->buffers[i].size, ctx->buffers[i].name);
+        //WSP_GGML_METAL_LOG_INFO("ioffs = %10ld, tsize = %10ld, sum = %10ld, ctx->buffers[%d].size = %10ld, name = %s\n", ioffs, tsize, ioffs + tsize, i, ctx->buffers[i].size, ctx->buffers[i].name);
         if (ioffs >= 0 && ioffs + tsize <= (int64_t) ctx->buffers[i].size) {
             *offs = (size_t) ioffs;
 
-            //metal_printf("%s: '%s' tensor '%16s', offs = %8ld\n", __func__, ctx->buffers[i].name, t->name, *offs);
+            //WSP_GGML_METAL_LOG_INFO("%s: '%s' tensor '%16s', offs = %8ld\n", __func__, ctx->buffers[i].name, t->name, *offs);
 
             return ctx->buffers[i].metal;
         }
     }
 
-    metal_printf("%s: error: buffer is nil\n", __func__);
+    WSP_GGML_METAL_LOG_ERROR("%s: error: buffer is nil\n", __func__);
 
     return nil;
 }
@@ -406,7 +487,7 @@ bool wsp_ggml_metal_add_buffer(
                          size_t   size,
                          size_t   max_size) {
     if (ctx->n_buffers >= WSP_GGML_METAL_MAX_BUFFERS) {
-        metal_printf("%s: too many buffers\n", __func__);
+        WSP_GGML_METAL_LOG_ERROR("%s: error: too many buffers\n", __func__);
         return false;
     }
 
@@ -416,7 +497,7 @@ bool wsp_ggml_metal_add_buffer(
             const int64_t ioffs = (int64_t) data - (int64_t) ctx->buffers[i].data;
 
             if (ioffs >= 0 && ioffs < (int64_t) ctx->buffers[i].size) {
-                metal_printf("%s: error: buffer '%s' overlaps with '%s'\n", __func__, name, ctx->buffers[i].name);
+                WSP_GGML_METAL_LOG_ERROR("%s: error: buffer '%s' overlaps with '%s'\n", __func__, name, ctx->buffers[i].name);
                 return false;
             }
         }
@@ -437,11 +518,11 @@ bool wsp_ggml_metal_add_buffer(
             ctx->buffers[ctx->n_buffers].metal = [ctx->device newBufferWithBytesNoCopy:data length:size_aligned options:MTLResourceStorageModeShared deallocator:nil];
 
             if (ctx->buffers[ctx->n_buffers].metal == nil) {
-                metal_printf("%s: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1024.0 / 1024.0);
+                WSP_GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1024.0 / 1024.0);
                 return false;
             }
 
-            metal_printf("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1024.0 / 1024.0);
+            WSP_GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1024.0 / 1024.0);
 
             ++ctx->n_buffers;
         } else {
@@ -461,13 +542,13 @@ bool wsp_ggml_metal_add_buffer(
                 ctx->buffers[ctx->n_buffers].metal = [ctx->device newBufferWithBytesNoCopy:(void *) ((uint8_t *) data + i) length:size_step_aligned options:MTLResourceStorageModeShared deallocator:nil];
 
                 if (ctx->buffers[ctx->n_buffers].metal == nil) {
-                    metal_printf("%s: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1024.0 / 1024.0);
+                    WSP_GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1024.0 / 1024.0);
                     return false;
                 }
 
-                metal_printf("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1024.0 / 1024.0, i);
+                WSP_GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1024.0 / 1024.0, i);
                 if (i + size_step < size) {
-                    metal_printf("\n");
+                    WSP_GGML_METAL_LOG_INFO("\n");
                 }
 
                 ++ctx->n_buffers;
@@ -475,17 +556,17 @@ bool wsp_ggml_metal_add_buffer(
         }
 
 #if TARGET_OS_OSX
-        metal_printf(", (%8.2f / %8.2f)",
+        WSP_GGML_METAL_LOG_INFO(", (%8.2f / %8.2f)",
                 ctx->device.currentAllocatedSize / 1024.0 / 1024.0,
                 ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
 
         if (ctx->device.currentAllocatedSize > ctx->device.recommendedMaxWorkingSetSize) {
-            metal_printf(", warning: current allocated size is greater than the recommended max working set size\n");
+            WSP_GGML_METAL_LOG_WARN(", warning: current allocated size is greater than the recommended max working set size\n", __func__);
         } else {
-            metal_printf("\n");
+            WSP_GGML_METAL_LOG_INFO("\n");
         }
 #else
-        metal_printf(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1024.0 / 1024.0);
+        WSP_GGML_METAL_LOG_INFO(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1024.0 / 1024.0);
 #endif
     }
 
@@ -598,7 +679,7 @@ void wsp_ggml_metal_graph_find_concurrency(
     }
 
     if (ctx->concur_list_len > WSP_GGML_MAX_CONCUR) {
-        metal_printf("%s: too many elements for metal ctx->concur_list!\n", __func__);
+        WSP_GGML_METAL_LOG_WARN("%s: too many elements for metal ctx->concur_list!\n", __func__);
     }
 }
 
@@ -652,11 +733,25 @@ void wsp_ggml_metal_graph_compute(
                     continue;
                 }
 
-                //metal_printf("%s: encoding node %3d, op = %8s\n", __func__, i, wsp_ggml_op_name(gf->nodes[i]->op));
+                //WSP_GGML_METAL_LOG_INFO("%s: encoding node %3d, op = %8s\n", __func__, i, wsp_ggml_op_name(gf->nodes[i]->op));
 
                 struct wsp_ggml_tensor * src0 = gf->nodes[i]->src[0];
                 struct wsp_ggml_tensor * src1 = gf->nodes[i]->src[1];
                 struct wsp_ggml_tensor * dst  = gf->nodes[i];
+
+                switch (dst->op) {
+                    case WSP_GGML_OP_NONE:
+                    case WSP_GGML_OP_RESHAPE:
+                    case WSP_GGML_OP_VIEW:
+                    case WSP_GGML_OP_TRANSPOSE:
+                    case WSP_GGML_OP_PERMUTE:
+                        {
+                            // noop -> next node
+                        } continue;
+                    default:
+                        {
+                        } break;
+                }
 
                 const int64_t  ne00 = src0 ? src0->ne[0] : 0;
                 const int64_t  ne01 = src0 ? src0->ne[1] : 0;
@@ -696,53 +791,117 @@ void wsp_ggml_metal_graph_compute(
                 id<MTLBuffer> id_src1 = src1 ? wsp_ggml_metal_get_buffer(ctx, src1, &offs_src1) : nil;
                 id<MTLBuffer> id_dst  = dst  ? wsp_ggml_metal_get_buffer(ctx, dst,  &offs_dst)  : nil;
 
-                //metal_printf("%s: op - %s\n", __func__, wsp_ggml_op_name(dst->op));
+                //WSP_GGML_METAL_LOG_INFO("%s: op - %s\n", __func__, wsp_ggml_op_name(dst->op));
                 //if (src0) {
-                //    metal_printf("%s: src0 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, wsp_ggml_type_name(src0t), ne00, ne01, ne02,
+                //    WSP_GGML_METAL_LOG_INFO("%s: src0 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, wsp_ggml_type_name(src0t), ne00, ne01, ne02,
                 //            wsp_ggml_is_contiguous(src0), src0->name);
                 //}
                 //if (src1) {
-                //    metal_printf("%s: src1 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, wsp_ggml_type_name(src1t), ne10, ne11, ne12,
+                //    WSP_GGML_METAL_LOG_INFO("%s: src1 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, wsp_ggml_type_name(src1t), ne10, ne11, ne12,
                 //            wsp_ggml_is_contiguous(src1), src1->name);
                 //}
                 //if (dst) {
-                //    metal_printf("%s: dst  - %4s [%5lld, %5lld, %5lld], 1, %s\n",  __func__, wsp_ggml_type_name(dstt),  ne0,  ne1,  ne2,
+                //    WSP_GGML_METAL_LOG_INFO("%s: dst  - %4s [%5lld, %5lld, %5lld], 1, %s\n",  __func__, wsp_ggml_type_name(dstt),  ne0,  ne1,  ne2,
                 //            dst->name);
                 //}
 
                 switch (dst->op) {
-                    case WSP_GGML_OP_NONE:
-                    case WSP_GGML_OP_RESHAPE:
-                    case WSP_GGML_OP_VIEW:
-                    case WSP_GGML_OP_TRANSPOSE:
-                    case WSP_GGML_OP_PERMUTE:
+                    case WSP_GGML_OP_CONCAT:
                         {
-                            // noop
+                            const int64_t nb = ne00;
+
+                            [encoder setComputePipelineState:ctx->pipeline_concat];
+                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
+                            [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
+                            [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
+                            [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:3];
+                            [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:4];
+                            [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:5];
+                            [encoder setBytes:&ne03 length:sizeof(ne03) atIndex:6];
+                            [encoder setBytes:&nb00 length:sizeof(nb00) atIndex:7];
+                            [encoder setBytes:&nb01 length:sizeof(nb01) atIndex:8];
+                            [encoder setBytes:&nb02 length:sizeof(nb02) atIndex:9];
+                            [encoder setBytes:&nb03 length:sizeof(nb03) atIndex:10];
+                            [encoder setBytes:&ne10 length:sizeof(ne10) atIndex:11];
+                            [encoder setBytes:&ne11 length:sizeof(ne11) atIndex:12];
+                            [encoder setBytes:&ne12 length:sizeof(ne12) atIndex:13];
+                            [encoder setBytes:&ne13 length:sizeof(ne13) atIndex:14];
+                            [encoder setBytes:&nb10 length:sizeof(nb10) atIndex:15];
+                            [encoder setBytes:&nb11 length:sizeof(nb11) atIndex:16];
+                            [encoder setBytes:&nb12 length:sizeof(nb12) atIndex:17];
+                            [encoder setBytes:&nb13 length:sizeof(nb13) atIndex:18];
+                            [encoder setBytes:&ne0  length:sizeof(ne0)  atIndex:19];
+                            [encoder setBytes:&ne1  length:sizeof(ne1)  atIndex:20];
+                            [encoder setBytes:&ne2  length:sizeof(ne2)  atIndex:21];
+                            [encoder setBytes:&ne3  length:sizeof(ne3)  atIndex:22];
+                            [encoder setBytes:&nb0  length:sizeof(nb0)  atIndex:23];
+                            [encoder setBytes:&nb1  length:sizeof(nb1)  atIndex:24];
+                            [encoder setBytes:&nb2  length:sizeof(nb2)  atIndex:25];
+                            [encoder setBytes:&nb3  length:sizeof(nb3)  atIndex:26];
+                            [encoder setBytes:&nb   length:sizeof(nb)   atIndex:27];
+
+                            const int nth = MIN(1024, ne0);
+
+                            [encoder dispatchThreadgroups:MTLSizeMake(ne1, ne2, ne3) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
                         } break;
                     case WSP_GGML_OP_ADD:
                         {
                             WSP_GGML_ASSERT(wsp_ggml_is_contiguous(src0));
                             WSP_GGML_ASSERT(wsp_ggml_is_contiguous(src1));
 
-                            // utilize float4
-                            WSP_GGML_ASSERT(ne00 % 4 == 0);
-                            const int64_t nb = ne00/4;
+                            bool bcast_row = false;
 
-                            if (wsp_ggml_nelements(src1) == ne10) {
+                            int64_t nb = ne00;
+
+                            if (wsp_ggml_nelements(src1) == ne10 && ne00 % 4 == 0) {
                                 // src1 is a row
                                 WSP_GGML_ASSERT(ne11 == 1);
+
+                                nb = ne00 / 4;
                                 [encoder setComputePipelineState:ctx->pipeline_add_row];
+
+                                bcast_row = true;
                             } else {
                                 [encoder setComputePipelineState:ctx->pipeline_add];
                             }
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                             [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
-                            [encoder setBytes:&nb     length:sizeof(nb) atIndex:3];
+                            [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:3];
+                            [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:4];
+                            [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:5];
+                            [encoder setBytes:&ne03 length:sizeof(ne03) atIndex:6];
+                            [encoder setBytes:&nb00 length:sizeof(nb00) atIndex:7];
+                            [encoder setBytes:&nb01 length:sizeof(nb01) atIndex:8];
+                            [encoder setBytes:&nb02 length:sizeof(nb02) atIndex:9];
+                            [encoder setBytes:&nb03 length:sizeof(nb03) atIndex:10];
+                            [encoder setBytes:&ne10 length:sizeof(ne10) atIndex:11];
+                            [encoder setBytes:&ne11 length:sizeof(ne11) atIndex:12];
+                            [encoder setBytes:&ne12 length:sizeof(ne12) atIndex:13];
+                            [encoder setBytes:&ne13 length:sizeof(ne13) atIndex:14];
+                            [encoder setBytes:&nb10 length:sizeof(nb10) atIndex:15];
+                            [encoder setBytes:&nb11 length:sizeof(nb11) atIndex:16];
+                            [encoder setBytes:&nb12 length:sizeof(nb12) atIndex:17];
+                            [encoder setBytes:&nb13 length:sizeof(nb13) atIndex:18];
+                            [encoder setBytes:&ne0  length:sizeof(ne0)  atIndex:19];
+                            [encoder setBytes:&ne1  length:sizeof(ne1)  atIndex:20];
+                            [encoder setBytes:&ne2  length:sizeof(ne2)  atIndex:21];
+                            [encoder setBytes:&ne3  length:sizeof(ne3)  atIndex:22];
+                            [encoder setBytes:&nb0  length:sizeof(nb0)  atIndex:23];
+                            [encoder setBytes:&nb1  length:sizeof(nb1)  atIndex:24];
+                            [encoder setBytes:&nb2  length:sizeof(nb2)  atIndex:25];
+                            [encoder setBytes:&nb3  length:sizeof(nb3)  atIndex:26];
+                            [encoder setBytes:&nb   length:sizeof(nb)   atIndex:27];
 
-                            const int64_t n = wsp_ggml_nelements(dst)/4;
+                            if (bcast_row) {
+                                const int64_t n = wsp_ggml_nelements(dst)/4;
 
-                            [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                                [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                            } else {
+                                const int nth = MIN(1024, ne0);
+
+                                [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+                            }
                         } break;
                     case WSP_GGML_OP_MUL:
                         {
@@ -775,12 +934,18 @@ void wsp_ggml_metal_graph_compute(
 
                             const float scale = *(const float *) src1->data;
 
-                            [encoder setComputePipelineState:ctx->pipeline_scale];
+                            int64_t n = wsp_ggml_nelements(dst);
+
+                            if (n % 4 == 0) {
+                                n /= 4;
+                                [encoder setComputePipelineState:ctx->pipeline_scale_4];
+                            } else {
+                                [encoder setComputePipelineState:ctx->pipeline_scale];
+                            }
+
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
                             [encoder setBytes:&scale length:sizeof(scale) atIndex:2];
-
-                            const int64_t n = wsp_ggml_nelements(dst)/4;
 
                             [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                         } break;
@@ -792,9 +957,10 @@ void wsp_ggml_metal_graph_compute(
                                     [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                                     [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
 
-                                    const int64_t n = wsp_ggml_nelements(dst)/4;
+                                    const int64_t n = wsp_ggml_nelements(dst);
+                                    WSP_GGML_ASSERT(n % 4 == 0);
 
-                                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                                    [encoder dispatchThreadgroups:MTLSizeMake(n/4, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                                 } break;
                             case WSP_GGML_UNARY_OP_RELU:
                                 {
@@ -812,23 +978,39 @@ void wsp_ggml_metal_graph_compute(
                                     [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                                     [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
 
-                                    const int64_t n = wsp_ggml_nelements(dst)/4;
+                                    const int64_t n = wsp_ggml_nelements(dst);
+                                    WSP_GGML_ASSERT(n % 4 == 0);
 
-                                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                                    [encoder dispatchThreadgroups:MTLSizeMake(n/4, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                                 } break;
                             default:
                                 {
-                                    metal_printf("%s: node %3d, op = %8s not implemented\n", __func__, i, wsp_ggml_op_name(dst->op));
+                                    WSP_GGML_METAL_LOG_WARN("%s: node %3d, op = %8s not implemented\n", __func__, i, wsp_ggml_op_name(dst->op));
                                     WSP_GGML_ASSERT(false);
                                 }
                         } break;
+                    case WSP_GGML_OP_SQR:
+                        {
+                            WSP_GGML_ASSERT(wsp_ggml_is_contiguous(src0));
+
+                            [encoder setComputePipelineState:ctx->pipeline_sqr];
+                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
+                            [encoder setBuffer:id_dst  offset:offs_dst atIndex:1];
+
+                            const int64_t n = wsp_ggml_nelements(dst);
+                            [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                        } break;
                     case WSP_GGML_OP_SOFT_MAX:
                         {
-                            const int nth = 32;
+                            int nth = 32; // SIMD width
 
                             if (ne00%4 == 0) {
                                 [encoder setComputePipelineState:ctx->pipeline_soft_max_4];
                             } else {
+                                do {
+                                    nth *= 2;
+                                } while (nth <= ne00 && nth <= 1024);
+                                nth /= 2;
                                 [encoder setComputePipelineState:ctx->pipeline_soft_max];
                             }
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
@@ -836,8 +1018,9 @@ void wsp_ggml_metal_graph_compute(
                             [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:2];
                             [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:3];
                             [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:4];
+                            [encoder setThreadgroupMemoryLength:nth/32*sizeof(float) atIndex:0];
 
-                            [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+                            [encoder dispatchThreadgroups:MTLSizeMake(ne01*ne02*ne03, 1, 1) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
                         } break;
                     case WSP_GGML_OP_DIAG_MASK_INF:
                         {
@@ -863,26 +1046,53 @@ void wsp_ggml_metal_graph_compute(
                         } break;
                     case WSP_GGML_OP_MUL_MAT:
                         {
-                            // TODO: needs to be updated after PR: https://github.com/ggerganov/ggml/pull/224
-
                             WSP_GGML_ASSERT(ne00 == ne10);
-                            // WSP_GGML_ASSERT(ne02 == ne12); // Should be checked on individual data types until broadcast is implemented everywhere
-                            uint gqa = ne12/ne02;
                             WSP_GGML_ASSERT(ne03 == ne13);
+
+                            const uint gqa = ne12/ne02;
+
+                            // find the break-even point where the matrix-matrix kernel becomes more efficient compared
+                            // to the matrix-vector kernel
+                            int ne11_mm_min = 1;
+
+#if 0
+                            // the numbers below are measured on M2 Ultra for 7B and 13B models
+                            // these numbers do not translate to other devices or model sizes
+                            // TODO: need to find a better approach
+                            if ([ctx->device.name isEqualToString:@"Apple M2 Ultra"]) {
+                                switch (src0t) {
+                                    case WSP_GGML_TYPE_F16:  ne11_mm_min = 2;  break;
+                                    case WSP_GGML_TYPE_Q8_0: ne11_mm_min = 7;  break;
+                                    case WSP_GGML_TYPE_Q2_K: ne11_mm_min = 15; break;
+                                    case WSP_GGML_TYPE_Q3_K: ne11_mm_min = 7;  break;
+                                    case WSP_GGML_TYPE_Q4_0:
+                                    case WSP_GGML_TYPE_Q4_1: ne11_mm_min = 15; break;
+                                    case WSP_GGML_TYPE_Q4_K: ne11_mm_min = 11; break;
+                                    case WSP_GGML_TYPE_Q5_0:                          // not tested yet
+                                    case WSP_GGML_TYPE_Q5_1: ne11_mm_min = 13; break; // not tested yet
+                                    case WSP_GGML_TYPE_Q5_K: ne11_mm_min = 7;  break;
+                                    case WSP_GGML_TYPE_Q6_K: ne11_mm_min = 7;  break;
+                                    default:             ne11_mm_min = 1;  break;
+                                }
+                            }
+#endif
 
                             // for now the matrix-matrix multiplication kernel only works on A14+/M1+ SoCs
                             // AMD GPU and older A-chips will reuse matrix-vector multiplication kernel
-                            if (!wsp_ggml_is_transposed(src0) &&
+                            if ([ctx->device supportsFamily:MTLGPUFamilyApple7] &&
+                                !wsp_ggml_is_transposed(src0) &&
                                 !wsp_ggml_is_transposed(src1) &&
                                 src1t == WSP_GGML_TYPE_F32 &&
-                                [ctx->device supportsFamily:MTLGPUFamilyApple7] &&
-                                ne00%32 == 0 &&
-                                ne11 > 1) {
+                                ne00 % 32 == 0 && ne00 >= 64 &&
+                                ne11 > ne11_mm_min) {
+                                //printf("matrix: ne00 = %6d, ne01 = %6d, ne02 = %6d, ne11 = %6d, ne12 = %6d\n", ne00, ne01, ne02, ne11, ne12);
                                 switch (src0->type) {
                                     case WSP_GGML_TYPE_F32:  [encoder setComputePipelineState:ctx->pipeline_mul_mm_f32_f32];  break;
                                     case WSP_GGML_TYPE_F16:  [encoder setComputePipelineState:ctx->pipeline_mul_mm_f16_f32];  break;
                                     case WSP_GGML_TYPE_Q4_0: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q4_0_f32]; break;
                                     case WSP_GGML_TYPE_Q4_1: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q4_1_f32]; break;
+                                    case WSP_GGML_TYPE_Q5_0: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q5_0_f32]; break;
+                                    case WSP_GGML_TYPE_Q5_1: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q5_1_f32]; break;
                                     case WSP_GGML_TYPE_Q8_0: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q8_0_f32]; break;
                                     case WSP_GGML_TYPE_Q2_K: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q2_K_f32]; break;
                                     case WSP_GGML_TYPE_Q3_K: [encoder setComputePipelineState:ctx->pipeline_mul_mm_q3_K_f32]; break;
@@ -906,17 +1116,18 @@ void wsp_ggml_metal_graph_compute(
                                 [encoder setBytes:&ne1     length:sizeof(ne1)  atIndex:12];
                                 [encoder setBytes:&gqa     length:sizeof(gqa)  atIndex:13];
                                 [encoder setThreadgroupMemoryLength:8192 atIndex:0];
-                                [encoder dispatchThreadgroups:MTLSizeMake( (ne11+31)/32, (ne01+63) / 64, ne12) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
+                                [encoder dispatchThreadgroups:MTLSizeMake( (ne11 + 31)/32, (ne01 + 63)/64, ne12) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
                             } else {
                                 int nth0 = 32;
                                 int nth1 = 1;
                                 int nrows = 1;
+                                //printf("vector: ne00 = %6d, ne01 = %6d, ne02 = %6d, ne11 = %6d, ne12 = %6d\n", ne00, ne01, ne02, ne11, ne12);
 
                                 // use custom matrix x vector kernel
                                 switch (src0t) {
                                     case WSP_GGML_TYPE_F32:
                                         {
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_f32_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_f32_f32];
                                             nrows = 4;
                                         } break;
                                     case WSP_GGML_TYPE_F16:
@@ -924,12 +1135,12 @@ void wsp_ggml_metal_graph_compute(
                                             nth0 = 32;
                                             nth1 = 1;
                                             if (ne11 * ne12 < 4) {
-                                                [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32_1row];
+                                                [encoder setComputePipelineState:ctx->pipeline_mul_mv_f16_f32_1row];
                                             } else if (ne00 >= 128 && ne01 >= 8 && ne00%4 == 0) {
-                                                [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32_l4];
+                                                [encoder setComputePipelineState:ctx->pipeline_mul_mv_f16_f32_l4];
                                                 nrows = ne11;
                                             } else {
-                                                [encoder setComputePipelineState:ctx->pipeline_mul_mat_f16_f32];
+                                                [encoder setComputePipelineState:ctx->pipeline_mul_mv_f16_f32];
                                                 nrows = 4;
                                             }
                                         } break;
@@ -940,7 +1151,7 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 8;
                                             nth1 = 8;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q4_0_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q4_0_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q4_1:
                                         {
@@ -949,7 +1160,25 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 8;
                                             nth1 = 8;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q4_1_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q4_1_f32];
+                                        } break;
+                                    case WSP_GGML_TYPE_Q5_0:
+                                        {
+                                            WSP_GGML_ASSERT(ne02 == 1);
+                                            WSP_GGML_ASSERT(ne12 == 1);
+
+                                            nth0 = 8;
+                                            nth1 = 8;
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q5_0_f32];
+                                        } break;
+                                    case WSP_GGML_TYPE_Q5_1:
+                                        {
+                                            WSP_GGML_ASSERT(ne02 == 1);
+                                            WSP_GGML_ASSERT(ne12 == 1);
+
+                                            nth0 = 8;
+                                            nth1 = 8;
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q5_1_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q8_0:
                                         {
@@ -958,7 +1187,7 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 8;
                                             nth1 = 8;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q8_0_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q8_0_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q2_K:
                                         {
@@ -967,7 +1196,7 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 2;
                                             nth1 = 32;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q2_K_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q2_K_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q3_K:
                                         {
@@ -976,7 +1205,7 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 2;
                                             nth1 = 32;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q3_K_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q3_K_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q4_K:
                                         {
@@ -985,7 +1214,7 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 4; //1;
                                             nth1 = 8; //32;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q4_K_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q4_K_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q5_K:
                                         {
@@ -994,7 +1223,7 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 2;
                                             nth1 = 32;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q5_K_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q5_K_f32];
                                         } break;
                                     case WSP_GGML_TYPE_Q6_K:
                                         {
@@ -1003,11 +1232,11 @@ void wsp_ggml_metal_graph_compute(
 
                                             nth0 = 2;
                                             nth1 = 32;
-                                            [encoder setComputePipelineState:ctx->pipeline_mul_mat_q6_K_f32];
+                                            [encoder setComputePipelineState:ctx->pipeline_mul_mv_q6_K_f32];
                                         } break;
                                     default:
                                         {
-                                            metal_printf("Asserting on type %d\n",(int)src0t);
+                                            WSP_GGML_METAL_LOG_ERROR("Asserting on type %d\n", (int)src0t);
                                             WSP_GGML_ASSERT(false && "not implemented");
                                         }
                                 };
@@ -1031,8 +1260,9 @@ void wsp_ggml_metal_graph_compute(
                                 [encoder setBytes:&ne1  length:sizeof(ne1)  atIndex:16];
                                 [encoder setBytes:&gqa  length:sizeof(gqa)  atIndex:17];
 
-                                if (src0t == WSP_GGML_TYPE_Q4_0 || src0t == WSP_GGML_TYPE_Q4_1 || src0t == WSP_GGML_TYPE_Q8_0 ||
-                                    src0t == WSP_GGML_TYPE_Q2_K) {// || src0t == WSP_GGML_TYPE_Q4_K) {
+                                if (src0t == WSP_GGML_TYPE_Q4_0 || src0t == WSP_GGML_TYPE_Q4_1 ||
+                                    src0t == WSP_GGML_TYPE_Q5_0 || src0t == WSP_GGML_TYPE_Q5_1 || src0t == WSP_GGML_TYPE_Q8_0 ||
+                                    src0t == WSP_GGML_TYPE_Q2_K) { // || src0t == WSP_GGML_TYPE_Q4_K) {
                                     [encoder dispatchThreadgroups:MTLSizeMake((ne01 + 7)/8, ne11, ne12) threadsPerThreadgroup:MTLSizeMake(nth0, nth1, 1)];
                                 }
                                 else if (src0t == WSP_GGML_TYPE_Q4_K) {
@@ -1063,6 +1293,8 @@ void wsp_ggml_metal_graph_compute(
                                 case WSP_GGML_TYPE_F16:  [encoder setComputePipelineState:ctx->pipeline_get_rows_f16];  break;
                                 case WSP_GGML_TYPE_Q4_0: [encoder setComputePipelineState:ctx->pipeline_get_rows_q4_0]; break;
                                 case WSP_GGML_TYPE_Q4_1: [encoder setComputePipelineState:ctx->pipeline_get_rows_q4_1]; break;
+                                case WSP_GGML_TYPE_Q5_0: [encoder setComputePipelineState:ctx->pipeline_get_rows_q5_0]; break;
+                                case WSP_GGML_TYPE_Q5_1: [encoder setComputePipelineState:ctx->pipeline_get_rows_q5_1]; break;
                                 case WSP_GGML_TYPE_Q8_0: [encoder setComputePipelineState:ctx->pipeline_get_rows_q8_0]; break;
                                 case WSP_GGML_TYPE_Q2_K: [encoder setComputePipelineState:ctx->pipeline_get_rows_q2_K]; break;
                                 case WSP_GGML_TYPE_Q3_K: [encoder setComputePipelineState:ctx->pipeline_get_rows_q3_K]; break;
@@ -1085,10 +1317,12 @@ void wsp_ggml_metal_graph_compute(
                         } break;
                     case WSP_GGML_OP_RMS_NORM:
                         {
+                            WSP_GGML_ASSERT(ne00 % 4 == 0);
+
                             float eps;
                             memcpy(&eps, dst->op_params, sizeof(float));
 
-                            const int nth = 512;
+                            const int nth = MIN(512, ne00);
 
                             [encoder setComputePipelineState:ctx->pipeline_rms_norm];
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
@@ -1107,7 +1341,7 @@ void wsp_ggml_metal_graph_compute(
                             float eps;
                             memcpy(&eps, dst->op_params, sizeof(float));
 
-                            const int nth = 256;
+                            const int nth = MIN(256, ne00);
 
                             [encoder setComputePipelineState:ctx->pipeline_norm];
                             [encoder setBuffer:id_src0 offset:offs_src0        atIndex:0];
@@ -1125,17 +1359,16 @@ void wsp_ggml_metal_graph_compute(
                         {
                             WSP_GGML_ASSERT((src0t == WSP_GGML_TYPE_F32));
 
-                            const int n_past = ((int32_t *) dst->op_params)[0]; UNUSED(n_past);
+                            const int nth = MIN(1024, ne00);
+
+                            //const int n_past = ((int32_t *) dst->op_params)[0];
                             const int n_head = ((int32_t *) dst->op_params)[1];
                             float max_bias;
                             memcpy(&max_bias, (int32_t *) dst->op_params + 2, sizeof(float));
 
-                            if (__builtin_popcount(n_head) != 1) {
-                                WSP_GGML_ASSERT(false && "only power-of-two n_head implemented");
-                            }
-
                             const int n_heads_log2_floor = 1 << (int) floor(log2(n_head));
                             const float m0 = powf(2.0f, -(max_bias) / n_heads_log2_floor);
+                            const float m1 = powf(2.0f, -(max_bias / 2.0f) / n_heads_log2_floor);
 
                             [encoder setComputePipelineState:ctx->pipeline_alibi_f32];
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
@@ -1156,55 +1389,74 @@ void wsp_ggml_metal_graph_compute(
                             [encoder setBytes:&nb1  length:sizeof(uint64_t) atIndex:15];
                             [encoder setBytes:&nb2  length:sizeof(uint64_t) atIndex:16];
                             [encoder setBytes:&nb3  length:sizeof(uint64_t) atIndex:17];
-                            [encoder setBytes:&m0  length:sizeof(    float) atIndex:18];
-
-                            const int nth = 32;
+                            [encoder setBytes:&m0   length:sizeof(   float) atIndex:18];
+                            [encoder setBytes:&m1   length:sizeof(   float) atIndex:19];
+                            [encoder setBytes:&n_heads_log2_floor   length:sizeof(int) atIndex:20];
 
                             [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
                         } break;
                     case WSP_GGML_OP_ROPE:
                         {
-                            const int n_past = ((int32_t *) dst->op_params)[0];
-                            const int n_dims = ((int32_t *) dst->op_params)[1];
-                            const int mode   = ((int32_t *) dst->op_params)[2];
+                            WSP_GGML_ASSERT(ne10 == ne02);
 
-                            float freq_base;
-                            float freq_scale;
-                            memcpy(&freq_base,  (int32_t *) dst->op_params + 4, sizeof(float));
-                            memcpy(&freq_scale, (int32_t *) dst->op_params + 5, sizeof(float));
+                            const int nth = MIN(1024, ne00);
 
-                            [encoder setComputePipelineState:ctx->pipeline_rope];
-                            [encoder setBuffer:id_src0 offset:offs_src0        atIndex:0];
-                            [encoder setBuffer:id_dst  offset:offs_dst         atIndex:1];
-                            [encoder setBytes:&ne00    length:sizeof( int64_t) atIndex:2];
-                            [encoder setBytes:&ne01    length:sizeof( int64_t) atIndex:3];
-                            [encoder setBytes:&ne02    length:sizeof( int64_t) atIndex:4];
-                            [encoder setBytes:&ne03    length:sizeof( int64_t) atIndex:5];
-                            [encoder setBytes:&nb00    length:sizeof(uint64_t) atIndex:6];
-                            [encoder setBytes:&nb01    length:sizeof(uint64_t) atIndex:7];
-                            [encoder setBytes:&nb02    length:sizeof(uint64_t) atIndex:8];
-                            [encoder setBytes:&nb03    length:sizeof(uint64_t) atIndex:9];
-                            [encoder setBytes:&ne0     length:sizeof( int64_t) atIndex:10];
-                            [encoder setBytes:&ne1     length:sizeof( int64_t) atIndex:11];
-                            [encoder setBytes:&ne2     length:sizeof( int64_t) atIndex:12];
-                            [encoder setBytes:&ne3     length:sizeof( int64_t) atIndex:13];
-                            [encoder setBytes:&nb0     length:sizeof(uint64_t) atIndex:14];
-                            [encoder setBytes:&nb1     length:sizeof(uint64_t) atIndex:15];
-                            [encoder setBytes:&nb2     length:sizeof(uint64_t) atIndex:16];
-                            [encoder setBytes:&nb3     length:sizeof(uint64_t) atIndex:17];
-                            [encoder setBytes:&n_past  length:sizeof(     int) atIndex:18];
-                            [encoder setBytes:&n_dims  length:sizeof(     int) atIndex:19];
-                            [encoder setBytes:&mode    length:sizeof(     int) atIndex:20];
-                            [encoder setBytes:&freq_base  length:sizeof(float) atIndex:21];
-                            [encoder setBytes:&freq_scale length:sizeof(float) atIndex:22];
+                            const int n_past     = ((int32_t *) dst->op_params)[0];
+                            const int n_dims     = ((int32_t *) dst->op_params)[1];
+                            const int mode       = ((int32_t *) dst->op_params)[2];
+                            const int n_orig_ctx = ((int32_t *) dst->op_params)[3];
 
-                            [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(32, 1, 1)];
+                            float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
+                            memcpy(&freq_base,   (int32_t *) dst->op_params +  5, sizeof(float));
+                            memcpy(&freq_scale,  (int32_t *) dst->op_params +  6, sizeof(float));
+                            memcpy(&ext_factor,  (int32_t *) dst->op_params +  7, sizeof(float));
+                            memcpy(&attn_factor, (int32_t *) dst->op_params +  8, sizeof(float));
+                            memcpy(&beta_fast,   (int32_t *) dst->op_params +  9, sizeof(float));
+                            memcpy(&beta_slow,   (int32_t *) dst->op_params + 10, sizeof(float));
+
+                            switch (src0->type) {
+                                case WSP_GGML_TYPE_F32: [encoder setComputePipelineState:ctx->pipeline_rope_f32]; break;
+                                case WSP_GGML_TYPE_F16: [encoder setComputePipelineState:ctx->pipeline_rope_f16]; break;
+                                default: WSP_GGML_ASSERT(false);
+                            };
+
+                            [encoder setBuffer:id_src0     offset:offs_src0        atIndex:0];
+                            [encoder setBuffer:id_src1     offset:offs_src1        atIndex:1];
+                            [encoder setBuffer:id_dst      offset:offs_dst         atIndex:2];
+                            [encoder setBytes:&ne00        length:sizeof( int64_t) atIndex:3];
+                            [encoder setBytes:&ne01        length:sizeof( int64_t) atIndex:4];
+                            [encoder setBytes:&ne02        length:sizeof( int64_t) atIndex:5];
+                            [encoder setBytes:&ne03        length:sizeof( int64_t) atIndex:6];
+                            [encoder setBytes:&nb00        length:sizeof(uint64_t) atIndex:7];
+                            [encoder setBytes:&nb01        length:sizeof(uint64_t) atIndex:8];
+                            [encoder setBytes:&nb02        length:sizeof(uint64_t) atIndex:9];
+                            [encoder setBytes:&nb03        length:sizeof(uint64_t) atIndex:10];
+                            [encoder setBytes:&ne0         length:sizeof( int64_t) atIndex:11];
+                            [encoder setBytes:&ne1         length:sizeof( int64_t) atIndex:12];
+                            [encoder setBytes:&ne2         length:sizeof( int64_t) atIndex:13];
+                            [encoder setBytes:&ne3         length:sizeof( int64_t) atIndex:14];
+                            [encoder setBytes:&nb0         length:sizeof(uint64_t) atIndex:15];
+                            [encoder setBytes:&nb1         length:sizeof(uint64_t) atIndex:16];
+                            [encoder setBytes:&nb2         length:sizeof(uint64_t) atIndex:17];
+                            [encoder setBytes:&nb3         length:sizeof(uint64_t) atIndex:18];
+                            [encoder setBytes:&n_past      length:sizeof(     int) atIndex:19];
+                            [encoder setBytes:&n_dims      length:sizeof(     int) atIndex:20];
+                            [encoder setBytes:&mode        length:sizeof(     int) atIndex:21];
+                            [encoder setBytes:&n_orig_ctx  length:sizeof(     int) atIndex:22];
+                            [encoder setBytes:&freq_base   length:sizeof(   float) atIndex:23];
+                            [encoder setBytes:&freq_scale  length:sizeof(   float) atIndex:24];
+                            [encoder setBytes:&ext_factor  length:sizeof(   float) atIndex:25];
+                            [encoder setBytes:&attn_factor length:sizeof(   float) atIndex:26];
+                            [encoder setBytes:&beta_fast   length:sizeof(   float) atIndex:27];
+                            [encoder setBytes:&beta_slow   length:sizeof(   float) atIndex:28];
+
+                            [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
                         } break;
                     case WSP_GGML_OP_DUP:
                     case WSP_GGML_OP_CPY:
                     case WSP_GGML_OP_CONT:
                         {
-                            const int nth = 32;
+                            const int nth = MIN(1024, ne00);
 
                             switch (src0t) {
                                 case WSP_GGML_TYPE_F32:
@@ -1249,7 +1501,7 @@ void wsp_ggml_metal_graph_compute(
                         } break;
                     default:
                         {
-                            metal_printf("%s: node %3d, op = %8s not implemented\n", __func__, i, wsp_ggml_op_name(dst->op));
+                            WSP_GGML_METAL_LOG_ERROR("%s: error: node %3d, op = %8s not implemented\n", __func__, i, wsp_ggml_op_name(dst->op));
                             WSP_GGML_ASSERT(false);
                         }
                 }
@@ -1274,10 +1526,147 @@ void wsp_ggml_metal_graph_compute(
 
         MTLCommandBufferStatus status = (MTLCommandBufferStatus) [ctx->command_buffers[i] status];
         if (status != MTLCommandBufferStatusCompleted) {
-            metal_printf("%s: command buffer %d failed with status %lu\n", __func__, i, status);
+            WSP_GGML_METAL_LOG_INFO("%s: command buffer %d failed with status %lu\n", __func__, i, status);
             WSP_GGML_ASSERT(false);
         }
     }
 
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+// backend interface
+
+static const char * wsp_ggml_backend_metal_name(wsp_ggml_backend_t backend) {
+    return "Metal";
+
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_free(wsp_ggml_backend_t backend) {
+    struct wsp_ggml_metal_context * ctx = (struct wsp_ggml_metal_context *)backend->context;
+    wsp_ggml_metal_free(ctx);
+    free(backend);
+}
+
+static void * wsp_ggml_backend_metal_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
+    return (void *)buffer->context;
+}
+
+static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
+    free(buffer->context);
+    UNUSED(buffer);
+}
+
+static struct wsp_ggml_backend_buffer_i metal_backend_buffer_i = {
+    /* .free_buffer    = */ wsp_ggml_backend_metal_buffer_free_buffer,
+    /* .get_base       = */ wsp_ggml_backend_metal_buffer_get_base,
+    /* .get_alloc_size = */ NULL, // defaults to wsp_ggml_nbytes
+    /* .init_tensor    = */ NULL, // no initialization required
+    /* .free_tensor    = */ NULL, // no cleanup required
+};
+
+static wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_alloc_buffer(wsp_ggml_backend_t backend, size_t size) {
+    struct wsp_ggml_metal_context * ctx = (struct wsp_ggml_metal_context *)backend->context;
+
+    void * data = wsp_ggml_metal_host_malloc(size);
+
+    // TODO: set proper name of the buffers
+    wsp_ggml_metal_add_buffer(ctx, "backend", data, size, 0);
+
+    return wsp_ggml_backend_buffer_init(backend, metal_backend_buffer_i, data, size);
+}
+
+static size_t wsp_ggml_backend_metal_get_alignment(wsp_ggml_backend_t backend) {
+    return 32;
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_set_tensor_async(wsp_ggml_backend_t backend, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+
+    memcpy((char *)tensor->data + offset, data, size);
+
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_get_tensor_async(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor read out of bounds");
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+
+    memcpy(data, (const char *)tensor->data + offset, size);
+
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_synchronize(wsp_ggml_backend_t backend) {
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_cpy_tensor_from(wsp_ggml_backend_t backend, struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+    wsp_ggml_backend_tensor_get(src, dst->data, 0, wsp_ggml_nbytes(src));
+
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_cpy_tensor_to(wsp_ggml_backend_t backend, struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+    wsp_ggml_backend_tensor_set_async(dst, src->data, 0, wsp_ggml_nbytes(src));
+
+    UNUSED(backend);
+}
+
+static void wsp_ggml_backend_metal_graph_compute(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph) {
+    struct wsp_ggml_metal_context * metal_ctx = (struct wsp_ggml_metal_context *)backend->context;
+
+    wsp_ggml_metal_graph_compute(metal_ctx, cgraph);
+}
+
+static bool wsp_ggml_backend_metal_supports_op(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * op) {
+    return true;
+    UNUSED(backend);
+    UNUSED(op);
+}
+
+static struct wsp_ggml_backend_i metal_backend_i = {
+    /* .get_name            = */ wsp_ggml_backend_metal_name,
+    /* .free                = */ wsp_ggml_backend_metal_free,
+    /* .alloc_buffer        = */ wsp_ggml_backend_metal_alloc_buffer,
+    /* .get_alignment       = */ wsp_ggml_backend_metal_get_alignment,
+    /* .set_tensor_async    = */ wsp_ggml_backend_metal_set_tensor_async,
+    /* .get_tensor_async    = */ wsp_ggml_backend_metal_get_tensor_async,
+    /* .synchronize         = */ wsp_ggml_backend_metal_synchronize,
+    /* .cpy_tensor_from     = */ wsp_ggml_backend_metal_cpy_tensor_from,
+    /* .cpy_tensor_to       = */ wsp_ggml_backend_metal_cpy_tensor_to,
+    /* .graph_plan_create   = */ NULL, // the metal implementation does not require creating graph plans atm
+    /* .graph_plan_free     = */ NULL,
+    /* .graph_plan_compute  = */ NULL,
+    /* .graph_compute       = */ wsp_ggml_backend_metal_graph_compute,
+    /* .supports_op         = */ wsp_ggml_backend_metal_supports_op,
+};
+
+wsp_ggml_backend_t wsp_ggml_backend_metal_init(void) {
+    struct wsp_ggml_metal_context * ctx = malloc(sizeof(struct wsp_ggml_metal_context));
+
+    ctx = wsp_ggml_metal_init(WSP_GGML_DEFAULT_N_THREADS);
+
+    wsp_ggml_backend_t metal_backend = malloc(sizeof(struct wsp_ggml_backend));
+
+    *metal_backend = (struct wsp_ggml_backend) {
+        /* .interface = */ metal_backend_i,
+        /* .context   = */ ctx,
+    };
+
+    return metal_backend;
+}
+
+bool wsp_ggml_backend_is_metal(wsp_ggml_backend_t backend) {
+    return backend->iface.get_name == wsp_ggml_backend_metal_name;
+}
+
+void wsp_ggml_backend_metal_set_n_cb(wsp_ggml_backend_t backend, int n_cb) {
+    struct wsp_ggml_metal_context * ctx = (struct wsp_ggml_metal_context *)backend->context;
+
+    wsp_ggml_metal_set_n_cb(ctx, n_cb);
 }

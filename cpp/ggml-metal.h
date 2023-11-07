@@ -19,6 +19,9 @@
 
 #pragma once
 
+#include "ggml.h"
+#include "ggml-backend.h"
+
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -33,7 +36,14 @@ struct wsp_ggml_cgraph;
 extern "C" {
 #endif
 
+//
+// internal API
+// temporary exposed to user-code
+//
+
 struct wsp_ggml_metal_context;
+
+void wsp_ggml_metal_log_set_callback(wsp_ggml_log_callback log_callback, void * user_data);
 
 // number of command buffers to use
 struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb);
@@ -78,6 +88,17 @@ int * wsp_ggml_metal_get_concur_list(struct wsp_ggml_metal_context * ctx);
 // same as wsp_ggml_graph_compute but uses Metal
 // creates gf->n_threads command buffers in parallel
 void wsp_ggml_metal_graph_compute(struct wsp_ggml_metal_context * ctx, struct wsp_ggml_cgraph * gf);
+
+//
+// backend API
+// user-code should use only these functions
+//
+
+WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_metal_init(void);
+
+WSP_GGML_API bool wsp_ggml_backend_is_metal(wsp_ggml_backend_t backend);
+
+WSP_GGML_API void wsp_ggml_backend_metal_set_n_cb(wsp_ggml_backend_t backend, int n_cb);
 
 #ifdef __cplusplus
 }
