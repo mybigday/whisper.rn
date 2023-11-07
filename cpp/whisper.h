@@ -81,6 +81,7 @@ extern "C" {
 
     struct whisper_context_params {
         bool  use_gpu;
+        bool  use_coreml;
     };
 
     typedef struct whisper_token_data {
