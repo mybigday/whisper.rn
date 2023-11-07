@@ -450,7 +450,7 @@ export type ContextOptions = {
   isBundleAsset?: boolean
   /** Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. */
   useCoreMLIos?: boolean
-  /** [Currently iOS only] Use GPU if available. */
+  /** Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. */
   useGpu?: boolean
 }
 
