@@ -2855,9 +2855,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
         log("%s: kv cross size = %7.2f MB\n", __func__, memory_size / 1024.0 / 1024.0);
     }
 
-    
 #ifdef WHISPER_USE_COREML
-    if (ctx->params.use_coreml) {
     const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
 
     log("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
@@ -2872,7 +2870,6 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 #endif
     } else {
         log("%s: Core ML model loaded\n", __func__);
-    }
     }
 #endif
 
@@ -3051,7 +3048,6 @@ int whisper_ctx_init_openvino_encoder(
 struct whisper_context_params whisper_context_default_params() {
     struct whisper_context_params result = {
         /*.use_gpu    =*/ true,
-        /*.use_coreml =*/ false,
     };
     return result;
 }
@@ -3692,6 +3688,7 @@ void whisper_print_timings(struct whisper_context * ctx) {
 }
 
 void whisper_reset_timings(struct whisper_context * ctx) {
+    ctx->t_start_us = wsp_ggml_time_us();
     if (ctx->state != nullptr) {
         ctx->state->t_sample_us = 0;
         ctx->state->t_encode_us = 0;
@@ -3829,6 +3826,9 @@ struct whisper_full_params whisper_full_default_params(enum whisper_sampling_str
 
         /*.encoder_begin_callback           =*/ nullptr,
         /*.encoder_begin_callback_user_data =*/ nullptr,
+
+        /*.abort_callback                   =*/ nullptr,
+        /*.abort_callback_user_data         =*/ nullptr,
 
         /*.logits_filter_callback           =*/ nullptr,
         /*.logits_filter_callback_user_data =*/ nullptr,
