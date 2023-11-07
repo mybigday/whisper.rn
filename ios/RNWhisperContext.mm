@@ -18,6 +18,14 @@
     NSString *reasonNoMetal = @"";
     cparams.use_gpu = !noMetal;
 
+    cparams.use_coreml = !noCoreML;
+#ifndef WHISPER_USE_COREML
+    if (cparams.use_coreml) {
+        NSLog(@"[RNWhisper] CoreML is not enabled in this build, ignoring use_coreml option");
+        cparams.use_coreml = false;
+    }
+#endif
+
 #ifndef WSP_GGML_USE_METAL
     if (cparams.use_gpu) {
         NSLog(@"[RNWhisper] ggml-metal is not enabled in this build, ignoring use_gpu option");
@@ -56,13 +64,10 @@
     }
 #endif // WSP_GGML_USE_METAL
 
-    cparams.use_coreml = !noCoreML;
-#ifndef WHISPER_USE_COREML
-    if (cparams.use_coreml) {
-        NSLog(@"[RNWhisper] CoreML is not enabled in this build, ignoring use_coreml option");
-        cparams.use_coreml = false;
+    if (cparams.use_gpu && cparams.use_coreml) {
+        NSLog(@"[RNWhisper] Both use_gpu and use_coreml are enabled, ignoring use_coreml option");
+        cparams.use_coreml = false; // Skip CoreML if Metal is enabled
     }
-#endif
 
     context->ctx = whisper_init_from_file_with_params([modelPath UTF8String], cparams);
     context->dQueue = dispatch_queue_create(
