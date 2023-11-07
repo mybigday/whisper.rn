@@ -1,6 +1,6 @@
---- whisper.cpp.orig	2023-11-07 08:15:04
-+++ whisper.cpp	2023-11-07 08:20:02
-@@ -2855,7 +2855,9 @@
+--- whisper.cpp.orig	2023-11-08 05:39:06
++++ whisper.cpp	2023-11-08 05:39:07
+@@ -2881,7 +2881,9 @@
          log("%s: kv cross size = %7.2f MB\n", __func__, memory_size / 1024.0 / 1024.0);
      }
  
@@ -10,7 +10,7 @@
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
  
      log("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -2870,6 +2872,7 @@
+@@ -2896,6 +2898,7 @@
  #endif
      } else {
          log("%s: Core ML model loaded\n", __func__);
@@ -18,7 +18,7 @@
      }
  #endif
  
-@@ -3048,6 +3051,7 @@
+@@ -3074,6 +3077,7 @@
  struct whisper_context_params whisper_context_default_params() {
      struct whisper_context_params result = {
          /*.use_gpu    =*/ true,
