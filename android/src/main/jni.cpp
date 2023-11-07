@@ -297,16 +297,17 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     }
 
     // abort handlers
+    bool* abort_ptr = rn_whisper_assign_abort_map(job_id);
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return !is_aborted;
     };
-    params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(job_id);
+    params.encoder_begin_callback_user_data = abort_ptr;
     params.abort_callback = [](void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return is_aborted;
     };
-    params.abort_callback_user_data = rn_whisper_assign_abort_map(job_id);
+    params.abort_callback_user_data = abort_ptr;
 
     if (callback_instance != nullptr) {
         callback_context *cb_ctx = new callback_context;
@@ -344,6 +345,9 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     }
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
     env->ReleaseStringUTFChars(language, language_chars);
+    if (rn_whisper_transcribe_is_aborted(job_id)) {
+        code = -999;
+    }
     rn_whisper_remove_abort_map(job_id);
     return code;
 }

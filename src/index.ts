@@ -307,7 +307,7 @@ export class WhisperContext {
     let tOffset: number = 0
 
     const putSlice = (payload: TranscribeRealtimeNativePayload) => {
-      if (!payload.isUseSlices) return
+      if (!payload.isUseSlices || !payload.data) return
       if (sliceIndex !== payload.sliceIndex) {
         const { segments = [] } = slices[sliceIndex]?.data || {}
         tOffset = segments[segments.length - 1]?.t1 || 0
@@ -315,17 +315,15 @@ export class WhisperContext {
       ;({ sliceIndex } = payload)
       slices[sliceIndex] = {
         ...payload,
-        data: payload.data
-          ? {
-              ...payload.data,
-              segments:
-                payload.data.segments.map((segment) => ({
-                  ...segment,
-                  t0: segment.t0 + tOffset,
-                  t1: segment.t1 + tOffset,
-                })) || [],
-            }
-          : undefined,
+        data: {
+          ...payload.data,
+          segments:
+            payload.data.segments.map((segment) => ({
+              ...segment,
+              t0: segment.t0 + tOffset,
+              t1: segment.t1 + tOffset,
+            })) || [],
+        }
       }
     }
 

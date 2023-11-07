@@ -278,7 +278,7 @@ public class WhisperContext {
 
     if (code == 0) {
       payload.putMap("data", getTextSegments(0, getTextSegmentCount(context)));
-    } else {
+    } else if (code != -999) { // Not aborted
       payload.putString("error", "Transcribe failed with code " + code);
     }
 
@@ -297,7 +297,7 @@ public class WhisperContext {
       nSamplesTranscribing = 0;
     }
 
-    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex;
+    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex && code != -999;
 
     if (isStopped && !continueNeeded) {
       payload.putBoolean("isCapturing", false);
@@ -386,7 +386,7 @@ public class WhisperContext {
     int code = full(jobId, options, audioData, audioData.length);
     isTranscribing = false;
     this.jobId = -1;
-    if (code != 0) {
+    if (code != 0 && code != 999) {
       throw new Exception("Failed to transcribe the file. Code: " + code);
     }
     WritableMap result = getTextSegments(0, getTextSegmentCount(context));

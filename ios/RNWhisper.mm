@@ -170,7 +170,7 @@ RCT_REMAP_METHOD(transcribeFile,
             });
         }
         onEnd: ^(int code) {
-            if (code != 0) {
+            if (code != 0 && code != 999) {
                 free(waveFile);
                 reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
                 return;

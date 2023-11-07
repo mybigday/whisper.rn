@@ -556,16 +556,17 @@ struct rnwhisper_segments_callback_data {
     }
 
     // abort handler
+    bool *abort_ptr = rn_whisper_assign_abort_map(jobId);
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return !is_aborted;
     };
-    params.encoder_begin_callback_user_data = rn_whisper_assign_abort_map(jobId);
+    params.encoder_begin_callback_user_data = abort_ptr;
     params.abort_callback = [](void * user_data) {
         bool is_aborted = *(bool*)user_data;
         return is_aborted;
     };
-    params.abort_callback_user_data = rn_whisper_assign_abort_map(jobId);
+    params.abort_callback_user_data = abort_ptr;
 
     return params;
 }
@@ -578,6 +579,9 @@ struct rnwhisper_segments_callback_data {
     whisper_reset_timings(self->ctx);
 
     int code = whisper_full(self->ctx, params, audioData, audioDataCount);
+    if (rn_whisper_transcribe_is_aborted(jobId)) {
+        code = -999;
+    }
     rn_whisper_remove_abort_map(jobId);
     // if (code == 0) {
     //     whisper_print_timings(self->ctx);
