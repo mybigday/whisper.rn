@@ -27,7 +27,8 @@ target 'RNWhisperExample' do
   # Tip: You can use RNWHISPER_DISABLE_COREML = '1' to disable CoreML support.
   ENV['RNWHISPER_DISABLE_COREML'] = '0'
 
-  ENV['RNWHISPER_ENABLE_METAL'] = '0' # TODO
+  # Tip: You can use RNWHISPER_DISABLE_METAL = '1' to disable GPU support.
+  ENV['RNWHISPER_DISABLE_METAL'] = '0'
 
   config = use_native_modules!
 

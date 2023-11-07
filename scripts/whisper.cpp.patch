@@ -1,53 +1,28 @@
---- whisper.cpp.orig	2023-10-12 11:44:51
-+++ whisper.cpp	2023-10-12 11:43:31
-@@ -770,6 +770,9 @@
-     whisper_state * state = nullptr;
-
-     std::string path_model; // populated by whisper_init_from_file()
-+#ifdef WHISPER_USE_COREML
-+    bool load_coreml = true;
-+#endif
- };
-
- static void whisper_default_log(const char * text) {
-@@ -2854,6 +2857,7 @@
+--- whisper.cpp.orig	2023-11-08 05:39:06
++++ whisper.cpp	2023-11-08 05:39:07
+@@ -2881,7 +2881,9 @@
+         log("%s: kv cross size = %7.2f MB\n", __func__, memory_size / 1024.0 / 1024.0);
      }
-
+ 
++    
  #ifdef WHISPER_USE_COREML
-+if (ctx->load_coreml) { // Not in correct layer for easy patch
++    if (ctx->params.use_coreml) {
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
-
+ 
      log("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -2869,6 +2873,7 @@
+@@ -2896,6 +2898,7 @@
+ #endif
      } else {
          log("%s: Core ML model loaded\n", __func__);
++    }
      }
-+}
  #endif
-
-     state->logits.reserve(ctx->vocab.n_vocab * ctx->model.hparams.n_text_ctx);
-@@ -2987,7 +2992,24 @@
-     state->rng = std::mt19937(0);
-
-     return state;
-+}
-+
-+#ifdef WHISPER_USE_COREML
-+struct whisper_context * whisper_init_from_file_no_coreml(const char * path_model) {
-+    whisper_context * ctx = whisper_init_from_file_no_state(path_model);
-+    if (!ctx) {
-+        return nullptr;
-+    }
-+    ctx->load_coreml = false;
-+    ctx->state = whisper_init_state(ctx);
-+    if (!ctx->state) {
-+        whisper_free(ctx);
-+        return nullptr;
-+    }
-+
-+    return ctx;
+ 
+@@ -3074,6 +3077,7 @@
+ struct whisper_context_params whisper_context_default_params() {
+     struct whisper_context_params result = {
+         /*.use_gpu    =*/ true,
++        /*.use_coreml =*/ false,
+     };
+     return result;
  }
-+#endif
-
- int whisper_ctx_init_openvino_encoder(
-         struct whisper_context * ctx,

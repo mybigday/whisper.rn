@@ -1,47 +1,37 @@
---- ggml-metal.m.orig	2023-10-25 17:55:09
-+++ ggml-metal.m	2023-10-25 17:55:42
-@@ -178,7 +178,7 @@
- 
-         //NSString * path = [[NSBundle mainBundle] pathForResource:@"../../examples/metal/metal" ofType:@"metal"];
-         NSBundle * bundle = [NSBundle bundleForClass:[WSPGGMLMetalClass class]];
--        NSString * path   = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
-+        NSString * path   = [bundle pathForResource:@"ggml-metal-whisper" ofType:@"metal"];
-         metal_printf("%s: loading '%s'\n", __func__, [path UTF8String]);
- 
-         NSString * src  = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
-@@ -207,7 +207,7 @@
- #define WSP_GGML_METAL_ADD_KERNEL(name) \
-         ctx->function_##name = [ctx->library newFunctionWithName:@"kernel_"#name]; \
-         ctx->pipeline_##name = [ctx->device newComputePipelineStateWithFunction:ctx->function_##name error:&error]; \
--        metal_printf("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (void *) ctx->pipeline_##name, \
-+        metal_printf("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (__bridge void *) ctx->pipeline_##name, \
-                 (int) ctx->pipeline_##name.maxTotalThreadsPerThreadgroup, \
-                 (int) ctx->pipeline_##name.threadExecutionWidth); \
-         if (error) { \
-@@ -286,8 +286,6 @@
+--- ggml-metal.m.orig	2023-11-07 18:03:28
++++ ggml-metal.m	2023-11-07 18:03:29
+@@ -215,7 +215,7 @@
+             if (ggmlMetalPathResources) {
+                 sourcePath = [ggmlMetalPathResources stringByAppendingPathComponent:@"ggml-metal.metal"];
+             } else {
+-                sourcePath = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
++                sourcePath = [bundle pathForResource:@"ggml-metal-whisper" ofType:@"metal"];
+             }
+             if (sourcePath == nil) {
+                 WSP_GGML_METAL_LOG_WARN("%s: error: could not use bundle path to find ggml-metal.metal, falling back to trying cwd\n", __func__);
+@@ -355,8 +355,6 @@
  void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
-     metal_printf("%s: deallocating\n", __func__);
+     WSP_GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
  #define WSP_GGML_METAL_DEL_KERNEL(name) \
 -    [ctx->function_##name release]; \
 -    [ctx->pipeline_##name release];
  
      WSP_GGML_METAL_DEL_KERNEL(add);
      WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -342,17 +340,7 @@
-     WSP_GGML_METAL_DEL_KERNEL(cpy_f16_f16);
+@@ -423,16 +421,6 @@
+     WSP_GGML_METAL_DEL_KERNEL(sqr);
  
  #undef WSP_GGML_METAL_DEL_KERNEL
 -
 -    for (int i = 0; i < ctx->n_buffers; ++i) {
 -        [ctx->buffers[i].metal release];
 -    }
- 
+-
 -    [ctx->library release];
 -    [ctx->queue release];
 -    [ctx->device release];
 -
 -    dispatch_release(ctx->d_queue);
--
+ 
      free(ctx);
  }
- 

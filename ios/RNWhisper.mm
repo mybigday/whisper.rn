@@ -48,6 +48,7 @@ RCT_REMAP_METHOD(initContext,
 
     NSString *modelPath = [modelOptions objectForKey:@"filePath"];
     BOOL isBundleAsset = [[modelOptions objectForKey:@"isBundleAsset"] boolValue];
+    BOOL useGpu = [[modelOptions objectForKey:@"useGpu"] boolValue];
     BOOL useCoreMLIos = [[modelOptions objectForKey:@"useCoreMLIos"] boolValue];
 
     // For support debug assets in development mode
@@ -77,6 +78,7 @@ RCT_REMAP_METHOD(initContext,
         initWithModelPath:path
         contextId:contextId
         noCoreML:!useCoreMLIos
+        noMetal:!useGpu
     ];
     if ([context getContext] == NULL) {
         reject(@"whisper_cpp_error", @"Failed to load the model", nil);
@@ -85,7 +87,11 @@ RCT_REMAP_METHOD(initContext,
 
     [contexts setObject:context forKey:[NSNumber numberWithInt:contextId]];
 
-    resolve([NSNumber numberWithInt:contextId]);
+    resolve(@{
+        @"contextId": @(contextId),
+        @"gpu": @([context isMetalEnabled]),
+        @"reasonNoGPU": [context reasonNoMetal],
+    });
 }
 
 - (NSArray *)supportedEvents {

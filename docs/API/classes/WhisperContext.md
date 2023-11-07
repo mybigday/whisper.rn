@@ -10,7 +10,9 @@
 
 ### Properties
 
+- [gpu](WhisperContext.md#gpu)
 - [id](WhisperContext.md#id)
+- [reasonNoGPU](WhisperContext.md#reasonnogpu)
 
 ### Methods
 
@@ -22,19 +24,29 @@
 
 ### constructor
 
-• **new WhisperContext**(`id`)
+• **new WhisperContext**(`«destructured»`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `id` | `number` |
+| `«destructured»` | `NativeWhisperContext` |
 
 #### Defined in
 
-[index.ts:186](https://github.com/mybigday/whisper.rn/blob/f3ce9a6/src/index.ts#L186)
+[index.ts:190](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L190)
 
 ## Properties
+
+### gpu
+
+• **gpu**: `boolean` = `false`
+
+#### Defined in
+
+[index.ts:186](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L186)
+
+___
 
 ### id
 
@@ -42,7 +54,17 @@
 
 #### Defined in
 
-[index.ts:184](https://github.com/mybigday/whisper.rn/blob/f3ce9a6/src/index.ts#L184)
+[index.ts:184](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L184)
+
+___
+
+### reasonNoGPU
+
+• **reasonNoGPU**: `string` = `''`
+
+#### Defined in
+
+[index.ts:188](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L188)
 
 ## Methods
 
@@ -56,7 +78,7 @@
 
 #### Defined in
 
-[index.ts:423](https://github.com/mybigday/whisper.rn/blob/f3ce9a6/src/index.ts#L423)
+[index.ts:433](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L433)
 
 ___
 
@@ -84,7 +106,7 @@ Transcribe audio file
 
 #### Defined in
 
-[index.ts:191](https://github.com/mybigday/whisper.rn/blob/f3ce9a6/src/index.ts#L191)
+[index.ts:201](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L201)
 
 ___
 
@@ -106,4 +128,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:287](https://github.com/mybigday/whisper.rn/blob/f3ce9a6/src/index.ts#L287)
+[index.ts:297](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L297)

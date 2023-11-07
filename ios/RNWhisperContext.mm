@@ -1,28 +1,90 @@
 #import "RNWhisperContext.h"
 #import "RNWhisperAudioUtils.h"
+#import <Metal/Metal.h>
 #include <vector>
 
 #define NUM_BYTES_PER_BUFFER 16 * 1024
 
 @implementation RNWhisperContext
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML {
++ (instancetype)initWithModelPath:(NSString *)modelPath
+    contextId:(int)contextId
+    noCoreML:(BOOL)noCoreML
+    noMetal:(BOOL)noMetal
+{
     RNWhisperContext *context = [[RNWhisperContext alloc] init];
     context->contextId = contextId;
-#ifdef WHISPER_USE_COREML
-    if (noCoreML) {
-       context->ctx = whisper_init_from_file_no_coreml([modelPath UTF8String]);
-    } else {
-       context->ctx = whisper_init_from_file([modelPath UTF8String]);
+    struct whisper_context_params cparams;
+    NSString *reasonNoMetal = @"";
+    cparams.use_gpu = !noMetal;
+
+    cparams.use_coreml = !noCoreML;
+#ifndef WHISPER_USE_COREML
+    if (cparams.use_coreml) {
+        NSLog(@"[RNWhisper] CoreML is not enabled in this build, ignoring use_coreml option");
+        cparams.use_coreml = false;
     }
-#else
-    context->ctx = whisper_init_from_file([modelPath UTF8String]);
 #endif
+
+#ifndef WSP_GGML_USE_METAL
+    if (cparams.use_gpu) {
+        NSLog(@"[RNWhisper] ggml-metal is not enabled in this build, ignoring use_gpu option");
+        cparams.use_gpu = false;
+    }
+#endif
+
+#ifdef WSP_GGML_USE_METAL
+    if (cparams.use_gpu) {
+#if TARGET_OS_SIMULATOR
+        NSLog(@"[RNWhisper] ggml-metal is not available in simulator, ignoring use_gpu option: %@", reasonNoMetal);
+        cparams.use_gpu = false;
+#else // TARGET_OS_SIMULATOR
+        // Check ggml-metal availability
+        NSError * error = nil;
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        id<MTLLibrary> library = [device
+            newLibraryWithSource:@"#include <metal_stdlib>\n"
+                                    "using namespace metal;"
+                                    "kernel void test() { simd_sum(0); }"
+            options:nil
+            error:&error
+        ];
+        if (error) {
+            reasonNoMetal = [error localizedDescription];
+        } else {
+            id<MTLFunction> kernel = [library newFunctionWithName:@"test"];
+            id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:kernel error:&error];
+            if (pipeline == nil) {
+                reasonNoMetal = [error localizedDescription];
+                NSLog(@"[RNWhisper] ggml-metal is not available, ignoring use_gpu option: %@", reasonNoMetal);
+                cparams.use_gpu = false;
+            }
+        }
+#endif // TARGET_OS_SIMULATOR
+    }
+#endif // WSP_GGML_USE_METAL
+
+    if (cparams.use_gpu && cparams.use_coreml) {
+        NSLog(@"[RNWhisper] Both use_gpu and use_coreml are enabled, ignoring use_coreml option");
+        cparams.use_coreml = false; // Skip CoreML if Metal is enabled
+    }
+
+    context->ctx = whisper_init_from_file_with_params([modelPath UTF8String], cparams);
     context->dQueue = dispatch_queue_create(
         [[NSString stringWithFormat:@"RNWhisperContext-%d", contextId] UTF8String],
         DISPATCH_QUEUE_SERIAL
     );
+    context->isMetalEnabled = cparams.use_gpu;
+    context->reasonNoMetal = reasonNoMetal;
     return context;
+}
+
+- (bool)isMetalEnabled {
+    return isMetalEnabled;
+}
+
+- (NSString *)reasonNoMetal {
+    return reasonNoMetal;
 }
 
 - (struct whisper_context *)getContext {

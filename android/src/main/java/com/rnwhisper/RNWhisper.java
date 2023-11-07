@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.bridge.Arguments;
 
 import java.util.HashMap;
 import java.util.Random;
@@ -107,7 +108,11 @@ public class RNWhisper implements LifecycleEventListener {
           promise.reject(exception);
           return;
         }
-        promise.resolve(id);
+        WritableMap result = Arguments.createMap();
+        result.putInt("contextId", id);
+        result.putBoolean("gpu", false);
+        result.putString("reasonNoGPU", "Currently not supported");
+        promise.resolve(result);
         tasks.remove(this);
       }
     }.execute();

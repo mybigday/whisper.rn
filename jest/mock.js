@@ -2,7 +2,7 @@ const { NativeModules, DeviceEventEmitter } = require('react-native')
 
 if (!NativeModules.RNWhisper) {
   NativeModules.RNWhisper = {
-    initContext: jest.fn(() => Promise.resolve(1)),
+    initContext: jest.fn(() => Promise.resolve({ contextId: 1 })),
     transcribeFile: jest.fn(() => Promise.resolve({
       result: ' Test',
       segments: [{ text: ' Test', t0: 0, t1: 33 }],

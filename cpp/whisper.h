@@ -5,6 +5,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __GNUC__
+#    define WHISPER_DEPRECATED(func, hint) func __attribute__((deprecated(hint)))
+#elif defined(_MSC_VER)
+#    define WHISPER_DEPRECATED(func, hint) __declspec(deprecated(hint)) func
+#else
+#    define WHISPER_DEPRECATED(func, hint) func
+#endif
+
 #ifdef WHISPER_SHARED
 #    ifdef _WIN32
 #        ifdef WHISPER_BUILD
@@ -21,7 +29,6 @@
 
 #define WHISPER_SAMPLE_RATE 16000
 #define WHISPER_N_FFT       400
-#define WHISPER_N_MEL       80
 #define WHISPER_HOP_LENGTH  160
 #define WHISPER_CHUNK_SIZE  30
 
@@ -71,6 +78,11 @@ extern "C" {
 
     typedef int whisper_token;
 
+    struct whisper_context_params {
+        bool  use_gpu;
+        bool  use_coreml;
+    };
+
     typedef struct whisper_token_data {
         whisper_token id;  // token id
         whisper_token tid; // forced timestamp token id
@@ -99,18 +111,40 @@ extern "C" {
     // Various functions for loading a ggml whisper model.
     // Allocate (almost) all memory needed for the model.
     // Return NULL on failure
-#ifdef WHISPER_USE_COREML
-    WHISPER_API struct whisper_context * whisper_init_from_file_no_coreml(const char * path_model);
-#endif
-    WHISPER_API struct whisper_context * whisper_init_from_file(const char * path_model);
-    WHISPER_API struct whisper_context * whisper_init_from_buffer(void * buffer, size_t buffer_size);
-    WHISPER_API struct whisper_context * whisper_init(struct whisper_model_loader * loader);
+    WHISPER_API struct whisper_context * whisper_init_from_file_with_params(const char * path_model, struct whisper_context_params params);
+    WHISPER_API struct whisper_context * whisper_init_from_buffer_with_params(void * buffer, size_t buffer_size, struct whisper_context_params params);
+    WHISPER_API struct whisper_context * whisper_init_with_params(struct whisper_model_loader * loader, struct whisper_context_params params);
 
     // These are the same as the above, but the internal state of the context is not allocated automatically
     // It is the responsibility of the caller to allocate the state using whisper_init_state() (#523)
-    WHISPER_API struct whisper_context * whisper_init_from_file_no_state(const char * path_model);
-    WHISPER_API struct whisper_context * whisper_init_from_buffer_no_state(void * buffer, size_t buffer_size);
-    WHISPER_API struct whisper_context * whisper_init_no_state(struct whisper_model_loader * loader);
+    WHISPER_API struct whisper_context * whisper_init_from_file_with_params_no_state(const char * path_model, struct whisper_context_params params);
+    WHISPER_API struct whisper_context * whisper_init_from_buffer_with_params_no_state(void * buffer, size_t buffer_size, struct whisper_context_params params);
+    WHISPER_API struct whisper_context * whisper_init_with_params_no_state(struct whisper_model_loader * loader, struct whisper_context_params params);
+
+    WHISPER_DEPRECATED(
+        WHISPER_API struct whisper_context * whisper_init_from_file(const char * path_model),
+        "use whisper_init_from_file_with_params instead"
+    );
+    WHISPER_DEPRECATED(
+        WHISPER_API struct whisper_context * whisper_init_from_buffer(void * buffer, size_t buffer_size),
+        "use whisper_init_from_buffer_with_params instead"
+    );
+    WHISPER_DEPRECATED(
+        WHISPER_API struct whisper_context * whisper_init(struct whisper_model_loader * loader),
+        "use whisper_init_with_params instead"
+    );
+    WHISPER_DEPRECATED(
+        WHISPER_API struct whisper_context * whisper_init_from_file_no_state(const char * path_model),
+        "use whisper_init_from_file_with_params_no_state instead"
+    );
+    WHISPER_DEPRECATED(
+        WHISPER_API struct whisper_context * whisper_init_from_buffer_no_state(void * buffer, size_t buffer_size),
+        "use whisper_init_from_buffer_with_params_no_state instead"
+    );
+    WHISPER_DEPRECATED(
+        WHISPER_API struct whisper_context * whisper_init_no_state(struct whisper_model_loader * loader),
+        "use whisper_init_with_params_no_state instead"
+    );
 
     WHISPER_API struct whisper_state * whisper_init_state(struct whisper_context * ctx);
 
@@ -135,6 +169,7 @@ extern "C" {
     WHISPER_API void whisper_free      (struct whisper_context * ctx);
     WHISPER_API void whisper_free_state(struct whisper_state * state);
     WHISPER_API void whisper_free_params(struct whisper_full_params * params);
+    WHISPER_API void whisper_free_context_params(struct whisper_context_params * params);
 
     // Convert RAW PCM audio to log mel spectrogram.
     // The resulting spectrogram is stored inside the default state of the provided whisper context.
@@ -445,7 +480,9 @@ extern "C" {
         void * logits_filter_callback_user_data;
     };
 
-    // NOTE: this function allocates memory, and it is the responsibility of the caller to free the pointer - see whisper_free_params()
+    // NOTE: this function allocates memory, and it is the responsibility of the caller to free the pointer - see whisper_free_context_params & whisper_free_params()
+    WHISPER_API struct whisper_context_params * whisper_context_default_params_by_ref();
+    WHISPER_API struct whisper_context_params whisper_context_default_params(void);
     WHISPER_API struct whisper_full_params * whisper_full_default_params_by_ref(enum whisper_sampling_strategy strategy);
     WHISPER_API struct whisper_full_params whisper_full_default_params(enum whisper_sampling_strategy strategy);
 

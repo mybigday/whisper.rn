@@ -46,9 +46,13 @@ typedef struct {
     dispatch_queue_t dQueue;
     struct whisper_context * ctx;
     RNWhisperContextRecordState recordState;
+    NSString * reasonNoMetal;
+    bool isMetalEnabled;
 }
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML;
++ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML noMetal:(BOOL)noMetal;
+- (bool)isMetalEnabled;
+- (NSString *)reasonNoMetal;
 - (struct whisper_context *)getContext;
 - (dispatch_queue_t)getDispatchQueue;
 - (OSStatus)transcribeRealtime:(int)jobId

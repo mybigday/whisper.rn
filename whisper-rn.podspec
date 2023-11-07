@@ -16,8 +16,7 @@ if ENV['RNWHISPER_DISABLE_COREML'] != '1' then
   base_compiler_flags += " -DWHISPER_USE_COREML -DWHISPER_COREML_ALLOW_FALLBACK"
 end
 
-# TODO: Enable Metal by default when we have use_gpu param
-if ENV["RNWHISPER_ENABLE_METAL"] == "1" then
+if ENV["RNWHISPER_DISABLE_METAL"] != "1" then
   base_compiler_flags += " -DWSP_GGML_USE_METAL" # -DWSP_GGML_METAL_NDEBUG
 end
 
