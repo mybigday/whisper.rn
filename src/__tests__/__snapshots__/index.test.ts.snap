@@ -3,7 +3,9 @@
 exports[`Mock 1`] = `
 [
   {
-    "contextId": 1,
+    "contextId": {
+      "id": 1,
+    },
     "data": {
       "result": " Test",
       "segments": [
@@ -20,7 +22,9 @@ exports[`Mock 1`] = `
     "recordingTime": 1000,
   },
   {
-    "contextId": 1,
+    "contextId": {
+      "id": 1,
+    },
     "data": {
       "result": " Test",
       "segments": [
@@ -37,7 +41,9 @@ exports[`Mock 1`] = `
     "recordingTime": 2000,
   },
   {
-    "contextId": 1,
+    "contextId": {
+      "id": 1,
+    },
     "data": {
       "result": " Test",
       "segments": [

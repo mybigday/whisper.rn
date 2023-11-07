@@ -8,7 +8,7 @@ test('Mock', async () => {
   const context = await initWhisper({
     filePath: 'test.bin',
   })
-  expect(context.id).toBe(1)
+  expect(context.id).toEqual({ id: 1 })
   const { promise } = context.transcribe('test.wav')
   expect(await promise).toEqual({
     isAborted: false,
