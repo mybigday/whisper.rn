@@ -52,9 +52,16 @@ export type CoreMLAsset = {
 type NativeContextOptions = {
   filePath: string,
   isBundleAsset: boolean,
+  useGpu?: boolean,
   useCoreMLIos?: boolean,
   downloadCoreMLAssets?: boolean,
   coreMLAssets?: CoreMLAsset[],
+}
+
+export type NativeWhisperContext = {
+  contextId: number
+  gpu: boolean
+  reasonNoGPU: string
 }
 
 export interface Spec extends TurboModule {
@@ -62,7 +69,7 @@ export interface Spec extends TurboModule {
     useCoreML: boolean
     coreMLAllowFallback: boolean
   };
-  initContext(options: NativeContextOptions): Promise<number>;
+  initContext(options: NativeContextOptions): Promise<NativeWhisperContext>;
   releaseContext(contextId: number): Promise<void>;
   releaseAllContexts(): Promise<void>;
   transcribeFile(

@@ -5,7 +5,7 @@ import {
   DeviceEventEmitterStatic,
   Image,
 } from 'react-native'
-import RNWhisper from './NativeRNWhisper'
+import RNWhisper, { NativeWhisperContext } from './NativeRNWhisper'
 import type {
   TranscribeOptions,
   TranscribeResult,
@@ -183,8 +183,18 @@ const updateAudioSession = async (setting: AudioSessionSettingIos) => {
 export class WhisperContext {
   id: number
 
-  constructor(id: number) {
-    this.id = id
+  gpu: boolean = false
+
+  reasonNoGPU: string = ''
+
+  constructor({
+    contextId,
+    gpu,
+    reasonNoGPU,
+  }: NativeWhisperContext) {
+    this.id = contextId
+    this.gpu = gpu
+    this.reasonNoGPU = reasonNoGPU
   }
 
   /** Transcribe audio file */
@@ -440,6 +450,8 @@ export type ContextOptions = {
   isBundleAsset?: boolean
   /** Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. */
   useCoreMLIos?: boolean
+  /** [Currently iOS only] Use GPU if available. */
+  useGpu?: boolean
 }
 
 const coreMLModelAssetPaths = [
@@ -453,6 +465,7 @@ export async function initWhisper({
   filePath,
   coreMLModelAsset,
   isBundleAsset,
+  useGpu = true,
   useCoreMLIos = true,
 }: ContextOptions): Promise<WhisperContext> {
   let path = ''
@@ -499,15 +512,16 @@ export async function initWhisper({
     path = filePath
   }
   if (path.startsWith('file://')) path = path.slice(7)
-  const id = await RNWhisper.initContext({
+  const { contextId, gpu, reasonNoGPU } = await RNWhisper.initContext({
     filePath: path,
     isBundleAsset: !!isBundleAsset,
+    useGpu,
     useCoreMLIos,
     // Only development mode need download Core ML model assets (from packager server)
     downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
     coreMLAssets,
   })
-  return new WhisperContext(id)
+  return new WhisperContext({ contextId, gpu, reasonNoGPU })
 }
 
 export async function releaseAllWhisper(): Promise<void> {
