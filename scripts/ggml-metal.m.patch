@@ -1,5 +1,14 @@
---- ggml-metal.m.orig	2023-11-07 18:03:28
-+++ ggml-metal.m	2023-11-07 18:03:29
+--- ggml-metal.m.orig	2023-11-08 12:15:15
++++ ggml-metal.m	2023-11-08 12:14:49
+@@ -184,7 +184,7 @@
+     WSP_GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
+ 
+     // Configure context
+-    struct wsp_ggml_metal_context * ctx = malloc(sizeof(struct wsp_ggml_metal_context));
++    struct wsp_ggml_metal_context * ctx = calloc(1, sizeof(struct wsp_ggml_metal_context));
+     ctx->device = device;
+     ctx->n_cb   = MIN(n_cb, WSP_GGML_METAL_MAX_BUFFERS);
+     ctx->queue  = [ctx->device newCommandQueue];
 @@ -215,7 +215,7 @@
              if (ggmlMetalPathResources) {
                  sourcePath = [ggmlMetalPathResources stringByAppendingPathComponent:@"ggml-metal.metal"];
@@ -18,7 +27,7 @@
  
      WSP_GGML_METAL_DEL_KERNEL(add);
      WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -423,16 +421,6 @@
+@@ -423,17 +421,7 @@
      WSP_GGML_METAL_DEL_KERNEL(sqr);
  
  #undef WSP_GGML_METAL_DEL_KERNEL
@@ -26,12 +35,13 @@
 -    for (int i = 0; i < ctx->n_buffers; ++i) {
 -        [ctx->buffers[i].metal release];
 -    }
--
+ 
 -    [ctx->library release];
 -    [ctx->queue release];
 -    [ctx->device release];
 -
 -    dispatch_release(ctx->d_queue);
- 
+-
      free(ctx);
  }
+ 

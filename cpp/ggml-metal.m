@@ -184,7 +184,7 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
     WSP_GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
 
     // Configure context
-    struct wsp_ggml_metal_context * ctx = malloc(sizeof(struct wsp_ggml_metal_context));
+    struct wsp_ggml_metal_context * ctx = calloc(1, sizeof(struct wsp_ggml_metal_context));
     ctx->device = device;
     ctx->n_cb   = MIN(n_cb, WSP_GGML_METAL_MAX_BUFFERS);
     ctx->queue  = [ctx->device newCommandQueue];
