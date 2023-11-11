@@ -25,18 +25,18 @@ npm install whisper.rn
 
 Please re-run `npx pod-install` again.
 
-#### Android
-
 If you want to use `medium` or `large` model, the [Extended Virtual Addressing](https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_developer_kernel_extended-virtual-addressing) capability is recommended to enable on iOS project.
 
-For Android, it's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
+#### Android
 
-Don't forget to add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
+Add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
 
 ```proguard
 # whisper.rn
 -keep class com.rnwhisper.** { *; }
 ```
+
+For build, it's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
 #### Expo
 
@@ -91,7 +91,7 @@ subscribe(evt => {
   console.log(
     `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
       // The inference text result from audio record:
-      `Result: ${data.result}\n\n` + 
+      `Result: ${data.result}\n\n` +
       `Process time: ${processTime}ms\n` +
       `Recording time: ${recordingTime}ms`,
   )
@@ -220,7 +220,7 @@ In real world, we recommended to split the asset imports into another platform s
 
 The example app provide a simple UI for testing the functions.
 
-Used Whisper model: `tiny.en` in https://huggingface.co/ggerganov/whisper.cpp  
+Used Whisper model: `tiny.en` in https://huggingface.co/ggerganov/whisper.cpp
 Sample file: `jfk.wav` in https://github.com/ggerganov/whisper.cpp/tree/master/samples
 
 Please follow the [Development Workflow section of contributing guide](./CONTRIBUTING.md#development-workflow) to run the example app.
