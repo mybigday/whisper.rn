@@ -425,7 +425,7 @@ static const uint64_t table_b2b_1[1 << 8] = { B8(10, 00) }; // (!b) << 4
 #endif
 
 // reference implementation for deterministic creation of model files
-void quantize_row_q4_0_reference(const float * restrict x, block_q4_0 * restrict y, int k) {
+void wsp_quantize_row_q4_0_reference(const float * restrict x, block_q4_0 * restrict y, int k) {
     static const int qk = QK4_0;
 
     assert(k % qk == 0);
@@ -462,11 +462,11 @@ void quantize_row_q4_0_reference(const float * restrict x, block_q4_0 * restrict
     }
 }
 
-void quantize_row_q4_0(const float * restrict x, void * restrict y, int k) {
-    quantize_row_q4_0_reference(x, y, k);
+void wsp_quantize_row_q4_0(const float * restrict x, void * restrict y, int k) {
+    wsp_quantize_row_q4_0_reference(x, y, k);
 }
 
-void quantize_row_q4_1_reference(const float * restrict x, block_q4_1 * restrict y, int k) {
+void wsp_quantize_row_q4_1_reference(const float * restrict x, block_q4_1 * restrict y, int k) {
     const int qk = QK4_1;
 
     assert(k % qk == 0);
@@ -503,11 +503,11 @@ void quantize_row_q4_1_reference(const float * restrict x, block_q4_1 * restrict
     }
 }
 
-void quantize_row_q4_1(const float * restrict x, void * restrict y, int k) {
-    quantize_row_q4_1_reference(x, y, k);
+void wsp_quantize_row_q4_1(const float * restrict x, void * restrict y, int k) {
+    wsp_quantize_row_q4_1_reference(x, y, k);
 }
 
-void quantize_row_q5_0_reference(const float * restrict x, block_q5_0 * restrict y, int k) {
+void wsp_quantize_row_q5_0_reference(const float * restrict x, block_q5_0 * restrict y, int k) {
     static const int qk = QK5_0;
 
     assert(k % qk == 0);
@@ -551,11 +551,11 @@ void quantize_row_q5_0_reference(const float * restrict x, block_q5_0 * restrict
     }
 }
 
-void quantize_row_q5_0(const float * restrict x, void * restrict y, int k) {
-    quantize_row_q5_0_reference(x, y, k);
+void wsp_quantize_row_q5_0(const float * restrict x, void * restrict y, int k) {
+    wsp_quantize_row_q5_0_reference(x, y, k);
 }
 
-void quantize_row_q5_1_reference(const float * restrict x, block_q5_1 * restrict y, int k) {
+void wsp_quantize_row_q5_1_reference(const float * restrict x, block_q5_1 * restrict y, int k) {
     const int qk = QK5_1;
 
     assert(k % qk == 0);
@@ -599,12 +599,12 @@ void quantize_row_q5_1_reference(const float * restrict x, block_q5_1 * restrict
     }
 }
 
-void quantize_row_q5_1(const float * restrict x, void * restrict y, int k) {
-    quantize_row_q5_1_reference(x, y, k);
+void wsp_quantize_row_q5_1(const float * restrict x, void * restrict y, int k) {
+    wsp_quantize_row_q5_1_reference(x, y, k);
 }
 
 // reference implementation for deterministic creation of model files
-void quantize_row_q8_0_reference(const float * restrict x, block_q8_0 * restrict y, int k) {
+void wsp_quantize_row_q8_0_reference(const float * restrict x, block_q8_0 * restrict y, int k) {
     assert(k % QK8_0 == 0);
     const int nb = k / QK8_0;
 
@@ -629,7 +629,7 @@ void quantize_row_q8_0_reference(const float * restrict x, block_q8_0 * restrict
     }
 }
 
-void quantize_row_q8_0(const float * restrict x, void * restrict vy, int k) {
+void wsp_quantize_row_q8_0(const float * restrict x, void * restrict vy, int k) {
     assert(QK8_0 == 32);
     assert(k % QK8_0 == 0);
     const int nb = k / QK8_0;
@@ -813,12 +813,12 @@ void quantize_row_q8_0(const float * restrict x, void * restrict vy, int k) {
 #else
     WSP_GGML_UNUSED(nb);
     // scalar
-    quantize_row_q8_0_reference(x, y, k);
+    wsp_quantize_row_q8_0_reference(x, y, k);
 #endif
 }
 
 // reference implementation for deterministic creation of model files
-void quantize_row_q8_1_reference(const float * restrict x, block_q8_1 * restrict y, int k) {
+void wsp_quantize_row_q8_1_reference(const float * restrict x, block_q8_1 * restrict y, int k) {
     assert(QK8_1 == 32);
     assert(k % QK8_1 == 0);
     const int nb = k / QK8_1;
@@ -853,7 +853,7 @@ void quantize_row_q8_1_reference(const float * restrict x, block_q8_1 * restrict
     }
 }
 
-void quantize_row_q8_1(const float * restrict x, void * restrict vy, int k) {
+void wsp_quantize_row_q8_1(const float * restrict x, void * restrict vy, int k) {
     assert(k % QK8_1 == 0);
     const int nb = k / QK8_1;
 
@@ -1067,11 +1067,11 @@ void quantize_row_q8_1(const float * restrict x, void * restrict vy, int k) {
 #else
     WSP_GGML_UNUSED(nb);
     // scalar
-    quantize_row_q8_1_reference(x, y, k);
+    wsp_quantize_row_q8_1_reference(x, y, k);
 #endif
 }
 
-void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q4_0(const block_q4_0 * restrict x, float * restrict y, int k) {
     static const int qk = QK4_0;
 
     assert(k % qk == 0);
@@ -1091,7 +1091,7 @@ void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict y, int 
     }
 }
 
-void dequantize_row_q4_1(const block_q4_1 * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q4_1(const block_q4_1 * restrict x, float * restrict y, int k) {
     static const int qk = QK4_1;
 
     assert(k % qk == 0);
@@ -1112,7 +1112,7 @@ void dequantize_row_q4_1(const block_q4_1 * restrict x, float * restrict y, int 
     }
 }
 
-void dequantize_row_q5_0(const block_q5_0 * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q5_0(const block_q5_0 * restrict x, float * restrict y, int k) {
     static const int qk = QK5_0;
 
     assert(k % qk == 0);
@@ -1138,7 +1138,7 @@ void dequantize_row_q5_0(const block_q5_0 * restrict x, float * restrict y, int 
     }
 }
 
-void dequantize_row_q5_1(const block_q5_1 * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q5_1(const block_q5_1 * restrict x, float * restrict y, int k) {
     static const int qk = QK5_1;
 
     assert(k % qk == 0);
@@ -1165,7 +1165,7 @@ void dequantize_row_q5_1(const block_q5_1 * restrict x, float * restrict y, int 
     }
 }
 
-void dequantize_row_q8_0(const block_q8_0 * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q8_0(const block_q8_0 * restrict x, float * restrict y, int k) {
     static const int qk = QK8_0;
 
     assert(k % qk == 0);
@@ -1450,7 +1450,7 @@ static inline void get_scale_min_k4(int j, const uint8_t * restrict q, uint8_t *
 
 //========================- 2-bit (de)-quantization
 
-void quantize_row_q2_K_reference(const float * restrict x, block_q2_K * restrict y, int k) {
+void wsp_quantize_row_q2_K_reference(const float * restrict x, block_q2_K * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1527,7 +1527,7 @@ void quantize_row_q2_K_reference(const float * restrict x, block_q2_K * restrict
     }
 }
 
-void dequantize_row_q2_K(const block_q2_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q2_K(const block_q2_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1573,23 +1573,23 @@ void dequantize_row_q2_K(const block_q2_K * restrict x, float * restrict y, int 
     }
 }
 
-void quantize_row_q2_K(const float * restrict x, void * restrict vy, int k) {
-    quantize_row_q2_K_reference(x, vy, k);
+void wsp_quantize_row_q2_K(const float * restrict x, void * restrict vy, int k) {
+    wsp_quantize_row_q2_K_reference(x, vy, k);
 }
 
-size_t wsp_ggml_quantize_q2_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
+size_t wsp_ggml_wsp_quantize_q2_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
     (void)hist; // TODO: collect histograms
 
     for (int j = 0; j < n; j += k) {
         block_q2_K * restrict y = (block_q2_K *)dst + j/QK_K;
-        quantize_row_q2_K_reference(src + j, y, k);
+        wsp_quantize_row_q2_K_reference(src + j, y, k);
     }
     return (n/QK_K*sizeof(block_q2_K));
 }
 
 //========================= 3-bit (de)-quantization
 
-void quantize_row_q3_K_reference(const float * restrict x, block_q3_K * restrict y, int k) {
+void wsp_quantize_row_q3_K_reference(const float * restrict x, block_q3_K * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1703,7 +1703,7 @@ void quantize_row_q3_K_reference(const float * restrict x, block_q3_K * restrict
 }
 
 #if QK_K == 256
-void dequantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1753,7 +1753,7 @@ void dequantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int 
     }
 }
 #else
-void dequantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     assert(QK_K == 64);
     const int nb = k / QK_K;
@@ -1786,23 +1786,23 @@ void dequantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int 
 }
 #endif
 
-void quantize_row_q3_K(const float * restrict x, void * restrict vy, int k) {
-    quantize_row_q3_K_reference(x, vy, k);
+void wsp_quantize_row_q3_K(const float * restrict x, void * restrict vy, int k) {
+    wsp_quantize_row_q3_K_reference(x, vy, k);
 }
 
-size_t wsp_ggml_quantize_q3_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
+size_t wsp_ggml_wsp_quantize_q3_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
     (void)hist; // TODO: collect histograms
 
     for (int j = 0; j < n; j += k) {
         block_q3_K * restrict y = (block_q3_K *)dst + j/QK_K;
-        quantize_row_q3_K_reference(src + j, y, k);
+        wsp_quantize_row_q3_K_reference(src + j, y, k);
     }
     return (n/QK_K*sizeof(block_q3_K));
 }
 
 // ====================== 4-bit (de)-quantization
 
-void quantize_row_q4_K_reference(const float * restrict x, block_q4_K * restrict y, int k) {
+void wsp_quantize_row_q4_K_reference(const float * restrict x, block_q4_K * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1909,7 +1909,7 @@ void quantize_row_q4_K_reference(const float * restrict x, block_q4_K * restrict
     }
 }
 
-void dequantize_row_q4_K(const block_q4_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q4_K(const block_q4_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1948,26 +1948,26 @@ void dequantize_row_q4_K(const block_q4_K * restrict x, float * restrict y, int 
     }
 }
 
-void quantize_row_q4_K(const float * restrict x, void * restrict vy, int k) {
+void wsp_quantize_row_q4_K(const float * restrict x, void * restrict vy, int k) {
     assert(k % QK_K == 0);
     block_q4_K * restrict y = vy;
-    quantize_row_q4_K_reference(x, y, k);
+    wsp_quantize_row_q4_K_reference(x, y, k);
 }
 
-size_t wsp_ggml_quantize_q4_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
+size_t wsp_ggml_wsp_quantize_q4_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
     assert(k % QK_K == 0);
     (void)hist; // TODO: collect histograms
 
     for (int j = 0; j < n; j += k) {
         block_q4_K * restrict y = (block_q4_K *)dst + j/QK_K;
-        quantize_row_q4_K_reference(src + j, y, k);
+        wsp_quantize_row_q4_K_reference(src + j, y, k);
     }
     return (n/QK_K*sizeof(block_q4_K));
 }
 
 // ====================== 5-bit (de)-quantization
 
-void quantize_row_q5_K_reference(const float * restrict x, block_q5_K * restrict y, int k) {
+void wsp_quantize_row_q5_K_reference(const float * restrict x, block_q5_K * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -2109,7 +2109,7 @@ void quantize_row_q5_K_reference(const float * restrict x, block_q5_K * restrict
     }
 }
 
-void dequantize_row_q5_K(const block_q5_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q5_K(const block_q5_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -2154,26 +2154,26 @@ void dequantize_row_q5_K(const block_q5_K * restrict x, float * restrict y, int 
     }
 }
 
-void quantize_row_q5_K(const float * restrict x, void * restrict vy, int k) {
+void wsp_quantize_row_q5_K(const float * restrict x, void * restrict vy, int k) {
     assert(k % QK_K == 0);
     block_q5_K * restrict y = vy;
-    quantize_row_q5_K_reference(x, y, k);
+    wsp_quantize_row_q5_K_reference(x, y, k);
 }
 
-size_t wsp_ggml_quantize_q5_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
+size_t wsp_ggml_wsp_quantize_q5_K(const float * restrict src, void * restrict dst, int n, int k, int64_t * restrict hist) {
     assert(k % QK_K == 0);
     (void)hist; // TODO: collect histograms
 
     for (int j = 0; j < n; j += k) {
         block_q5_K * restrict y = (block_q5_K *)dst + j/QK_K;
-        quantize_row_q5_K_reference(src + j, y, k);
+        wsp_quantize_row_q5_K_reference(src + j, y, k);
     }
     return (n/QK_K*sizeof(block_q5_K));
 }
 
 // ====================== 6-bit (de)-quantization
 
-void quantize_row_q6_K_reference(const float * restrict x, block_q6_K * restrict y, int k) {
+void wsp_quantize_row_q6_K_reference(const float * restrict x, block_q6_K * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -2255,7 +2255,7 @@ void quantize_row_q6_K_reference(const float * restrict x, block_q6_K * restrict
     }
 }
 
-void dequantize_row_q6_K(const block_q6_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q6_K(const block_q6_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -2302,26 +2302,26 @@ void dequantize_row_q6_K(const block_q6_K * restrict x, float * restrict y, int 
     }
 }
 
-void quantize_row_q6_K(const float * restrict x, void * restrict vy, int k) {
+void wsp_quantize_row_q6_K(const float * restrict x, void * restrict vy, int k) {
     assert(k % QK_K == 0);
     block_q6_K * restrict y = vy;
-    quantize_row_q6_K_reference(x, y, k);
+    wsp_quantize_row_q6_K_reference(x, y, k);
 }
 
-size_t wsp_ggml_quantize_q6_K(const float * src, void * dst, int n, int k, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_q6_K(const float * src, void * dst, int n, int k, int64_t * hist) {
     assert(k % QK_K == 0);
     (void)hist; // TODO: collect histograms
 
     for (int j = 0; j < n; j += k) {
         block_q6_K * restrict y = (block_q6_K *)dst + j/QK_K;
-        quantize_row_q6_K_reference(src + j, y, k);
+        wsp_quantize_row_q6_K_reference(src + j, y, k);
     }
     return (n/QK_K*sizeof(block_q6_K));
 }
 
 //===================================== Q8_K ==============================================
 
-void quantize_row_q8_K_reference(const float * restrict x, block_q8_K * restrict y, int k) {
+void wsp_quantize_row_q8_K_reference(const float * restrict x, block_q8_K * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -2358,7 +2358,7 @@ void quantize_row_q8_K_reference(const float * restrict x, block_q8_K * restrict
     }
 }
 
-void dequantize_row_q8_K(const block_q8_K * restrict x, float * restrict y, int k) {
+void wsp_dewsp_quantize_row_q8_K(const block_q8_K * restrict x, float * restrict y, int k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -2369,8 +2369,8 @@ void dequantize_row_q8_K(const block_q8_K * restrict x, float * restrict y, int 
     }
 }
 
-void quantize_row_q8_K(const float * restrict x, void * restrict y, int k) {
-    quantize_row_q8_K_reference(x, y, k);
+void wsp_quantize_row_q8_K(const float * restrict x, void * restrict y, int k) {
+    wsp_quantize_row_q8_K_reference(x, y, k);
 }
 
 //===================================== Dot ptoducts =================================

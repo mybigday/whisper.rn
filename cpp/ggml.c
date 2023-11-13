@@ -455,9 +455,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK4_0,
         .type_size                = sizeof(block_q4_0),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q4_0,
-        .from_float               = quantize_row_q4_0,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q4_0_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q4_0,
+        .from_float               = wsp_quantize_row_q4_0,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q4_0_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q4_0_q8_0,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
     },
@@ -466,9 +466,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK4_1,
         .type_size                = sizeof(block_q4_1),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q4_1,
-        .from_float               = quantize_row_q4_1,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q4_1_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q4_1,
+        .from_float               = wsp_quantize_row_q4_1,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q4_1_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q4_1_q8_1,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_1,
     },
@@ -499,9 +499,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK5_0,
         .type_size                = sizeof(block_q5_0),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q5_0,
-        .from_float               = quantize_row_q5_0,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q5_0_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q5_0,
+        .from_float               = wsp_quantize_row_q5_0,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q5_0_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q5_0_q8_0,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
     },
@@ -510,9 +510,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK5_1,
         .type_size                = sizeof(block_q5_1),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q5_1,
-        .from_float               = quantize_row_q5_1,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q5_1_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q5_1,
+        .from_float               = wsp_quantize_row_q5_1,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q5_1_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q5_1_q8_1,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_1,
     },
@@ -521,9 +521,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK8_0,
         .type_size                = sizeof(block_q8_0),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q8_0,
-        .from_float               = quantize_row_q8_0,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q8_0_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q8_0,
+        .from_float               = wsp_quantize_row_q8_0,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q8_0_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q8_0_q8_0,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
     },
@@ -532,8 +532,8 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK8_1,
         .type_size                = sizeof(block_q8_1),
         .is_quantized             = true,
-        .from_float               = quantize_row_q8_1,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q8_1_reference,
+        .from_float               = wsp_quantize_row_q8_1,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q8_1_reference,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_1,
     },
     [WSP_GGML_TYPE_Q2_K] = {
@@ -541,9 +541,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q2_K),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q2_K,
-        .from_float               = quantize_row_q2_K,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q2_K_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q2_K,
+        .from_float               = wsp_quantize_row_q2_K,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q2_K_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q2_K_q8_K,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_K,
     },
@@ -552,9 +552,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q3_K),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q3_K,
-        .from_float               = quantize_row_q3_K,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q3_K_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q3_K,
+        .from_float               = wsp_quantize_row_q3_K,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q3_K_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q3_K_q8_K,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_K,
     },
@@ -563,9 +563,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q4_K),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q4_K,
-        .from_float               = quantize_row_q4_K,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q4_K_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q4_K,
+        .from_float               = wsp_quantize_row_q4_K,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q4_K_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q4_K_q8_K,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_K,
     },
@@ -574,9 +574,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q5_K),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q5_K,
-        .from_float               = quantize_row_q5_K,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q5_K_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q5_K,
+        .from_float               = wsp_quantize_row_q5_K,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q5_K_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q5_K_q8_K,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_K,
     },
@@ -585,9 +585,9 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q6_K),
         .is_quantized             = true,
-        .to_float                 = (wsp_ggml_to_float_t) dequantize_row_q6_K,
-        .from_float               = quantize_row_q6_K,
-        .from_float_reference     = (wsp_ggml_from_float_t) quantize_row_q6_K_reference,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q6_K,
+        .from_float               = wsp_quantize_row_q6_K,
+        .from_float_reference     = (wsp_ggml_from_float_t) wsp_quantize_row_q6_K_reference,
         .vec_dot                  = wsp_ggml_vec_dot_q6_K_q8_K,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_K,
     },
@@ -596,7 +596,7 @@ static const wsp_ggml_type_traits_t type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q8_K),
         .is_quantized             = true,
-        .from_float               = quantize_row_q8_K,
+        .from_float               = wsp_quantize_row_q8_K,
     }
 };
 
@@ -6472,7 +6472,7 @@ static void wsp_ggml_compute_forward_dup_f16(
                     }
                 }
             } else if (type_traits[dst->type].from_float) {
-                wsp_ggml_from_float_t const quantize_row_q = type_traits[dst->type].from_float;
+                wsp_ggml_from_float_t const wsp_quantize_row_q = type_traits[dst->type].from_float;
                 float * src0_f32 = (float *) params->wdata + (ne00 + CACHE_LINE_SIZE_F32) * ith;
 
                 size_t id = 0;
@@ -6489,7 +6489,7 @@ static void wsp_ggml_compute_forward_dup_f16(
                                 src0_f32[i00] = WSP_GGML_FP16_TO_FP32(src0_ptr[i00]);
                             }
 
-                            quantize_row_q(src0_f32, dst_ptr + id, ne00);
+                            wsp_quantize_row_q(src0_f32, dst_ptr + id, ne00);
                             id += rs;
                         }
                         id += rs * (ne01 - ir1);
@@ -6725,7 +6725,7 @@ static void wsp_ggml_compute_forward_dup_f32(
                     }
                 }
             } else if (type_traits[dst->type].from_float) {
-                wsp_ggml_from_float_t const quantize_row_q = type_traits[dst->type].from_float;
+                wsp_ggml_from_float_t const wsp_quantize_row_q = type_traits[dst->type].from_float;
 
                 size_t id = 0;
                 size_t rs = nb0 * (ne00 / wsp_ggml_blck_size(dst->type));
@@ -6736,7 +6736,7 @@ static void wsp_ggml_compute_forward_dup_f32(
                         id += rs * ir0;
                         for (int i01 = ir0; i01 < ir1; i01++) {
                             const float * src0_ptr = (float *) ((char *) src0->data + i01*nb01 + i02*nb02 + i03*nb03);
-                            quantize_row_q(src0_ptr, dst_ptr + id, ne00);
+                            wsp_quantize_row_q(src0_ptr, dst_ptr + id, ne00);
                             id += rs;
                         }
                         id += rs * (ne01 - ir1);
@@ -7158,8 +7158,8 @@ static void wsp_ggml_compute_forward_add_q_f32(
 
     const enum wsp_ggml_type type = src0->type;
     const enum wsp_ggml_type dtype = dst->type;
-    wsp_ggml_to_float_t const dequantize_row_q = type_traits[type].to_float;
-    wsp_ggml_from_float_t const quantize_row_q = type_traits[dtype].from_float;
+    wsp_ggml_to_float_t const wsp_dewsp_quantize_row_q = type_traits[type].to_float;
+    wsp_ggml_from_float_t const wsp_quantize_row_q = type_traits[dtype].from_float;
 
     // we don't support permuted src0 or src1
     WSP_GGML_ASSERT(nb00 == wsp_ggml_type_size(type));
@@ -7204,12 +7204,12 @@ static void wsp_ggml_compute_forward_add_q_f32(
         assert(ne00 % 32 == 0);
 
         // unquantize row from src0 to temp buffer
-        dequantize_row_q(src0_row, wdata, ne00);
+        wsp_dewsp_quantize_row_q(src0_row, wdata, ne00);
         // add src1
         wsp_ggml_vec_acc_f32(ne00, wdata, src1_row);
         // quantize row to dst
-        if (quantize_row_q != NULL) {
-            quantize_row_q(wdata, dst_row, ne00);
+        if (wsp_quantize_row_q != NULL) {
+            wsp_quantize_row_q(wdata, dst_row, ne00);
         } else {
             memcpy(dst_row, wdata, ne0*nb0);
         }
@@ -7435,8 +7435,8 @@ static void wsp_ggml_compute_forward_add1_q_f32(
     WSP_GGML_TENSOR_UNARY_OP_LOCALS
 
     const enum wsp_ggml_type type = src0->type;
-    wsp_ggml_to_float_t const dequantize_row_q = type_traits[type].to_float;
-    wsp_ggml_from_float_t const quantize_row_q = type_traits[type].from_float;
+    wsp_ggml_to_float_t const wsp_dewsp_quantize_row_q = type_traits[type].to_float;
+    wsp_ggml_from_float_t const wsp_quantize_row_q = type_traits[type].from_float;
 
     // we don't support permuted src0
     WSP_GGML_ASSERT(nb00 == wsp_ggml_type_size(type));
@@ -7471,11 +7471,11 @@ static void wsp_ggml_compute_forward_add1_q_f32(
         assert(ne0 % 32 == 0);
 
         // unquantize row from src0 to temp buffer
-        dequantize_row_q(src0_row, wdata, ne0);
+        wsp_dewsp_quantize_row_q(src0_row, wdata, ne0);
         // add src1
         wsp_ggml_vec_acc1_f32(ne0, wdata, v);
         // quantize row to dst
-        quantize_row_q(wdata, dst_row, ne0);
+        wsp_quantize_row_q(wdata, dst_row, ne0);
     }
 }
 
@@ -9880,7 +9880,7 @@ static void wsp_ggml_compute_forward_out_prod_q_f32(
     const int nth = params->nth;
 
     const enum wsp_ggml_type type = src0->type;
-    wsp_ggml_to_float_t const dequantize_row_q = type_traits[type].to_float;
+    wsp_ggml_to_float_t const wsp_dewsp_quantize_row_q = type_traits[type].to_float;
 
     WSP_GGML_ASSERT(ne02 == ne12);
     WSP_GGML_ASSERT(ne03 == ne13);
@@ -9957,7 +9957,7 @@ static void wsp_ggml_compute_forward_out_prod_q_f32(
             float * s1 = (float *) ((char *) src1->data + (i1*nb10 + i11*nb11 + i12*nb12 + i13*nb13));
             float * d  = (float *) ((char *)  dst->data + (          i1*nb1 + i2*nb2 + i3*nb3));
 
-            dequantize_row_q(s0, wdata, ne0);
+            wsp_dewsp_quantize_row_q(s0, wdata, ne0);
             wsp_ggml_vec_mad_f32(ne0, d, wdata, *s1);
         }
     }
@@ -10251,7 +10251,7 @@ static void wsp_ggml_compute_forward_get_rows_q(
     const int nc = src0->ne[0];
     const int nr = wsp_ggml_nelements(src1);
     const enum wsp_ggml_type type = src0->type;
-    wsp_ggml_to_float_t const dequantize_row_q = type_traits[type].to_float;
+    wsp_ggml_to_float_t const wsp_dewsp_quantize_row_q = type_traits[type].to_float;
 
     assert( dst->ne[0] == nc);
     assert( dst->ne[1] == nr);
@@ -10260,7 +10260,7 @@ static void wsp_ggml_compute_forward_get_rows_q(
     for (int i = 0; i < nr; ++i) {
         const int r = ((int32_t *) src1->data)[i];
 
-        dequantize_row_q(
+        wsp_dewsp_quantize_row_q(
                 (const void *) ((char *) src0->data + r*src0->nb[1]),
                      (float *) ((char *)  dst->data + i*dst->nb[1]), nc);
     }
@@ -18719,14 +18719,14 @@ enum wsp_ggml_opt_result wsp_ggml_opt_resume_g(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t wsp_ggml_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist) {
     assert(k % QK4_0 == 0);
     const int nb = k / QK4_0;
 
     for (int b = 0; b < n; b += k) {
         block_q4_0 * restrict y = (block_q4_0 *) dst + b/QK4_0;
 
-        quantize_row_q4_0_reference(src + b, y, k);
+        wsp_quantize_row_q4_0_reference(src + b, y, k);
 
         for (int i = 0; i < nb; i++) {
             for (int j = 0; j < QK4_0; j += 2) {
@@ -18742,14 +18742,14 @@ size_t wsp_ggml_quantize_q4_0(const float * src, void * dst, int n, int k, int64
     return (n/QK4_0*sizeof(block_q4_0));
 }
 
-size_t wsp_ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist) {
     assert(k % QK4_1 == 0);
     const int nb = k / QK4_1;
 
     for (int b = 0; b < n; b += k) {
         block_q4_1 * restrict y = (block_q4_1 *) dst + b/QK4_1;
 
-        quantize_row_q4_1_reference(src + b, y, k);
+        wsp_quantize_row_q4_1_reference(src + b, y, k);
 
         for (int i = 0; i < nb; i++) {
             for (int j = 0; j < QK4_1; j += 2) {
@@ -18765,14 +18765,14 @@ size_t wsp_ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64
     return (n/QK4_1*sizeof(block_q4_1));
 }
 
-size_t wsp_ggml_quantize_q5_0(const float * src, void * dst, int n, int k, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_q5_0(const float * src, void * dst, int n, int k, int64_t * hist) {
     assert(k % QK5_0 == 0);
     const int nb = k / QK5_0;
 
     for (int b = 0; b < n; b += k) {
         block_q5_0 * restrict y = (block_q5_0 *)dst + b/QK5_0;
 
-        quantize_row_q5_0_reference(src + b, y, k);
+        wsp_quantize_row_q5_0_reference(src + b, y, k);
 
         for (int i = 0; i < nb; i++) {
             uint32_t qh;
@@ -18795,14 +18795,14 @@ size_t wsp_ggml_quantize_q5_0(const float * src, void * dst, int n, int k, int64
     return (n/QK5_0*sizeof(block_q5_0));
 }
 
-size_t wsp_ggml_quantize_q5_1(const float * src, void * dst, int n, int k, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_q5_1(const float * src, void * dst, int n, int k, int64_t * hist) {
     assert(k % QK5_1 == 0);
     const int nb = k / QK5_1;
 
     for (int b = 0; b < n; b += k) {
         block_q5_1 * restrict y = (block_q5_1 *)dst + b/QK5_1;
 
-        quantize_row_q5_1_reference(src + b, y, k);
+        wsp_quantize_row_q5_1_reference(src + b, y, k);
 
         for (int i = 0; i < nb; i++) {
             uint32_t qh;
@@ -18825,14 +18825,14 @@ size_t wsp_ggml_quantize_q5_1(const float * src, void * dst, int n, int k, int64
     return (n/QK5_1*sizeof(block_q5_1));
 }
 
-size_t wsp_ggml_quantize_q8_0(const float * src, void * dst, int n, int k, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_q8_0(const float * src, void * dst, int n, int k, int64_t * hist) {
     assert(k % QK8_0 == 0);
     const int nb = k / QK8_0;
 
     for (int b = 0; b < n; b += k) {
         block_q8_0 * restrict y = (block_q8_0 *)dst + b/QK8_0;
 
-        quantize_row_q8_0_reference(src + b, y, k);
+        wsp_quantize_row_q8_0_reference(src + b, y, k);
 
         for (int i = 0; i < nb; i++) {
             for (int j = 0; j < QK8_0; ++j) {
@@ -18846,68 +18846,68 @@ size_t wsp_ggml_quantize_q8_0(const float * src, void * dst, int n, int k, int64
     return (n/QK8_0*sizeof(block_q8_0));
 }
 
-size_t wsp_ggml_quantize_chunk(enum wsp_ggml_type type, const float * src, void * dst, int start, int n, int64_t * hist) {
+size_t wsp_ggml_wsp_quantize_chunk(enum wsp_ggml_type type, const float * src, void * dst, int start, int n, int64_t * hist) {
     size_t result = 0;
     switch (type) {
         case WSP_GGML_TYPE_Q4_0:
             {
                 WSP_GGML_ASSERT(start % QK4_0 == 0);
                 block_q4_0 * block = (block_q4_0*)dst + start / QK4_0;
-                result = wsp_ggml_quantize_q4_0(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q4_0(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q4_1:
             {
                 WSP_GGML_ASSERT(start % QK4_1 == 0);
                 block_q4_1 * block = (block_q4_1*)dst + start / QK4_1;
-                result = wsp_ggml_quantize_q4_1(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q4_1(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q5_0:
             {
                 WSP_GGML_ASSERT(start % QK5_0 == 0);
                 block_q5_0 * block = (block_q5_0*)dst + start / QK5_0;
-                result = wsp_ggml_quantize_q5_0(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q5_0(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q5_1:
             {
                 WSP_GGML_ASSERT(start % QK5_1 == 0);
                 block_q5_1 * block = (block_q5_1*)dst + start / QK5_1;
-                result = wsp_ggml_quantize_q5_1(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q5_1(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q8_0:
             {
                 WSP_GGML_ASSERT(start % QK8_0 == 0);
                 block_q8_0 * block = (block_q8_0*)dst + start / QK8_0;
-                result = wsp_ggml_quantize_q8_0(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q8_0(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q2_K:
             {
                 WSP_GGML_ASSERT(start % QK_K == 0);
                 block_q2_K * block = (block_q2_K*)dst + start / QK_K;
-                result = wsp_ggml_quantize_q2_K(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q2_K(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q3_K:
             {
                 WSP_GGML_ASSERT(start % QK_K == 0);
                 block_q3_K * block = (block_q3_K*)dst + start / QK_K;
-                result = wsp_ggml_quantize_q3_K(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q3_K(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q4_K:
             {
                 WSP_GGML_ASSERT(start % QK_K == 0);
                 block_q4_K * block = (block_q4_K*)dst + start / QK_K;
-                result = wsp_ggml_quantize_q4_K(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q4_K(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q5_K:
             {
                 WSP_GGML_ASSERT(start % QK_K == 0);
                 block_q5_K * block = (block_q5_K*)dst + start / QK_K;
-                result = wsp_ggml_quantize_q5_K(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q5_K(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_Q6_K:
             {
                 WSP_GGML_ASSERT(start % QK_K == 0);
                 block_q6_K * block = (block_q6_K*)dst + start / QK_K;
-                result = wsp_ggml_quantize_q6_K(src + start, block, n, n, hist);
+                result = wsp_ggml_wsp_quantize_q6_K(src + start, block, n, n, hist);
             } break;
         case WSP_GGML_TYPE_F16:
             {

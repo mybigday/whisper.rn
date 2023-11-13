@@ -50,12 +50,16 @@ for file in "${files[@]}"; do
     sed -i '' 's/GGUF_/WSP_GGUF_/g' $file
     sed -i '' 's/gguf_/wsp_gguf_/g' $file
     sed -i '' 's/GGMLMetalClass/WSPGGMLMetalClass/g' $file
+    sed -i '' 's/dequantize_/wsp_dequantize_/g' $file
+    sed -i '' 's/quantize_/wsp_quantize_/g' $file
   else
     sed -i 's/GGML_/WSP_GGML_/g' $file
     sed -i 's/ggml_/wsp_ggml_/g' $file
     sed -i 's/GGUF_/WSP_GGUF_/g' $file
     sed -i 's/gguf_/wsp_gguf_/g' $file
     sed -i 's/GGMLMetalClass/WSPGGMLMetalClass/g' $file
+    sed -i 's/dequantize_/wsp_dequantize_/g' $file
+    sed -i 's/quantize_/wsp_quantize_/g' $file
   fi
 done
 
