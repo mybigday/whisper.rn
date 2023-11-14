@@ -403,13 +403,8 @@ extern "C" {
         WSP_GGML_OP_ROPE_BACK,
         WSP_GGML_OP_ALIBI,
         WSP_GGML_OP_CLAMP,
-        WSP_GGML_OP_CONV_1D,
-        WSP_GGML_OP_CONV_1D_STAGE_0,  // internal
-        WSP_GGML_OP_CONV_1D_STAGE_1,  // internal
         WSP_GGML_OP_CONV_TRANSPOSE_1D,
-        WSP_GGML_OP_CONV_2D,
-        WSP_GGML_OP_CONV_2D_STAGE_0, // internal
-        WSP_GGML_OP_CONV_2D_STAGE_1, // internal
+        WSP_GGML_OP_IM2COL,
         WSP_GGML_OP_CONV_TRANSPOSE_2D,
         WSP_GGML_OP_POOL_1D,
         WSP_GGML_OP_POOL_2D,
@@ -1397,6 +1392,18 @@ extern "C" {
             struct wsp_ggml_tensor  * a,
             float                 min,
             float                 max);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_im2col(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            struct wsp_ggml_tensor  * b,
+            int                  s0,
+            int                  s1,
+            int                  p0,
+            int                  p1,
+            int                  d0,
+            int                  d1,
+            bool                 is_2D);
 
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_1d(
             struct wsp_ggml_context * ctx,

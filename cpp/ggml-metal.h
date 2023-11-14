@@ -26,7 +26,7 @@
 #include <stdbool.h>
 
 // max memory buffers that can be mapped to the device
-#define WSP_GGML_METAL_MAX_BUFFERS 16
+#define WSP_GGML_METAL_MAX_BUFFERS 64
 #define WSP_GGML_METAL_MAX_COMMAND_BUFFERS 32
 
 struct wsp_ggml_tensor;
