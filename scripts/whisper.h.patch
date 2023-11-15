@@ -1,10 +1,10 @@
---- whisper.h.orig	2023-11-08 05:39:06
-+++ whisper.h	2023-11-08 05:39:07
-@@ -80,6 +80,7 @@
- 
+--- whisper.h.orig	2023-11-14 08:04:07
++++ whisper.h	2023-11-14 08:04:08
+@@ -82,6 +82,7 @@
+
      struct whisper_context_params {
          bool  use_gpu;
 +        bool  use_coreml;
      };
- 
+
      typedef struct whisper_token_data {
