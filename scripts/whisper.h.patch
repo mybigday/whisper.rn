@@ -1,6 +1,6 @@
---- whisper.h.orig	2023-11-14 08:04:07
-+++ whisper.h	2023-11-14 08:04:08
-@@ -82,6 +82,7 @@
+--- whisper.h.orig	2023-11-29 12:02:06
++++ whisper.h	2023-11-29 12:02:07
+@@ -86,6 +86,7 @@
 
      struct whisper_context_params {
          bool  use_gpu;

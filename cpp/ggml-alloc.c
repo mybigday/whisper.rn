@@ -446,12 +446,14 @@ static wsp_ggml_tallocr_t node_tallocr(wsp_ggml_gallocr_t galloc, struct wsp_ggm
     return galloc->hash_allocs[wsp_ggml_hash_find_or_insert(galloc->hash_set, node)];
 }
 
-static void init_view(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * view) {
+static void init_view(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * view, bool update_backend) {
     wsp_ggml_tallocr_t alloc = node_tallocr(galloc, view);
 
     //printf("init_view: %s from src %s\n", view->name, view->view_src->name);
     WSP_GGML_ASSERT(view->view_src != NULL && view->view_src->data != NULL);
-    view->backend = view->view_src->backend;
+    if (update_backend) {
+        view->backend = view->view_src->backend;
+    }
     view->buffer  = view->view_src->buffer;
     view->data    = (char *)view->view_src->data + view->view_offs;
 
@@ -469,7 +471,7 @@ static void allocate_node(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * no
 
     if (node->data == NULL) {
         if (wsp_ggml_is_view(node)) {
-            init_view(galloc, node);
+            init_view(galloc, node, true);
         } else {
             // see if we can reuse a parent's buffer (inplace)
             if (wsp_ggml_op_can_inplace(node->op)) {
@@ -499,15 +501,14 @@ static void allocate_node(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * no
                                 AT_PRINTF("reusing view parent %s (%s) for %s\n", parent->name, view_src->name, node->name);
                                 node->view_src = view_src;
                                 view_src_hn->n_views += 1;
-                                init_view(galloc, node);
+                                init_view(galloc, node, false);
                                 return;
                             }
-                        }
-                        else {
+                        } else {
                             AT_PRINTF("reusing parent %s for %s\n", parent->name, node->name);
                             node->view_src = parent;
                             p_hn->n_views += 1;
-                            init_view(galloc, node);
+                            init_view(galloc, node, false);
                             return;
                         }
                     }
@@ -537,7 +538,7 @@ static void wsp_ggml_tallocr_alloc_graph_impl(wsp_ggml_gallocr_t galloc, struct 
             hash_get(galloc, view_src)->n_views += 1;
             if (node->buffer == NULL && node->data != NULL) {
                 // view of a pre-allocated tensor, didn't call init_view() yet
-                init_view(galloc, node);
+                init_view(galloc, node, true);
             }
         }
 
@@ -548,7 +549,7 @@ static void wsp_ggml_tallocr_alloc_graph_impl(wsp_ggml_gallocr_t galloc, struct 
             }
             hash_get(galloc, parent)->n_children += 1;
             if (wsp_ggml_is_view(parent) && parent->buffer == NULL && parent->data != NULL) {
-                init_view(galloc, parent);
+                init_view(galloc, parent, true);
             }
         }
    }
@@ -663,7 +664,7 @@ size_t wsp_ggml_gallocr_alloc_graph(wsp_ggml_gallocr_t galloc, wsp_ggml_tallocr_
     return max_size;
 }
 
-void wsp_ggml_gallocr_alloc_graph_n(wsp_ggml_gallocr_t galloc, struct wsp_ggml_cgraph * graph, struct wsp_ggml_hash_set hash_set, wsp_ggml_tallocr_t * hash_node_alloct) {
+void wsp_ggml_gallocr_alloc_graph_n(wsp_ggml_gallocr_t galloc, struct wsp_ggml_cgraph * graph, struct wsp_ggml_hash_set hash_set, wsp_ggml_tallocr_t * hash_node_talloc) {
     const size_t hash_size = hash_set.size;
 
     WSP_GGML_ASSERT(hash_size >= (size_t)(graph->n_nodes + graph->n_leafs));
@@ -686,7 +687,7 @@ void wsp_ggml_gallocr_alloc_graph_n(wsp_ggml_gallocr_t galloc, struct wsp_ggml_c
     // reset hash values
     memset(galloc->hash_values, 0, sizeof(struct hash_node) * hash_size);
 
-    galloc->hash_allocs = hash_node_alloct;
+    galloc->hash_allocs = hash_node_talloc;
 
     wsp_ggml_tallocr_alloc_graph_impl(galloc, graph);
 

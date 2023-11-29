@@ -346,9 +346,9 @@ struct wsp_ggml_metal_context * wsp_ggml_metal_init(int n_cb) {
     }
 
     WSP_GGML_METAL_LOG_INFO("%s: hasUnifiedMemory              = %s\n",       __func__, ctx->device.hasUnifiedMemory ? "true" : "false");
-    WSP_GGML_METAL_LOG_INFO("%s: recommendedMaxWorkingSetSize  = %8.2f MB\n", __func__, ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
+    WSP_GGML_METAL_LOG_INFO("%s: recommendedMaxWorkingSetSize  = %8.2f MB\n", __func__, ctx->device.recommendedMaxWorkingSetSize / 1e6);
     if (ctx->device.maxTransferRate != 0) {
-        WSP_GGML_METAL_LOG_INFO("%s: maxTransferRate               = %8.2f MB/s\n", __func__, ctx->device.maxTransferRate / 1024.0 / 1024.0);
+        WSP_GGML_METAL_LOG_INFO("%s: maxTransferRate               = %8.2f MB/s\n", __func__, ctx->device.maxTransferRate / 1e6);
     } else {
         WSP_GGML_METAL_LOG_INFO("%s: maxTransferRate               = built-in GPU\n", __func__);
     }
@@ -447,6 +447,10 @@ void wsp_ggml_metal_host_free(void * data) {
     free(data);
 }
 
+bool wsp_ggml_metal_supports_family(struct wsp_ggml_metal_context * ctx, int family) {
+    return [ctx->device supportsFamily:(MTLGPUFamilyApple1 + family - 1)];
+}
+
 void wsp_ggml_metal_set_n_cb(struct wsp_ggml_metal_context * ctx, int n_cb) {
     ctx->n_cb = MIN(n_cb, WSP_GGML_METAL_MAX_BUFFERS);
 }
@@ -529,11 +533,11 @@ bool wsp_ggml_metal_add_buffer(
             ctx->buffers[ctx->n_buffers].metal = [ctx->device newBufferWithBytesNoCopy:data length:size_aligned options:MTLResourceStorageModeShared deallocator:nil];
 
             if (ctx->buffers[ctx->n_buffers].metal == nil) {
-                WSP_GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1024.0 / 1024.0);
+                WSP_GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1e6);
                 return false;
             }
 
-            WSP_GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1024.0 / 1024.0);
+            WSP_GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1e6);
 
             ++ctx->n_buffers;
         } else {
@@ -553,11 +557,11 @@ bool wsp_ggml_metal_add_buffer(
                 ctx->buffers[ctx->n_buffers].metal = [ctx->device newBufferWithBytesNoCopy:(void *) ((uint8_t *) data + i) length:size_step_aligned options:MTLResourceStorageModeShared deallocator:nil];
 
                 if (ctx->buffers[ctx->n_buffers].metal == nil) {
-                    WSP_GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1024.0 / 1024.0);
+                    WSP_GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1e6);
                     return false;
                 }
 
-                WSP_GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1024.0 / 1024.0, i);
+                WSP_GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1e6, i);
                 if (i + size_step < size) {
                     WSP_GGML_METAL_LOG_INFO("\n");
                 }
@@ -568,8 +572,8 @@ bool wsp_ggml_metal_add_buffer(
 
 #if TARGET_OS_OSX
         WSP_GGML_METAL_LOG_INFO(", (%8.2f / %8.2f)",
-                ctx->device.currentAllocatedSize / 1024.0 / 1024.0,
-                ctx->device.recommendedMaxWorkingSetSize / 1024.0 / 1024.0);
+                ctx->device.currentAllocatedSize / 1e6,
+                ctx->device.recommendedMaxWorkingSetSize / 1e6);
 
         if (ctx->device.currentAllocatedSize > ctx->device.recommendedMaxWorkingSetSize) {
             WSP_GGML_METAL_LOG_WARN("%s: warning: current allocated size is greater than the recommended max working set size\n", __func__);
@@ -577,7 +581,7 @@ bool wsp_ggml_metal_add_buffer(
             WSP_GGML_METAL_LOG_INFO("\n");
         }
 #else
-        WSP_GGML_METAL_LOG_INFO(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1024.0 / 1024.0);
+        WSP_GGML_METAL_LOG_INFO(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1e6);
 #endif
     }
 
@@ -1060,7 +1064,7 @@ void wsp_ggml_metal_graph_compute(
                             WSP_GGML_ASSERT(ne00 == ne10);
                             WSP_GGML_ASSERT(ne03 == ne13);
 
-                            const uint gqa = ne12/ne02;
+                            const unsigned int gqa = ne12/ne02;
 
                             // find the break-even point where the matrix-matrix kernel becomes more efficient compared
                             // to the matrix-vector kernel
@@ -1738,4 +1742,10 @@ void wsp_ggml_backend_metal_set_n_cb(wsp_ggml_backend_t backend, int n_cb) {
     struct wsp_ggml_metal_context * ctx = (struct wsp_ggml_metal_context *)backend->context;
 
     wsp_ggml_metal_set_n_cb(ctx, n_cb);
+}
+
+bool wsp_ggml_backend_metal_supports_family(wsp_ggml_backend_t backend, int family) {
+    struct wsp_ggml_metal_context * ctx = (struct wsp_ggml_metal_context *)backend->context;
+
+    return wsp_ggml_metal_supports_family(ctx, family);
 }
