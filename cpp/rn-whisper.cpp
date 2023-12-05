@@ -3,39 +3,46 @@
 #include <vector>
 #include <unordered_map>
 #include "whisper.h"
+#include "rn-whisper.h"
 
-extern "C" {
+namespace rnwhisper {
 
-std::unordered_map<int, bool> abort_map;
-
-bool* rn_whisper_assign_abort_map(int job_id) {
-    abort_map[job_id] = false;
-    return &abort_map[job_id];
+job::~job() {
+    fprintf(stderr, "%s: job_id: %d\n", __func__, job_id);
 }
 
-void rn_whisper_remove_abort_map(int job_id) {
-    if (abort_map.find(job_id) != abort_map.end()) {
-        abort_map.erase(job_id);
+bool job::is_aborted() {
+    return aborted;
+}
+
+void job::abort() {
+    aborted = true;
+}
+
+std::unordered_map<int, job> job_map;
+
+void job_abort_all() {
+    for (auto it = job_map.begin(); it != job_map.end(); ++it) {
+        it->second.abort();
     }
 }
 
-void rn_whisper_abort_transcribe(int job_id) {
-    if (abort_map.find(job_id) != abort_map.end()) {
-        abort_map[job_id] = true;
-    }
+job job_new(int job_id) {
+    job ctx;
+    ctx.job_id = job_id;
+    job_map[job_id] = ctx;
+    return ctx;
 }
 
-bool rn_whisper_transcribe_is_aborted(int job_id) {
-    if (abort_map.find(job_id) != abort_map.end()) {
-        return abort_map[job_id];
-    }
-    return false;
+void job_remove(int job_id) {
+    job_map.erase(job_id);
 }
 
-void rn_whisper_abort_all_transcribe() {
-    for (auto it = abort_map.begin(); it != abort_map.end(); ++it) {
-        it->second = true;
+job* job_get(int job_id) {
+    if (job_map.find(job_id) != job_map.end()) {
+        return &job_map[job_id];
     }
+    return nullptr;
 }
 
 void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate) {
@@ -51,7 +58,7 @@ void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate
     }
 }
 
-bool rn_whisper_vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool verbose) {
+bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool verbose) {
     const int n_samples      = pcmf32.size();
     const int n_samples_last = (sample_rate * last_ms) / 1000;
 
