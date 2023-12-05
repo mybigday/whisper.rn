@@ -282,13 +282,13 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     // abort handlers
     rnwhisper::job job = rnwhisper::job_new(job_id);
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
-        rnwhisper::job job = *(rnwhisper::job*)user_data;
-        return !job.is_aborted();
+        rnwhisper::job *job = (rnwhisper::job*)user_data;
+        return !job->is_aborted();
     };
     params.encoder_begin_callback_user_data = &job;
     params.abort_callback = [](void * user_data) {
-        rnwhisper::job job = *(rnwhisper::job*)user_data;
-        return job.is_aborted();
+        rnwhisper::job *job = (rnwhisper::job*)user_data;
+        return job->is_aborted();
     };
     params.abort_callback_user_data = &job;
 
