@@ -169,7 +169,7 @@ bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSampl
             for (int i = 0; i < sampleSize; i++) {
                 audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
             }
-            isSpeech = rn_whisper_vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, state->vadThold, state->vadFreqThold, false);
+            isSpeech = rnwhisper::vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, state->vadThold, state->vadFreqThold, false);
             NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
         } else {
             isSpeech = false;
@@ -476,7 +476,8 @@ struct rnwhisper_segments_callback_data {
 }
 
 - (void)stopTranscribe:(int)jobId {
-    rn_whisper_abort_transcribe(jobId);
+    rnwhisper::job *job = rnwhisper::job_get(jobId);
+    if (job) job->abort();
     if (self->recordState.isRealtime && self->recordState.isCapturing) {
         [self stopAudio];
         if (!self->recordState.isTranscribing) {
@@ -556,17 +557,17 @@ struct rnwhisper_segments_callback_data {
     }
 
     // abort handler
-    bool *abort_ptr = rn_whisper_assign_abort_map(jobId);
+    rnwhisper::job job = rnwhisper::job_new(jobId);
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
-        bool is_aborted = *(bool*)user_data;
-        return !is_aborted;
+        rnwhisper::job job = *(rnwhisper::job*)user_data;
+        return !job.is_aborted();
     };
-    params.encoder_begin_callback_user_data = abort_ptr;
+    params.encoder_begin_callback_user_data = &job;
     params.abort_callback = [](void * user_data) {
-        bool is_aborted = *(bool*)user_data;
-        return is_aborted;
+        rnwhisper::job job = *(rnwhisper::job*)user_data;
+        return job.is_aborted();
     };
-    params.abort_callback_user_data = abort_ptr;
+    params.abort_callback_user_data = &job;
 
     return params;
 }
@@ -579,10 +580,10 @@ struct rnwhisper_segments_callback_data {
     whisper_reset_timings(self->ctx);
 
     int code = whisper_full(self->ctx, params, audioData, audioDataCount);
-    if (rn_whisper_transcribe_is_aborted(jobId)) {
-        code = -999;
-    }
-    rn_whisper_remove_abort_map(jobId);
+
+    rnwhisper::job* job = rnwhisper::job_get(jobId);
+    if (job && job->is_aborted()) code = -999;
+    rnwhisper::job_remove(jobId);
     // if (code == 0) {
     //     whisper_print_timings(self->ctx);
     // }
