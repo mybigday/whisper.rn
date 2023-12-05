@@ -207,7 +207,7 @@ Java_com_rnwhisper_WhisperContext_vadSimple(
     for (int i = 0; i < audio_data_len; i++) {
         samples[i] = audio_data_arr[i];
     }
-    bool is_speech = rn_whisper_vad_simple(samples, WHISPER_SAMPLE_RATE, 1000, vad_thold, vad_freq_thold, false);
+    bool is_speech = rnwhisper::vad_simple(samples, WHISPER_SAMPLE_RATE, 1000, vad_thold, vad_freq_thold, false);
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
     return is_speech;
 }
@@ -280,17 +280,17 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     if (language != nullptr) params.language = env->GetStringUTFChars(language, nullptr);
 
     // abort handlers
-    bool* abort_ptr = rn_whisper_assign_abort_map(job_id);
+    rnwhisper::job job = rnwhisper::job_new(job_id);
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
-        bool is_aborted = *(bool*)user_data;
-        return !is_aborted;
+        rnwhisper::job job = *(rnwhisper::job*)user_data;
+        return !job.is_aborted();
     };
-    params.encoder_begin_callback_user_data = abort_ptr;
+    params.encoder_begin_callback_user_data = &job;
     params.abort_callback = [](void * user_data) {
-        bool is_aborted = *(bool*)user_data;
-        return is_aborted;
+        rnwhisper::job job = *(rnwhisper::job*)user_data;
+        return job.is_aborted();
     };
-    params.abort_callback_user_data = abort_ptr;
+    params.abort_callback_user_data = &job;
 
     if (callback_instance != nullptr) {
         callback_context *cb_ctx = new callback_context;
@@ -329,10 +329,9 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
     if (language != nullptr) env->ReleaseStringUTFChars(language, params.language);
     if (prompt != nullptr) env->ReleaseStringUTFChars(prompt, params.initial_prompt);
-    if (rn_whisper_transcribe_is_aborted(job_id)) {
-        code = -999;
-    }
-    rn_whisper_remove_abort_map(job_id);
+
+    if (job.is_aborted()) code = -999;
+    rnwhisper::job_remove(job_id);
     return code;
 }
 
@@ -343,7 +342,8 @@ Java_com_rnwhisper_WhisperContext_abortTranscribe(
     jint job_id
 ) {
     UNUSED(thiz);
-    rn_whisper_abort_transcribe(job_id);
+    rnwhisper::job *job = rnwhisper::job_get(job_id);
+    if (job) job->abort();
 }
 
 JNIEXPORT void JNICALL
@@ -352,7 +352,7 @@ Java_com_rnwhisper_WhisperContext_abortAllTranscribe(
     jobject thiz
 ) {
     UNUSED(thiz);
-    rn_whisper_abort_all_transcribe();
+    rnwhisper::job_abort_all();
 }
 
 JNIEXPORT jint JNICALL
