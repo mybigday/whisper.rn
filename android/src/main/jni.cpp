@@ -97,7 +97,8 @@ static void input_stream_close(void *ctx) {
 
 static struct whisper_context *whisper_init_from_input_stream(
     JNIEnv *env,
-    jobject input_stream // PushbackInputStream
+    jobject input_stream, // PushbackInputStream
+    struct whisper_context_params cparams
 ) {
     input_stream_context *context = new input_stream_context;
     context->env = env;
@@ -109,7 +110,7 @@ static struct whisper_context *whisper_init_from_input_stream(
         .eof = &input_stream_is_eof,
         .close = &input_stream_close
     };
-    return whisper_init(&loader);
+    return whisper_init_with_params(&loader, cparams);
 }
 
 // Load model from asset
@@ -128,7 +129,8 @@ static void asset_close(void *ctx) {
 static struct whisper_context *whisper_init_from_asset(
     JNIEnv *env,
     jobject assetManager,
-    const char *asset_path
+    const char *asset_path,
+    struct whisper_context_params cparams
 ) {
     LOGI("Loading model from asset '%s'\n", asset_path);
     AAssetManager *asset_manager = AAssetManager_fromJava(env, assetManager);
@@ -143,7 +145,7 @@ static struct whisper_context *whisper_init_from_asset(
         .eof = &asset_is_eof,
         .close = &asset_close
     };
-    return whisper_init(&loader);
+    return whisper_init_with_params(&loader, cparams);
 }
 
 extern "C" {
@@ -152,9 +154,10 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initContext(
         JNIEnv *env, jobject thiz, jstring model_path_str) {
     UNUSED(thiz);
+    struct whisper_context_params cparams;
     struct whisper_context *context = nullptr;
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
-    context = whisper_init_from_file(model_path_chars);
+    context = whisper_init_from_file_with_params(model_path_chars, cparams);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
     return reinterpret_cast<jlong>(context);
 }
@@ -167,9 +170,10 @@ Java_com_rnwhisper_WhisperContext_initContextWithAsset(
     jstring model_path_str
 ) {
     UNUSED(thiz);
+    struct whisper_context_params cparams;
     struct whisper_context *context = nullptr;
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
-    context = whisper_init_from_asset(env, asset_manager, model_path_chars);
+    context = whisper_init_from_asset(env, asset_manager, model_path_chars, cparams);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
     return reinterpret_cast<jlong>(context);
 }
@@ -181,8 +185,9 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
     jobject input_stream
 ) {
     UNUSED(thiz);
+    struct whisper_context_params cparams;
     struct whisper_context *context = nullptr;
-    context = whisper_init_from_input_stream(env, input_stream);
+    context = whisper_init_from_input_stream(env, input_stream, cparams);
     return reinterpret_cast<jlong>(context);
 }
 
