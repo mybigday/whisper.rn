@@ -11,9 +11,9 @@
 
 typedef struct {
     __unsafe_unretained id mSelf;
-
-    int jobId;
     NSDictionary* options;
+
+    struct rnwhisper::job * job;
 
     bool isTranscribing;
     bool isRealtime;

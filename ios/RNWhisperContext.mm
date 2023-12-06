@@ -275,7 +275,8 @@ void AudioInputCallback(void * inUserData,
             audioOutputFile:state->audioOutputPath
         ];
     }
-    state->transcribeHandler(state->jobId, @"end", result);
+    state->transcribeHandler(state->job->job_id, @"end", result);
+    rnwhisper::job_remove(state->job->job_id);
 }
 
 - (void)fullTranscribeSamples:(RNWhisperContextRecordState*) state {
@@ -290,8 +291,9 @@ void AudioInputCallback(void * inUserData,
         audioBufferF32[i] = (float)audioBufferI16[i] / 32768.0f;
     }
     CFTimeInterval timeStart = CACurrentMediaTime();
-    struct whisper_full_params params = [state->mSelf getParams:state->options jobId:state->jobId];
-    int code = [state->mSelf fullTranscribe:state->jobId params:params audioData:audioBufferF32 audioDataCount:state->nSamplesTranscribing];
+    
+    int code = [state->mSelf fullTranscribe:state->job audioData:audioBufferF32 audioDataCount:state->nSamplesTranscribing];
+
     free(audioBufferF32);
     CFTimeInterval timeEnd = CACurrentMediaTime();
     const float timeRecording = (float) state->nSamplesTranscribing / (float) state->dataFormat.mSampleRate;
@@ -340,10 +342,10 @@ void AudioInputCallback(void * inUserData,
         [state->mSelf finishRealtimeTranscribe:state result:result];
     } else if (code == 0) {
         result[@"isCapturing"] = @(true);
-        state->transcribeHandler(state->jobId, @"transcribe", result);
+        state->transcribeHandler(state->job->job_id, @"transcribe", result);
     } else {
         result[@"isCapturing"] = @(true);
-        state->transcribeHandler(state->jobId, @"transcribe", result);
+        state->transcribeHandler(state->job->job_id, @"transcribe", result);
     }
 
     if (continueNeeded) {
@@ -371,8 +373,8 @@ void AudioInputCallback(void * inUserData,
     onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe
 {
     self->recordState.transcribeHandler = onTranscribe;
-    self->recordState.jobId = jobId;
     [self prepareRealtime:options];
+    self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
 
     OSStatus status = AudioQueueNewInput(
         &self->recordState.dataFormat,
@@ -413,9 +415,9 @@ struct rnwhisper_segments_callback_data {
     dispatch_async(dQueue, ^{
         self->recordState.isStoppedByAction = false;
         self->recordState.isTranscribing = true;
-        self->recordState.jobId = jobId;
 
-        whisper_full_params params = [self getParams:options jobId:jobId];
+        whisper_full_params params = [self createParams:options jobId:jobId];
+
         if (options[@"onProgress"] && [options[@"onProgress"] boolValue]) {
             params.progress_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, int progress, void * user_data) {
                 void (^onProgress)(int) = (__bridge void (^)(int))user_data;
@@ -460,8 +462,10 @@ struct rnwhisper_segments_callback_data {
             };
             params.new_segment_callback_user_data = &user_data;
         }
-        int code = [self fullTranscribe:jobId params:params audioData:audioData audioDataCount:audioDataCount];
-        self->recordState.jobId = -1;
+    
+        rnwhisper::job* job = rnwhisper::job_new(jobId, params);;
+        int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
+        rnwhisper::job_remove(jobId);
         self->recordState.isTranscribing = false;
         onEnd(code);
     });
@@ -476,8 +480,7 @@ struct rnwhisper_segments_callback_data {
 }
 
 - (void)stopTranscribe:(int)jobId {
-    rnwhisper::job *job = rnwhisper::job_get(jobId);
-    if (job) job->abort();
+    if (self->recordState.job) self->recordState.job->abort();
     if (self->recordState.isRealtime && self->recordState.isCapturing) {
         [self stopAudio];
         if (!self->recordState.isTranscribing) {
@@ -491,13 +494,11 @@ struct rnwhisper_segments_callback_data {
 }
 
 - (void)stopCurrentTranscribe {
-    if (!self->recordState.jobId) {
-        return;
-    }
-    [self stopTranscribe:self->recordState.jobId];
+    if (self->recordState.job == nullptr) return;
+    [self stopTranscribe:self->recordState.job->job_id];
 }
 
-- (struct whisper_full_params)getParams:(NSDictionary *)options jobId:(int)jobId {
+- (struct whisper_full_params)createParams:(NSDictionary *)options jobId:(int)jobId {
     struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 
     const int n_threads = options[@"maxThreads"] != nil ?
@@ -554,22 +555,16 @@ struct rnwhisper_segments_callback_data {
         params.initial_prompt = [options[@"prompt"] UTF8String];
     }
 
-    rnwhisper::job_new(jobId, params);
     return params;
 }
 
-- (int)fullTranscribe:(int)jobId
-  params:(struct whisper_full_params)params
+- (int)fullTranscribe:(rnwhisper::job *)job
   audioData:(float *)audioData
   audioDataCount:(int)audioDataCount
 {
     whisper_reset_timings(self->ctx);
-
-    int code = whisper_full(self->ctx, params, audioData, audioDataCount);
-
-    rnwhisper::job* job = rnwhisper::job_get(jobId);
+    int code = whisper_full(self->ctx, job->params, audioData, audioDataCount);
     if (job && job->is_aborted()) code = -999;
-    rnwhisper::job_remove(jobId);
     // if (code == 0) {
     //     whisper_print_timings(self->ctx);
     // }

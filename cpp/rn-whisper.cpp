@@ -26,7 +26,7 @@ void job_abort_all() {
     }
 }
 
-job job_new(int job_id, struct whisper_full_params params) {
+job* job_new(int job_id, struct whisper_full_params params) {
     job ctx;
     ctx.job_id = job_id;
     ctx.params = params;
@@ -44,7 +44,7 @@ job job_new(int job_id, struct whisper_full_params params) {
     params.abort_callback_user_data = &ctx;
 
     job_map[job_id] = ctx;
-    return ctx;
+    return &job_map[job_id];
 }
 
 void job_remove(int job_id) {

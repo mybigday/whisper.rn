@@ -17,7 +17,7 @@ struct job {
 };
 
 void job_abort_all();
-job job_new(int job_id, struct whisper_full_params params);
+job* job_new(int job_id, struct whisper_full_params params);
 void job_remove(int job_id);
 job* job_get(int job_id);
 

@@ -212,6 +212,60 @@ Java_com_rnwhisper_WhisperContext_vadSimple(
     return is_speech;
 }
 
+struct whisper_full_params createFullParams(JNIEnv *env, jobject options) {
+    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+
+    params.print_realtime = false;
+    params.print_progress = false;
+    params.print_timestamps = false;
+    params.print_special = false;
+    
+    int max_threads = std::thread::hardware_concurrency();
+    // Use 2 threads by default on 4-core devices, 4 threads on more cores
+    int default_n_threads = max_threads == 4 ? 2 : min(4, max_threads);
+    int n_threads = readablemap::getInt(env, options, "maxThreads", default_n_threads);
+    params.n_threads = n_threads > 0 ? n_threads : default_n_threads;
+    params.translate = readablemap::getBool(env, options, "translate", false);
+    params.speed_up = readablemap::getBool(env, options, "speedUp", false);
+    params.token_timestamps = readablemap::getBool(env, options, "tokenTimestamps", false);
+    params.offset_ms = 0;
+    params.no_context = true;
+    params.single_segment = false;
+
+    int beam_size = readablemap::getInt(env, options, "beamSize", -1);
+    if (beam_size > -1) {
+        params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
+        params.beam_search.beam_size = beam_size;
+    }
+    int best_of = readablemap::getInt(env, options, "bestOf", -1);
+    if (best_of > -1) params.greedy.best_of = best_of;
+    int max_len = readablemap::getInt(env, options, "maxLen", -1);
+    if (max_len > -1) params.max_len = max_len;
+    int max_context = readablemap::getInt(env, options, "maxContext", -1);
+    if (max_context > -1) params.n_max_text_ctx = max_context;
+    int offset = readablemap::getInt(env, options, "offset", -1);
+    if (offset > -1) params.offset_ms = offset;
+    int duration = readablemap::getInt(env, options, "duration", -1);
+    if (duration > -1) params.duration_ms = duration;
+    int word_thold = readablemap::getInt(env, options, "wordThold", -1);
+    if (word_thold > -1) params.thold_pt = word_thold;
+    float temperature = readablemap::getFloat(env, options, "temperature", -1);
+    if (temperature > -1) params.temperature = temperature;
+    float temperature_inc = readablemap::getFloat(env, options, "temperatureInc", -1);
+    if (temperature_inc > -1) params.temperature_inc = temperature_inc;
+    jstring prompt = readablemap::getString(env, options, "prompt", nullptr);
+    if (prompt != nullptr) {
+        params.initial_prompt = env->GetStringUTFChars(prompt, nullptr);
+        env->ReleaseStringUTFChars(prompt, params.initial_prompt);
+    }
+    jstring language = readablemap::getString(env, options, "language", nullptr);
+    if (language != nullptr) {
+        params.language = env->GetStringUTFChars(language, nullptr);
+        env->ReleaseStringUTFChars(language, params.language);
+    }
+    return params;
+}
+
 struct callback_context {
     JNIEnv *env;
     jobject callback_instance;
@@ -225,7 +279,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jlong context_ptr,
     jfloatArray audio_data,
     jint audio_data_len,
-    jobject transcribe_params,
+    jobject options,
     jobject callback_instance
 ) {
     UNUSED(thiz);
@@ -234,50 +288,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
 
     LOGI("About to create params");
 
-    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-
-    params.print_realtime = false;
-    params.print_progress = false;
-    params.print_timestamps = false;
-    params.print_special = false;
-    
-    int max_threads = std::thread::hardware_concurrency();
-    // Use 2 threads by default on 4-core devices, 4 threads on more cores
-    int default_n_threads = max_threads == 4 ? 2 : min(4, max_threads);
-    int n_threads = readablemap::getInt(env, transcribe_params, "maxThreads", default_n_threads);
-    params.n_threads = n_threads > 0 ? n_threads : default_n_threads;
-    params.translate = readablemap::getBool(env, transcribe_params, "translate", false);
-    params.speed_up = readablemap::getBool(env, transcribe_params, "speedUp", false);
-    params.token_timestamps = readablemap::getBool(env, transcribe_params, "tokenTimestamps", false);
-    params.offset_ms = 0;
-    params.no_context = true;
-    params.single_segment = false;
-
-    int beam_size = readablemap::getInt(env, transcribe_params, "beamSize", -1);
-    if (beam_size > -1) {
-        params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
-        params.beam_search.beam_size = beam_size;
-    }
-    int best_of = readablemap::getInt(env, transcribe_params, "bestOf", -1);
-    if (best_of > -1) params.greedy.best_of = best_of;
-    int max_len = readablemap::getInt(env, transcribe_params, "maxLen", -1);
-    if (max_len > -1) params.max_len = max_len;
-    int max_context = readablemap::getInt(env, transcribe_params, "maxContext", -1);
-    if (max_context > -1) params.n_max_text_ctx = max_context;
-    int offset = readablemap::getInt(env, transcribe_params, "offset", -1);
-    if (offset > -1) params.offset_ms = offset;
-    int duration = readablemap::getInt(env, transcribe_params, "duration", -1);
-    if (duration > -1) params.duration_ms = duration;
-    int word_thold = readablemap::getInt(env, transcribe_params, "wordThold", -1);
-    if (word_thold > -1) params.thold_pt = word_thold;
-    float temperature = readablemap::getFloat(env, transcribe_params, "temperature", -1);
-    if (temperature > -1) params.temperature = temperature;
-    float temperature_inc = readablemap::getFloat(env, transcribe_params, "temperatureInc", -1);
-    if (temperature_inc > -1) params.temperature_inc = temperature_inc;
-    jstring prompt = readablemap::getString(env, transcribe_params, "prompt", nullptr);
-    if (prompt != nullptr) params.initial_prompt = env->GetStringUTFChars(prompt, nullptr);
-    jstring language = readablemap::getString(env, transcribe_params, "language", nullptr);
-    if (language != nullptr) params.language = env->GetStringUTFChars(language, nullptr);
+    whisper_full_params params = createFullParams(env, options);
 
     if (callback_instance != nullptr) {
         callback_context *cb_ctx = new callback_context;
@@ -305,7 +316,7 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         params.new_segment_callback_user_data = cb_ctx;
     }
 
-    rnwhisper::job job = rnwhisper::job_new(job_id, params);
+    rnwhisper::job* job = rnwhisper::job_new(job_id, params);
 
     LOGI("About to reset timings");
     whisper_reset_timings(context);
@@ -316,13 +327,13 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         // whisper_print_timings(context);
     }
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
-    if (language != nullptr) env->ReleaseStringUTFChars(language, params.language);
-    if (prompt != nullptr) env->ReleaseStringUTFChars(prompt, params.initial_prompt);
-
-    if (job.is_aborted()) code = -999;
+    
+    if (job->is_aborted()) code = -999;
     rnwhisper::job_remove(job_id);
     return code;
 }
+
+// TODO: full for realtimeTranscribe with job_id (need create job first)
 
 JNIEXPORT void JNICALL
 Java_com_rnwhisper_WhisperContext_abortTranscribe(
