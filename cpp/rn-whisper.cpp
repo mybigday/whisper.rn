@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "whisper.h"
 #include "rn-whisper.h"
 
 namespace rnwhisper {
@@ -27,9 +26,23 @@ void job_abort_all() {
     }
 }
 
-job job_new(int job_id) {
+job job_new(int job_id, struct whisper_full_params params) {
     job ctx;
     ctx.job_id = job_id;
+    ctx.params = params;
+
+    // Abort handler
+    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
+        job *j = (job*)user_data;
+        return !j->is_aborted();
+    };
+    params.encoder_begin_callback_user_data = &ctx;
+    params.abort_callback = [](void * user_data) {
+        job *j = (job*)user_data;
+        return j->is_aborted();
+    };
+    params.abort_callback_user_data = &ctx;
+
     job_map[job_id] = ctx;
     return ctx;
 }

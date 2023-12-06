@@ -3,11 +3,13 @@
 
 #include <string>
 #include <vector>
+#include "whisper.h"
 
 namespace rnwhisper {
 
 struct job {
     int job_id;
+    whisper_full_params params;
     bool aborted = false;
     ~job();
     bool is_aborted();
@@ -15,7 +17,7 @@ struct job {
 };
 
 void job_abort_all();
-job job_new(int job_id);
+job job_new(int job_id, struct whisper_full_params params);
 void job_remove(int job_id);
 job* job_get(int job_id);
 

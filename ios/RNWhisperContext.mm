@@ -535,7 +535,6 @@ struct rnwhisper_segments_callback_data {
     if (options[@"maxContext"] != nil) {
         params.n_max_text_ctx = [options[@"maxContext"] intValue];
     }
-
     if (options[@"offset"] != nil) {
         params.offset_ms = [options[@"offset"] intValue];
     }
@@ -551,24 +550,11 @@ struct rnwhisper_segments_callback_data {
     if (options[@"temperatureInc"] != nil) {
         params.temperature_inc = [options[@"temperature_inc"] floatValue];
     }
-
     if (options[@"prompt"] != nil) {
         params.initial_prompt = [options[@"prompt"] UTF8String];
     }
 
-    // abort handler
-    rnwhisper::job job = rnwhisper::job_new(jobId);
-    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
-        rnwhisper::job *job = (rnwhisper::job*)user_data;
-        return !job->is_aborted();
-    };
-    params.encoder_begin_callback_user_data = &job;
-    params.abort_callback = [](void * user_data) {
-        rnwhisper::job *job = (rnwhisper::job*)user_data;
-        return job->is_aborted();
-    };
-    params.abort_callback_user_data = &job;
-
+    rnwhisper::job_new(jobId, params);
     return params;
 }
 

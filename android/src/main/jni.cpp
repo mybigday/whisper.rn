@@ -279,19 +279,6 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     jstring language = readablemap::getString(env, transcribe_params, "language", nullptr);
     if (language != nullptr) params.language = env->GetStringUTFChars(language, nullptr);
 
-    // abort handlers
-    rnwhisper::job job = rnwhisper::job_new(job_id);
-    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
-        rnwhisper::job *job = (rnwhisper::job*)user_data;
-        return !job->is_aborted();
-    };
-    params.encoder_begin_callback_user_data = &job;
-    params.abort_callback = [](void * user_data) {
-        rnwhisper::job *job = (rnwhisper::job*)user_data;
-        return job->is_aborted();
-    };
-    params.abort_callback_user_data = &job;
-
     if (callback_instance != nullptr) {
         callback_context *cb_ctx = new callback_context;
         cb_ctx->env = env;
@@ -317,6 +304,8 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
         };
         params.new_segment_callback_user_data = cb_ctx;
     }
+
+    rnwhisper::job job = rnwhisper::job_new(job_id, params);
 
     LOGI("About to reset timings");
     whisper_reset_timings(context);
