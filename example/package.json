@@ -9,8 +9,10 @@
     "pods": "pod-install --quiet"
   },
   "dependencies": {
+    "@react-native/babel-preset": "^0.73.18",
+    "@react-native/metro-config": "^0.73.2",
     "react": "18.2.0",
-    "react-native": "0.71.11",
+    "react-native": "0.73.0",
     "react-native-fs": "^2.20.0",
     "react-native-sound": "^0.11.2",
     "react-native-zip-archive": "^6.1.0"
@@ -18,7 +20,6 @@
   "devDependencies": {
     "@babel/core": "^7.23.5",
     "@babel/preset-env": "^7.23.5",
-    "@babel/runtime": "^7.23.5",
-    "metro-react-native-babel-preset": "0.73.8"
+    "@babel/runtime": "^7.23.5"
   }
 }
