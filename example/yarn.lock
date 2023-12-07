@@ -557,14 +557,7 @@
   dependencies:
     "@babel/helper-plugin-utils" "^7.8.3"
 
-"@babel/plugin-syntax-flow@^7.0.0", "@babel/plugin-syntax-flow@^7.18.0", "@babel/plugin-syntax-flow@^7.18.6":
-  version "7.18.6"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-syntax-flow/-/plugin-syntax-flow-7.18.6.tgz#774d825256f2379d06139be0c723c4dd444f3ca1"
-  integrity sha512-LUbR+KNTBWCUAqRG9ex5Gnzu2IOkt8jRJbHHXFT9q+L9zm7M/QQbEqXyw1n1pohYvOyWC8CjeyjrSaIwiYjK7A==
-  dependencies:
-    "@babel/helper-plugin-utils" "^7.18.6"
-
-"@babel/plugin-syntax-flow@^7.12.1", "@babel/plugin-syntax-flow@^7.23.3":
+"@babel/plugin-syntax-flow@^7.0.0", "@babel/plugin-syntax-flow@^7.12.1", "@babel/plugin-syntax-flow@^7.18.0", "@babel/plugin-syntax-flow@^7.23.3":
   version "7.23.3"
   resolved "https://registry.yarnpkg.com/@babel/plugin-syntax-flow/-/plugin-syntax-flow-7.23.3.tgz#084564e0f3cc21ea6c70c44cff984a1c0509729a"
   integrity sha512-YZiAIpkJAwQXBJLIQbRFayR5c+gJ35Vcz3bg954k7cd73zqjvhacJuL9RbrzPz8qPmZdgqP6EUKwy0PCNhaaPA==
@@ -803,15 +796,7 @@
     "@babel/helper-plugin-utils" "^7.22.5"
     "@babel/plugin-syntax-export-namespace-from" "^7.8.3"
 
-"@babel/plugin-transform-flow-strip-types@^7.0.0", "@babel/plugin-transform-flow-strip-types@^7.18.6":
-  version "7.21.0"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-flow-strip-types/-/plugin-transform-flow-strip-types-7.21.0.tgz#6aeca0adcb81dc627c8986e770bfaa4d9812aff5"
-  integrity sha512-FlFA2Mj87a6sDkW4gfGrQQqwY/dLlBAyJa2dJEZ+FHXUVHBflO2wyKvg+OOEzXfrKYIa4HWl0mgmbCzt0cMb7w==
-  dependencies:
-    "@babel/helper-plugin-utils" "^7.20.2"
-    "@babel/plugin-syntax-flow" "^7.18.6"
-
-"@babel/plugin-transform-flow-strip-types@^7.20.0":
+"@babel/plugin-transform-flow-strip-types@^7.0.0", "@babel/plugin-transform-flow-strip-types@^7.18.6", "@babel/plugin-transform-flow-strip-types@^7.20.0":
   version "7.23.3"
   resolved "https://registry.yarnpkg.com/@babel/plugin-transform-flow-strip-types/-/plugin-transform-flow-strip-types-7.23.3.tgz#cfa7ca159cc3306fab526fc67091556b51af26ff"
   integrity sha512-26/pQTf9nQSNVJCrLB1IkHUKyPxR+lMrH2QDPG89+Znu9rAMbtrybdbWeE9bb7gzjmE5iXHEY+e0HUwM6Co93Q==
@@ -1593,58 +1578,10 @@
   dependencies:
     "@react-native/codegen" "*"
 
-"@react-native/babel-preset@*":
+"@react-native/babel-preset@*", "@react-native/babel-preset@^0.74.0":
   version "0.74.0"
   resolved "https://registry.yarnpkg.com/@react-native/babel-preset/-/babel-preset-0.74.0.tgz#1d933f7737549a6c54f8c808c3ccb452be5f7cbb"
   integrity sha512-k+1aaYQeLn+GBmGA5Qs3NKI8uzhLvRRMML+pB/+43ZL6DvCklbuJ5KO5oqRRpF3KZ2t/VKUqqSichpXfFrXGjg==
-  dependencies:
-    "@babel/core" "^7.20.0"
-    "@babel/plugin-proposal-async-generator-functions" "^7.0.0"
-    "@babel/plugin-proposal-class-properties" "^7.18.0"
-    "@babel/plugin-proposal-export-default-from" "^7.0.0"
-    "@babel/plugin-proposal-nullish-coalescing-operator" "^7.18.0"
-    "@babel/plugin-proposal-numeric-separator" "^7.0.0"
-    "@babel/plugin-proposal-object-rest-spread" "^7.20.0"
-    "@babel/plugin-proposal-optional-catch-binding" "^7.0.0"
-    "@babel/plugin-proposal-optional-chaining" "^7.20.0"
-    "@babel/plugin-syntax-dynamic-import" "^7.8.0"
-    "@babel/plugin-syntax-export-default-from" "^7.0.0"
-    "@babel/plugin-syntax-flow" "^7.18.0"
-    "@babel/plugin-syntax-nullish-coalescing-operator" "^7.0.0"
-    "@babel/plugin-syntax-optional-chaining" "^7.0.0"
-    "@babel/plugin-transform-arrow-functions" "^7.0.0"
-    "@babel/plugin-transform-async-to-generator" "^7.20.0"
-    "@babel/plugin-transform-block-scoping" "^7.0.0"
-    "@babel/plugin-transform-classes" "^7.0.0"
-    "@babel/plugin-transform-computed-properties" "^7.0.0"
-    "@babel/plugin-transform-destructuring" "^7.20.0"
-    "@babel/plugin-transform-flow-strip-types" "^7.20.0"
-    "@babel/plugin-transform-function-name" "^7.0.0"
-    "@babel/plugin-transform-literals" "^7.0.0"
-    "@babel/plugin-transform-modules-commonjs" "^7.0.0"
-    "@babel/plugin-transform-named-capturing-groups-regex" "^7.0.0"
-    "@babel/plugin-transform-parameters" "^7.0.0"
-    "@babel/plugin-transform-private-methods" "^7.22.5"
-    "@babel/plugin-transform-private-property-in-object" "^7.22.11"
-    "@babel/plugin-transform-react-display-name" "^7.0.0"
-    "@babel/plugin-transform-react-jsx" "^7.0.0"
-    "@babel/plugin-transform-react-jsx-self" "^7.0.0"
-    "@babel/plugin-transform-react-jsx-source" "^7.0.0"
-    "@babel/plugin-transform-runtime" "^7.0.0"
-    "@babel/plugin-transform-shorthand-properties" "^7.0.0"
-    "@babel/plugin-transform-spread" "^7.0.0"
-    "@babel/plugin-transform-sticky-regex" "^7.0.0"
-    "@babel/plugin-transform-typescript" "^7.5.0"
-    "@babel/plugin-transform-unicode-regex" "^7.0.0"
-    "@babel/template" "^7.0.0"
-    "@react-native/babel-plugin-codegen" "*"
-    babel-plugin-transform-flow-enums "^0.0.2"
-    react-refresh "^0.14.0"
-
-"@react-native/babel-preset@^0.73.18":
-  version "0.73.18"
-  resolved "https://registry.yarnpkg.com/@react-native/babel-preset/-/babel-preset-0.73.18.tgz#0ff24ba35102d9ac071de8ab10706ccaee5e3e6f"
-  integrity sha512-FzPasmazoX9WZnmwotk6SK9ydiExdqS4Xt5VaukPoY9u8u3AUUODzqjTsWSOxjFD9eRF3Knyg5H8JMDe6pj5wQ==
   dependencies:
     "@babel/core" "^7.20.0"
     "@babel/plugin-proposal-async-generator-functions" "^7.0.0"
