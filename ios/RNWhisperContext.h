@@ -29,11 +29,6 @@ typedef struct {
     int audioSliceSec;
     NSString* audioOutputPath;
 
-    bool useVad;
-    int vadMs;
-    float vadThold;
-    float vadFreqThold;
-
     AudioQueueRef queue;
     AudioStreamBasicDescription dataFormat;
     AudioQueueBufferRef buffers[NUM_BUFFERS];

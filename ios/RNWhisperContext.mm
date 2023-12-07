@@ -117,13 +117,6 @@
 
     self->recordState.audioOutputPath = options[@"audioOutputPath"];
 
-    self->recordState.useVad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false;
-    self->recordState.vadMs = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] : 2000;
-    if (self->recordState.vadMs < 2000) self->recordState.vadMs = 2000;
-
-    self->recordState.vadThold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f;
-    self->recordState.vadFreqThold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f;
-
     self->recordState.audioSliceSec = audioSliceSec;
     self->recordState.isUseSlices = audioSliceSec < maxAudioSec;
 
@@ -158,24 +151,10 @@
     }
 }
 
-bool vad(RNWhisperContextRecordState *state, int16_t* audioBufferI16, int nSamples, int n)
+bool vad(RNWhisperContextRecordState *state, short* pcm, int nSamples, int n)
 {
-    bool isSpeech = true;
-    if (!state->isTranscribing && state->useVad) {
-        int sampleSize = (int) (WHISPER_SAMPLE_RATE * state->vadMs / 1000);
-        if (nSamples + n > sampleSize) {
-            int start = nSamples + n - sampleSize;
-            std::vector<float> audioBufferF32Vec(sampleSize);
-            for (int i = 0; i < sampleSize; i++) {
-                audioBufferF32Vec[i] = (float)audioBufferI16[i + start] / 32768.0f;
-            }
-            isSpeech = rnwhisper::vad_simple(audioBufferF32Vec, WHISPER_SAMPLE_RATE, 1000, state->vadThold, state->vadFreqThold, false);
-            NSLog(@"[RNWhisper] VAD result: %d", isSpeech);
-        } else {
-            isSpeech = false;
-        }
-    }
-    return isSpeech;
+    if (state->isTranscribing) return true;
+    return state->job->vad_simple(pcm, nSamples, n);
 }
 
 void AudioInputCallback(void * inUserData,
@@ -375,6 +354,14 @@ void AudioInputCallback(void * inUserData,
     self->recordState.transcribeHandler = onTranscribe;
     [self prepareRealtime:options];
     self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
+
+    rnwhisper::vad_params vad = {
+        .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
+        .vad_ms = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] : 2000,
+        .vad_thold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f,
+        .freq_thold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f
+    };
+    self->recordState.job->set_vad_params(vad);
 
     OSStatus status = AudioQueueNewInput(
         &self->recordState.dataFormat,
