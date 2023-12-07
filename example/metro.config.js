@@ -2,6 +2,8 @@
 const path = require('path')
 const escape = require('escape-string-regexp')
 const exclusionList = require('metro-config/src/defaults/exclusionList')
+
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config')
 const defaultAssetExts = require('metro-config/src/defaults/defaults').assetExts
 const pak = require('../package.json')
 
@@ -11,7 +13,7 @@ const modules = Object.keys({
   ...pak.peerDependencies,
 })
 
-module.exports = {
+const config = {
   projectRoot: __dirname,
   watchFolders: [root],
 
@@ -34,7 +36,7 @@ module.exports = {
       ...defaultAssetExts,
       'bin', // ggml model binary
       'mil', // CoreML model asset
-    ]
+    ],
   },
 
   transformer: {
@@ -46,3 +48,5 @@ module.exports = {
     }),
   },
 }
+
+module.exports = mergeConfig(getDefaultConfig(__dirname), config)

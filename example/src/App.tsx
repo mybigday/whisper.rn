@@ -21,7 +21,7 @@ const sampleFile = require('../assets/jfk.wav')
 if (Platform.OS === 'android') {
   // Request record audio permission
   // @ts-ignore
-  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, { 
+  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
     title: 'Whisper Audio Permission',
     message: 'Whisper needs access to your microphone',
     buttonNeutral: 'Ask Me Later',
@@ -94,17 +94,27 @@ const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
 export default function App() {
-  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(null)
+  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
+    null,
+  )
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
   const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
-  const [stopTranscribe, setStopTranscribe] = useState<{ stop: () => void } | null>(null)
+  const [stopTranscribe, setStopTranscribe] = useState<{
+    stop: () => void
+  } | null>(null)
 
-  const log = useCallback((...messages) => {
+  const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
   }, [])
 
   const progress = useCallback(
-    ({ contentLength, bytesWritten }) => {
+    ({
+      contentLength,
+      bytesWritten,
+    }: {
+      contentLength: number
+      bytesWritten: number
+    }) => {
       const written = bytesWritten >= 0 ? bytesWritten : 0
       log(`Download progress: ${Math.round((written / contentLength) * 100)}%`)
     },
@@ -368,7 +378,7 @@ export default function App() {
         <TouchableOpacity
           style={[styles.button, styles.buttonClear]}
           onPress={async () => {
-            if (!await RNFS.exists(recordFile)) {
+            if (!(await RNFS.exists(recordFile))) {
               log('Recorded file does not exist')
               return
             }
@@ -379,12 +389,12 @@ export default function App() {
               }
               player.play((success) => {
                 if (success) {
-                  log('successfully finished playing');
+                  log('successfully finished playing')
                 } else {
-                  log('playback failed due to audio decoding errors');
+                  log('playback failed due to audio decoding errors')
                 }
-                player.release();
-              });
+                player.release()
+              })
             })
           }}
         >
