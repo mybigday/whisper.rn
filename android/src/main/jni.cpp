@@ -362,6 +362,7 @@ Java_com_rnwhisper_WhisperContext_finishRealtimeTranscribeJob(
         slice_n_samples_vec = std::vector<int>(slice_n_samples_arr, slice_n_samples_arr + env->GetArrayLength(slice_n_samples));
         env->ReleaseIntArrayElements(slice_n_samples, slice_n_samples_arr, JNI_ABORT);
 
+        // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
         rnaudioutils::save_wav_file(
             rnaudioutils::concat_short_buffers(job->pcm_slices, slice_n_samples_vec),
             *job->audio_output_path

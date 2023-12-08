@@ -201,7 +201,6 @@ void AudioInputCallback(void * inUserData,
         state->sliceNSamples.push_back(0);
     }
 
-    // Append to buffer
     NSLog(@"[RNWhisper] Slice %d has %d samples", state->sliceIndex, nSamples);
 
     state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
