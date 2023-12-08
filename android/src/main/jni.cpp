@@ -191,26 +191,6 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
     return reinterpret_cast<jlong>(context);
 }
 
-JNIEXPORT jboolean JNICALL
-Java_com_rnwhisper_WhisperContext_vadSimple(
-    JNIEnv *env,
-    jobject thiz,
-    jfloatArray audio_data,
-    jint audio_data_len,
-    jfloat vad_thold,
-    jfloat vad_freq_thold
-) {
-    UNUSED(thiz);
-
-    std::vector<float> samples(audio_data_len);
-    jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
-    for (int i = 0; i < audio_data_len; i++) {
-        samples[i] = audio_data_arr[i];
-    }
-    bool is_speech = rnwhisper::vad_simple(samples, WHISPER_SAMPLE_RATE, 1000, vad_thold, vad_freq_thold, false);
-    env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
-    return is_speech;
-}
 
 struct whisper_full_params createFullParams(JNIEnv *env, jobject options) {
     struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
@@ -272,7 +252,7 @@ struct callback_context {
 };
 
 JNIEXPORT jint JNICALL
-Java_com_rnwhisper_WhisperContext_fullTranscribe(
+Java_com_rnwhisper_WhisperContext_fullWithNewJob(
     JNIEnv *env,
     jobject thiz,
     jint job_id,
@@ -333,7 +313,78 @@ Java_com_rnwhisper_WhisperContext_fullTranscribe(
     return code;
 }
 
-// TODO: full for realtimeTranscribe with job_id (need create job first)
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_createRealtimeTranscribeJob(
+    JNIEnv *env,
+    jobject thiz,
+    jint job_id,
+    jlong context_ptr,
+    jobject options
+) {
+    whisper_full_params params = createFullParams(env, options);
+    rnwhisper::job* job = rnwhisper::job_new(job_id, params);
+    rnwhisper::vad_params vad;
+    vad.use_vad = readablemap::getBool(env, options, "useVad", false);
+    vad.vad_ms = readablemap::getInt(env, options, "vadMs", 2000);
+    vad.vad_thold = readablemap::getFloat(env, options, "vadThold", 0.6f);
+    vad.freq_thold = readablemap::getFloat(env, options, "vadFreqThold", 100.0f);
+    job->set_vad_params(vad);
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_removeRealtimeTranscribeJob(
+    JNIEnv *env,
+    jobject thiz,
+    jint job_id,
+    jlong context_ptr
+) {
+    UNUSED(env);
+    UNUSED(thiz);
+    UNUSED(context_ptr);
+    rnwhisper::job_remove(job_id);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_rnwhisper_WhisperContext_vadSimple(
+    JNIEnv *env,
+    jobject thiz,
+    jint job_id,
+    jshortArray pcm,
+    jint n_samples,
+    jint n
+) {
+    UNUSED(thiz);
+
+    jshort *pcm_arr = env->GetShortArrayElements(pcm, nullptr);
+    rnwhisper::job* job = rnwhisper::job_get(job_id);
+    bool is_speech = job->vad_simple(pcm_arr, n_samples, n);
+    env->ReleaseShortArrayElements(pcm, pcm_arr, JNI_ABORT);
+    return is_speech;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_rnwhisper_WhisperContext_fullWithJob(
+    JNIEnv *env,
+    jobject thiz,
+    jint job_id,
+    jlong context_ptr,
+    jfloatArray audio_data, // TODO: move audio slice to C++
+    jint audio_data_len
+) {
+    UNUSED(thiz);
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
+
+    rnwhisper::job* job = rnwhisper::job_get(job_id);
+
+    int code = whisper_full(context, job->params, audio_data_arr, audio_data_len);
+    if (code == 0) {
+        // whisper_print_timings(context);
+    }
+    env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
+    if (job->is_aborted()) code = -999;
+    return code;
+}
 
 JNIEXPORT void JNICALL
 Java_com_rnwhisper_WhisperContext_abortTranscribe(

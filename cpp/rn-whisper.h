@@ -9,8 +9,8 @@ namespace rnwhisper {
 
 struct vad_params {
     bool use_vad = false;
-    float vad_thold = 0.1;
-    float freq_thold = 0.1;
+    float vad_thold = 0.6f;
+    float freq_thold = 100.0f;
     int vad_ms = 2000;
     int last_ms = 1000;
     bool verbose = false;

@@ -80,25 +80,8 @@ public class WhisperContext {
   }
 
   private boolean vad(ReadableMap options, short[] shortBuffer, int nSamples, int n) {
-    boolean isSpeech = true;
-    if (!isTranscribing && options.hasKey("useVad") && options.getBoolean("useVad")) {
-      int vadMs = options.hasKey("vadMs") ? options.getInt("vadMs") : 2000;
-      if (vadMs < 2000) vadMs = 2000;
-      int sampleSize = (int) (SAMPLE_RATE * vadMs / 1000);
-      if (nSamples + n > sampleSize) {
-        int start = nSamples + n - sampleSize;
-        float[] audioData = new float[sampleSize];
-        for (int i = 0; i < sampleSize; i++) {
-          audioData[i] = shortBuffer[i + start] / 32768.0f;
-        }
-        float vadThold = options.hasKey("vadThold") ? (float) options.getDouble("vadThold") : 0.6f;
-        float vadFreqThold = options.hasKey("vadFreqThold") ? (float) options.getDouble("vadFreqThold") : 0.6f;
-        isSpeech = vadSimple(audioData, sampleSize, vadThold, vadFreqThold);
-      } else {
-        isSpeech = false;
-      }
-    }
-    return isSpeech;
+    if (isTranscribing) return true;
+    return vadSimple(jobId, shortBuffer, nSamples, n);
   }
 
   private void finishRealtimeTranscribe(ReadableMap options, WritableMap result) {
@@ -112,8 +95,8 @@ public class WhisperContext {
         Log.e(NAME, "Error saving wav file: " + e.getMessage());
       }
     }
-
     emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
+    removeRealtimeTranscribeJob(jobId, context);
   }
 
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
@@ -132,6 +115,7 @@ public class WhisperContext {
     rewind();
 
     this.jobId = jobId;
+    createRealtimeTranscribeJob(jobId, context, options);
 
     int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
     final int audioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
@@ -178,8 +162,7 @@ public class WhisperContext {
                   finishRealtimeTranscribe(options, Arguments.createMap());
                 } else if (!isTranscribing) {
                   short[] shortBuffer = shortBufferSlices.get(sliceIndex);
-                  boolean isSpeech = vad(options, shortBuffer, nSamples, 0);
-                  if (!isSpeech) {
+                  if (!vad(options, shortBuffer, nSamples, 0)) {
                     finishRealtimeTranscribe(options, Arguments.createMap());
                     break;
                   }
@@ -265,7 +248,7 @@ public class WhisperContext {
     Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
 
     int timeStart = (int) System.currentTimeMillis();
-    int code = full(jobId, options, nSamplesBuffer32, nSamplesTranscribing);
+    int code = fullWithJob(jobId, context, nSamplesBuffer32, nSamplesTranscribing);
     int timeEnd = (int) System.currentTimeMillis();
     int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
 
@@ -383,7 +366,22 @@ public class WhisperContext {
     this.jobId = jobId;
     isTranscribing = true;
     float[] audioData = AudioUtils.decodeWaveFile(inputStream);
-    int code = full(jobId, options, audioData, audioData.length);
+
+    boolean hasProgressCallback = options.hasKey("onProgress") && options.getBoolean("onProgress");
+    boolean hasNewSegmentsCallback = options.hasKey("onNewSegments") && options.getBoolean("onNewSegments");
+    int code = fullWithNewJob(
+      jobId,
+      context,
+      // float[] audio_data,
+      audioData,
+      // jint audio_data_len,
+      audioData.length,
+      // ReadableMap options,
+      options,
+      // Callback callback
+      hasProgressCallback || hasNewSegmentsCallback ? new Callback(this, hasProgressCallback, hasNewSegmentsCallback) : null
+    );
+
     isTranscribing = false;
     this.jobId = -1;
     if (code != 0 && code != 999) {
@@ -392,23 +390,6 @@ public class WhisperContext {
     WritableMap result = getTextSegments(0, getTextSegmentCount(context));
     result.putBoolean("isAborted", isStoppedByAction);
     return result;
-  }
-
-  private int full(int jobId, ReadableMap options, float[] audioData, int audioDataLen) {
-    boolean hasProgressCallback = options.hasKey("onProgress") && options.getBoolean("onProgress");
-    boolean hasNewSegmentsCallback = options.hasKey("onNewSegments") && options.getBoolean("onNewSegments");
-    return fullTranscribe(
-      jobId,
-      context,
-      // float[] audio_data,
-      audioData,
-      // jint audio_data_len,
-      audioDataLen,
-      // ReadableMap options,
-      options,
-      // Callback callback
-      hasProgressCallback || hasNewSegmentsCallback ? new Callback(this, hasProgressCallback, hasNewSegmentsCallback) : null
-    );
   }
 
   private WritableMap getTextSegments(int start, int count) {
@@ -531,14 +512,23 @@ public class WhisperContext {
   protected static native long initContext(String modelPath);
   protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
   protected static native long initContextWithInputStream(PushbackInputStream inputStream);
-  protected static native boolean vadSimple(float[] audio_data, int audio_data_len, float vad_thold, float vad_freq_thold);
-  protected static native int fullTranscribe(
+
+  protected static native int fullWithNewJob(
     int job_id,
     long context,
     float[] audio_data,
     int audio_data_len,
     ReadableMap options,
     Callback Callback
+  );
+  protected static native void createRealtimeTranscribeJob(int job_id, long context, ReadableMap options);
+  protected static native void removeRealtimeTranscribeJob(int job_id, long context);
+  protected static native boolean vadSimple(int job_id, short[] pcm, int n_samples, int n);
+  protected static native int fullWithJob(
+    int job_id,
+    long context,
+    float[] audio_data,
+    int audio_data_len
   );
   protected static native void abortTranscribe(int jobId);
   protected static native void abortAllTranscribe();

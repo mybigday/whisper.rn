@@ -355,13 +355,12 @@ void AudioInputCallback(void * inUserData,
     [self prepareRealtime:options];
     self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
 
-    rnwhisper::vad_params vad = {
+    self->recordState.job->set_vad_params({
         .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
         .vad_ms = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] : 2000,
         .vad_thold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f,
         .freq_thold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f
-    };
-    self->recordState.job->set_vad_params(vad);
+    });
 
     OSStatus status = AudioQueueNewInput(
         &self->recordState.dataFormat,
