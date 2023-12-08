@@ -77,12 +77,12 @@ public class WhisperContext {
     fullHandler = null;
   }
 
-  private boolean vad(ReadableMap options, int sliceIndex, int nSamples, int n) {
+  private boolean vad(int sliceIndex, int nSamples, int n) {
     if (isTranscribing) return true;
     return vadSimple(jobId, sliceIndex, nSamples, n);
   }
 
-  private void finishRealtimeTranscribe(ReadableMap options, WritableMap result) {
+  private void finishRealtimeTranscribe(WritableMap result) {
     emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
     finishRealtimeTranscribeJob(jobId, context, sliceNSamples.stream().mapToInt(i -> i).toArray());
   }
@@ -142,14 +142,14 @@ public class WhisperContext {
                   nSamples == nSamplesTranscribing &&
                   sliceIndex == transcribeSliceIndex
                 ) {
-                  finishRealtimeTranscribe(options, Arguments.createMap());
+                  finishRealtimeTranscribe(Arguments.createMap());
                 } else if (!isTranscribing) {
-                  if (!vad(options, sliceIndex, nSamples, 0)) {
-                    finishRealtimeTranscribe(options, Arguments.createMap());
+                  if (!vad(sliceIndex, nSamples, 0)) {
+                    finishRealtimeTranscribe(Arguments.createMap());
                     break;
                   }
                   isTranscribing = true;
-                  fullTranscribeSamples(options, true);
+                  fullTranscribeSamples(true);
                 }
                 break;
               }
@@ -164,7 +164,7 @@ public class WhisperContext {
               }
               putPcmData(buffer, sliceIndex, nSamples, n);
 
-              boolean isSpeech = vad(options, sliceIndex, nSamples, n);
+              boolean isSpeech = vad(sliceIndex, nSamples, n);
 
               nSamples += n;
               sliceNSamples.set(sliceIndex, nSamples);
@@ -176,7 +176,7 @@ public class WhisperContext {
                 fullHandler = new Thread(new Runnable() {
                   @Override
                   public void run() {
-                    fullTranscribeSamples(options, false);
+                    fullTranscribeSamples(false);
                   }
                 });
                 fullHandler.start();
@@ -187,7 +187,7 @@ public class WhisperContext {
           }
 
           if (!isTranscribing) {
-            finishRealtimeTranscribe(options, Arguments.createMap());
+            finishRealtimeTranscribe(Arguments.createMap());
           }
           if (fullHandler != null) {
             fullHandler.join(); // Wait for full transcribe to finish
@@ -205,15 +205,12 @@ public class WhisperContext {
     return state;
   }
 
-  private void fullTranscribeSamples(ReadableMap options, boolean skipCapturingCheck) {
+  private void fullTranscribeSamples(boolean skipCapturingCheck) {
     int nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
 
     if (!isCapturing && !skipCapturingCheck) return;
 
-    int nSamples = sliceNSamples.get(transcribeSliceIndex);
-
     nSamplesTranscribing = nSamplesOfIndex;
-
     Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
 
     int timeStart = (int) System.currentTimeMillis();
@@ -254,7 +251,7 @@ public class WhisperContext {
     if (isStopped && !continueNeeded) {
       payload.putBoolean("isCapturing", false);
       payload.putBoolean("isStoppedByAction", isStoppedByAction);
-      finishRealtimeTranscribe(options, payload);
+      finishRealtimeTranscribe(payload);
     } else if (code == 0) {
       payload.putBoolean("isCapturing", true);
       emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
@@ -265,7 +262,7 @@ public class WhisperContext {
 
     if (continueNeeded) {
       // If no more capturing, continue transcribing until all slices are transcribed
-      fullTranscribeSamples(options, true);
+      fullTranscribeSamples(true);
     } else if (isStopped) {
       // No next, cleanup
       rewind();
@@ -477,10 +474,11 @@ public class WhisperContext {
     }
   }
 
-
+  // JNI methods
   protected static native long initContext(String modelPath);
   protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
   protected static native long initContextWithInputStream(PushbackInputStream inputStream);
+  protected static native void freeContext(long contextPtr);
 
   protected static native int fullWithNewJob(
     int job_id,
@@ -490,6 +488,13 @@ public class WhisperContext {
     ReadableMap options,
     Callback Callback
   );
+  protected static native void abortTranscribe(int jobId);
+  protected static native void abortAllTranscribe();
+  protected static native int getTextSegmentCount(long context);
+  protected static native String getTextSegment(long context, int index);
+  protected static native int getTextSegmentT0(long context, int index);
+  protected static native int getTextSegmentT1(long context, int index);
+
   protected static native void createRealtimeTranscribeJob(
     int job_id,
     long context,
@@ -504,11 +509,4 @@ public class WhisperContext {
     int slice_index,
     int n_samples
   );
-  protected static native void abortTranscribe(int jobId);
-  protected static native void abortAllTranscribe();
-  protected static native int getTextSegmentCount(long context);
-  protected static native String getTextSegment(long context, int index);
-  protected static native int getTextSegmentT0(long context, int index);
-  protected static native int getTextSegmentT1(long context, int index);
-  protected static native void freeContext(long contextPtr);
 }
