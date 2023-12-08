@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "whisper.h"
+#include "rn-audioutils.h"
 
 namespace rnwhisper {
 
@@ -29,8 +30,9 @@ struct job {
     vad_params vad;
     int audio_sec = 0;
     int audio_slice_sec = 0;
+    std::string* audio_output_path = nullptr;
     std::vector<short *> pcm_slices;
-    void set_realtime_params(vad_params vad, int audio_sec, int audio_slice_sec);
+    void set_realtime_params(vad_params vad, int audio_sec, int audio_slice_sec, std::string* audio_output_path);
     bool vad_simple(int slice_index, int n_samples, int n);
     void put_pcm_data(short* pcm, int slice_index, int n_samples, int n);
     float* pcm_slice_to_f32(int slice_index, int size);

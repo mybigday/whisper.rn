@@ -20,7 +20,7 @@ typedef struct {
     bool isCapturing;
     bool isStoppedByAction;
     int nSamplesTranscribing;
-    NSMutableArray<NSNumber *> *sliceNSamples;
+    std::vector<int> sliceNSamples;
     bool isUseSlices;
     int sliceIndex;
     int transcribeSliceIndex;

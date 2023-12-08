@@ -328,24 +328,45 @@ Java_com_rnwhisper_WhisperContext_createRealtimeTranscribeJob(
     vad.vad_ms = readablemap::getInt(env, options, "vadMs", 2000);
     vad.vad_thold = readablemap::getFloat(env, options, "vadThold", 0.6f);
     vad.freq_thold = readablemap::getFloat(env, options, "vadFreqThold", 100.0f);
+
+    jstring audio_output_path = readablemap::getString(env, options, "audioOutputPath", nullptr);
+    std::string *audio_output_path_str = nullptr;
+    if (audio_output_path != nullptr) {
+        audio_output_path_str = new std::string(env->GetStringUTFChars(audio_output_path, nullptr));
+        env->ReleaseStringUTFChars(audio_output_path, audio_output_path_str->c_str());
+    }
     job->set_realtime_params(
         vad,
         readablemap::getInt(env, options, "realtimeAudioSec", 0),
-        readablemap::getInt(env, options, "realtimeAudioSliceSec", 0)
+        readablemap::getInt(env, options, "realtimeAudioSliceSec", 0),
+        audio_output_path_str
     );
 }
 
 JNIEXPORT void JNICALL
-Java_com_rnwhisper_WhisperContext_removeRealtimeTranscribeJob(
+Java_com_rnwhisper_WhisperContext_finishRealtimeTranscribeJob(
     JNIEnv *env,
     jobject thiz,
     jint job_id,
-    jlong context_ptr
+    jlong context_ptr,
+    jintArray slice_n_samples
 ) {
     UNUSED(env);
     UNUSED(thiz);
     UNUSED(context_ptr);
+
     rnwhisper::job *job = rnwhisper::job_get(job_id);
+    if (job->audio_output_path != nullptr) {
+        std::vector<int> slice_n_samples_vec;
+        jint *slice_n_samples_arr = env->GetIntArrayElements(slice_n_samples, nullptr);
+        slice_n_samples_vec = std::vector<int>(slice_n_samples_arr, slice_n_samples_arr + env->GetArrayLength(slice_n_samples));
+        env->ReleaseIntArrayElements(slice_n_samples, slice_n_samples_arr, JNI_ABORT);
+
+        rnaudioutils::save_wav_file(
+            rnaudioutils::concat_short_buffers(job->pcm_slices, slice_n_samples_vec),
+            *job->audio_output_path
+        );
+    }
     job->free_pcm_slices();
     rnwhisper::job_remove(job_id);
 }

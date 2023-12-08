@@ -63,11 +63,17 @@ job::~job() {
     fprintf(stderr, "%s: job_id: %d\n", __func__, job_id);
 }
 
-void job::set_realtime_params(vad_params params, int sec, int slice_sec) {
+void job::set_realtime_params(
+    vad_params params,
+    int sec,
+    int slice_sec,
+    std::string* output_path
+) {
     vad = params;
     if (vad.vad_ms < 2000) vad.vad_ms = 2000;
     audio_sec = sec > 0 ? sec : DEFAULT_MAX_AUDIO_SEC;
     audio_slice_sec = slice_sec > 0 && slice_sec < audio_sec ? slice_sec : audio_sec;
+    audio_output_path = output_path;
 }
 
 bool job::vad_simple(int slice_index, int n_samples, int n) {

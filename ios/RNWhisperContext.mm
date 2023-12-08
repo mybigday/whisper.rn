@@ -1,5 +1,4 @@
 #import "RNWhisperContext.h"
-#import "RNWhisperAudioUtils.h"
 #import <Metal/Metal.h>
 #include <vector>
 
@@ -113,16 +112,14 @@
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = false;
 
-    self->recordState.audioOutputPath = options[@"audioOutputPath"];
-
     self->recordState.sliceIndex = 0;
     self->recordState.transcribeSliceIndex = 0;
     self->recordState.nSamplesTranscribing = 0;
 
-    self->recordState.sliceNSamples = [NSMutableArray new];
-    [self->recordState.sliceNSamples addObject:[NSNumber numberWithInt:0]];
+    self->recordState.sliceNSamples.push_back(0);
 
     self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
+    std::string audio_output_path = options[@"audioOutputPath"] != nil ? [options[@"audioOutputPath"] UTF8String] : "";
     self->recordState.job->set_realtime_params(
         {
             .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
@@ -131,7 +128,8 @@
             .freq_thold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f
         },
         options[@"realtimeAudioSec"] != nil ? [options[@"realtimeAudioSec"] intValue] : 0,
-        options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0
+        options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0,
+        options[@"audioOutputPath"] != nil ? &audio_output_path : nullptr
     );
     self->recordState.isUseSlices = self->recordState.job->audio_slice_sec < self->recordState.job->audio_sec;
 
@@ -162,13 +160,13 @@ void AudioInputCallback(void * inUserData,
     }
 
     int totalNSamples = 0;
-    for (int i = 0; i < [state->sliceNSamples count]; i++) {
-        totalNSamples += [[state->sliceNSamples objectAtIndex:i] intValue];
+    for (int i = 0; i < state->sliceNSamples.size(); i++) {
+        totalNSamples += state->sliceNSamples[i];
     }
 
     const int n = inBuffer->mAudioDataByteSize / 2;
 
-    int nSamples = [state->sliceNSamples[state->sliceIndex] intValue];
+    int nSamples = state->sliceNSamples[state->sliceIndex];
 
     if (totalNSamples + n > state->job->audio_sec * WHISPER_SAMPLE_RATE) {
         NSLog(@"[RNWhisper] Audio buffer is full, stop capturing");
@@ -200,7 +198,7 @@ void AudioInputCallback(void * inUserData,
         // next slice
         state->sliceIndex++;
         nSamples = 0;
-        [state->sliceNSamples addObject:[NSNumber numberWithInt:0]];
+        state->sliceNSamples.push_back(0);
     }
 
     // Append to buffer
@@ -210,7 +208,7 @@ void AudioInputCallback(void * inUserData,
 
     bool isSpeech = vad(state, state->sliceIndex, nSamples, n);
     nSamples += n;
-    state->sliceNSamples[state->sliceIndex] = [NSNumber numberWithInt:nSamples];
+    state->sliceNSamples[state->sliceIndex] = nSamples;
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
 
@@ -226,13 +224,12 @@ void AudioInputCallback(void * inUserData,
 
 - (void)finishRealtimeTranscribe:(RNWhisperContextRecordState*) state result:(NSDictionary*)result {
     // Save wav if needed
-    if (state->audioOutputPath != nil) {
+    if (state->job->audio_output_path != nullptr) {
         // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-        // [RNWhisperAudioUtils
-        //     saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
-        //                     sliceNSamples:state->sliceNSamples]
-        //     audioOutputFile:state->audioOutputPath
-        // ];
+        rnaudioutils::save_wav_file(
+            rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
+            *state->job->audio_output_path
+        );
     }
     state->transcribeHandler(state->job->job_id, @"end", result);
     state->job->free_pcm_slices();
@@ -240,7 +237,7 @@ void AudioInputCallback(void * inUserData,
 }
 
 - (void)fullTranscribeSamples:(RNWhisperContextRecordState*) state {
-    int nSamplesOfIndex = [[state->sliceNSamples objectAtIndex:state->transcribeSliceIndex] intValue];
+    int nSamplesOfIndex = state->sliceNSamples[state->transcribeSliceIndex];
     state->nSamplesTranscribing = nSamplesOfIndex;
     NSLog(@"[RNWhisper] Transcribing %d samples", state->nSamplesTranscribing);
 
@@ -268,7 +265,7 @@ void AudioInputCallback(void * inUserData,
         result[@"error"] = [NSString stringWithFormat:@"Transcribe failed with code %d", code];
     }
 
-    nSamplesOfIndex = [[state->sliceNSamples objectAtIndex:state->transcribeSliceIndex] intValue];
+    nSamplesOfIndex = state->sliceNSamples[state->transcribeSliceIndex];
 
     bool isStopped = state->isStoppedByAction || (
         !state->isCapturing &&

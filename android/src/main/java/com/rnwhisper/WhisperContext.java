@@ -83,19 +83,8 @@ public class WhisperContext {
   }
 
   private void finishRealtimeTranscribe(ReadableMap options, WritableMap result) {
-    String audioOutputPath = options.hasKey("audioOutputPath") ? options.getString("audioOutputPath") : null;
-    if (audioOutputPath != null) {
-       // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-      Log.d(NAME, "Begin saving wav file to " + audioOutputPath);
-      // try {
-      //   // TODO: cpp audio utils
-      //   AudioUtils.saveWavFile(AudioUtils.concatShortBuffers(shortBufferSlices), audioOutputPath);
-      // } catch (IOException e) {
-      //   Log.e(NAME, "Error saving wav file: " + e.getMessage());
-      // }
-    }
     emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
-    removeRealtimeTranscribeJob(jobId, context);
+    finishRealtimeTranscribeJob(jobId, context, sliceNSamples.stream().mapToInt(i -> i).toArray());
   }
 
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
@@ -122,8 +111,6 @@ public class WhisperContext {
     isUseSlices = audioSliceSec < audioSec;
 
     createRealtimeTranscribeJob(jobId, context, options);
-
-    String audioOutputPath = options.hasKey("audioOutputPath") ? options.getString("audioOutputPath") : null;
 
     sliceNSamples = new ArrayList<Integer>();
     sliceNSamples.add(0);
@@ -508,7 +495,7 @@ public class WhisperContext {
     long context,
     ReadableMap options
   );
-  protected static native void removeRealtimeTranscribeJob(int job_id, long context);
+  protected static native void finishRealtimeTranscribeJob(int job_id, long context, int[] sliceNSamples);
   protected static native boolean vadSimple(int job_id, int slice_index, int n_samples, int n);
   protected static native void putPcmData(short[] buffer, int slice_index, int n_samples, int n);
   protected static native int fullWithJob(
