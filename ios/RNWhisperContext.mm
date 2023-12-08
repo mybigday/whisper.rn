@@ -95,7 +95,7 @@
     return self->dQueue;
 }
 
-- (void)prepareRealtime:(NSDictionary *)options {
+- (void)prepareRealtime:(int)jobId options:(NSDictionary *)options {
     self->recordState.options = options;
 
     self->recordState.dataFormat.mSampleRate = WHISPER_SAMPLE_RATE; // 16000
@@ -108,53 +108,40 @@
     self->recordState.dataFormat.mReserved = 0;
     self->recordState.dataFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger;
 
-    int maxAudioSecOpt = options[@"realtimeAudioSec"] != nil ? [options[@"realtimeAudioSec"] intValue] : 0;
-    int maxAudioSec = maxAudioSecOpt > 0 ? maxAudioSecOpt : DEFAULT_MAX_AUDIO_SEC;
-    self->recordState.maxAudioSec = maxAudioSec;
-
-    int realtimeAudioSliceSec = options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0;
-    int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < maxAudioSec ? realtimeAudioSliceSec : maxAudioSec;
-
-    self->recordState.audioOutputPath = options[@"audioOutputPath"];
-
-    self->recordState.audioSliceSec = audioSliceSec;
-    self->recordState.isUseSlices = audioSliceSec < maxAudioSec;
-
-    self->recordState.sliceIndex = 0;
-    self->recordState.transcribeSliceIndex = 0;
-    self->recordState.nSamplesTranscribing = 0;
-
-    [self freeBufferIfNeeded];
-    self->recordState.shortBufferSlices = [NSMutableArray new];
-
-    int16_t *audioBufferI16 = (int16_t *) malloc(audioSliceSec * WHISPER_SAMPLE_RATE * sizeof(int16_t));
-    [self->recordState.shortBufferSlices addObject:[NSValue valueWithPointer:audioBufferI16]];
-
-    self->recordState.sliceNSamples = [NSMutableArray new];
-    [self->recordState.sliceNSamples addObject:[NSNumber numberWithInt:0]];
-
     self->recordState.isRealtime = true;
     self->recordState.isTranscribing = false;
     self->recordState.isCapturing = false;
     self->recordState.isStoppedByAction = false;
 
+    self->recordState.audioOutputPath = options[@"audioOutputPath"];
+
+    self->recordState.sliceIndex = 0;
+    self->recordState.transcribeSliceIndex = 0;
+    self->recordState.nSamplesTranscribing = 0;
+
+    self->recordState.sliceNSamples = [NSMutableArray new];
+    [self->recordState.sliceNSamples addObject:[NSNumber numberWithInt:0]];
+
+    self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
+    self->recordState.job->set_realtime_params(
+        {
+            .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
+            .vad_ms = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] : 2000,
+            .vad_thold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f,
+            .freq_thold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f
+        },
+        options[@"realtimeAudioSec"] != nil ? [options[@"realtimeAudioSec"] intValue] : 0,
+        options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0
+    );
+    self->recordState.isUseSlices = self->recordState.job->audio_slice_sec < self->recordState.job->audio_sec;
+
     self->recordState.mSelf = self;
 }
 
-- (void)freeBufferIfNeeded {
-    if (self->recordState.shortBufferSlices != nil) {
-        for (int i = 0; i < [self->recordState.shortBufferSlices count]; i++) {
-            int16_t *audioBufferI16 = (int16_t *) [self->recordState.shortBufferSlices[i] pointerValue];
-            free(audioBufferI16);
-        }
-        self->recordState.shortBufferSlices = nil;
-    }
-}
-
-bool vad(RNWhisperContextRecordState *state, short* pcm, int nSamples, int n)
+bool vad(RNWhisperContextRecordState *state, int sliceIndex, int nSamples, int n)
 {
     if (state->isTranscribing) return true;
-    return state->job->vad_simple(pcm, nSamples, n);
+    return state->job->vad_simple(sliceIndex, nSamples, n);
 }
 
 void AudioInputCallback(void * inUserData,
@@ -183,7 +170,7 @@ void AudioInputCallback(void * inUserData,
 
     int nSamples = [state->sliceNSamples[state->sliceIndex] intValue];
 
-    if (totalNSamples + n > state->maxAudioSec * WHISPER_SAMPLE_RATE) {
+    if (totalNSamples + n > state->job->audio_sec * WHISPER_SAMPLE_RATE) {
         NSLog(@"[RNWhisper] Audio buffer is full, stop capturing");
         state->isCapturing = false;
         [state->mSelf stopAudio];
@@ -197,8 +184,7 @@ void AudioInputCallback(void * inUserData,
             !state->isTranscribing &&
             nSamples != state->nSamplesTranscribing
         ) {
-            int16_t* audioBufferI16 = (int16_t*) [state->shortBufferSlices[state->sliceIndex] pointerValue];
-            if (!vad(state, audioBufferI16, nSamples, 0)) {
+            if (!vad(state, state->sliceIndex, nSamples, 0)) {
                 [state->mSelf finishRealtimeTranscribe:state result:@{}];
                 return;
             }
@@ -210,25 +196,19 @@ void AudioInputCallback(void * inUserData,
         return;
     }
 
-    int audioSliceSec = state->audioSliceSec;
-    if (nSamples + n > audioSliceSec * WHISPER_SAMPLE_RATE) {
+    if (nSamples + n > state->job->audio_slice_sec * WHISPER_SAMPLE_RATE) {
         // next slice
         state->sliceIndex++;
         nSamples = 0;
-        int16_t* audioBufferI16 = (int16_t*) malloc(audioSliceSec * WHISPER_SAMPLE_RATE * sizeof(int16_t));
-        [state->shortBufferSlices addObject:[NSValue valueWithPointer:audioBufferI16]];
         [state->sliceNSamples addObject:[NSNumber numberWithInt:0]];
     }
 
     // Append to buffer
     NSLog(@"[RNWhisper] Slice %d has %d samples", state->sliceIndex, nSamples);
 
-    int16_t* audioBufferI16 = (int16_t*) [state->shortBufferSlices[state->sliceIndex] pointerValue];
-    for (int i = 0; i < n; i++) {
-        audioBufferI16[nSamples + i] = ((short*)inBuffer->mAudioData)[i];
-    }
+    state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
 
-    bool isSpeech = vad(state, audioBufferI16, nSamples, n);
+    bool isSpeech = vad(state, state->sliceIndex, nSamples, n);
     nSamples += n;
     state->sliceNSamples[state->sliceIndex] = [NSNumber numberWithInt:nSamples];
 
@@ -248,13 +228,14 @@ void AudioInputCallback(void * inUserData,
     // Save wav if needed
     if (state->audioOutputPath != nil) {
         // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-        [RNWhisperAudioUtils
-            saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
-                            sliceNSamples:state->sliceNSamples]
-            audioOutputFile:state->audioOutputPath
-        ];
+        // [RNWhisperAudioUtils
+        //     saveWavFile:[RNWhisperAudioUtils concatShortBuffers:state->shortBufferSlices
+        //                     sliceNSamples:state->sliceNSamples]
+        //     audioOutputFile:state->audioOutputPath
+        // ];
     }
     state->transcribeHandler(state->job->job_id, @"end", result);
+    state->job->free_pcm_slices();
     rnwhisper::job_remove(state->job->job_id);
 }
 
@@ -263,17 +244,11 @@ void AudioInputCallback(void * inUserData,
     state->nSamplesTranscribing = nSamplesOfIndex;
     NSLog(@"[RNWhisper] Transcribing %d samples", state->nSamplesTranscribing);
 
-    int16_t* audioBufferI16 = (int16_t*) [state->shortBufferSlices[state->transcribeSliceIndex] pointerValue];
-    float* audioBufferF32 = (float*) malloc(state->nSamplesTranscribing * sizeof(float));
-    // convert I16 to F32
-    for (int i = 0; i < state->nSamplesTranscribing; i++) {
-        audioBufferF32[i] = (float)audioBufferI16[i] / 32768.0f;
-    }
-    CFTimeInterval timeStart = CACurrentMediaTime();
-    
-    int code = [state->mSelf fullTranscribe:state->job audioData:audioBufferF32 audioDataCount:state->nSamplesTranscribing];
+    float* pcmf32 = state->job->pcm_slice_to_f32(state->transcribeSliceIndex, state->nSamplesTranscribing);
 
-    free(audioBufferF32);
+    CFTimeInterval timeStart = CACurrentMediaTime();
+    int code = [state->mSelf fullTranscribe:state->job audioData:pcmf32 audioDataCount:state->nSamplesTranscribing];
+    free(pcmf32);
     CFTimeInterval timeEnd = CACurrentMediaTime();
     const float timeRecording = (float) state->nSamplesTranscribing / (float) state->dataFormat.mSampleRate;
 
@@ -352,15 +327,7 @@ void AudioInputCallback(void * inUserData,
     onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe
 {
     self->recordState.transcribeHandler = onTranscribe;
-    [self prepareRealtime:options];
-    self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
-
-    self->recordState.job->set_vad_params({
-        .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
-        .vad_ms = options[@"vadMs"] != nil ? [options[@"vadMs"] intValue] : 2000,
-        .vad_thold = options[@"vadThold"] != nil ? [options[@"vadThold"] floatValue] : 0.6f,
-        .freq_thold = options[@"vadFreqThold"] != nil ? [options[@"vadFreqThold"] floatValue] : 100.0f
-    });
+    [self prepareRealtime:jobId options:options];
 
     OSStatus status = AudioQueueNewInput(
         &self->recordState.dataFormat,
@@ -584,7 +551,6 @@ struct rnwhisper_segments_callback_data {
 - (void)invalidate {
     [self stopCurrentTranscribe];
     whisper_free(self->ctx);
-    [self freeBufferIfNeeded];
 }
 
 @end

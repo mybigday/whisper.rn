@@ -20,13 +20,21 @@ struct job {
     int job_id;
     bool aborted = false;
     whisper_full_params params;
-    vad_params vad; // Realtime transcription only
-    
+
     ~job();
-    void set_vad_params(vad_params vad);
-    bool vad_simple(short* pcm, int n_samples, int n);
     bool is_aborted();
     void abort();
+
+    // Realtime transcription only:
+    vad_params vad;
+    int audio_sec = 0;
+    int audio_slice_sec = 0;
+    std::vector<short *> pcm_slices;
+    void set_realtime_params(vad_params vad, int audio_sec, int audio_slice_sec);
+    bool vad_simple(int slice_index, int n_samples, int n);
+    void put_pcm_data(short* pcm, int slice_index, int n_samples, int n);
+    float* pcm_slice_to_f32(int slice_index, int size);
+    void free_pcm_slices();
 };
 
 void job_abort_all();

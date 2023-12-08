@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include "rn-whisper.h"
 
+#define DEFAULT_MAX_AUDIO_SEC 30;
+
 namespace rnwhisper {
 
 void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate) {
@@ -61,14 +63,17 @@ job::~job() {
     fprintf(stderr, "%s: job_id: %d\n", __func__, job_id);
 }
 
-void job::set_vad_params(vad_params params) {
+void job::set_realtime_params(vad_params params, int sec, int slice_sec) {
     vad = params;
     if (vad.vad_ms < 2000) vad.vad_ms = 2000;
+    audio_sec = sec > 0 ? sec : DEFAULT_MAX_AUDIO_SEC;
+    audio_slice_sec = slice_sec > 0 && slice_sec < audio_sec ? slice_sec : audio_sec;
 }
 
-bool job::vad_simple(short* pcm, int n_samples, int n) {
+bool job::vad_simple(int slice_index, int n_samples, int n) {
     if (!vad.use_vad) return true;
 
+    short* pcm = pcm_slices[slice_index];
     int sample_size = (int) (WHISPER_SAMPLE_RATE * vad.vad_ms / 1000);
     if (n_samples + n > sample_size) {
         int start = n_samples + n - sample_size;
@@ -79,6 +84,35 @@ bool job::vad_simple(short* pcm, int n_samples, int n) {
         return vad_simple_impl(pcmf32, WHISPER_SAMPLE_RATE, vad.last_ms, vad.vad_thold, vad.freq_thold, vad.verbose);
     }
     return false;
+}
+
+void job::put_pcm_data(short* data, int slice_index, int n_samples, int n) {
+    if (pcm_slices.size() == slice_index) {
+        int n_slices = (int) (WHISPER_SAMPLE_RATE * audio_slice_sec);
+        pcm_slices.push_back(new short[n_slices]);
+    }
+    short* pcm = pcm_slices[slice_index];
+    for (int i = 0; i < n; i++) {
+        pcm[i + n_samples] = data[i];
+    }
+}
+
+float* job::pcm_slice_to_f32(int slice_index, int size) {
+    if (pcm_slices.size() > slice_index) {
+        float* pcmf32 = new float[size];
+        for (int i = 0; i < size; i++) {
+            pcmf32[i] = (float)pcm_slices[slice_index][i] / 32768.0f;
+        }
+        return pcmf32;
+    }
+    return nullptr;
+}
+
+void job::free_pcm_slices() {
+    for (size_t i = 0; i < pcm_slices.size(); i++) {
+        delete[] pcm_slices[i];
+    }
+    pcm_slices.clear();
 }
 
 bool job::is_aborted() {

@@ -42,7 +42,6 @@ public class WhisperContext {
   private AudioRecord recorder = null;
   private int bufferSize;
   private int nSamplesTranscribing = 0;
-  private ArrayList<short[]> shortBufferSlices;
   // Remember number of samples in each slice
   private ArrayList<Integer> sliceNSamples;
   // Current buffer slice index
@@ -66,7 +65,6 @@ public class WhisperContext {
   }
 
   private void rewind() {
-    shortBufferSlices = null;
     sliceNSamples = null;
     sliceIndex = 0;
     transcribeSliceIndex = 0;
@@ -79,9 +77,9 @@ public class WhisperContext {
     fullHandler = null;
   }
 
-  private boolean vad(ReadableMap options, short[] shortBuffer, int nSamples, int n) {
+  private boolean vad(ReadableMap options, int sliceIndex, int nSamples, int n) {
     if (isTranscribing) return true;
-    return vadSimple(jobId, shortBuffer, nSamples, n);
+    return vadSimple(jobId, sliceIndex, nSamples, n);
   }
 
   private void finishRealtimeTranscribe(ReadableMap options, WritableMap result) {
@@ -89,11 +87,12 @@ public class WhisperContext {
     if (audioOutputPath != null) {
        // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
       Log.d(NAME, "Begin saving wav file to " + audioOutputPath);
-      try {
-        AudioUtils.saveWavFile(AudioUtils.concatShortBuffers(shortBufferSlices), audioOutputPath);
-      } catch (IOException e) {
-        Log.e(NAME, "Error saving wav file: " + e.getMessage());
-      }
+      // try {
+      //   // TODO: cpp audio utils
+      //   AudioUtils.saveWavFile(AudioUtils.concatShortBuffers(shortBufferSlices), audioOutputPath);
+      // } catch (IOException e) {
+      //   Log.e(NAME, "Error saving wav file: " + e.getMessage());
+      // }
     }
     emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
     removeRealtimeTranscribeJob(jobId, context);
@@ -115,20 +114,17 @@ public class WhisperContext {
     rewind();
 
     this.jobId = jobId;
-    createRealtimeTranscribeJob(jobId, context, options);
 
     int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
     final int audioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
-
     int realtimeAudioSliceSec = options.hasKey("realtimeAudioSliceSec") ? options.getInt("realtimeAudioSliceSec") : 0;
     final int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < audioSec ? realtimeAudioSliceSec : audioSec;
-
     isUseSlices = audioSliceSec < audioSec;
+
+    createRealtimeTranscribeJob(jobId, context, options);
 
     String audioOutputPath = options.hasKey("audioOutputPath") ? options.getString("audioOutputPath") : null;
 
-    shortBufferSlices = new ArrayList<short[]>();
-    shortBufferSlices.add(new short[audioSliceSec * SAMPLE_RATE]);
     sliceNSamples = new ArrayList<Integer>();
     sliceNSamples.add(0);
 
@@ -161,8 +157,7 @@ public class WhisperContext {
                 ) {
                   finishRealtimeTranscribe(options, Arguments.createMap());
                 } else if (!isTranscribing) {
-                  short[] shortBuffer = shortBufferSlices.get(sliceIndex);
-                  if (!vad(options, shortBuffer, nSamples, 0)) {
+                  if (!vad(options, sliceIndex, nSamples, 0)) {
                     finishRealtimeTranscribe(options, Arguments.createMap());
                     break;
                   }
@@ -173,22 +168,16 @@ public class WhisperContext {
               }
 
               // Append to buffer
-              short[] shortBuffer = shortBufferSlices.get(sliceIndex);
               if (nSamples + n > audioSliceSec * SAMPLE_RATE) {
                 Log.d(NAME, "next slice");
 
                 sliceIndex++;
                 nSamples = 0;
-                shortBuffer = new short[audioSliceSec * SAMPLE_RATE];
-                shortBufferSlices.add(shortBuffer);
                 sliceNSamples.add(0);
               }
+              putPcmData(buffer, sliceIndex, nSamples, n);
 
-              for (int i = 0; i < n; i++) {
-                shortBuffer[nSamples + i] = buffer[i];
-              }
-
-              boolean isSpeech = vad(options, shortBuffer, nSamples, n);
+              boolean isSpeech = vad(options, sliceIndex, nSamples, n);
 
               nSamples += n;
               sliceNSamples.set(sliceIndex, nSamples);
@@ -234,21 +223,14 @@ public class WhisperContext {
 
     if (!isCapturing && !skipCapturingCheck) return;
 
-    short[] shortBuffer = shortBufferSlices.get(transcribeSliceIndex);
     int nSamples = sliceNSamples.get(transcribeSliceIndex);
 
     nSamplesTranscribing = nSamplesOfIndex;
 
-    // convert I16 to F32
-    float[] nSamplesBuffer32 = new float[nSamplesTranscribing];
-    for (int i = 0; i < nSamplesTranscribing; i++) {
-      nSamplesBuffer32[i] = shortBuffer[i] / 32768.0f;
-    }
-
     Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
 
     int timeStart = (int) System.currentTimeMillis();
-    int code = fullWithJob(jobId, context, nSamplesBuffer32, nSamplesTranscribing);
+    int code = fullWithJob(jobId, context, transcribeSliceIndex, nSamplesTranscribing);
     int timeEnd = (int) System.currentTimeMillis();
     int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
 
@@ -521,14 +503,19 @@ public class WhisperContext {
     ReadableMap options,
     Callback Callback
   );
-  protected static native void createRealtimeTranscribeJob(int job_id, long context, ReadableMap options);
+  protected static native void createRealtimeTranscribeJob(
+    int job_id,
+    long context,
+    ReadableMap options
+  );
   protected static native void removeRealtimeTranscribeJob(int job_id, long context);
-  protected static native boolean vadSimple(int job_id, short[] pcm, int n_samples, int n);
+  protected static native boolean vadSimple(int job_id, int slice_index, int n_samples, int n);
+  protected static native void putPcmData(short[] buffer, int slice_index, int n_samples, int n);
   protected static native int fullWithJob(
     int job_id,
     long context,
-    float[] audio_data,
-    int audio_data_len
+    int slice_index,
+    int n_samples
   );
   protected static native void abortTranscribe(int jobId);
   protected static native void abortAllTranscribe();

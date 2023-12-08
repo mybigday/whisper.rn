@@ -328,7 +328,11 @@ Java_com_rnwhisper_WhisperContext_createRealtimeTranscribeJob(
     vad.vad_ms = readablemap::getInt(env, options, "vadMs", 2000);
     vad.vad_thold = readablemap::getFloat(env, options, "vadThold", 0.6f);
     vad.freq_thold = readablemap::getFloat(env, options, "vadFreqThold", 100.0f);
-    job->set_vad_params(vad);
+    job->set_realtime_params(
+        vad,
+        readablemap::getInt(env, options, "realtimeAudioSec", 0),
+        readablemap::getInt(env, options, "realtimeAudioSliceSec", 0)
+    );
 }
 
 JNIEXPORT void JNICALL
@@ -341,6 +345,8 @@ Java_com_rnwhisper_WhisperContext_removeRealtimeTranscribeJob(
     UNUSED(env);
     UNUSED(thiz);
     UNUSED(context_ptr);
+    rnwhisper::job *job = rnwhisper::job_get(job_id);
+    job->free_pcm_slices();
     rnwhisper::job_remove(job_id);
 }
 
@@ -349,17 +355,30 @@ Java_com_rnwhisper_WhisperContext_vadSimple(
     JNIEnv *env,
     jobject thiz,
     jint job_id,
-    jshortArray pcm,
+    jint slice_index,
     jint n_samples,
     jint n
 ) {
     UNUSED(thiz);
-
-    jshort *pcm_arr = env->GetShortArrayElements(pcm, nullptr);
     rnwhisper::job* job = rnwhisper::job_get(job_id);
-    bool is_speech = job->vad_simple(pcm_arr, n_samples, n);
+    return job->vad_simple(slice_index, n_samples, n);
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_putPcmData(
+    JNIEnv *env,
+    jobject thiz,
+    jint job_id,
+    jshortArray pcm,
+    jint slice_index,
+    jint n_samples,
+    jint n
+) {
+    UNUSED(thiz);
+    rnwhisper::job* job = rnwhisper::job_get(job_id);
+    jshort *pcm_arr = env->GetShortArrayElements(pcm, nullptr);
+    job->put_pcm_data(pcm_arr, slice_index, n_samples, n);
     env->ReleaseShortArrayElements(pcm, pcm_arr, JNI_ABORT);
-    return is_speech;
 }
 
 JNIEXPORT jint JNICALL
@@ -368,20 +387,19 @@ Java_com_rnwhisper_WhisperContext_fullWithJob(
     jobject thiz,
     jint job_id,
     jlong context_ptr,
-    jfloatArray audio_data, // TODO: move audio slice to C++
-    jint audio_data_len
+    jint slice_index,
+    jint n_samples
 ) {
     UNUSED(thiz);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
-    jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
 
     rnwhisper::job* job = rnwhisper::job_get(job_id);
-
-    int code = whisper_full(context, job->params, audio_data_arr, audio_data_len);
+    float* pcmf32 = job->pcm_slice_to_f32(slice_index, n_samples);
+    int code = whisper_full(context, job->params, pcmf32, n_samples);
+    free(pcmf32);
     if (code == 0) {
         // whisper_print_timings(context);
     }
-    env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
     if (job->is_aborted()) code = -999;
     return code;
 }

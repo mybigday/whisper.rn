@@ -19,14 +19,11 @@ typedef struct {
     bool isRealtime;
     bool isCapturing;
     bool isStoppedByAction;
-    int maxAudioSec;
     int nSamplesTranscribing;
-    NSMutableArray<NSValue *> *shortBufferSlices;
     NSMutableArray<NSNumber *> *sliceNSamples;
     bool isUseSlices;
     int sliceIndex;
     int transcribeSliceIndex;
-    int audioSliceSec;
     NSString* audioOutputPath;
 
     AudioQueueRef queue;
