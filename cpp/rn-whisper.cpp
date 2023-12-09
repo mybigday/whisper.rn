@@ -59,10 +59,6 @@ bool vad_simple_impl(std::vector<float> & pcmf32, int sample_rate, int last_ms, 
     return true;
 }
 
-job::~job() {
-    fprintf(stderr, "%s: job_id: %d\n", __func__, job_id);
-}
-
 void job::set_realtime_params(
     vad_params params,
     int sec,
@@ -114,13 +110,6 @@ float* job::pcm_slice_to_f32(int slice_index, int size) {
     return nullptr;
 }
 
-void job::free_pcm_slices() {
-    for (size_t i = 0; i < pcm_slices.size(); i++) {
-        delete[] pcm_slices[i];
-    }
-    pcm_slices.clear();
-}
-
 bool job::is_aborted() {
     return aborted;
 }
@@ -129,43 +118,56 @@ void job::abort() {
     aborted = true;
 }
 
-std::unordered_map<int, job> job_map;
+job::~job() {
+    fprintf(stderr, "%s: job_id: %d\n", __func__, job_id);
+
+    for (size_t i = 0; i < pcm_slices.size(); i++) {
+        delete[] pcm_slices[i];
+    }
+    pcm_slices.clear();
+}
+
+std::unordered_map<int, job*> job_map;
 
 void job_abort_all() {
     for (auto it = job_map.begin(); it != job_map.end(); ++it) {
-        it->second.abort();
+        it->second->abort();
     }
 }
 
 job* job_new(int job_id, struct whisper_full_params params) {
-    job ctx;
-    ctx.job_id = job_id;
-    ctx.params = params;
+    job* ctx = new job();
+    ctx->job_id = job_id;
+    ctx->params = params;
+
+    job_map[job_id] = ctx;
 
     // Abort handler
     params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         job *j = (job*)user_data;
         return !j->is_aborted();
     };
-    params.encoder_begin_callback_user_data = &ctx;
+    params.encoder_begin_callback_user_data = job_map[job_id];
     params.abort_callback = [](void * user_data) {
         job *j = (job*)user_data;
         return j->is_aborted();
     };
-    params.abort_callback_user_data = &ctx;
+    params.abort_callback_user_data = job_map[job_id];
 
-    job_map[job_id] = ctx;
-    return &job_map[job_id];
+    return job_map[job_id];
 }
 
 job* job_get(int job_id) {
     if (job_map.find(job_id) != job_map.end()) {
-        return &job_map[job_id];
+        return job_map[job_id];
     }
     return nullptr;
 }
 
 void job_remove(int job_id) {
+    if (job_map.find(job_id) != job_map.end()) {
+        delete job_map[job_id];
+    }
     job_map.erase(job_id);
 }
 

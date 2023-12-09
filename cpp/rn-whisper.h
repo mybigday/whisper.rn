@@ -36,7 +36,6 @@ struct job {
     bool vad_simple(int slice_index, int n_samples, int n);
     void put_pcm_data(short* pcm, int slice_index, int n_samples, int n);
     float* pcm_slice_to_f32(int slice_index, int size);
-    void free_pcm_slices();
 };
 
 void job_abort_all();

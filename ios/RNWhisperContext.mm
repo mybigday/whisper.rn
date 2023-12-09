@@ -231,7 +231,6 @@ void AudioInputCallback(void * inUserData,
         );
     }
     state->transcribeHandler(state->job->job_id, @"end", result);
-    state->job->free_pcm_slices();
     rnwhisper::job_remove(state->job->job_id);
 }
 

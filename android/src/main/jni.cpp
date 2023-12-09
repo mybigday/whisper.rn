@@ -368,7 +368,6 @@ Java_com_rnwhisper_WhisperContext_finishRealtimeTranscribeJob(
             *job->audio_output_path
         );
     }
-    job->free_pcm_slices();
     rnwhisper::job_remove(job_id);
 }
 
