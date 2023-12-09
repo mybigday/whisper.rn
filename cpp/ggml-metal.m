@@ -1891,7 +1891,6 @@ static void wsp_ggml_backend_metal_free_device(void) {
     g_backend_device_ref_count--;
 
     if (g_backend_device_ref_count == 0) {
-        [g_backend_device release];
         g_backend_device = nil;
     }
 }
@@ -1905,7 +1904,6 @@ static void * wsp_ggml_backend_metal_buffer_get_base(wsp_ggml_backend_buffer_t b
 static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
     struct wsp_ggml_backend_metal_buffer_context * ctx = (struct wsp_ggml_backend_metal_buffer_context *)buffer->context;
 
-    [ctx->metal release];
     wsp_ggml_backend_metal_free_device();
 
     free(ctx->data);
