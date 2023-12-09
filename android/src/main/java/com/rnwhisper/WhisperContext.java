@@ -162,7 +162,7 @@ public class WhisperContext {
                 nSamples = 0;
                 sliceNSamples.add(0);
               }
-              putPcmData(buffer, sliceIndex, nSamples, n);
+              putPcmData(jobId, buffer, sliceIndex, nSamples, n);
 
               boolean isSpeech = vad(sliceIndex, nSamples, n);
 
@@ -502,7 +502,7 @@ public class WhisperContext {
   );
   protected static native void finishRealtimeTranscribeJob(int job_id, long context, int[] sliceNSamples);
   protected static native boolean vadSimple(int job_id, int slice_index, int n_samples, int n);
-  protected static native void putPcmData(short[] buffer, int slice_index, int n_samples, int n);
+  protected static native void putPcmData(int job_id, short[] buffer, int slice_index, int n_samples, int n);
   protected static native int fullWithJob(
     int job_id,
     long context,
