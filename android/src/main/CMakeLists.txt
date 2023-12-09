@@ -34,6 +34,10 @@ function(build_library target_name)
         target_compile_options(${target_name} PRIVATE -mfpu=neon-vfpv4)
     endif ()
 
+    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        target_compile_options(${target_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
+    endif ()
+
     # NOTE: If you want to debug the native code, you can uncomment if and endif
     # if (NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 

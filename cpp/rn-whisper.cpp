@@ -49,7 +49,7 @@ bool vad_simple_impl(std::vector<float> & pcmf32, int sample_rate, int last_ms, 
     energy_last /= n_samples_last;
 
     if (verbose) {
-        fprintf(stderr, "%s: energy_all: %f, energy_last: %f, vad_thold: %f, freq_thold: %f\n", __func__, energy_all, energy_last, vad_thold, freq_thold);
+        RNWHISPER_LOG_INFO("%s: energy_all: %f, energy_last: %f, vad_thold: %f, freq_thold: %f\n", __func__, energy_all, energy_last, vad_thold, freq_thold);
     }
 
     if (energy_last > vad_thold*energy_all) {
@@ -119,7 +119,7 @@ void job::abort() {
 }
 
 job::~job() {
-    fprintf(stderr, "%s: job_id: %d\n", __func__, job_id);
+    RNWHISPER_LOG_INFO("rnwhisper::job::%s: job_id: %d\n", __func__, job_id);
 
     for (size_t i = 0; i < pcm_slices.size(); i++) {
         delete[] pcm_slices[i];

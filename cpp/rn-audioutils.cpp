@@ -1,4 +1,5 @@
 #include "rn-audioutils.h"
+#include "rn-whisper-log.h"
 
 namespace rnaudioutils {
 
@@ -30,7 +31,7 @@ void save_wav_file(const std::vector<uint8_t>& raw, const std::string& file) {
     std::ofstream output(file, std::ios::binary);
 
     if (!output.is_open()) {
-        std::cerr << "Failed to open file for writing: " << file << std::endl;
+        RNWHISPER_LOG_ERROR("Failed to open file for writing: %s\n", file.c_str());
         return;
     }
 

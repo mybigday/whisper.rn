@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "whisper.h"
+#include "rn-whisper-log.h"
 #include "rn-audioutils.h"
 
 namespace rnwhisper {
