@@ -8,6 +8,7 @@ extern "C" {
 
 struct wsp_ggml_backend;
 struct wsp_ggml_backend_buffer;
+struct wsp_ggml_backend_buffer_type;
 
 //
 // Legacy API
@@ -79,6 +80,12 @@ WSP_GGML_API void   wsp_ggml_gallocr_alloc_graph_n(
                     struct wsp_ggml_cgraph * graph,
                     struct wsp_ggml_hash_set hash_set,
                     wsp_ggml_tallocr_t * hash_node_talloc);
+
+
+// Utils
+// Create a buffer and allocate all the tensors in a wsp_ggml_context
+WSP_GGML_API struct wsp_ggml_backend_buffer * wsp_ggml_backend_alloc_ctx_tensors_from_buft(struct wsp_ggml_context * ctx, struct wsp_ggml_backend_buffer_type * buft);
+WSP_GGML_API struct wsp_ggml_backend_buffer * wsp_ggml_backend_alloc_ctx_tensors(struct wsp_ggml_context * ctx, struct wsp_ggml_backend * backend);
 
 #ifdef  __cplusplus
 }

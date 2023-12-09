@@ -1,15 +1,15 @@
---- ggml-metal.m.orig	2023-11-14 08:06:06
-+++ ggml-metal.m	2023-11-14 08:06:07
-@@ -187,7 +187,7 @@
+--- ggml-metal.m.orig	2023-12-09 10:50:29
++++ ggml-metal.m	2023-12-09 10:50:30
+@@ -209,7 +209,7 @@
      WSP_GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
-
+ 
      // Configure context
 -    struct wsp_ggml_metal_context * ctx = malloc(sizeof(struct wsp_ggml_metal_context));
 +    struct wsp_ggml_metal_context * ctx = calloc(1, sizeof(struct wsp_ggml_metal_context));
      ctx->device = device;
      ctx->n_cb   = MIN(n_cb, WSP_GGML_METAL_MAX_BUFFERS);
      ctx->queue  = [ctx->device newCommandQueue];
-@@ -218,7 +218,7 @@
+@@ -243,7 +243,7 @@
              if (ggmlMetalPathResources) {
                  sourcePath = [ggmlMetalPathResources stringByAppendingPathComponent:@"ggml-metal.metal"];
              } else {
@@ -18,24 +18,24 @@
              }
              if (sourcePath == nil) {
                  WSP_GGML_METAL_LOG_WARN("%s: error: could not use bundle path to find ggml-metal.metal, falling back to trying cwd\n", __func__);
-@@ -360,8 +360,6 @@
+@@ -407,8 +407,6 @@
  void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
      WSP_GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
  #define WSP_GGML_METAL_DEL_KERNEL(name) \
 -    [ctx->function_##name release]; \
 -    [ctx->pipeline_##name release];
-
+ 
      WSP_GGML_METAL_DEL_KERNEL(add);
      WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -430,17 +428,7 @@
-     WSP_GGML_METAL_DEL_KERNEL(sqr);
-
+@@ -499,17 +497,7 @@
+     WSP_GGML_METAL_DEL_KERNEL(sum_rows);
+ 
  #undef WSP_GGML_METAL_DEL_KERNEL
 -
 -    for (int i = 0; i < ctx->n_buffers; ++i) {
 -        [ctx->buffers[i].metal release];
 -    }
-
+ 
 -    [ctx->library release];
 -    [ctx->queue release];
 -    [ctx->device release];
@@ -44,4 +44,4 @@
 -
      free(ctx);
  }
-
+ 

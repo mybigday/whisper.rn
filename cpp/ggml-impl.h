@@ -232,7 +232,7 @@ bool   wsp_ggml_hash_contains      (const struct wsp_ggml_hash_set hash_set, str
 // returns WSP_GGML_HASHTABLE_FULL if table is full, otherwise the current index of the key or where it should be inserted
 size_t wsp_ggml_hash_find          (const struct wsp_ggml_hash_set hash_set, struct wsp_ggml_tensor * key);
 
-// returns WSP_GGML_HAHSHTABLE_ALREADY_EXISTS if key already exists, index otherwise, asserts if table is full
+// returns WSP_GGML_HASHTABLE_ALREADY_EXISTS if key already exists, index otherwise, asserts if table is full
 size_t wsp_ggml_hash_insert        (      struct wsp_ggml_hash_set hash_set, struct wsp_ggml_tensor * key);
 
 // return index, asserts if table is full

@@ -137,7 +137,7 @@ void wsp_ggml_tallocr_alloc(wsp_ggml_tallocr_t alloc, struct wsp_ggml_tensor * t
 
 #ifdef WSP_GGML_ALLOCATOR_DEBUG
     add_allocated_tensor(alloc, tensor);
-    size_t cur_max = (char*)addr - (char*)alloc->data + size;
+    size_t cur_max = (char*)addr - (char*)alloc->base + size;
     if (cur_max > alloc->max_size) {
         printf("max_size = %.2f MB: tensors: ", cur_max / 1024.0 / 1024.0);
         for (int i = 0; i < 1024; i++) {
@@ -167,10 +167,6 @@ static void wsp_ggml_tallocr_free_tensor(wsp_ggml_tallocr_t alloc, struct wsp_gg
     size_t size = wsp_ggml_backend_buffer_get_alloc_size(alloc->buffer, tensor);
     size = aligned_offset(NULL, size, alloc->alignment);
     AT_PRINTF("%s: freeing %s at %p (%zu bytes) - n_free_blocks = %d\n", __func__, tensor->name, ptr, size, alloc->n_free_blocks);
-
-    if (!alloc->measure) {
-        wsp_ggml_backend_buffer_free_tensor(alloc->buffer, tensor);
-    }
 
 #ifdef WSP_GGML_ALLOCATOR_DEBUG
     remove_allocated_tensor(alloc, tensor);
@@ -237,7 +233,7 @@ void wsp_ggml_tallocr_reset(wsp_ggml_tallocr_t alloc) {
 }
 
 wsp_ggml_tallocr_t wsp_ggml_tallocr_new(void * data, size_t size, size_t alignment) {
-    struct wsp_ggml_backend_buffer * buffer = wsp_ggml_backend_cpu_buffer_from_ptr(NULL, data, size);
+    struct wsp_ggml_backend_buffer * buffer = wsp_ggml_backend_cpu_buffer_from_ptr(data, size);
 
     wsp_ggml_tallocr_t alloc = (wsp_ggml_tallocr_t)malloc(sizeof(struct wsp_ggml_tallocr));
 
@@ -449,7 +445,6 @@ static wsp_ggml_tallocr_t node_tallocr(wsp_ggml_gallocr_t galloc, struct wsp_ggm
 static void init_view(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * view, bool update_backend) {
     wsp_ggml_tallocr_t alloc = node_tallocr(galloc, view);
 
-    //printf("init_view: %s from src %s\n", view->name, view->view_src->name);
     WSP_GGML_ASSERT(view->view_src != NULL && view->view_src->data != NULL);
     if (update_backend) {
         view->backend = view->view_src->backend;
@@ -459,7 +454,7 @@ static void init_view(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * view, 
 
     // FIXME: the view should be initialized by the owning buffer, but currently this breaks the CUDA backend
     // due to the wsp_ggml_tensor_extra_gpu ring buffer overwriting the KV cache extras
-    assert(wsp_ggml_tallocr_is_measure(alloc) || !view->buffer || view->buffer->backend == alloc->buffer->backend);
+    assert(wsp_ggml_tallocr_is_measure(alloc) || !view->buffer || view->buffer->buft == alloc->buffer->buft);
 
     if (!alloc->measure) {
         wsp_ggml_backend_buffer_init_tensor(alloc->buffer, view);
@@ -764,4 +759,44 @@ size_t wsp_ggml_allocr_max_size(wsp_ggml_allocr_t alloc) {
 
 size_t wsp_ggml_allocr_alloc_graph(wsp_ggml_allocr_t alloc, struct wsp_ggml_cgraph * graph) {
     return wsp_ggml_gallocr_alloc_graph(alloc->galloc, alloc->talloc, graph);
+}
+
+// utils
+wsp_ggml_backend_buffer_t wsp_ggml_backend_alloc_ctx_tensors_from_buft(struct wsp_ggml_context * ctx, wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(wsp_ggml_get_no_alloc(ctx) == true);
+
+    size_t alignment = wsp_ggml_backend_buft_get_alignment(buft);
+
+    size_t nbytes = 0;
+    for (struct wsp_ggml_tensor * t = wsp_ggml_get_first_tensor(ctx); t != NULL; t = wsp_ggml_get_next_tensor(ctx, t)) {
+        if (t->data == NULL && t->view_src == NULL) {
+            nbytes += WSP_GGML_PAD(wsp_ggml_backend_buft_get_alloc_size(buft, t), alignment);
+        }
+    }
+
+    if (nbytes == 0) {
+        fprintf(stderr, "%s: no tensors to allocate\n", __func__);
+        return NULL;
+    }
+
+    wsp_ggml_backend_buffer_t buffer = wsp_ggml_backend_buft_alloc_buffer(buft, nbytes);
+    wsp_ggml_tallocr_t tallocr = wsp_ggml_tallocr_new_from_buffer(buffer);
+
+    for (struct wsp_ggml_tensor * t = wsp_ggml_get_first_tensor(ctx); t != NULL; t = wsp_ggml_get_next_tensor(ctx, t)) {
+        if (t->data == NULL) {
+            if (t->view_src == NULL) {
+                wsp_ggml_tallocr_alloc(tallocr, t);
+            } else {
+                wsp_ggml_backend_view_init(buffer, t);
+            }
+        }
+    }
+
+    wsp_ggml_tallocr_free(tallocr);
+
+    return buffer;
+}
+
+wsp_ggml_backend_buffer_t wsp_ggml_backend_alloc_ctx_tensors(struct wsp_ggml_context * ctx, wsp_ggml_backend_t backend) {
+    return wsp_ggml_backend_alloc_ctx_tensors_from_buft(ctx, wsp_ggml_backend_get_default_buffer_type(backend));
 }

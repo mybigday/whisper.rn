@@ -1,25 +1,25 @@
---- whisper.cpp.orig	2023-11-29 12:02:06
-+++ whisper.cpp	2023-11-29 12:02:07
-@@ -3073,8 +3073,10 @@
+--- whisper.cpp.orig	2023-12-09 10:50:29
++++ whisper.cpp	2023-12-09 10:50:30
+@@ -3043,8 +3043,10 @@
          const size_t memory_size = wsp_ggml_nbytes(state->kv_cross.k) + wsp_ggml_nbytes(state->kv_cross.v);
          WHISPER_LOG_INFO("%s: kv cross size = %7.2f MB\n", __func__, memory_size / 1e6);
      }
 +
-
+ 
  #ifdef WHISPER_USE_COREML
 +    if (ctx->params.use_coreml) {
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
-
+ 
      WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -3089,6 +3091,7 @@
+@@ -3059,6 +3061,7 @@
  #endif
      } else {
          WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
 +    }
      }
  #endif
-
-@@ -3214,6 +3217,7 @@
+ 
+@@ -3184,6 +3187,7 @@
  struct whisper_context_params whisper_context_default_params() {
      struct whisper_context_params result = {
          /*.use_gpu    =*/ true,
