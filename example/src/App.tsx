@@ -225,13 +225,13 @@ export default function App() {
               log('Start transcribing...')
               const startTime = Date.now()
               const { stop, promise } = whisperContext.transcribe(sampleFile, {
-                language: 'zh',
-                prompt: 'HELLO WORLD',
                 maxLen: 1,
                 tokenTimestamps: true,
                 onProgress: (cur) => {
                   log(`Transcribing progress: ${cur}%`)
                 },
+                language: 'en',
+                // prompt: 'HELLO WORLD',
                 // onNewSegments: (segments) => {
                 //   console.log('New segments:', segments)
                 // },
