@@ -12,6 +12,7 @@ set(
     ${RNWHISPER_LIB_DIR}/ggml-backend.c
     ${RNWHISPER_LIB_DIR}/ggml-quants.c
     ${RNWHISPER_LIB_DIR}/whisper.cpp
+    ${RNWHISPER_LIB_DIR}/rn-audioutils.cpp
     ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp
 )
@@ -31,6 +32,10 @@ function(build_library target_name)
         target_compile_options(${target_name} PRIVATE -march=armv8.2-a+fp16)
     elseif (${target_name} STREQUAL "whisper_vfpv4")
         target_compile_options(${target_name} PRIVATE -mfpu=neon-vfpv4)
+    endif ()
+
+    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        target_compile_options(${target_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
     endif ()
 
     # NOTE: If you want to debug the native code, you can uncomment if and endif

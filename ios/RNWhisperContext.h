@@ -11,28 +11,20 @@
 
 typedef struct {
     __unsafe_unretained id mSelf;
-
-    int jobId;
     NSDictionary* options;
+
+    struct rnwhisper::job * job;
 
     bool isTranscribing;
     bool isRealtime;
     bool isCapturing;
     bool isStoppedByAction;
-    int maxAudioSec;
     int nSamplesTranscribing;
-    NSMutableArray<NSValue *> *shortBufferSlices;
-    NSMutableArray<NSNumber *> *sliceNSamples;
+    std::vector<int> sliceNSamples;
     bool isUseSlices;
     int sliceIndex;
     int transcribeSliceIndex;
-    int audioSliceSec;
     NSString* audioOutputPath;
-
-    bool useVad;
-    int vadMs;
-    float vadThold;
-    float vadFreqThold;
 
     AudioQueueRef queue;
     AudioStreamBasicDescription dataFormat;

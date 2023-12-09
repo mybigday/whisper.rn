@@ -142,9 +142,9 @@ RCT_REMAP_METHOD(transcribeFile,
         audioDataCount:count
         options:options
         onProgress: ^(int progress) {
-            if (rn_whisper_transcribe_is_aborted(jobId)) {
-                return;
-            }
+            rnwhisper::job* job = rnwhisper::job_get(jobId);
+            if (job && job->is_aborted()) return;
+
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self sendEventWithName:@"@RNWhisper_onTranscribeProgress"
                     body:@{
@@ -156,9 +156,9 @@ RCT_REMAP_METHOD(transcribeFile,
             });
         }
         onNewSegments: ^(NSDictionary *result) {
-            if (rn_whisper_transcribe_is_aborted(jobId)) {
-                return;
-            }
+            rnwhisper::job* job = rnwhisper::job_get(jobId);
+            if (job && job->is_aborted()) return;
+
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self sendEventWithName:@"@RNWhisper_onTranscribeNewSegments"
                     body:@{
@@ -279,7 +279,7 @@ RCT_REMAP_METHOD(releaseAllContexts,
         [context invalidate];
     }
 
-    rn_whisper_abort_all_transcribe(); // graceful abort
+    rnwhisper::job_abort_all(); // graceful abort
 
     [contexts removeAllObjects];
     contexts = nil;

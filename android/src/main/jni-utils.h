@@ -4,7 +4,7 @@
 
 namespace readablemap {
 
-jboolean hasKey(JNIEnv *env, jobject readableMap, const char *key) {
+bool hasKey(JNIEnv *env, jobject readableMap, const char *key) {
     jclass mapClass = env->GetObjectClass(readableMap);
     jmethodID hasKeyMethod = env->GetMethodID(mapClass, "hasKey", "(Ljava/lang/String;)Z");
     jstring jKey = env->NewStringUTF(key);
@@ -13,7 +13,7 @@ jboolean hasKey(JNIEnv *env, jobject readableMap, const char *key) {
     return result;
 }
 
-jint getInt(JNIEnv *env, jobject readableMap, const char *key, jint defaultValue) {
+int getInt(JNIEnv *env, jobject readableMap, const char *key, jint defaultValue) {
     if (!hasKey(env, readableMap, key)) {
         return defaultValue;
     }
@@ -25,7 +25,7 @@ jint getInt(JNIEnv *env, jobject readableMap, const char *key, jint defaultValue
     return result;
 }
 
-jboolean getBool(JNIEnv *env, jobject readableMap, const char *key, jboolean defaultValue) {
+bool getBool(JNIEnv *env, jobject readableMap, const char *key, jboolean defaultValue) {
     if (!hasKey(env, readableMap, key)) {
         return defaultValue;
     }
@@ -37,7 +37,7 @@ jboolean getBool(JNIEnv *env, jobject readableMap, const char *key, jboolean def
     return result;
 }
 
-jlong getLong(JNIEnv *env, jobject readableMap, const char *key, jlong defaultValue) {
+long getLong(JNIEnv *env, jobject readableMap, const char *key, jlong defaultValue) {
     if (!hasKey(env, readableMap, key)) {
         return defaultValue;
     }
@@ -49,7 +49,7 @@ jlong getLong(JNIEnv *env, jobject readableMap, const char *key, jlong defaultVa
     return result;
 }
 
-jfloat getFloat(JNIEnv *env, jobject readableMap, const char *key, jfloat defaultValue) {
+float getFloat(JNIEnv *env, jobject readableMap, const char *key, jfloat defaultValue) {
     if (!hasKey(env, readableMap, key)) {
         return defaultValue;
     }
