@@ -236,12 +236,12 @@ struct whisper_full_params createFullParams(JNIEnv *env, jobject options) {
     jstring prompt = readablemap::getString(env, options, "prompt", nullptr);
     if (prompt != nullptr) {
         params.initial_prompt = env->GetStringUTFChars(prompt, nullptr);
-        env->ReleaseStringUTFChars(prompt, params.initial_prompt);
+        env->DeleteLocalRef(prompt);
     }
     jstring language = readablemap::getString(env, options, "language", nullptr);
     if (language != nullptr) {
         params.language = env->GetStringUTFChars(language, nullptr);
-        env->ReleaseStringUTFChars(language, params.language);
+        env->DeleteLocalRef(language);
     }
     return params;
 }
@@ -330,10 +330,10 @@ Java_com_rnwhisper_WhisperContext_createRealtimeTranscribeJob(
     vad.freq_thold = readablemap::getFloat(env, options, "vadFreqThold", 100.0f);
 
     jstring audio_output_path = readablemap::getString(env, options, "audioOutputPath", nullptr);
-    std::string *audio_output_path_str = nullptr;
+    const char* audio_output_path_str = nullptr;
     if (audio_output_path != nullptr) {
-        audio_output_path_str = new std::string(env->GetStringUTFChars(audio_output_path, nullptr));
-        env->ReleaseStringUTFChars(audio_output_path, audio_output_path_str->c_str());
+        audio_output_path_str = env->GetStringUTFChars(audio_output_path, nullptr);
+        env->DeleteLocalRef(audio_output_path);
     }
     job->set_realtime_params(
         vad,
@@ -357,6 +357,7 @@ Java_com_rnwhisper_WhisperContext_finishRealtimeTranscribeJob(
 
     rnwhisper::job *job = rnwhisper::job_get(job_id);
     if (job->audio_output_path != nullptr) {
+        RNWHISPER_LOG_INFO("job->params.language: %s\n", job->params.language);
         std::vector<int> slice_n_samples_vec;
         jint *slice_n_samples_arr = env->GetIntArrayElements(slice_n_samples, nullptr);
         slice_n_samples_vec = std::vector<int>(slice_n_samples_arr, slice_n_samples_arr + env->GetArrayLength(slice_n_samples));
@@ -365,7 +366,7 @@ Java_com_rnwhisper_WhisperContext_finishRealtimeTranscribeJob(
         // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
         rnaudioutils::save_wav_file(
             rnaudioutils::concat_short_buffers(job->pcm_slices, slice_n_samples_vec),
-            *job->audio_output_path
+            job->audio_output_path
         );
     }
     rnwhisper::job_remove(job_id);

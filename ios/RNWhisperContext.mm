@@ -119,7 +119,6 @@
     self->recordState.sliceNSamples.push_back(0);
 
     self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
-    std::string audio_output_path = options[@"audioOutputPath"] != nil ? [options[@"audioOutputPath"] UTF8String] : "";
     self->recordState.job->set_realtime_params(
         {
             .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
@@ -129,7 +128,7 @@
         },
         options[@"realtimeAudioSec"] != nil ? [options[@"realtimeAudioSec"] intValue] : 0,
         options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0,
-        options[@"audioOutputPath"] != nil ? &audio_output_path : nullptr
+        options[@"audioOutputPath"] != nil ? [options[@"audioOutputPath"] UTF8String] : nullptr
     );
     self->recordState.isUseSlices = self->recordState.job->audio_slice_sec < self->recordState.job->audio_sec;
 
@@ -227,7 +226,7 @@ void AudioInputCallback(void * inUserData,
         // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
         rnaudioutils::save_wav_file(
             rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
-            *state->job->audio_output_path
+            state->job->audio_output_path
         );
     }
     state->transcribeHandler(state->job->job_id, @"end", result);

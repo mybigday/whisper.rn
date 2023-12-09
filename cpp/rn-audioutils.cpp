@@ -61,6 +61,8 @@ void save_wav_file(const std::vector<uint8_t>& raw, const std::string& file) {
     output.write(reinterpret_cast<const char*>(data.data()), data.size());
 
     output.close();
+
+    RNWHISPER_LOG_INFO("Saved audio file: %s\n", file.c_str());
 }
 
 } // namespace rnaudioutils

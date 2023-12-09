@@ -63,7 +63,7 @@ void job::set_realtime_params(
     vad_params params,
     int sec,
     int slice_sec,
-    std::string* output_path
+    const char* output_path
 ) {
     vad = params;
     if (vad.vad_ms < 2000) vad.vad_ms = 2000;
