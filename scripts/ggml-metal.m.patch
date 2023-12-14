@@ -1,15 +1,15 @@
---- ggml-metal.m.orig	2023-12-09 10:58:50
-+++ ggml-metal.m	2023-12-09 10:59:32
-@@ -209,7 +209,7 @@
+--- ggml-metal.m.orig	2023-12-15 06:38:34
++++ ggml-metal.m	2023-12-15 06:38:35
+@@ -231,7 +231,7 @@
      WSP_GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
- 
+
      // Configure context
 -    struct wsp_ggml_metal_context * ctx = malloc(sizeof(struct wsp_ggml_metal_context));
 +    struct wsp_ggml_metal_context * ctx = calloc(1, sizeof(struct wsp_ggml_metal_context));
      ctx->device = device;
      ctx->n_cb   = MIN(n_cb, WSP_GGML_METAL_MAX_BUFFERS);
      ctx->queue  = [ctx->device newCommandQueue];
-@@ -243,7 +243,7 @@
+@@ -265,7 +265,7 @@
              if (ggmlMetalPathResources) {
                  sourcePath = [ggmlMetalPathResources stringByAppendingPathComponent:@"ggml-metal.metal"];
              } else {
@@ -18,18 +18,18 @@
              }
              if (sourcePath == nil) {
                  WSP_GGML_METAL_LOG_WARN("%s: error: could not use bundle path to find ggml-metal.metal, falling back to trying cwd\n", __func__);
-@@ -407,8 +407,6 @@
+@@ -451,8 +451,6 @@
  void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
      WSP_GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
  #define WSP_GGML_METAL_DEL_KERNEL(name) \
 -    [ctx->function_##name release]; \
 -    [ctx->pipeline_##name release];
- 
+
      WSP_GGML_METAL_DEL_KERNEL(add);
      WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -499,16 +497,6 @@
+@@ -565,16 +563,6 @@
      WSP_GGML_METAL_DEL_KERNEL(sum_rows);
- 
+
  #undef WSP_GGML_METAL_DEL_KERNEL
 -
 -    for (int i = 0; i < ctx->n_buffers; ++i) {
@@ -41,22 +41,22 @@
 -    [ctx->device release];
 -
 -    dispatch_release(ctx->d_queue);
- 
+
      free(ctx);
  }
-@@ -1903,7 +1891,6 @@
+@@ -2380,7 +2368,6 @@
      g_backend_device_ref_count--;
- 
+
      if (g_backend_device_ref_count == 0) {
 -        [g_backend_device release];
          g_backend_device = nil;
      }
  }
-@@ -1917,7 +1904,6 @@
+@@ -2394,7 +2381,6 @@
  static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
      struct wsp_ggml_backend_metal_buffer_context * ctx = (struct wsp_ggml_backend_metal_buffer_context *)buffer->context;
- 
+
 -    [ctx->metal release];
      wsp_ggml_backend_metal_free_device();
- 
+
      free(ctx->data);

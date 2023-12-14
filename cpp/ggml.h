@@ -215,9 +215,9 @@
 #define WSP_GGML_QNT_VERSION_FACTOR 1000 // do not change this
 
 #define WSP_GGML_MAX_DIMS           4
-#define WSP_GGML_MAX_PARAMS         1024
+#define WSP_GGML_MAX_PARAMS         2048
 #define WSP_GGML_MAX_CONTEXTS       64
-#define WSP_GGML_MAX_SRC            6
+#define WSP_GGML_MAX_SRC            10
 #define WSP_GGML_MAX_NAME           64
 #define WSP_GGML_MAX_OP_PARAMS      64
 #define WSP_GGML_DEFAULT_N_THREADS  4
@@ -423,7 +423,9 @@ extern "C" {
         WSP_GGML_OP_POOL_1D,
         WSP_GGML_OP_POOL_2D,
         WSP_GGML_OP_UPSCALE, // nearest interpolate
+        WSP_GGML_OP_PAD,
         WSP_GGML_OP_ARGSORT,
+        WSP_GGML_OP_LEAKY_RELU,
 
         WSP_GGML_OP_FLASH_ATTN,
         WSP_GGML_OP_FLASH_FF,
@@ -463,7 +465,6 @@ extern "C" {
         WSP_GGML_UNARY_OP_GELU,
         WSP_GGML_UNARY_OP_GELU_QUICK,
         WSP_GGML_UNARY_OP_SILU,
-        WSP_GGML_UNARY_OP_LEAKY,
 
         WSP_GGML_UNARY_OP_COUNT,
     };
@@ -793,6 +794,9 @@ extern "C" {
             struct wsp_ggml_tensor  * a,
             struct wsp_ggml_tensor  * b);
 
+    // dst = a
+    // view(dst, nb1, nb2, nb3, offset) += b
+    // return dst
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_acc(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
@@ -957,15 +961,14 @@ extern "C" {
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_leaky(
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_leaky_relu(
             struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+            struct wsp_ggml_tensor  * a, float negative_slope, bool inplace);
 
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_relu_inplace(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
 
-    // TODO: double-check this computation is correct
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
@@ -1051,7 +1054,8 @@ extern "C" {
     //  wsp_ggml_mul_mat_id(ctx, as, ids, id, b) ~= wsp_ggml_mul_mat(as[ids[id]], b)
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mul_mat_id(
             struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * as[],
+            struct wsp_ggml_tensor  * const as[],
+            int                   n_as,
             struct wsp_ggml_tensor  * ids,
             int                   id,
             struct wsp_ggml_tensor  * b);
@@ -1263,6 +1267,7 @@ extern "C" {
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
 
+    // supports 3D: a->ne[2] == b->ne[1]
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_rows(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
@@ -1548,6 +1553,15 @@ extern "C" {
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
             int                   scale_factor);
+
+    // pad each dimension with zeros: [x, ..., x] -> [x, ..., x, 0, ..., 0]
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            int                  p0,
+            int                  p1,
+            int                  p2,
+            int                  p3);
 
     // sort rows
     enum wsp_ggml_sort_order {

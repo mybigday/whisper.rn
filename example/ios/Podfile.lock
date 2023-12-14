@@ -1110,7 +1110,7 @@ PODS:
     - SSZipArchive (~> 2.2)
   - SocketRocket (0.6.1)
   - SSZipArchive (2.4.3)
-  - whisper-rn (0.4.0-rc.4):
+  - whisper-rn (0.4.0-rc.5):
     - RCT-Folly
     - RCTRequired
     - RCTTypeSafety
@@ -1357,7 +1357,7 @@ SPEC CHECKSUMS:
   RNZipArchive: ef9451b849c45a29509bf44e65b788829ab07801
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
-  whisper-rn: 03b3324c7b855753dea1802d65ca213de46e0381
+  whisper-rn: f1425a730824210b64515e6ac8384fbe09ad8447
   Yoga: 20d6a900dcc8d61d5e3b799bbf627cc34474a8c4
 
 PODFILE CHECKSUM: 80498ebe77b4fb086f5bdde47d6aa337318b67f0
