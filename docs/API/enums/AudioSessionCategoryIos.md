@@ -25,7 +25,7 @@ https://developer.apple.com/documentation/avfaudio/avaudiosessioncategory?langua
 
 #### Defined in
 
-[AudioSessionIos.ts:8](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L8)
+[AudioSessionIos.ts:8](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L8)
 
 ___
 
@@ -35,7 +35,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:13](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L13)
+[AudioSessionIos.ts:13](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L13)
 
 ___
 
@@ -45,7 +45,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:12](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L12)
+[AudioSessionIos.ts:12](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L12)
 
 ___
 
@@ -55,7 +55,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:10](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L10)
+[AudioSessionIos.ts:10](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L10)
 
 ___
 
@@ -65,7 +65,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:11](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L11)
+[AudioSessionIos.ts:11](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L11)
 
 ___
 
@@ -75,4 +75,4 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:9](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L9)
+[AudioSessionIos.ts:9](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L9)

@@ -34,7 +34,7 @@
 
 #### Defined in
 
-[index.ts:190](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L190)
+[index.ts:195](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L195)
 
 ## Properties
 
@@ -44,7 +44,7 @@
 
 #### Defined in
 
-[index.ts:186](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L186)
+[index.ts:191](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L191)
 
 ___
 
@@ -54,7 +54,7 @@ ___
 
 #### Defined in
 
-[index.ts:184](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L184)
+[index.ts:189](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L189)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[index.ts:188](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L188)
+[index.ts:193](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L193)
 
 ## Methods
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[index.ts:433](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L433)
+[index.ts:436](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L436)
 
 ___
 
@@ -106,7 +106,7 @@ Transcribe audio file
 
 #### Defined in
 
-[index.ts:201](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L201)
+[index.ts:206](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L206)
 
 ___
 
@@ -128,4 +128,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:297](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/index.ts#L297)
+[index.ts:302](https://github.com/mybigday/whisper.rn/blob/85066fc/src/index.ts#L302)

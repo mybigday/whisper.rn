@@ -27,7 +27,7 @@ https://developer.apple.com/documentation/avfaudio/avaudiosessionmode?language=o
 
 #### Defined in
 
-[AudioSessionIos.ts:33](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L33)
+[AudioSessionIos.ts:33](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L33)
 
 ___
 
@@ -37,7 +37,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:36](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L36)
+[AudioSessionIos.ts:36](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L36)
 
 ___
 
@@ -47,7 +47,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:38](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L38)
+[AudioSessionIos.ts:38](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L38)
 
 ___
 
@@ -57,7 +57,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:39](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L39)
+[AudioSessionIos.ts:39](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L39)
 
 ___
 
@@ -67,7 +67,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:40](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L40)
+[AudioSessionIos.ts:40](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L40)
 
 ___
 
@@ -77,7 +77,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:35](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L35)
+[AudioSessionIos.ts:35](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L35)
 
 ___
 
@@ -87,7 +87,7 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:37](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L37)
+[AudioSessionIos.ts:37](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L37)
 
 ___
 
@@ -97,4 +97,4 @@ ___
 
 #### Defined in
 
-[AudioSessionIos.ts:34](https://github.com/mybigday/whisper.rn/blob/ae1df68/src/AudioSessionIos.ts#L34)
+[AudioSessionIos.ts:34](https://github.com/mybigday/whisper.rn/blob/85066fc/src/AudioSessionIos.ts#L34)
