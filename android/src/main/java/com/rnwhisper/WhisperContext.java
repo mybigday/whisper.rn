@@ -110,6 +110,9 @@ public class WhisperContext {
     final int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < audioSec ? realtimeAudioSliceSec : audioSec;
     isUseSlices = audioSliceSec < audioSec;
 
+    double realtimeAudioMinSec = options.hasKey("realtimeAudioMinSec") ? options.getDouble("realtimeAudioMinSec") : 0;
+    final double audioMinSec = realtimeAudioMinSec > 0.5 && realtimeAudioMinSec <= audioSliceSec ? realtimeAudioMinSec : 1;
+
     createRealtimeTranscribeJob(jobId, context, options);
 
     sliceNSamples = new ArrayList<Integer>();
@@ -144,7 +147,8 @@ public class WhisperContext {
                 ) {
                   finishRealtimeTranscribe(Arguments.createMap());
                 } else if (!isTranscribing) {
-                  if (!vad(sliceIndex, nSamples, 0)) {
+                  boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
+                  if (!isSamplesEnough || !vad(sliceIndex, nSamples, 0)) {
                     finishRealtimeTranscribe(Arguments.createMap());
                     break;
                   }
@@ -169,7 +173,8 @@ public class WhisperContext {
               nSamples += n;
               sliceNSamples.set(sliceIndex, nSamples);
 
-              if (!isSpeech) continue;
+              boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
+              if (!isSamplesEnough || !isSpeech) continue;
 
               if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
                 isTranscribing = true;

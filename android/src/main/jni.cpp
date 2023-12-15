@@ -199,7 +199,7 @@ struct whisper_full_params createFullParams(JNIEnv *env, jobject options) {
     params.print_progress = false;
     params.print_timestamps = false;
     params.print_special = false;
-    
+
     int max_threads = std::thread::hardware_concurrency();
     // Use 2 threads by default on 4-core devices, 4 threads on more cores
     int default_n_threads = max_threads == 4 ? 2 : min(4, max_threads);
@@ -307,7 +307,7 @@ Java_com_rnwhisper_WhisperContext_fullWithNewJob(
         // whisper_print_timings(context);
     }
     env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
-    
+
     if (job->is_aborted()) code = -999;
     rnwhisper::job_remove(job_id);
     return code;
@@ -339,6 +339,7 @@ Java_com_rnwhisper_WhisperContext_createRealtimeTranscribeJob(
         vad,
         readablemap::getInt(env, options, "realtimeAudioSec", 0),
         readablemap::getInt(env, options, "realtimeAudioSliceSec", 0),
+        readablemap::getFloat(env, options, "realtimeAudioMinSec", 0),
         audio_output_path_str
     );
 }

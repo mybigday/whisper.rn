@@ -128,6 +128,7 @@
         },
         options[@"realtimeAudioSec"] != nil ? [options[@"realtimeAudioSec"] intValue] : 0,
         options[@"realtimeAudioSliceSec"] != nil ? [options[@"realtimeAudioSliceSec"] intValue] : 0,
+        options[@"realtimeAudioMinSec"] != nil ? [options[@"realtimeAudioMinSec"] floatValue] : 0,
         options[@"audioOutputPath"] != nil ? [options[@"audioOutputPath"] UTF8String] : nullptr
     );
     self->recordState.isUseSlices = self->recordState.job->audio_slice_sec < self->recordState.job->audio_sec;
@@ -181,7 +182,8 @@ void AudioInputCallback(void * inUserData,
             !state->isTranscribing &&
             nSamples != state->nSamplesTranscribing
         ) {
-            if (!vad(state, state->sliceIndex, nSamples, 0)) {
+            bool isSamplesEnough = nSamples / WHISPER_SAMPLE_RATE >= state->job->audio_min_sec;
+            if (!isSamplesEnough || !vad(state, state->sliceIndex, nSamples, 0)) {
                 [state->mSelf finishRealtimeTranscribe:state result:@{}];
                 return;
             }
@@ -210,7 +212,8 @@ void AudioInputCallback(void * inUserData,
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
 
-    if (!isSpeech) return;
+    bool isSamplesEnough = nSamples / WHISPER_SAMPLE_RATE >= state->job->audio_min_sec;
+    if (!isSamplesEnough || !isSpeech) return;
 
     if (!state->isTranscribing) {
         state->isTranscribing = true;

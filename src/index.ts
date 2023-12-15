@@ -95,6 +95,11 @@ export type TranscribeRealtimeOptions = TranscribeOptions & {
    */
   realtimeAudioSliceSec?: number
   /**
+   * Min duration of audio to start transcribe in seconds for each slice.
+   * The minimum value is 0.5 ms and maximum value is realtimeAudioSliceSec (Default: 1)
+   */
+  realtimeAudioMinSec?: number
+  /**
    * Output path for audio file. If not set, the audio file will not be saved
    * (Default: Undefined)
    */

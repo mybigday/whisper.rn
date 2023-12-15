@@ -63,12 +63,14 @@ void job::set_realtime_params(
     vad_params params,
     int sec,
     int slice_sec,
+    float min_sec,
     const char* output_path
 ) {
     vad = params;
     if (vad.vad_ms < 2000) vad.vad_ms = 2000;
     audio_sec = sec > 0 ? sec : DEFAULT_MAX_AUDIO_SEC;
     audio_slice_sec = slice_sec > 0 && slice_sec < audio_sec ? slice_sec : audio_sec;
+    audio_min_sec = min_sec >= 0.5 && min_sec <= audio_slice_sec ? min_sec : 1.0f;
     audio_output_path = output_path;
 }
 
