@@ -140,7 +140,7 @@ export default function App() {
               log('Initialize context...')
               const startTime = Date.now()
               const ctx = await initWhisper({
-                filePath: require('../assets/ggml-tiny.en.bin'),
+                filePath: require('../assets/ggml-base.bin'),
                 ...contextOpts,
               })
               const endTime = Date.now()
@@ -161,7 +161,7 @@ export default function App() {
                 log('Released previous context')
               }
               await createDir(log)
-              const modelFilePath = `${fileDir}/ggml-tiny.en.bin`
+              const modelFilePath = `${fileDir}/ggml-base.bin`
               if (await RNFS.exists(modelFilePath)) {
                 log('Model already exists:')
                 log(filterPath(modelFilePath))
@@ -169,7 +169,7 @@ export default function App() {
                 log('Start Download Model to:')
                 log(filterPath(modelFilePath))
                 await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-tiny.en.bin`,
+                  fromUrl: `${modelHost}/ggml-base.bin`,
                   toFile: modelFilePath,
                   progressInterval: 1000,
                   begin: () => {},
@@ -180,7 +180,7 @@ export default function App() {
               }
 
               // If you don't want to enable Core ML, you can remove this
-              const coremlModelFilePath = `${fileDir}/ggml-tiny.en-encoder.mlmodelc.zip`
+              const coremlModelFilePath = `${fileDir}/ggml-base-encoder.mlmodelc.zip`
               if (
                 Platform.OS === 'ios' &&
                 (await RNFS.exists(coremlModelFilePath))
@@ -191,7 +191,7 @@ export default function App() {
                 log('Start Download Core ML Model to:')
                 log(filterPath(coremlModelFilePath))
                 await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-tiny.en-encoder.mlmodelc.zip`,
+                  fromUrl: `${modelHost}/ggml-base-encoder.mlmodelc.zip`,
                   toFile: coremlModelFilePath,
                   progressInterval: 1000,
                   begin: () => {},
@@ -279,7 +279,10 @@ export default function App() {
                 await createDir(log)
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
+                    maxLen: 1,
                     language: 'en',
+                    // Enable beam search (may be slower than greedy but more accurate)
+                    // beamSize: 2,
                     // Record duration in seconds
                     realtimeAudioSec: 60,
                     // Slice audio into 25 (or < 30) sec chunks for better performance

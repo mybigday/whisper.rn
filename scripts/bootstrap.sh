@@ -83,21 +83,21 @@ cd whisper.cpp/models
 
 # If CI env is `true`, use dummy model
 if [ "$CI" = "true" ]; then
-  cp for-tests-ggml-tiny.en.bin ggml-tiny.en.bin
-  echo "CI: Copied for-tests-ggml-tiny.en.bin to ggml-tiny.en.bin"
+  cp for-tests-ggml-base.bin ggml-base.bin
+  echo "CI: Copied for-tests-ggml-base.bin to ggml-base.bin"
 else
-  ./download-ggml-model.sh tiny.en
+  ./download-ggml-model.sh base
 fi
 
 # Copy to assets
 cp ../samples/jfk.wav ../../example/assets
-cp ggml-tiny.en.bin ../../example/assets
-echo "Copied ggml-tiny.en.bin to example/assets"
+cp ggml-base.bin ../../example/assets
+echo "Copied ggml-base.bin to example/assets"
 
-# Check whisper.cpp/models/ggml-tiny.en-encoder.mlmodelc exist
-if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then
-  URL=https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-encoder.mlmodelc.zip
-  FILE=ggml-tiny.en-encoder.mlmodelc.zip
+# Check whisper.cpp/models/ggml-base-encoder.mlmodelc exist
+if [ ! -d ./ggml-base-encoder.mlmodelc ]; then
+  URL=https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-encoder.mlmodelc.zip
+  FILE=ggml-base-encoder.mlmodelc.zip
 
   if [ -x "$(command -v wget)" ]; then
     wget --no-config --quiet --show-progress -O $FILE $URL
@@ -112,6 +112,6 @@ if [ ! -d ./ggml-tiny.en-encoder.mlmodelc ]; then
   rm $FILE
 fi
 
-if [ ! -d ../../example/assets/ggml-tiny.en-encoder.mlmodelc ]; then
-  cp -r ./ggml-tiny.en-encoder.mlmodelc ../../example/assets/
+if [ ! -d ../../example/assets/ggml-base-encoder.mlmodelc ]; then
+  cp -r ./ggml-base-encoder.mlmodelc ../../example/assets/
 fi

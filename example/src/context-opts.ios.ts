@@ -6,11 +6,11 @@ export default {
   coreMLModelAsset:
     Platform.OS === 'ios'
       ? {
-          filename: 'ggml-tiny.en-encoder.mlmodelc',
+          filename: 'ggml-base-encoder.mlmodelc',
           assets: [
-            require('../assets/ggml-tiny.en-encoder.mlmodelc/weights/weight.bin'),
-            require('../assets/ggml-tiny.en-encoder.mlmodelc/model.mil'),
-            require('../assets/ggml-tiny.en-encoder.mlmodelc/coremldata.bin'),
+            require('../assets/ggml-base-encoder.mlmodelc/weights/weight.bin'),
+            require('../assets/ggml-base-encoder.mlmodelc/model.mil'),
+            require('../assets/ggml-base-encoder.mlmodelc/coremldata.bin'),
           ],
         }
       : undefined,
