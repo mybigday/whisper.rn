@@ -409,7 +409,7 @@ struct rnwhisper_segments_callback_data {
             };
             params.new_segment_callback_user_data = &user_data;
         }
-    
+
         rnwhisper::job* job = rnwhisper::job_new(jobId, params);;
         int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
         rnwhisper::job_remove(jobId);
@@ -466,7 +466,7 @@ struct rnwhisper_segments_callback_data {
     params.print_special    = false;
     params.speed_up         = options[@"speedUp"] != nil ? [options[@"speedUp"] boolValue] : false;
     params.translate        = options[@"translate"] != nil ? [options[@"translate"] boolValue] : false;
-    params.language         = options[@"language"] != nil ? [options[@"language"] UTF8String] : "auto";
+    params.language         = options[@"language"] != nil ? strdup([options[@"language"] UTF8String]) : "auto";
     params.n_threads        = n_threads > 0 ? n_threads : default_n_threads;
     params.offset_ms        = 0;
     params.no_context       = true;
@@ -499,7 +499,7 @@ struct rnwhisper_segments_callback_data {
         params.temperature_inc = [options[@"temperature_inc"] floatValue];
     }
     if (options[@"prompt"] != nil) {
-        params.initial_prompt = [options[@"prompt"] UTF8String];
+        params.initial_prompt = strdup([options[@"prompt"] UTF8String]);
     }
 
     return params;
