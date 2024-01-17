@@ -413,7 +413,8 @@ struct rnwhisper_segments_callback_data {
             params.new_segment_callback_user_data = &user_data;
         }
 
-        rnwhisper::job* job = rnwhisper::job_new(jobId, params);;
+        rnwhisper::job* job = rnwhisper::job_new(jobId, params);
+        self->recordState.job = job;
         int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
         rnwhisper::job_remove(jobId);
         self->recordState.isTranscribing = false;
