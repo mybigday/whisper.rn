@@ -115,7 +115,7 @@ public class RNWhisper implements LifecycleEventListener {
         promise.resolve(result);
         tasks.remove(this);
       }
-    }.execute();
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     tasks.put(task, "initContext");
   }
 
@@ -174,7 +174,7 @@ public class RNWhisper implements LifecycleEventListener {
         promise.resolve(data);
         tasks.remove(this);
       }
-    }.execute();
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     tasks.put(task, "transcribeFile-" + id);
   }
 
@@ -231,7 +231,7 @@ public class RNWhisper implements LifecycleEventListener {
         promise.resolve(null);
         tasks.remove(this);
       }
-    }.execute();
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     tasks.put(task, "abortTranscribe-" + id);
   }
 
@@ -272,7 +272,7 @@ public class RNWhisper implements LifecycleEventListener {
         promise.resolve(null);
         tasks.remove(this);
       }
-    }.execute();
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     tasks.put(task, "releaseContext-" + id);
   }
 
@@ -299,7 +299,7 @@ public class RNWhisper implements LifecycleEventListener {
         promise.resolve(null);
         tasks.remove(this);
       }
-    }.execute();
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     tasks.put(task, "releaseAllContexts");
   }
 
