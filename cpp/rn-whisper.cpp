@@ -75,6 +75,7 @@ void job::set_realtime_params(
 }
 
 bool job::vad_simple(int slice_index, int n_samples, int n) {
+    if (slice_index >= pcm_slices.size()) return !vad.use_vad;
     if (!vad.use_vad) return true;
 
     short* pcm = pcm_slices[slice_index];
