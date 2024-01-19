@@ -24,7 +24,7 @@ struct whisper_coreml_context * whisper_coreml_init(const char * path_model) {
 
     // select which device to run the Core ML model on
     MLModelConfiguration *config = [[MLModelConfiguration alloc] init];
-    //config.computeUnits = MLComputeUnitsCPUAndGPU;
+    // config.computeUnits = MLComputeUnitsCPUAndGPU;
     //config.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
     config.computeUnits = MLComputeUnitsAll;
 

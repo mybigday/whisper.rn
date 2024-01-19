@@ -1,6 +1,6 @@
---- ggml-metal.m.orig	2023-12-15 06:38:34
-+++ ggml-metal.m	2023-12-15 06:38:35
-@@ -231,7 +231,7 @@
+--- ggml-metal.m.orig	2024-01-19 10:55:39
++++ ggml-metal.m	2024-01-19 10:58:09
+@@ -254,7 +254,7 @@
      WSP_GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
 
      // Configure context
@@ -9,7 +9,7 @@
      ctx->device = device;
      ctx->n_cb   = MIN(n_cb, WSP_GGML_METAL_MAX_BUFFERS);
      ctx->queue  = [ctx->device newCommandQueue];
-@@ -265,7 +265,7 @@
+@@ -288,7 +288,7 @@
              if (ggmlMetalPathResources) {
                  sourcePath = [ggmlMetalPathResources stringByAppendingPathComponent:@"ggml-metal.metal"];
              } else {
@@ -18,33 +18,35 @@
              }
              if (sourcePath == nil) {
                  WSP_GGML_METAL_LOG_WARN("%s: error: could not use bundle path to find ggml-metal.metal, falling back to trying cwd\n", __func__);
-@@ -451,8 +451,6 @@
- void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
+@@ -530,27 +530,7 @@
+
+ static void wsp_ggml_metal_free(struct wsp_ggml_metal_context * ctx) {
      WSP_GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
- #define WSP_GGML_METAL_DEL_KERNEL(name) \
--    [ctx->function_##name release]; \
--    [ctx->pipeline_##name release];
-
-     WSP_GGML_METAL_DEL_KERNEL(add);
-     WSP_GGML_METAL_DEL_KERNEL(add_row);
-@@ -565,16 +563,6 @@
-     WSP_GGML_METAL_DEL_KERNEL(sum_rows);
-
- #undef WSP_GGML_METAL_DEL_KERNEL
 -
 -    for (int i = 0; i < ctx->n_buffers; ++i) {
 -        [ctx->buffers[i].metal release];
 -    }
 -
+-    for (int i = 0; i < WSP_GGML_METAL_MAX_KERNELS; ++i) {
+-        if (ctx->kernels[i].pipeline) {
+-            [ctx->kernels[i].pipeline release];
+-        }
+-
+-        if (ctx->kernels[i].function) {
+-            [ctx->kernels[i].function release];
+-        }
+-    }
+
 -    [ctx->library release];
 -    [ctx->queue release];
 -    [ctx->device release];
 -
 -    dispatch_release(ctx->d_queue);
-
+-
      free(ctx);
  }
-@@ -2380,7 +2368,6 @@
+
+@@ -2278,7 +2258,6 @@
      g_backend_device_ref_count--;
 
      if (g_backend_device_ref_count == 0) {
@@ -52,11 +54,13 @@
          g_backend_device = nil;
      }
  }
-@@ -2394,7 +2381,6 @@
- static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
+@@ -2292,9 +2271,6 @@
+ WSP_GGML_CALL static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
      struct wsp_ggml_backend_metal_buffer_context * ctx = (struct wsp_ggml_backend_metal_buffer_context *)buffer->context;
 
--    [ctx->metal release];
+-    for (int i = 0; i < ctx->n_buffers; i++) {
+-        [ctx->buffers[i].metal release];
+-    }
      wsp_ggml_backend_metal_free_device();
 
-     free(ctx->data);
+     if (ctx->owned) {
