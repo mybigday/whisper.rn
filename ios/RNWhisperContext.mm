@@ -116,6 +116,7 @@
     self->recordState.transcribeSliceIndex = 0;
     self->recordState.nSamplesTranscribing = 0;
 
+    self->recordState.sliceNSamples.clear();
     self->recordState.sliceNSamples.push_back(0);
 
     self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
@@ -202,7 +203,7 @@ void AudioInputCallback(void * inUserData,
         state->sliceNSamples.push_back(0);
     }
 
-    NSLog(@"[RNWhisper] Slice %d has %d samples", state->sliceIndex, nSamples);
+    NSLog(@"[RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
 
     state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
 
