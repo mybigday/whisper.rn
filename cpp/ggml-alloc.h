@@ -52,8 +52,10 @@ typedef struct wsp_ggml_tallocr * wsp_ggml_tallocr_t;
 
 WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new(void * data, size_t size, size_t alignment);
 WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_measure(size_t alignment);
-WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_from_buffer(struct wsp_ggml_backend_buffer * buffer);
+WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_from_buft(struct wsp_ggml_backend_buffer_type * buft, size_t size);
 WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_from_backend(struct wsp_ggml_backend * backend, size_t size); // allocates an owned buffer
+WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_from_buffer(struct wsp_ggml_backend_buffer * buffer);
+WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_measure_from_buft(struct wsp_ggml_backend_buffer_type * buft);
 WSP_GGML_API wsp_ggml_tallocr_t wsp_ggml_tallocr_new_measure_from_backend(struct wsp_ggml_backend * backend);
 
 WSP_GGML_API struct wsp_ggml_backend_buffer * wsp_ggml_tallocr_get_buffer(wsp_ggml_tallocr_t talloc);

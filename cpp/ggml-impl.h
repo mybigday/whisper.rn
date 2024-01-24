@@ -5,6 +5,7 @@
 // GGML internal header
 
 #include <assert.h>
+#include <stdlib.h> // load `stdlib.h` before other headers to work around MinGW bug: https://sourceforge.net/p/mingw-w64/bugs/192/
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h> // memcpy
@@ -226,6 +227,8 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
 
 #define WSP_GGML_HASHTABLE_FULL ((size_t)-1)
 #define WSP_GGML_HASHTABLE_ALREADY_EXISTS ((size_t)-2)
+
+struct wsp_ggml_hash_set wsp_ggml_hash_set_new(size_t size);
 
 bool   wsp_ggml_hash_contains      (const struct wsp_ggml_hash_set hash_set, struct wsp_ggml_tensor * key);
 
