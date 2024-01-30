@@ -1633,7 +1633,7 @@
     babel-plugin-transform-flow-enums "^0.0.2"
     react-refresh "^0.14.0"
 
-"@react-native/babel-preset@^0.73.20":
+"@react-native/babel-preset@0.73.20", "@react-native/babel-preset@^0.73.20":
   version "0.73.20"
   resolved "https://registry.yarnpkg.com/@react-native/babel-preset/-/babel-preset-0.73.20.tgz#65ab68cce16bb222bb1faece498abb6f7b1d5db0"
   integrity sha512-fU9NqkusbfFq71l4BWQfqqD/lLcLC0MZ++UYgieA3j8lIEppJTLVauv2RwtD2yltBkjebgYEC5Rwvt1l0MUBXw==
@@ -1752,13 +1752,23 @@
     hermes-parser "0.15.0"
     nullthrows "^1.1.1"
 
-"@react-native/metro-config@^0.73.3":
-  version "0.73.3"
-  resolved "https://registry.yarnpkg.com/@react-native/metro-config/-/metro-config-0.73.3.tgz#15f5e1393258148fadb285821dd9b037ea411459"
-  integrity sha512-aIVh+lM52n7/RFDXLDiIp1vI21jc9thm2VxdkP7KwxMut7VvW+2tO38zKt74/2ker2ca0205tbf3pyCYBvV6Ww==
+"@react-native/metro-babel-transformer@0.73.14":
+  version "0.73.14"
+  resolved "https://registry.yarnpkg.com/@react-native/metro-babel-transformer/-/metro-babel-transformer-0.73.14.tgz#a4ee02c729216e4ab5b7c7aa28abbfe8e0a943a8"
+  integrity sha512-5wLeYw/lormpSqYfI9H/geZ/EtPmi+x5qLkEit15Q/70hkzYo/M+aWztUtbOITfgTEOP8d6ybROzoGsqgyZLcw==
+  dependencies:
+    "@babel/core" "^7.20.0"
+    "@react-native/babel-preset" "0.73.20"
+    hermes-parser "0.15.0"
+    nullthrows "^1.1.1"
+
+"@react-native/metro-config@^0.73.4":
+  version "0.73.4"
+  resolved "https://registry.yarnpkg.com/@react-native/metro-config/-/metro-config-0.73.4.tgz#475feab57a60734c5f40c60ef92f4552dec6174c"
+  integrity sha512-4IpWb9InOY23ssua6z/ho2B4uRqF4QaNHGg4aV3D/og5yiVF39GEm/REHU36i+KoHRO3GcB6DrI7N9KrcvgGBw==
   dependencies:
     "@react-native/js-polyfills" "0.73.1"
-    "@react-native/metro-babel-transformer" "0.73.13"
+    "@react-native/metro-babel-transformer" "0.73.14"
     metro-config "^0.80.3"
     metro-runtime "^0.80.3"
 
