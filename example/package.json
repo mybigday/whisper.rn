@@ -12,7 +12,7 @@
     "@react-native/babel-preset": "^0.73.20",
     "@react-native/metro-config": "^0.73.3",
     "react": "18.2.0",
-    "react-native": "0.73.2",
+    "react-native": "0.73.5",
     "react-native-fs": "^2.20.0",
     "react-native-sound": "^0.11.2",
     "react-native-zip-archive": "^6.1.0"
