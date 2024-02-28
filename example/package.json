@@ -20,6 +20,6 @@
   "devDependencies": {
     "@babel/core": "^7.23.9",
     "@babel/preset-env": "^7.23.8",
-    "@babel/runtime": "^7.23.9"
+    "@babel/runtime": "^7.24.0"
   }
 }
