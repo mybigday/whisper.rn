@@ -1262,16 +1262,7 @@
   dependencies:
     regenerator-runtime "^0.14.0"
 
-"@babel/template@^7.0.0", "@babel/template@^7.18.10", "@babel/template@^7.20.7", "@babel/template@^7.22.15", "@babel/template@^7.22.5", "@babel/template@^7.23.9":
-  version "7.23.9"
-  resolved "https://registry.yarnpkg.com/@babel/template/-/template-7.23.9.tgz#f881d0487cba2828d3259dcb9ef5005a9731011a"
-  integrity sha512-+xrD2BWLpvHKNmX2QbpdpsBaWnRxahMwJjO+KZk2JOElj5nSmKezyS1B4u+QbHMTX69t4ukm6hh9lsYQ7GHCKA==
-  dependencies:
-    "@babel/code-frame" "^7.23.5"
-    "@babel/parser" "^7.23.9"
-    "@babel/types" "^7.23.9"
-
-"@babel/template@^7.24.0":
+"@babel/template@^7.0.0", "@babel/template@^7.18.10", "@babel/template@^7.20.7", "@babel/template@^7.22.15", "@babel/template@^7.22.5", "@babel/template@^7.23.9", "@babel/template@^7.24.0":
   version "7.24.0"
   resolved "https://registry.yarnpkg.com/@babel/template/-/template-7.24.0.tgz#c6a524aa93a4a05d66aaf31654258fae69d87d50"
   integrity sha512-Bkf2q8lMB0AFpX0NFEqSbx1OkTHf0f+0j82mkw+ZpzBnkk7e9Ql0891vlfgi+kHwOk8tQjiQHpqh4LaSa0fKEA==
@@ -1603,13 +1594,6 @@
   dependencies:
     "@react-native/codegen" "0.73.2"
 
-"@react-native/babel-plugin-codegen@0.73.3":
-  version "0.73.3"
-  resolved "https://registry.yarnpkg.com/@react-native/babel-plugin-codegen/-/babel-plugin-codegen-0.73.3.tgz#6bf135322b89264342c80778ee6bb697f968f773"
-  integrity sha512-+zQrDDbz6lB48LyzFHxNCgXDCBHH+oTRdXAjikRcBUdeG9St9ABbYFLtb799zSxLOrCqFVyXqhJR2vlgLLEbcg==
-  dependencies:
-    "@react-native/codegen" "0.73.2"
-
 "@react-native/babel-plugin-codegen@0.74.79":
   version "0.74.79"
   resolved "https://registry.yarnpkg.com/@react-native/babel-plugin-codegen/-/babel-plugin-codegen-0.74.79.tgz#43be63d1bd5a324654df0c4e50e8439aea8c2e3f"
@@ -1665,7 +1649,7 @@
     babel-plugin-transform-flow-enums "^0.0.2"
     react-refresh "^0.14.0"
 
-"@react-native/babel-preset@0.74.79":
+"@react-native/babel-preset@0.74.79", "@react-native/babel-preset@^0.74.79":
   version "0.74.79"
   resolved "https://registry.yarnpkg.com/@react-native/babel-preset/-/babel-preset-0.74.79.tgz#eafb64029ccff45c3d1215eb0dc062681372a65e"
   integrity sha512-D18reDwFiLEBJEcYTP49CUjVfPWAq73HNrGS+HnARwky8DlWML0tDF1L7oxlO9KYRKp/I0BjaIWo6YnF3ttXFA==
@@ -1711,54 +1695,6 @@
     "@babel/plugin-transform-unicode-regex" "^7.0.0"
     "@babel/template" "^7.0.0"
     "@react-native/babel-plugin-codegen" "0.74.79"
-    babel-plugin-transform-flow-enums "^0.0.2"
-    react-refresh "^0.14.0"
-
-"@react-native/babel-preset@^0.73.20":
-  version "0.73.20"
-  resolved "https://registry.yarnpkg.com/@react-native/babel-preset/-/babel-preset-0.73.20.tgz#65ab68cce16bb222bb1faece498abb6f7b1d5db0"
-  integrity sha512-fU9NqkusbfFq71l4BWQfqqD/lLcLC0MZ++UYgieA3j8lIEppJTLVauv2RwtD2yltBkjebgYEC5Rwvt1l0MUBXw==
-  dependencies:
-    "@babel/core" "^7.20.0"
-    "@babel/plugin-proposal-async-generator-functions" "^7.0.0"
-    "@babel/plugin-proposal-class-properties" "^7.18.0"
-    "@babel/plugin-proposal-export-default-from" "^7.0.0"
-    "@babel/plugin-proposal-nullish-coalescing-operator" "^7.18.0"
-    "@babel/plugin-proposal-numeric-separator" "^7.0.0"
-    "@babel/plugin-proposal-object-rest-spread" "^7.20.0"
-    "@babel/plugin-proposal-optional-catch-binding" "^7.0.0"
-    "@babel/plugin-proposal-optional-chaining" "^7.20.0"
-    "@babel/plugin-syntax-dynamic-import" "^7.8.0"
-    "@babel/plugin-syntax-export-default-from" "^7.0.0"
-    "@babel/plugin-syntax-flow" "^7.18.0"
-    "@babel/plugin-syntax-nullish-coalescing-operator" "^7.0.0"
-    "@babel/plugin-syntax-optional-chaining" "^7.0.0"
-    "@babel/plugin-transform-arrow-functions" "^7.0.0"
-    "@babel/plugin-transform-async-to-generator" "^7.20.0"
-    "@babel/plugin-transform-block-scoping" "^7.0.0"
-    "@babel/plugin-transform-classes" "^7.0.0"
-    "@babel/plugin-transform-computed-properties" "^7.0.0"
-    "@babel/plugin-transform-destructuring" "^7.20.0"
-    "@babel/plugin-transform-flow-strip-types" "^7.20.0"
-    "@babel/plugin-transform-function-name" "^7.0.0"
-    "@babel/plugin-transform-literals" "^7.0.0"
-    "@babel/plugin-transform-modules-commonjs" "^7.0.0"
-    "@babel/plugin-transform-named-capturing-groups-regex" "^7.0.0"
-    "@babel/plugin-transform-parameters" "^7.0.0"
-    "@babel/plugin-transform-private-methods" "^7.22.5"
-    "@babel/plugin-transform-private-property-in-object" "^7.22.11"
-    "@babel/plugin-transform-react-display-name" "^7.0.0"
-    "@babel/plugin-transform-react-jsx" "^7.0.0"
-    "@babel/plugin-transform-react-jsx-self" "^7.0.0"
-    "@babel/plugin-transform-react-jsx-source" "^7.0.0"
-    "@babel/plugin-transform-runtime" "^7.0.0"
-    "@babel/plugin-transform-shorthand-properties" "^7.0.0"
-    "@babel/plugin-transform-spread" "^7.0.0"
-    "@babel/plugin-transform-sticky-regex" "^7.0.0"
-    "@babel/plugin-transform-typescript" "^7.5.0"
-    "@babel/plugin-transform-unicode-regex" "^7.0.0"
-    "@babel/template" "^7.0.0"
-    "@react-native/babel-plugin-codegen" "0.73.3"
     babel-plugin-transform-flow-enums "^0.0.2"
     react-refresh "^0.14.0"
 
