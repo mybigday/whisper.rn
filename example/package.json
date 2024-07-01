@@ -9,7 +9,7 @@
     "pods": "pod-install --quiet"
   },
   "dependencies": {
-    "@react-native/babel-preset": "^0.73.20",
+    "@react-native/babel-preset": "^0.74.85",
     "@react-native/metro-config": "^0.74.79",
     "react": "18.2.0",
     "react-native": "0.73.2",
