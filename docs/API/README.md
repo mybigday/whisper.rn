@@ -149,6 +149,7 @@ ___
 | `offset?` | `number` | Time offset in milliseconds |
 | `prompt?` | `string` | Initial Prompt |
 | `speedUp?` | `boolean` | Speed up audio by x2 (reduced accuracy) |
+| `tdrzEnable?` | `boolean` | Enable tinydiarize (requires a tdrz model) |
 | `temperature?` | `number` | Tnitial decoding temperature |
 | `temperatureInc?` | `number` | - |
 | `tokenTimestamps?` | `boolean` | Enable token-level timestamps |

@@ -15,6 +15,8 @@ export type TranscribeOptions = {
   maxLen?: number,
   /** Enable token-level timestamps */
   tokenTimestamps?: boolean,
+  /** Enable token-level timestamps */
+  tdrzEnable?: boolean,
   /** Word timestamp probability threshold */
   wordThold?: number,
   /** Time offset in milliseconds */

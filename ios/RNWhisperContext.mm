@@ -1,4 +1,5 @@
 #import "RNWhisperContext.h"
+#include "whisper.h"
 #import <Metal/Metal.h>
 #include <vector>
 
@@ -353,6 +354,7 @@ void AudioInputCallback(void * inUserData,
 struct rnwhisper_segments_callback_data {
     void (^onNewSegments)(NSDictionary *);
     int total_n_new;
+    bool tdrzEnable;
 };
 
 - (void)transcribeFile:(int)jobId
@@ -386,12 +388,18 @@ struct rnwhisper_segments_callback_data {
                 NSMutableArray *segments = [[NSMutableArray alloc] init];
                 for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
                     const char * text_cur = whisper_full_get_segment_text(ctx, i);
-                    text = [text stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
+                    NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
+
+                    if (data->tdrzEnable && whisper_full_get_segment_speaker_turn_next(ctx, i)) {
+                        [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
+                    }
+
+                    text = [text stringByAppendingString:mutable_ns_text];
 
                     const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
                     const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
                     NSDictionary *segment = @{
-                        @"text": [NSString stringWithUTF8String:text_cur],
+                        @"text": [NSString stringWithString:mutable_ns_text],
                         @"t0": [NSNumber numberWithLongLong:t0],
                         @"t1": [NSNumber numberWithLongLong:t1]
                     };
@@ -409,7 +417,8 @@ struct rnwhisper_segments_callback_data {
             };
             struct rnwhisper_segments_callback_data user_data = {
                 .onNewSegments = onNewSegments,
-                .total_n_new = 0
+                .tdrzEnable = options[@"tdrzEnable"] && [options[@"tdrzEnable"] boolValue],
+                .total_n_new = 0,
             };
             params.new_segment_callback_user_data = &user_data;
         }
@@ -481,6 +490,7 @@ struct rnwhisper_segments_callback_data {
         params.max_len = [options[@"maxLen"] intValue];
     }
     params.token_timestamps = options[@"tokenTimestamps"] != nil ? [options[@"tokenTimestamps"] boolValue] : false;
+    params.tdrz_enable = options[@"tdrzEnable"] != nil ? [options[@"tdrzEnable"] boolValue] : false;
 
     if (options[@"bestOf"] != nil) {
         params.greedy.best_of = [options[@"bestOf"] intValue];
@@ -530,12 +540,21 @@ struct rnwhisper_segments_callback_data {
     NSMutableArray *segments = [[NSMutableArray alloc] init];
     for (int i = 0; i < n_segments; i++) {
         const char * text_cur = whisper_full_get_segment_text(self->ctx, i);
-        text = [text stringByAppendingString:[NSString stringWithUTF8String:text_cur]];
+        NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
+
+        // Simplified condition
+        if (self->recordState.options[@"tdrzEnable"] && 
+            [self->recordState.options[@"tdrzEnable"] boolValue] &&
+            whisper_full_get_segment_speaker_turn_next(self->ctx, i)) {
+            [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
+        }
+
+        text = [text stringByAppendingString:mutable_ns_text];
 
         const int64_t t0 = whisper_full_get_segment_t0(self->ctx, i);
         const int64_t t1 = whisper_full_get_segment_t1(self->ctx, i);
         NSDictionary *segment = @{
-            @"text": [NSString stringWithUTF8String:text_cur],
+            @"text": [NSString stringWithString:mutable_ns_text],
             @"t0": [NSNumber numberWithLongLong:t0],
             @"t1": [NSNumber numberWithLongLong:t1]
         };
