@@ -53,6 +53,7 @@ public class WhisperContext {
   private boolean isCapturing = false;
   private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
+  private boolean isTdrzEnable = false;
   private Thread rootFullHandler = null;
   private Thread fullHandler = null;
 
@@ -73,6 +74,7 @@ public class WhisperContext {
     isCapturing = false;
     isStoppedByAction = false;
     isTranscribing = false;
+    isTdrzEnable = false;
     rootFullHandler = null;
     fullHandler = null;
   }
@@ -112,6 +114,8 @@ public class WhisperContext {
 
     double realtimeAudioMinSec = options.hasKey("realtimeAudioMinSec") ? options.getDouble("realtimeAudioMinSec") : 0;
     final double audioMinSec = realtimeAudioMinSec > 0.5 && realtimeAudioMinSec <= audioSliceSec ? realtimeAudioMinSec : 1;
+
+    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
     createRealtimeTranscribeJob(jobId, context, options);
 
@@ -333,8 +337,9 @@ public class WhisperContext {
       throw new Exception("Context is already in capturing or transcribing");
     }
     rewind();
-
     this.jobId = jobId;
+    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
+
     isTranscribing = true;
     float[] audioData = AudioUtils.decodeWaveFile(inputStream);
 
@@ -368,8 +373,15 @@ public class WhisperContext {
 
     WritableMap data = Arguments.createMap();
     WritableArray segments = Arguments.createArray();
+
     for (int i = 0; i < count; i++) {
       String text = getTextSegment(context, i);
+
+      // If tdrzEnable is enabled and speaker turn is detected
+      if (this.isTdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
+          text += " [SPEAKER_TURN]";
+      }
+
       builder.append(text);
 
       WritableMap segment = Arguments.createMap();
@@ -499,6 +511,7 @@ public class WhisperContext {
   protected static native String getTextSegment(long context, int index);
   protected static native int getTextSegmentT0(long context, int index);
   protected static native int getTextSegmentT1(long context, int index);
+  protected static native boolean getTextSegmentSpeakerTurnNext(long context, int index);
 
   protected static native void createRealtimeTranscribeJob(
     int job_id,
