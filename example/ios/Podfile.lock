@@ -1101,16 +1101,13 @@ PODS:
     - RNSound/Core (= 0.11.2)
   - RNSound/Core (0.11.2):
     - React-Core
-  - RNZipArchive (6.1.0):
+  - RNZipArchive (7.0.1):
     - React-Core
-    - RNZipArchive/Core (= 6.1.0)
-    - SSZipArchive (~> 2.2)
-  - RNZipArchive/Core (6.1.0):
-    - React-Core
-    - SSZipArchive (~> 2.2)
+    - RNZipArchive/Core (= 7.0.1)
+    - SSZipArchive (~> 2.5.5)
   - SocketRocket (0.6.1)
-  - SSZipArchive (2.4.3)
-  - whisper-rn (0.4.0-rc.7):
+  - SSZipArchive (2.5.5)
+  - whisper-rn (0.4.0-rc.8):
     - RCT-Folly
     - RCTRequired
     - RCTTypeSafety
@@ -1354,12 +1351,12 @@ SPEC CHECKSUMS:
   ReactCommon: 45b5d4f784e869c44a6f5a8fad5b114ca8f78c53
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
   RNSound: 6c156f925295bdc83e8e422e7d8b38d33bc71852
-  RNZipArchive: ef9451b849c45a29509bf44e65b788829ab07801
+  RNZipArchive: 7bb4c70d6aa2dd235212c0a4a3de0a4e237e2569
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
-  SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
-  whisper-rn: fee681f3a7f168c6f615879dd8bf4bc002c1e335
+  SSZipArchive: c69881e8ac5521f0e622291387add5f60f30f3c4
+  whisper-rn: 7a97195e567a3388f4ace1abf5b7456196f1f6d1
   Yoga: e64aa65de36c0832d04e8c7bd614396c77a80047
 
 PODFILE CHECKSUM: 80498ebe77b4fb086f5bdde47d6aa337318b67f0
 
-COCOAPODS: 1.14.3
+COCOAPODS: 1.15.2

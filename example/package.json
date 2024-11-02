@@ -15,7 +15,7 @@
     "react-native": "0.73.2",
     "react-native-fs": "^2.20.0",
     "react-native-sound": "^0.11.2",
-    "react-native-zip-archive": "^6.1.0"
+    "react-native-zip-archive": "^7.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.23.9",
