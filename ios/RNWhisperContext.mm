@@ -1,5 +1,4 @@
 #import "RNWhisperContext.h"
-#include "whisper.h"
 #import <Metal/Metal.h>
 #include <vector>
 
@@ -543,7 +542,7 @@ struct rnwhisper_segments_callback_data {
         NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
 
         // Simplified condition
-        if (self->recordState.options[@"tdrzEnable"] && 
+        if (self->recordState.options[@"tdrzEnable"] &&
             [self->recordState.options[@"tdrzEnable"] boolValue] &&
             whisper_full_get_segment_speaker_turn_next(self->ctx, i)) {
             [mutable_ns_text appendString:@" [SPEAKER_TURN]"];

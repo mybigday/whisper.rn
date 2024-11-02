@@ -53,9 +53,9 @@ public class WhisperContext {
   private boolean isCapturing = false;
   private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
+  private boolean isTdrzEnable = false;
   private Thread rootFullHandler = null;
   private Thread fullHandler = null;
-  private ReadableMap options;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
     this.id = id;
@@ -74,6 +74,7 @@ public class WhisperContext {
     isCapturing = false;
     isStoppedByAction = false;
     isTranscribing = false;
+    isTdrzEnable = false;
     rootFullHandler = null;
     fullHandler = null;
   }
@@ -104,7 +105,7 @@ public class WhisperContext {
     rewind();
 
     this.jobId = jobId;
-    this.options = options;
+
     int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
     final int audioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
     int realtimeAudioSliceSec = options.hasKey("realtimeAudioSliceSec") ? options.getInt("realtimeAudioSliceSec") : 0;
@@ -113,6 +114,8 @@ public class WhisperContext {
 
     double realtimeAudioMinSec = options.hasKey("realtimeAudioMinSec") ? options.getDouble("realtimeAudioMinSec") : 0;
     final double audioMinSec = realtimeAudioMinSec > 0.5 && realtimeAudioMinSec <= audioSliceSec ? realtimeAudioMinSec : 1;
+
+    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
     createRealtimeTranscribeJob(jobId, context, options);
 
@@ -334,8 +337,9 @@ public class WhisperContext {
       throw new Exception("Context is already in capturing or transcribing");
     }
     rewind();
-    this.options = options;
     this.jobId = jobId;
+    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
+
     isTranscribing = true;
     float[] audioData = AudioUtils.decodeWaveFile(inputStream);
 
@@ -370,14 +374,11 @@ public class WhisperContext {
     WritableMap data = Arguments.createMap();
     WritableArray segments = Arguments.createArray();
 
-    // Check if tdrzEnable is enabled
-    boolean tdrzEnable = options != null && options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
-
     for (int i = 0; i < count; i++) {
       String text = getTextSegment(context, i);
 
       // If tdrzEnable is enabled and speaker turn is detected
-      if (tdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
+      if (this.tdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
           text += " [SPEAKER_TURN]";
       }
 
