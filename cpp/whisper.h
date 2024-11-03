@@ -84,9 +84,48 @@ extern "C" {
     typedef int32_t whisper_token;
     typedef int32_t whisper_seq_id;
 
+    enum whisper_alignment_heads_preset {
+        WHISPER_AHEADS_NONE,
+        WHISPER_AHEADS_N_TOP_MOST,  // All heads from the N-top-most text-layers
+        WHISPER_AHEADS_CUSTOM,
+        WHISPER_AHEADS_TINY_EN,
+        WHISPER_AHEADS_TINY,
+        WHISPER_AHEADS_BASE_EN,
+        WHISPER_AHEADS_BASE,
+        WHISPER_AHEADS_SMALL_EN,
+        WHISPER_AHEADS_SMALL,
+        WHISPER_AHEADS_MEDIUM_EN,
+        WHISPER_AHEADS_MEDIUM,
+        WHISPER_AHEADS_LARGE_V1,
+        WHISPER_AHEADS_LARGE_V2,
+        WHISPER_AHEADS_LARGE_V3,
+        WHISPER_AHEADS_LARGE_V3_TURBO,
+    };
+
+    typedef struct whisper_ahead {
+        int n_text_layer;
+        int n_head;
+    } whisper_ahead;
+
+    typedef struct whisper_aheads {
+        size_t n_heads;
+        const whisper_ahead * heads;
+    } whisper_aheads;
+
     struct whisper_context_params {
         bool  use_gpu;
         bool  use_coreml;
+        bool  flash_attn;
+        int   gpu_device;  // CUDA device
+
+        // [EXPERIMENTAL] Token-level timestamps with DTW
+        bool dtw_token_timestamps;
+        enum whisper_alignment_heads_preset dtw_aheads_preset;
+
+        int dtw_n_top;
+        struct whisper_aheads dtw_aheads;
+
+        size_t dtw_mem_size; // TODO: remove
     };
 
     typedef struct whisper_token_data {
@@ -102,6 +141,11 @@ extern "C" {
         // do not use if you haven't computed token-level timestamps
         int64_t t0;        // start time of the token
         int64_t t1;        //   end time of the token
+
+        // [EXPERIMENTAL] Token-level timestamps with DTW
+        // do not use if you haven't computed token-level timestamps with dtw
+        // Roughly corresponds to the moment in audio in which the token was output
+        int64_t t_dtw;
 
         float vlen;        // voice length of the token
     } whisper_token_data;
@@ -196,6 +240,13 @@ extern "C" {
     //                     GPU, by caching compiled 'blobs' there.
     //                     Set to nullptr if not used.
     // Returns 0 on success. If OpenVINO is not enabled in build, this simply returns 1.
+    WHISPER_API int whisper_ctx_init_openvino_encoder_with_state(
+        struct whisper_context * ctx,
+          struct whisper_state * state,
+                    const char * model_path,
+                    const char * device,
+                    const char * cache_dir);
+
     WHISPER_API int whisper_ctx_init_openvino_encoder(
         struct whisper_context * ctx,
                     const char * model_path,
@@ -223,22 +274,6 @@ extern "C" {
                        const float * samples,
                                int   n_samples,
                                int   n_threads);
-
-    // Convert RAW PCM audio to log mel spectrogram but applies a Phase Vocoder to speed up the audio x2.
-    // The resulting spectrogram is stored inside the default state of the provided whisper context.
-    // Returns 0 on success
-    WHISPER_API int whisper_pcm_to_mel_phase_vocoder(
-        struct whisper_context * ctx,
-                   const float * samples,
-                           int   n_samples,
-                           int   n_threads);
-
-    WHISPER_API int whisper_pcm_to_mel_phase_vocoder_with_state(
-        struct whisper_context * ctx,
-          struct whisper_state * state,
-                   const float * samples,
-                           int   n_samples,
-                           int   n_threads);
 
     // This can be used to set a custom log mel spectrogram inside the default state of the provided whisper context.
     // Use this instead of whisper_pcm_to_mel() if you want to provide your own log mel spectrogram.
@@ -296,7 +331,7 @@ extern "C" {
     // Convert the provided text into tokens.
     // The tokens pointer must be large enough to hold the resulting tokens.
     // Returns the number of tokens on success, no more than n_max_tokens
-    // Returns -1 on failure
+    // Returns a negative number on failure - the number of tokens that would have been returned
     // TODO: not sure if correct
     WHISPER_API int whisper_tokenize(
             struct whisper_context * ctx,
@@ -304,8 +339,12 @@ extern "C" {
                      whisper_token * tokens,
                                int   n_max_tokens);
 
+    // Return the number of tokens in the provided text
+    // Equivalent to: -whisper_tokenize(ctx, text, NULL, 0)
+    int whisper_token_count(struct whisper_context * ctx, const char * text);
+
     // Largest language id (i.e. number of available languages - 1)
-    WHISPER_API int whisper_lang_max_id();
+    WHISPER_API int whisper_lang_max_id(void);
 
     // Return the id of the specified language, returns -1 if not found
     // Examples:
@@ -412,11 +451,6 @@ extern "C" {
     // If it returns false, the computation is aborted
     typedef bool (*whisper_encoder_begin_callback)(struct whisper_context * ctx, struct whisper_state * state, void * user_data);
 
-    // Abort callback
-    // If not NULL, called before ggml computation
-    // If it returns true, the computation is aborted
-    typedef bool (*whisper_abort_callback)(void * user_data);
-
     // Logits filter callback
     // Can be used to modify the logits before sampling
     // If not NULL, called after applying temperature to logits
@@ -458,15 +492,19 @@ extern "C" {
 
         // [EXPERIMENTAL] speed-up techniques
         // note: these can significantly reduce the quality of the output
-        bool speed_up;          // speed-up the audio by 2x using Phase Vocoder
         bool debug_mode;        // enable debug_mode provides extra info (eg. Dump log_mel)
         int  audio_ctx;         // overwrite the audio context size (0 = use default)
 
         // [EXPERIMENTAL] [TDRZ] tinydiarize
         bool tdrz_enable;       // enable tinydiarize speaker turn detection
 
+        // A regular expression that matches tokens to suppress
+        const char * suppress_regex;
+
         // tokens to provide to the whisper decoder as initial prompt
         // these are prepended to any existing text context from a previous call
+        // use whisper_tokenize() to convert text to tokens
+        // maximum of whisper_n_text_ctx()/2 tokens are used (typically 224)
         const char * initial_prompt;
         const whisper_token * prompt_tokens;
         int prompt_n_tokens;
@@ -513,7 +551,7 @@ extern "C" {
         void * encoder_begin_callback_user_data;
 
         // called each time before ggml computation starts
-        whisper_abort_callback abort_callback;
+        wsp_ggml_abort_callback abort_callback;
         void * abort_callback_user_data;
 
         // called by each decoder to filter obtained logits
@@ -527,10 +565,10 @@ extern "C" {
     };
 
     // NOTE: this function allocates memory, and it is the responsibility of the caller to free the pointer - see whisper_free_context_params & whisper_free_params()
-    WHISPER_API struct whisper_context_params * whisper_context_default_params_by_ref();
-    WHISPER_API struct whisper_context_params whisper_context_default_params(void);
+    WHISPER_API struct whisper_context_params * whisper_context_default_params_by_ref(void);
+    WHISPER_API struct whisper_context_params   whisper_context_default_params       (void);
     WHISPER_API struct whisper_full_params * whisper_full_default_params_by_ref(enum whisper_sampling_strategy strategy);
-    WHISPER_API struct whisper_full_params whisper_full_default_params(enum whisper_sampling_strategy strategy);
+    WHISPER_API struct whisper_full_params   whisper_full_default_params       (enum whisper_sampling_strategy strategy);
 
     // Run the entire model: PCM -> log mel spectrogram -> encoder -> decoder -> text
     // Not thread safe for same context

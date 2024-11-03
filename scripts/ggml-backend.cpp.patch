@@ -1,0 +1,14 @@
+--- ggml-backend.cpp.orig	2024-11-03 12:39:40
++++ ggml-backend.cpp	2024-11-03 12:39:41
+@@ -574,8 +574,11 @@
+         register_backend(wsp_ggml_backend_cuda_reg());
+ #endif
+ #ifdef WSP_GGML_USE_METAL
++#include <TargetConditionals.h>
++#if !TARGET_OS_SIMULATOR
+         register_backend(wsp_ggml_backend_metal_reg());
+ #endif
++#endif
+ #ifdef WSP_GGML_USE_SYCL
+         register_backend(wsp_ggml_backend_sycl_reg());
+ #endif

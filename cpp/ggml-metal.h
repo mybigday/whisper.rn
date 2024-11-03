@@ -1,7 +1,9 @@
+// Note: this description is outdated
+//
 // An interface allowing to compute wsp_ggml_cgraph with Metal
 //
 // This is a fully functional interface that extends ggml with GPU support for Apple devices.
-// A similar interface can be created for other GPU backends (e.g. Vulkan, CUDA, OpenCL, etc.)
+// A similar interface can be created for other GPU backends (e.g. Vulkan, CUDA, etc.)
 //
 // How it works?
 //
@@ -25,10 +27,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// max memory buffers that can be mapped to the device
-#define WSP_GGML_METAL_MAX_BUFFERS 64
-#define WSP_GGML_METAL_MAX_COMMAND_BUFFERS 32
-
 struct wsp_ggml_tensor;
 struct wsp_ggml_cgraph;
 
@@ -41,24 +39,28 @@ extern "C" {
 // user-code should use only these functions
 //
 
-WSP_GGML_API void wsp_ggml_backend_metal_log_set_callback(wsp_ggml_log_callback log_callback, void * user_data);
-
 WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_metal_init(void);
 
 WSP_GGML_API bool wsp_ggml_backend_is_metal(wsp_ggml_backend_t backend);
 
-WSP_GGML_API WSP_GGML_CALL wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_from_ptr(void * data, size_t size, size_t max_size);
+WSP_GGML_DEPRECATED(
+        WSP_GGML_API wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_from_ptr(void * data, size_t size, size_t max_size),
+        "obsoleted by the new device interface - https://github.com/ggerganov/llama.cpp/pull/9713");
 
-WSP_GGML_API void wsp_ggml_backend_metal_set_n_cb(wsp_ggml_backend_t backend, int n_cb);
+WSP_GGML_API void wsp_ggml_backend_metal_set_abort_callback(wsp_ggml_backend_t backend, wsp_ggml_abort_callback abort_callback, void * user_data);
 
-WSP_GGML_API WSP_GGML_CALL wsp_ggml_backend_buffer_type_t wsp_ggml_backend_metal_buffer_type(void);
+WSP_GGML_API wsp_ggml_backend_buffer_type_t wsp_ggml_backend_metal_buffer_type(void);
 
 // helper to check if the device supports a specific family
 // ideally, the user code should be doing these checks
 // ref: https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 WSP_GGML_API bool wsp_ggml_backend_metal_supports_family(wsp_ggml_backend_t backend, int family);
 
+// capture all command buffers committed the next time `wsp_ggml_backend_graph_compute` is called
+WSP_GGML_API void wsp_ggml_backend_metal_capture_next_compute(wsp_ggml_backend_t backend);
+
+WSP_GGML_API wsp_ggml_backend_reg_t wsp_ggml_backend_metal_reg(void);
+
 #ifdef __cplusplus
 }
 #endif
-
