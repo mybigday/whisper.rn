@@ -142,5 +142,6 @@
     "name": "RNWhisperSpec",
     "type": "all",
     "jsSrcsDir": "./src/"
-  }
+  },
+  "packageManager": "yarn@1.22.22"
 }
