@@ -50,6 +50,7 @@ RCT_REMAP_METHOD(initContext,
     BOOL isBundleAsset = [[modelOptions objectForKey:@"isBundleAsset"] boolValue];
     BOOL useGpu = [[modelOptions objectForKey:@"useGpu"] boolValue];
     BOOL useCoreMLIos = [[modelOptions objectForKey:@"useCoreMLIos"] boolValue];
+    BOOL useFlashAttn = [[modelOptions objectForKey:@"useFlashAttn"] boolValue];
 
     // For support debug assets in development mode
     BOOL downloadCoreMLAssets = [[modelOptions objectForKey:@"downloadCoreMLAssets"] boolValue];
@@ -79,6 +80,7 @@ RCT_REMAP_METHOD(initContext,
         contextId:contextId
         noCoreML:!useCoreMLIos
         noMetal:!useGpu
+        useFlashAttn:useFlashAttn
     ];
     if ([context getContext] == NULL) {
         reject(@"whisper_cpp_error", @"Failed to load the model", nil);

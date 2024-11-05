@@ -10,12 +10,14 @@
     contextId:(int)contextId
     noCoreML:(BOOL)noCoreML
     noMetal:(BOOL)noMetal
+    useFlashAttn:(BOOL)useFlashAttn
 {
     RNWhisperContext *context = [[RNWhisperContext alloc] init];
     context->contextId = contextId;
     struct whisper_context_params cparams;
     NSString *reasonNoMetal = @"";
     cparams.use_gpu = !noMetal;
+    cparams.flash_attn = useFlashAttn;
 
     cparams.use_coreml = !noCoreML;
 #ifndef WHISPER_USE_COREML

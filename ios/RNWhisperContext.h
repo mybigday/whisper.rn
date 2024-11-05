@@ -42,7 +42,7 @@ typedef struct {
     bool isMetalEnabled;
 }
 
-+ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML noMetal:(BOOL)noMetal;
++ (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML noMetal:(BOOL)noMetal useFlashAttn:(BOOL)useFlashAttn;
 - (bool)isMetalEnabled;
 - (NSString *)reasonNoMetal;
 - (struct whisper_context *)getContext;

@@ -52,6 +52,7 @@ export type CoreMLAsset = {
 type NativeContextOptions = {
   filePath: string,
   isBundleAsset: boolean,
+  useFlashAttn?: boolean,
   useGpu?: boolean,
   useCoreMLIos?: boolean,
   downloadCoreMLAssets?: boolean,
