@@ -455,6 +455,8 @@ export type ContextOptions = {
   useCoreMLIos?: boolean
   /** Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. */
   useGpu?: boolean
+  /** Use Flash Attention, only recommended if GPU available */
+  useFlashAttn?: boolean,
 }
 
 const coreMLModelAssetPaths = [
@@ -470,6 +472,7 @@ export async function initWhisper({
   isBundleAsset,
   useGpu = true,
   useCoreMLIos = true,
+  useFlashAttn = false,
 }: ContextOptions): Promise<WhisperContext> {
   let path = ''
   let coreMLAssets: CoreMLAsset[] | undefined
@@ -518,6 +521,7 @@ export async function initWhisper({
   const { contextId, gpu, reasonNoGPU } = await RNWhisper.initContext({
     filePath: path,
     isBundleAsset: !!isBundleAsset,
+    useFlashAttn,
     useGpu,
     useCoreMLIos,
     // Only development mode need download Core ML model assets (from packager server)

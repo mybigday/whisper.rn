@@ -10,12 +10,14 @@
     contextId:(int)contextId
     noCoreML:(BOOL)noCoreML
     noMetal:(BOOL)noMetal
+    useFlashAttn:(BOOL)useFlashAttn
 {
     RNWhisperContext *context = [[RNWhisperContext alloc] init];
     context->contextId = contextId;
     struct whisper_context_params cparams;
     NSString *reasonNoMetal = @"";
     cparams.use_gpu = !noMetal;
+    cparams.flash_attn = useFlashAttn;
 
     cparams.use_coreml = !noCoreML;
 #ifndef WHISPER_USE_COREML
@@ -477,7 +479,6 @@ struct rnwhisper_segments_callback_data {
     params.print_progress   = false;
     params.print_timestamps = false;
     params.print_special    = false;
-    params.speed_up         = options[@"speedUp"] != nil ? [options[@"speedUp"] boolValue] : false;
     params.translate        = options[@"translate"] != nil ? [options[@"translate"] boolValue] : false;
     params.language         = options[@"language"] != nil ? strdup([options[@"language"] UTF8String]) : "auto";
     params.n_threads        = n_threads > 0 ? n_threads : default_n_threads;
