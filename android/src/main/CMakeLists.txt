@@ -9,7 +9,7 @@ set(
     SOURCE_FILES
     ${RNWHISPER_LIB_DIR}/ggml.c
     ${RNWHISPER_LIB_DIR}/ggml-alloc.c
-    ${RNWHISPER_LIB_DIR}/ggml-backend.c
+    ${RNWHISPER_LIB_DIR}/ggml-backend.cpp
     ${RNWHISPER_LIB_DIR}/ggml-quants.c
     ${RNWHISPER_LIB_DIR}/whisper.cpp
     ${RNWHISPER_LIB_DIR}/rn-audioutils.cpp
