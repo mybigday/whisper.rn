@@ -206,7 +206,6 @@ struct whisper_full_params createFullParams(JNIEnv *env, jobject options) {
     int n_threads = readablemap::getInt(env, options, "maxThreads", default_n_threads);
     params.n_threads = n_threads > 0 ? n_threads : default_n_threads;
     params.translate = readablemap::getBool(env, options, "translate", false);
-    params.speed_up = readablemap::getBool(env, options, "speedUp", false);
     params.token_timestamps = readablemap::getBool(env, options, "tokenTimestamps", false);
     params.tdrz_enable = readablemap::getBool(env, options, "tdrzEnable", false);
     params.offset_ms = 0;

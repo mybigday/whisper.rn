@@ -30,8 +30,6 @@ export type TranscribeOptions = {
   beamSize?: number,
   /** Number of best candidates to keep */
   bestOf?: number,
-  /** Speed up audio by x2 (reduced accuracy) */
-  speedUp?: boolean,
   /** Initial Prompt */
   prompt?: string,
 }
