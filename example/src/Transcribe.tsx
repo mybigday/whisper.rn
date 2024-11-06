@@ -1,11 +1,10 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   StyleSheet,
   ScrollView,
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   Platform,
   PermissionsAndroid,
 } from 'react-native'
@@ -94,9 +93,8 @@ const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
 export default function App() {
-  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
-    null,
-  )
+  const whisperContextRef = useRef<WhisperContext | null>(null)
+  const whisperContext = whisperContextRef.current
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
   const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
   const [stopTranscribe, setStopTranscribe] = useState<{
@@ -105,6 +103,11 @@ export default function App() {
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
+  }, [])
+
+  useEffect(() => () => {
+    whisperContextRef.current?.release()
+    whisperContextRef.current = null
   }, [])
 
   const progress = useCallback(
@@ -126,7 +129,7 @@ export default function App() {
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.scrollview}
     >
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
@@ -134,7 +137,7 @@ export default function App() {
               if (whisperContext) {
                 log('Found previous context')
                 await whisperContext.release()
-                setWhisperContext(null)
+                whisperContextRef.current = null
                 log('Released previous context')
               }
               log('Initialize context...')
@@ -147,7 +150,7 @@ export default function App() {
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
-              setWhisperContext(ctx)
+              whisperContextRef.current = ctx
             }}
           >
             <Text style={styles.buttonText}>Initialize (Use Asset)</Text>
@@ -158,7 +161,7 @@ export default function App() {
               if (whisperContext) {
                 log('Found previous context')
                 await whisperContext.release()
-                setWhisperContext(null)
+                whisperContextRef.current = null
                 log('Released previous context')
               }
               await createDir(log)
@@ -210,7 +213,7 @@ export default function App() {
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
-              setWhisperContext(ctx)
+              whisperContextRef.current = ctx
             }}
           >
             <Text style={styles.buttonText}>Initialize (Download)</Text>
@@ -355,7 +358,7 @@ export default function App() {
           onPress={async () => {
             if (!whisperContext) return
             await whisperContext.release()
-            setWhisperContext(null)
+            whisperContextRef.current = null
             log('Released context')
           }}
         >
@@ -404,7 +407,7 @@ export default function App() {
         >
           <Text style={styles.buttonText}>Play Recorded file</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     </ScrollView>
   )
 }
