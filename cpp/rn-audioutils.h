@@ -8,7 +8,7 @@
 
 namespace rnaudioutils {
 
-std::vector<uint8_t> concat_short_buffers(const std::vector<short*>& buffers, const std::vector<int>& slice_n_samples);
-void save_wav_file(const std::vector<uint8_t>& raw, const std::string& file);
+void append_wav_data(const short* data, const int n_samples, const std::string& file);
+void add_wav_header_to_file(const std::string& file, const int data_size);
 
 } // namespace rnaudioutils

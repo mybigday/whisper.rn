@@ -100,6 +100,7 @@ void job::put_pcm_data(short* data, int slice_index, int n_samples, int n) {
     for (int i = 0; i < n; i++) {
         pcm[i + n_samples] = data[i];
     }
+    pcm_data_size += n;
 }
 
 float* job::pcm_slice_to_f32(int slice_index, int size) {

@@ -33,6 +33,7 @@ struct job {
     int audio_slice_sec = 0;
     float audio_min_sec = 0;
     const char* audio_output_path = nullptr;
+    int pcm_data_size = 0;
     std::vector<short *> pcm_slices;
     void set_realtime_params(vad_params vad, int sec, int slice_sec, float min_sec, const char* output_path);
     bool vad_simple(int slice_index, int n_samples, int n);
