@@ -15,6 +15,7 @@ import Sound from 'react-native-sound'
 import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
+import { Buffer } from 'buffer'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -28,6 +29,14 @@ if (Platform.OS === 'android') {
     buttonNegative: 'Cancel',
     buttonPositive: 'OK',
   })
+}
+
+const base64ToInt16ArrayBase64 = (base64: string) => {
+  const wavData = Buffer.from(base64, 'base64')
+
+  // cut header
+  const wavDataWithoutHeader = wavData.subarray(44)
+  return Buffer.from(wavDataWithoutHeader).toString('base64')
 }
 
 const styles = StyleSheet.create({
@@ -224,19 +233,40 @@ export default function App() {
               if (!whisperContext) return log('No context')
 
               log('Start transcribing...')
+
+              try {
+                await RNFS.mkdir(fileDir)
+                if (!(await RNFS.exists(`${fileDir}/jfk.wav`)))
+                  await RNFS.downloadFile({
+                    fromUrl:
+                      'https://github.com/ggerganov/whisper.cpp/raw/refs/heads/master/samples/jfk.wav',
+                    toFile: `${fileDir}/jfk.wav`,
+                  }).promise
+              } catch (e) {
+                log('Error downloading file:', e)
+              }
+              const sampleFileBase64 = await RNFS.readFile(
+                `${fileDir}/jfk.wav`,
+                'base64',
+              )
+              // convert to float32 PCM data
+              const base64 = base64ToInt16ArrayBase64(sampleFileBase64)
               const startTime = Date.now()
-              const { stop, promise } = whisperContext.transcribe(sampleFile, {
-                maxLen: 1,
-                tokenTimestamps: true,
-                onProgress: (cur) => {
-                  log(`Transcribing progress: ${cur}%`)
+              const { stop, promise } = whisperContext.transcribeData(
+                base64,
+                {
+                  maxLen: 1,
+                  tokenTimestamps: true,
+                  onProgress: (cur) => {
+                    log(`Transcribing progress: ${cur}%`)
+                  },
+                  language: 'en',
+                  // prompt: 'HELLO WORLD',
+                  // onNewSegments: (segments) => {
+                  //   console.log('New segments:', segments)
+                  // },
                 },
-                language: 'en',
-                // prompt: 'HELLO WORLD',
-                // onNewSegments: (segments) => {
-                //   console.log('New segments:', segments)
-                // },
-              })
+              )
               setStopTranscribe({ stop })
               const { result, segments } = await promise
               const endTime = Date.now()
