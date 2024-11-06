@@ -202,32 +202,10 @@ export class WhisperContext {
     this.reasonNoGPU = reasonNoGPU
   }
 
-  /** Transcribe audio file */
-  transcribe(
-    filePath: string | number,
-    options: TranscribeFileOptions = {},
-  ): {
-    /** Stop the transcribe */
+  private transcribeWithNativeMethod(method: 'transcribeFile' | 'transcribeData', data: string, options: TranscribeFileOptions = {}): {
     stop: () => Promise<void>
-    /** Transcribe result promise */
     promise: Promise<TranscribeResult>
   } {
-    let path = ''
-    if (typeof filePath === 'number') {
-      try {
-        const source = Image.resolveAssetSource(filePath)
-        if (source) path = source.uri
-      } catch (e) {
-        throw new Error(`Invalid asset: ${filePath}`)
-      }
-    } else {
-      if (filePath.startsWith('http'))
-        throw new Error(
-          'Transcribe remote file is not supported, please download it first',
-        )
-      path = filePath
-    }
-    if (path.startsWith('file://')) path = path.slice(7)
     const jobId: number = Math.floor(Math.random() * 10000)
 
     const { onProgress, onNewSegments, ...rest } = options
@@ -276,7 +254,7 @@ export class WhisperContext {
         removeProgressListener()
         removeNewSegmenetsListener()
       },
-      promise: RNWhisper.transcribeFile(this.id, jobId, path, {
+      promise: RNWhisper[method](this.id, jobId, data, {
         ...rest,
         onProgress: !!onProgress,
         onNewSegments: !!onNewSegments,
@@ -296,6 +274,48 @@ export class WhisperContext {
           throw e
         }),
     }
+  }
+
+  /**
+   * Transcribe audio file (path or base64 encoded wav file)
+   * base64: need add `data:audio/wav;base64,` prefix
+   */
+  transcribe(
+    filePathOrBase64: string | number,
+    options: TranscribeFileOptions = {},
+  ): {
+    /** Stop the transcribe */
+    stop: () => Promise<void>
+    /** Transcribe result promise */
+    promise: Promise<TranscribeResult>
+  } {
+    let path = ''
+    if (typeof filePathOrBase64 === 'number') {
+      try {
+        const source = Image.resolveAssetSource(filePathOrBase64)
+        if (source) path = source.uri
+      } catch (e) {
+        throw new Error(`Invalid asset: ${filePathOrBase64}`)
+      }
+    } else {
+      if (filePathOrBase64.startsWith('http'))
+        throw new Error(
+          'Transcribe remote file is not supported, please download it first',
+        )
+      path = filePathOrBase64
+    }
+    if (path.startsWith('file://')) path = path.slice(7)
+    return this.transcribeWithNativeMethod('transcribeFile', path, options)
+  }
+
+  /**
+   * Transcribe audio data (base64 encoded float32 PCM data)
+   */
+  transcribeData(data: string, options: TranscribeFileOptions = {}): {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  } {
+    return this.transcribeWithNativeMethod('transcribeData', data, options)
   }
 
   /** Transcribe the microphone audio stream, the microphone user permission is required */

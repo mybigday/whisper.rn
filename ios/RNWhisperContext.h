@@ -50,7 +50,7 @@ typedef struct {
 - (OSStatus)transcribeRealtime:(int)jobId
     options:(NSDictionary *)options
     onTranscribe:(void (^)(int, NSString *, NSDictionary *))onTranscribe;
-- (void)transcribeFile:(int)jobId
+- (void)transcribeData:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options

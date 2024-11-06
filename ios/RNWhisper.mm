@@ -105,42 +105,17 @@ RCT_REMAP_METHOD(initContext,
   ];
 }
 
-RCT_REMAP_METHOD(transcribeFile,
-                 withContextId:(int)contextId
-                 withJobId:(int)jobId
-                 withWaveFile:(NSString *)waveFilePath
-                 withOptions:(NSDictionary *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
+- (void)transcribeData:(RNWhisperContext *)context
+    withContextId:(int)contextId
+    withJobId:(int)jobId
+    withData:(float *)data
+    withDataCount:(int)count
+    withOptions:(NSDictionary *)options
+    withResolver:(RCTPromiseResolveBlock)resolve
+    withRejecter:(RCTPromiseRejectBlock)reject
 {
-    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-
-    if (context == nil) {
-        reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    if ([context isCapturing]) {
-        reject(@"whisper_error", @"The context is in realtime transcribe mode", nil);
-        return;
-    }
-    if ([context isTranscribing]) {
-        reject(@"whisper_error", @"Context is already transcribing", nil);
-        return;
-    }
-
-    NSString *path = waveFilePath;
-    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-        path = [RNWhisperDownloader downloadFile:path toFile:nil];
-    }
-
-    int count = 0;
-    float *waveFile = [RNWhisperAudioUtils decodeWaveFile:path count:&count];
-    if (waveFile == nil) {
-        reject(@"whisper_error", @"Invalid file", nil);
-        return;
-    }
-    [context transcribeFile:jobId
-        audioData:waveFile
+    [context transcribeData:jobId
+        audioData:data
         audioDataCount:count
         options:options
         onProgress: ^(int progress) {
@@ -173,16 +148,107 @@ RCT_REMAP_METHOD(transcribeFile,
         }
         onEnd: ^(int code) {
             if (code != 0 && code != 999) {
-                free(waveFile);
                 reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
                 return;
             }
-            free(waveFile);
             NSMutableDictionary *result = [context getTextSegments];
             result[@"isAborted"] = @([context isStoppedByAction]);
             resolve(result);
         }
     ];
+}
+
+RCT_REMAP_METHOD(transcribeFile,
+                 withContextId:(int)contextId
+                 withJobId:(int)jobId
+                 withWaveFile:(NSString *)waveFilePathOrDataBase64
+                 withOptions:(NSDictionary *)options
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+
+    if (context == nil) {
+        reject(@"whisper_error", @"Context not found", nil);
+        return;
+    }
+    if ([context isCapturing]) {
+        reject(@"whisper_error", @"The context is in realtime transcribe mode", nil);
+        return;
+    }
+    if ([context isTranscribing]) {
+        reject(@"whisper_error", @"Context is already transcribing", nil);
+        return;
+    }
+
+    float *data = nil;
+    int count = 0;
+    if ([waveFilePathOrDataBase64 hasPrefix:@"http://"] || [waveFilePathOrDataBase64 hasPrefix:@"https://"]) {
+        NSString *path = [RNWhisperDownloader downloadFile:waveFilePathOrDataBase64 toFile:nil];
+        data = [RNWhisperAudioUtils decodeWaveFile:path count:&count];
+    } else if ([waveFilePathOrDataBase64 hasPrefix:@"data:audio/wav;base64,"]) {
+        NSData *waveData = [[NSData alloc] initWithBase64EncodedString:[waveFilePathOrDataBase64 substringFromIndex:22] options:0];
+        data = [RNWhisperAudioUtils decodeWaveData:waveData count:&count cutHeader:YES];
+    } else {
+        data = [RNWhisperAudioUtils decodeWaveFile:waveFilePathOrDataBase64 count:&count];
+    }
+    if (data == nil) {
+        reject(@"whisper_error", @"Invalid file", nil);
+        return;
+    }
+
+    [self transcribeData:context
+        withContextId:contextId
+        withJobId:jobId
+        withData:data
+        withDataCount:count
+        withOptions:options
+        withResolver:resolve
+        withRejecter:reject
+    ];
+}
+
+RCT_REMAP_METHOD(transcribeData,
+                 withContextId:(int)contextId
+                 withJobId:(int)jobId
+                 withData:(NSString *)dataBase64 // pcm data base64 encoded
+                 withOptions:(NSDictionary *)options
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+  RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+
+  if (context == nil) {
+      reject(@"whisper_error", @"Context not found", nil);
+      return;
+  }
+  if ([context isCapturing]) {
+      reject(@"whisper_error", @"The context is in realtime transcribe mode", nil);
+      return;
+  }
+  if ([context isTranscribing]) {
+      reject(@"whisper_error", @"Context is already transcribing", nil);
+      return;
+  }
+
+  NSData *pcmData = [[NSData alloc] initWithBase64EncodedString:dataBase64 options:0];
+  int count = 0;
+  float *data = [RNWhisperAudioUtils decodeWaveData:pcmData count:&count cutHeader:NO];
+
+  if (data == nil) {
+      reject(@"whisper_error", @"Invalid data", nil);
+      return;
+  }
+
+  [self transcribeData:context
+      withContextId:contextId
+      withJobId:jobId
+      withData:data
+      withDataCount:count
+      withOptions:options
+      withResolver:resolve
+      withRejecter:reject
+  ];
 }
 
 RCT_REMAP_METHOD(startRealtimeTranscribe,
