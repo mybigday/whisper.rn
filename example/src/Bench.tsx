@@ -8,6 +8,7 @@ import {
   Pressable,
 } from 'react-native'
 import RNFS from 'react-native-fs'
+import Clipboard from '@react-native-clipboard/clipboard'
 import { initWhisper } from '../../src' // whisper.rn
 import contextOpts from './context-opts'
 
@@ -345,13 +346,19 @@ export default function Bench() {
       >
         <Text style={styles.buttonText}>Run benchmark</Text>
       </Pressable>
-      <View style={styles.logContainer}>
+      <Pressable
+        style={({ pressed }: { pressed: boolean }) => [
+          styles.logContainer,
+          { backgroundColor: pressed ? '#ccc' : 'lightgray', opacity: pressed ? 0.75 : 1 },
+        ]}
+        onPress={() => Clipboard.setString(logs.join('\n'))}
+      >
         {logs.map((msg, index) => (
           <Text key={index} style={styles.logText}>
             {msg}
           </Text>
         ))}
-      </View>
+      </Pressable>
       <View style={styles.buttonContainer}>
         <Pressable style={styles.button} onPress={() => setLogs([])}>
           <Text style={styles.buttonText}>Clear Logs</Text>
