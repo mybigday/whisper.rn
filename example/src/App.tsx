@@ -1,9 +1,16 @@
 import * as React from 'react'
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
+import {
+  GestureHandlerRootView,
+  TouchableOpacity,
+} from 'react-native-gesture-handler'
+import { enableScreens } from 'react-native-screens'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import Transcribe from './Transcribe'
 import Bench from './Bench'
+
+enableScreens()
 
 const styles = StyleSheet.create({
   container: {
@@ -26,18 +33,18 @@ const styles = StyleSheet.create({
 function HomeScreen({ navigation }: { navigation: any }) {
   return (
     <View style={styles.container}>
-      <Pressable
+      <TouchableOpacity
         style={styles.button}
         onPress={() => navigation.navigate('Transcribe')}
       >
         <Text style={styles.buttonText}>Transcribe Examples</Text>
-      </Pressable>
-      <Pressable
+      </TouchableOpacity>
+      <TouchableOpacity
         style={styles.button}
         onPress={() => navigation.navigate('Bench')}
       >
         <Text style={styles.buttonText}>Benchmark</Text>
-      </Pressable>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -46,13 +53,15 @@ const Stack = createNativeStackNavigator()
 
 function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Transcribe" component={Transcribe} />
-        <Stack.Screen name="Bench" component={Bench} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <GestureHandlerRootView>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Transcribe" component={Transcribe} />
+          <Stack.Screen name="Bench" component={Bench} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </GestureHandlerRootView>
   )
 }
 

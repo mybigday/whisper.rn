@@ -5,13 +5,13 @@ import {
   View,
   Text,
   Platform,
-  Pressable,
 } from 'react-native'
+import { TouchableOpacity } from 'react-native-gesture-handler'
 import RNFS from 'react-native-fs'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { initWhisper } from '../../src' // whisper.rn
+import { createDir, fileDir, modelHost } from './util'
 
-const baseURL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'
 const modelList = [
   // TODO: Add coreml model download
   { name: 'tiny', default: true },
@@ -44,10 +44,6 @@ const modelNameMap = modelList.reduce((acc, model) => {
   acc[model.name as keyof typeof acc] = model.default
   return acc
 }, {} as Record<string, boolean>)
-
-const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
-
-console.log('[App] fileDir', fileDir)
 
 const styles = StyleSheet.create({
   container: {
@@ -110,7 +106,7 @@ const styles = StyleSheet.create({
   logContainer: {
     backgroundColor: 'lightgray',
     padding: 8,
-    width: '95%',
+    width: '100%',
     borderRadius: 8,
     marginVertical: 8,
   },
@@ -168,8 +164,9 @@ const Model = (props: {
           onDownloaded(model.name)
           return
         }
+        await createDir(null)
         const { jobId, promise } = RNFS.downloadFile({
-          fromUrl: `${baseURL}ggml-${model.name}.bin?download=true`,
+          fromUrl: `${modelHost}/ggml-${model.name}.bin?download=true`,
           toFile: `${fileDir}/ggml-${model.name}.bin`,
           begin: () => {
             setProgress(0)
@@ -192,7 +189,7 @@ const Model = (props: {
   }, [state, downloadNeeded, model.name, onDownloadStarted, onDownloaded])
 
   return (
-    <Pressable
+    <TouchableOpacity
       key={model.name}
       style={[
         styles.modelItem,
@@ -215,7 +212,7 @@ const Model = (props: {
       {downloadNeeded && (
         <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
       )}
-    </Pressable>
+    </TouchableOpacity>
   )
 }
 
@@ -279,7 +276,7 @@ export default function Bench() {
           />
         ))}
       </View>
-      <Pressable
+      <TouchableOpacity
         style={styles.button}
         onPress={() => {
           if (modelState === 'select') {
@@ -295,8 +292,8 @@ export default function Bench() {
             modelState === 'select' ? 'Download' : 'Cancel'
           } ${downloadCount} models`}
         </Text>
-      </Pressable>
-      <Pressable
+      </TouchableOpacity>
+      <TouchableOpacity
         style={styles.button}
         onPress={async () => {
           log('Start benchmark')
@@ -344,12 +341,9 @@ export default function Bench() {
         }}
       >
         <Text style={styles.buttonText}>Run benchmark</Text>
-      </Pressable>
-      <Pressable
-        style={({ pressed }: { pressed: boolean }) => [
-          styles.logContainer,
-          { backgroundColor: pressed ? '#ccc' : 'lightgray', opacity: pressed ? 0.75 : 1 },
-        ]}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.logContainer}
         onPress={() => Clipboard.setString(logs.join('\n'))}
       >
         {logs.map((msg, index) => (
@@ -357,12 +351,12 @@ export default function Bench() {
             {msg}
           </Text>
         ))}
-      </Pressable>
+      </TouchableOpacity>
       <View style={styles.buttonContainer}>
-        <Pressable style={styles.button} onPress={() => setLogs([])}>
+        <TouchableOpacity style={styles.button} onPress={() => setLogs([])}>
           <Text style={styles.buttonText}>Clear Logs</Text>
-        </Pressable>
-        <Pressable
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.button}
           onPress={() => {
             setModelState('select')
@@ -374,7 +368,7 @@ export default function Bench() {
           }}
         >
           <Text style={styles.buttonText}>Clear Downloaded Models</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   )

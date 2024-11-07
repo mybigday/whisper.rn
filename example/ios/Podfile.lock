@@ -1253,6 +1253,27 @@ PODS:
     - Yoga
   - RNFS (2.20.0):
     - React-Core
+  - RNGestureHandler (2.19.0):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.01.01.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Codegen
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - RNScreens (3.32.0):
     - DoubleConversion
     - glog
@@ -1377,6 +1398,7 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCClipboard (from `../node_modules/@react-native-clipboard/clipboard`)"
   - RNFS (from `../node_modules/react-native-fs`)
+  - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSound (from `../node_modules/react-native-sound`)
   - RNZipArchive (from `../node_modules/react-native-zip-archive`)
@@ -1502,6 +1524,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-clipboard/clipboard"
   RNFS:
     :path: "../node_modules/react-native-fs"
+  RNGestureHandler:
+    :path: "../node_modules/react-native-gesture-handler"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNSound:
@@ -1570,6 +1594,7 @@ SPEC CHECKSUMS:
   ReactCommon: 5c504a77030c7ab89eee75b1725b80d8cee7f5d7
   RNCClipboard: 99d86f515e6262a8a1d0915f1f6e6b410698aa3a
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
+  RNGestureHandler: e723a54dfedabf2a6be36bbcb6c7d5c96de8a379
   RNScreens: d3d50aa84db4541eee00fbb1f32151030f56c510
   RNSound: 6c156f925295bdc83e8e422e7d8b38d33bc71852
   RNZipArchive: 7bb4c70d6aa2dd235212c0a4a3de0a4e237e2569

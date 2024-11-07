@@ -4,16 +4,17 @@ import {
   ScrollView,
   View,
   Text,
-  TouchableOpacity,
   Platform,
   PermissionsAndroid,
 } from 'react-native'
+import { TouchableOpacity } from 'react-native-gesture-handler'
 import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
 import Sound from 'react-native-sound'
 import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
+import { createDir, fileDir, modelHost } from './util'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -74,20 +75,8 @@ function toTimestamp(t: number, comma = false) {
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
-const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
-
-console.log('[App] fileDir', fileDir)
-
 const recordFile = `${fileDir}/realtime.wav`
 
-const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
-
-const createDir = async (log: any) => {
-  if (!(await RNFS.exists(fileDir))) {
-    log('Create dir', fileDir)
-    await RNFS.mkdir(fileDir)
-  }
-}
 
 const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
