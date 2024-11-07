@@ -223,9 +223,10 @@ export default function Bench() {
   }, [])
 
   useEffect(() => {
+    const count = downloadedModelsRef.current.length
     if (
-      downloadedModelsRef.current.length ===
-      Object.values(downloadMap).filter(Boolean).length
+      count > 0 &&
+      count === Object.values(downloadMap).filter(Boolean).length
     ) {
       downloadedModelsRef.current = []
       setModelState('select')
@@ -256,7 +257,7 @@ export default function Bench() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      <Text style={styles.title}>Download List</Text>
+      <Text style={styles.title}>Model List</Text>
       <View style={styles.modelList}>
         {modelList.map((model) => (
           <Model
@@ -282,9 +283,9 @@ export default function Bench() {
         }}
       >
         <Text style={styles.buttonText}>
-          {`${
-            modelState === 'select' ? 'Download' : 'Cancel'
-          } ${downloadCount} models`}
+          {modelState === 'select'
+            ? `Download ${downloadCount} Models`
+            : 'Cancel Download'}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -368,7 +369,7 @@ export default function Bench() {
             })
           }}
         >
-          <Text style={styles.buttonText}>DeleteModels</Text>
+          <Text style={styles.buttonText}>Delete Models</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
