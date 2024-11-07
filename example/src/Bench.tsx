@@ -10,7 +10,6 @@ import {
 import RNFS from 'react-native-fs'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { initWhisper } from '../../src' // whisper.rn
-import contextOpts from './context-opts'
 
 const baseURL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'
 const modelList = [
