@@ -1,11 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
-  Platform,
-} from 'react-native'
+import { StyleSheet, ScrollView, View, Text, Platform } from 'react-native'
 import { TouchableOpacity } from 'react-native-gesture-handler'
 import RNFS from 'react-native-fs'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -59,7 +53,6 @@ const styles = StyleSheet.create({
   },
   modelList: {
     padding: 10,
-    // auto wrap
     flexWrap: 'wrap',
     flexDirection: 'row',
   },
@@ -102,6 +95,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     opacity: 0.5,
     width: '0%',
+    borderRadius: 5,
   },
   logContainer: {
     backgroundColor: 'lightgray',
@@ -320,9 +314,13 @@ export default function Bench() {
               })
               try {
                 const result = await ctx.bench(-1)
-                const { config, nThreads, nEncode, nDecode, nBatchd, nPrompt } = result
+                const { config, nThreads, nEncode, nDecode, nBatchd, nPrompt } =
+                  result
                 const fa = Platform.OS === 'ios' ? '1' : '0'
-                const systemInfo = config.split(' ').filter(c => ['NEON', 'BLAS', 'METAL'].includes(c)).join(' ')
+                const systemInfo = config
+                  .split(' ')
+                  .filter((c) => ['NEON', 'BLAS', 'METAL'].includes(c))
+                  .join(' ')
                 log(
                   `| <todo> | ${
                     Platform.OS
@@ -342,17 +340,20 @@ export default function Bench() {
       >
         <Text style={styles.buttonText}>Run benchmark</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.logContainer}
-        onPress={() => Clipboard.setString(logs.join('\n'))}
-      >
+      <View style={styles.logContainer}>
         {logs.map((msg, index) => (
           <Text key={index} style={styles.logText}>
             {msg}
           </Text>
         ))}
-      </TouchableOpacity>
+      </View>
       <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => Clipboard.setString(logs.join('\n'))}
+        >
+          <Text style={styles.buttonText}>Copy Logs</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => setLogs([])}>
           <Text style={styles.buttonText}>Clear Logs</Text>
         </TouchableOpacity>
@@ -367,7 +368,7 @@ export default function Bench() {
             })
           }}
         >
-          <Text style={styles.buttonText}>Clear Downloaded Models</Text>
+          <Text style={styles.buttonText}>DeleteModels</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
