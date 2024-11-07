@@ -14,34 +14,34 @@ import { initWhisper } from '../../src' // whisper.rn
 const baseURL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'
 const modelList = [
   // TODO: Add coreml model download
-  { name: 'tiny' },
-  { name: 'tiny-q5_1' },
-  { name: 'tiny-q8_0' },
-  { name: 'base' },
-  { name: 'base-q5_1' },
-  { name: 'base-q8_0' },
-  { name: 'small' },
-  { name: 'small-q5_1' },
-  { name: 'small-q8_0' },
-  { name: 'medium' },
-  { name: 'medium-q5_0' },
-  { name: 'medium-q8_0' },
-  { name: 'large-v1' },
-  { name: 'large-v1-q5_0' },
-  { name: 'large-v1-q8_0' },
-  { name: 'large-v2' },
-  { name: 'large-v2-q5_0' },
-  { name: 'large-v2-q8_0' },
-  { name: 'large-v3' },
-  { name: 'large-v3-q5_0' },
-  { name: 'large-v3-q8_0' },
-  { name: 'large-v3-turbo' },
-  { name: 'large-v3-turbo-q5_0' },
-  { name: 'large-v3-turbo-q8_0' },
+  { name: 'tiny', default: true },
+  { name: 'tiny-q5_1', default: true },
+  { name: 'tiny-q8_0', default: true },
+  { name: 'base', default: true },
+  { name: 'base-q5_1', default: true },
+  { name: 'base-q8_0', default: true },
+  { name: 'small', default: true },
+  { name: 'small-q5_1', default: true },
+  { name: 'small-q8_0', default: true },
+  { name: 'medium', default: true },
+  { name: 'medium-q5_0', default: true },
+  { name: 'medium-q8_0', default: true },
+  { name: 'large-v1', default: false },
+  { name: 'large-v1-q5_0', default: false },
+  { name: 'large-v1-q8_0', default: false },
+  { name: 'large-v2', default: false },
+  { name: 'large-v2-q5_0', default: false },
+  { name: 'large-v2-q8_0', default: false },
+  { name: 'large-v3', default: false },
+  { name: 'large-v3-q5_0', default: false },
+  { name: 'large-v3-q8_0', default: false },
+  { name: 'large-v3-turbo', default: false },
+  { name: 'large-v3-turbo-q5_0', default: false },
+  { name: 'large-v3-turbo-q8_0', default: false },
 ] as const
 
 const modelNameMap = modelList.reduce((acc, model) => {
-  acc[model.name as keyof typeof acc] = true
+  acc[model.name as keyof typeof acc] = model.default
   return acc
 }, {} as Record<string, boolean>)
 
@@ -307,12 +307,13 @@ export default function Bench() {
             '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
           )
           await Object.entries(downloadMap).reduce(
-            async (acc, [modelName, downloadNeeded]) => {
-              if (!downloadNeeded) return acc
+            async (promise, [modelName, downloadNeeded]) => {
+              await promise
+              if (!downloadNeeded) return
               const filePath = `${fileDir}/ggml-${modelName}.bin`
               if (!(await RNFS.exists(filePath))) {
                 log(`${modelName} not found, skipping`)
-                return acc
+                return
               }
               const ctx = await initWhisper({
                 filePath,
@@ -337,7 +338,6 @@ export default function Bench() {
               } finally {
                 await ctx.release()
               }
-              return acc
             },
             Promise.resolve(),
           )
