@@ -88,7 +88,7 @@ std::string bench(struct whisper_context * ctx, int n_threads) {
     whisper_timings timings = whisper_get_timings(ctx);
 
     return std::string("[") +
-        system_info() + "," +
+        "\"" + system_info() + "\"," +
         std::to_string(n_threads) + "," +
         std::to_string(timings.encode_ms) + "," +
         std::to_string(timings.decode_ms) + "," +

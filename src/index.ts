@@ -175,6 +175,7 @@ export type TranscribeRealtimeNativeEvent = {
 }
 
 export type BenchResult = {
+  config: string
   nThreads: number
   nEncode: number
   nDecode: number

@@ -323,12 +323,13 @@ export default function Bench() {
               })
               try {
                 const result = await ctx.bench(-1)
-                const { config,nThreads, nEncode, nDecode, nBatchd, nPrompt } = result
+                const { config, nThreads, nEncode, nDecode, nBatchd, nPrompt } = result
                 const fa = Platform.OS === 'ios' ? '1' : '0'
+                const systemInfo = config.split(' ').filter(c => ['NEON', 'BLAS', 'METAL'].includes(c)).join(' ')
                 log(
                   `| <todo> | ${
                     Platform.OS
-                  } | ${config} | ${modelName} | ${nThreads} | ${fa} | ${nEncode.toFixed(
+                  } | ${systemInfo} | ${modelName} | ${nThreads} | ${fa} | ${nEncode.toFixed(
                     2,
                   )} | ${nDecode.toFixed(2)} | ${nBatchd.toFixed(
                     2,
