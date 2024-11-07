@@ -84,7 +84,7 @@ yarn example
 # Apply patch
 patch -p0 -d ./cpp < ./scripts/ggml-backend.cpp.patch
 patch -p0 -d ./cpp < ./scripts/ggml-metal.m.patch
-# patch -p0 -d ./cpp < ./scripts/whisper.h.patch
+patch -p0 -d ./cpp < ./scripts/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/whisper.cpp.patch
 
 if [ "$OS" = "Darwin" ]; then
