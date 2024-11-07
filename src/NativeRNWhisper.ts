@@ -86,6 +86,8 @@ export interface Spec extends TurboModule {
   ): Promise<void>;
   abortTranscribe(contextId: number, jobId: number): Promise<void>;
 
+  bench(contextId: number, maxThreads: number): Promise<string>;
+
   // iOS specific
   getAudioSessionCurrentCategory: () => Promise<{
     category: string,

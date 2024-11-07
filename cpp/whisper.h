@@ -424,6 +424,20 @@ extern "C" {
     WHISPER_API whisper_token whisper_token_transcribe(struct whisper_context * ctx);
 
     // Performance information from the default state.
+    struct whisper_timings {
+        int64_t load_us;
+        int64_t t_start_us;
+        int32_t fail_p;
+        int32_t fail_h;
+        int64_t t_mel_us;
+        int32_t n_sample;
+        int32_t n_encode;
+        int32_t n_decode;
+        int32_t n_batchd;
+        int32_t n_prompt;
+    };
+
+    WHISPER_API struct whisper_timings whisper_get_timings(struct whisper_context * ctx);
     WHISPER_API void whisper_print_timings(struct whisper_context * ctx);
     WHISPER_API void whisper_reset_timings(struct whisper_context * ctx);
 

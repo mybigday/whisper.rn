@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <unordered_map>
 #include "rn-whisper.h"
@@ -7,6 +8,74 @@
 #define DEFAULT_MAX_AUDIO_SEC 30;
 
 namespace rnwhisper {
+
+std::string bench(struct whisper_context * ctx, int n_threads) {
+    const int n_mels = whisper_model_n_mels(ctx);
+
+    if (int ret = whisper_set_mel(ctx, nullptr, 0, n_mels)) {
+        return "error: failed to set mel: " + std::to_string(ret);
+    }
+    // heat encoder
+    if (int ret = whisper_encode(ctx, 0, n_threads) != 0) {
+        return "error: failed to encode: " + std::to_string(ret);
+    }
+
+    whisper_token tokens[512];
+    memset(tokens, 0, sizeof(tokens));
+
+    // prompt heat
+    if (int ret = whisper_decode(ctx, tokens, 256, 0, n_threads) != 0) {
+        return "error: failed to decode: " + std::to_string(ret);
+    }
+
+    // text-generation heat
+    if (int ret = whisper_decode(ctx, tokens, 1, 256, n_threads) != 0) {
+        return "error: failed to decode: " + std::to_string(ret);
+    }
+
+    whisper_reset_timings(ctx);
+
+    // actual run
+    if (int ret = whisper_encode(ctx, 0, n_threads) != 0) {
+        return "error: failed to encode: " + std::to_string(ret);
+    }
+
+    // text-generation
+    for (int i = 0; i < 256; i++) {
+        if (int ret = whisper_decode(ctx, tokens, 1, i, n_threads) != 0) {
+            return "error: failed to decode: " + std::to_string(ret);
+        }
+    }
+
+    // batched decoding
+    for (int i = 0; i < 64; i++) {
+        if (int ret = whisper_decode(ctx, tokens, 5, 0, n_threads) != 0) {
+            return "error: failed to decode: " + std::to_string(ret);
+        }
+    }
+
+    // prompt processing
+    for (int i = 0; i < 16; i++) {
+        if (int ret = whisper_decode(ctx, tokens, 256, 0, n_threads) != 0) {
+            return "error: failed to decode: " + std::to_string(ret);
+        }
+    }
+
+    const int64_t t_end_us = wsp_ggml_time_us();
+    whisper_timings timings = whisper_get_timings(ctx);
+    return std::string("[") +
+        std::to_string(timings.load_us) + "," +
+        std::to_string(timings.t_start_us) + "," +
+        std::to_string(t_end_us) + "," +
+        std::to_string(timings.fail_p) + "," +
+        std::to_string(timings.fail_h) + "," +
+        std::to_string(timings.t_mel_us) + "," +
+        std::to_string(timings.n_sample) + "," +
+        std::to_string(timings.n_encode) + "," +
+        std::to_string(timings.n_decode) + "," +
+        std::to_string(timings.n_batchd) + "," +
+        std::to_string(timings.n_prompt) + "]";
+}
 
 void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate) {
     const float rc = 1.0f / (2.0f * M_PI * cutoff);

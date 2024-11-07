@@ -433,6 +433,10 @@ export class WhisperContext {
     }
   }
 
+  async bench(maxThreads: number): Promise<string> {
+    return RNWhisper.bench(this.id, maxThreads)
+  }
+
   async release(): Promise<void> {
     return RNWhisper.releaseContext(this.id)
   }

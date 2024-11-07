@@ -14,30 +14,31 @@ import contextOpts from './context-opts'
 
 const baseURL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'
 const modelList = [
-  { name: 'tiny', coreml: true },
+  // TODO: Add coreml model download
+  { name: 'tiny' },
   { name: 'tiny-q5_1' },
   { name: 'tiny-q8_0' },
-  // { name: 'base', coreml: true },
-  // { name: 'base-q5_1' },
-  // { name: 'base-q8_0' },
-  // { name: 'small', coreml: true },
-  // { name: 'small-q5_1' },
-  // { name: 'small-q8_0' },
-  // { name: 'medium', coreml: true },
-  // { name: 'medium-q5_0' },
-  // { name: 'medium-q8_0' },
-  // { name: 'large-v1', coreml: true },
-  // { name: 'large-v1-q5_0', },
-  // { name: 'large-v1-q8_0', },
-  // { name: 'large-v2', coreml: true },
-  // { name: 'large-v2-q5_0' },
-  // { name: 'large-v2-q8_0' },
-  // { name: 'large-v3', coreml: true },
-  // { name: 'large-v3-q5_0' },
-  // { name: 'large-v3-q8_0' },
-  // { name: 'large-v3-turbo', coreml: true },
-  // { name: 'large-v3-turbo-q5_0' },
-  // { name: 'large-v3-turbo-q8_0' },
+  { name: 'base' },
+  { name: 'base-q5_1' },
+  { name: 'base-q8_0' },
+  { name: 'small' },
+  { name: 'small-q5_1' },
+  { name: 'small-q8_0' },
+  { name: 'medium' },
+  { name: 'medium-q5_0' },
+  { name: 'medium-q8_0' },
+  { name: 'large-v1' },
+  { name: 'large-v1-q5_0', },
+  { name: 'large-v1-q8_0', },
+  { name: 'large-v2' },
+  { name: 'large-v2-q5_0' },
+  { name: 'large-v2-q8_0' },
+  { name: 'large-v3' },
+  { name: 'large-v3-q5_0' },
+  { name: 'large-v3-q8_0' },
+  { name: 'large-v3-turbo' },
+  { name: 'large-v3-turbo-q5_0' },
+  { name: 'large-v3-turbo-q8_0' },
 ] as const
 
 const modelNameMap = modelList.reduce((acc, model) => {
@@ -105,6 +106,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     opacity: 0.5,
+    width: '0%',
   },
   logContainer: {
     backgroundColor: 'lightgray',
@@ -128,7 +130,14 @@ const Model = (props: {
   onDownloadStarted: (modelName: string) => void
   onDownloaded: (modelName: string) => void
 }) => {
-  const { model, state, downloadMap, setDownloadMap, onDownloadStarted, onDownloaded } = props
+  const {
+    model,
+    state,
+    downloadMap,
+    setDownloadMap,
+    onDownloadStarted,
+    onDownloaded,
+  } = props
 
   const downloadRef = useRef<number | null>(null)
   const [progress, setProgress] = useState(0)
@@ -160,7 +169,6 @@ const Model = (props: {
           onDownloaded(model.name)
           return
         }
-        console.log('[Model] download', `${baseURL}${model.name}.bin?download=true`)
         const { jobId, promise } = RNFS.downloadFile({
           fromUrl: `${baseURL}ggml-${model.name}.bin?download=true`,
           toFile: `${fileDir}/ggml-${model.name}.bin`,
@@ -213,15 +221,12 @@ const Model = (props: {
 }
 
 export default function Bench() {
-  const whisperContextRef = useRef<WhisperContext | null>(null)
-  const whisperContext = whisperContextRef.current
   const [logs, setLogs] = useState<string[]>([])
   const [downloadMap, setDownloadMap] =
     useState<Record<string, boolean>>(modelNameMap)
   const [modelState, setModelState] = useState<'select' | 'download'>('select')
 
   const downloadedModelsRef = useRef<string[]>([])
-
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -292,7 +297,32 @@ export default function Bench() {
           } ${downloadCount} models`}
         </Text>
       </Pressable>
-      <Pressable style={styles.button} onPress={() => {}}>
+      <Pressable
+        style={styles.button}
+        onPress={async () => {
+          await Object.entries(downloadMap).reduce(async (acc, [modelName, downloadNeeded]) => {
+            if (!downloadNeeded) return acc
+            const filePath = `${fileDir}/ggml-${modelName}.bin`
+            if (!(await RNFS.exists(filePath))) {
+              log(`${modelName} not found, skipping`)
+              return acc
+            }
+            const ctx = await initWhisper({
+              filePath,
+              useCoreMLIos: false,
+              useGpu: Platform.OS === 'ios',
+              useFlashAttn: Platform.OS === 'ios',
+            })
+            try {
+              const result = await ctx.bench(-1)
+              log(result)
+            } finally {
+              await ctx.release()
+            }
+            return acc
+          }, Promise.resolve())
+        }}
+      >
         <Text style={styles.buttonText}>Run benchmark</Text>
       </Pressable>
       <View style={styles.logContainer}>
@@ -303,9 +333,7 @@ export default function Bench() {
         ))}
       </View>
       <View style={styles.buttonContainer}>
-        <Pressable style={styles.button} onPress={() => {
-          setLogs([])
-        }}>
+        <Pressable style={styles.button} onPress={() => setLogs([])}>
           <Text style={styles.buttonText}>Clear Logs</Text>
         </Pressable>
         <Pressable
