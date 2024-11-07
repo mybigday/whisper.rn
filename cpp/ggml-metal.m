@@ -76,6 +76,7 @@ static void wsp_ggml_backend_metal_device_rel(struct wsp_ggml_backend_metal_devi
     ctx->mtl_device_ref_count--;
 
     if (ctx->mtl_device_ref_count == 0) {
+        [ctx->mtl_device release];
         ctx->mtl_device = nil;
     }
 }
@@ -520,8 +521,10 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
             struct wsp_ggml_metal_kernel * kernel = &ctx->kernels[e]; \
             id<MTLFunction> metal_function = [metal_library newFunctionWithName:@"kernel_"#name]; \
             kernel->pipeline = [device newComputePipelineStateWithFunction:metal_function error:&error]; \
+            [metal_function release]; \
             if (error) { \
                 WSP_GGML_LOG_ERROR("%s: error: load pipeline error: %s\n", __func__, [[error description] UTF8String]); \
+                [metal_library release]; \
                 return NULL; \
             } \
         } else { \
@@ -723,11 +726,23 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_POOL_2D_MAX_F32,               pool_2d_max_f32,                true);
     }
 
+    [metal_library release];
+
     return ctx;
 }
 
 static void wsp_ggml_metal_free(struct wsp_ggml_backend_metal_context * ctx) {
     WSP_GGML_LOG_INFO("%s: deallocating\n", __func__);
+
+    for (int i = 0; i < WSP_GGML_METAL_KERNEL_TYPE_COUNT; ++i) {
+        [ctx->kernels[i].pipeline release];
+    }
+
+    Block_release(ctx->encode_async);
+
+    [ctx->queue release];
+
+    dispatch_release(ctx->d_queue);
 
     free(ctx);
 }
@@ -3241,6 +3256,9 @@ static const char * wsp_ggml_backend_metal_buffer_get_name(wsp_ggml_backend_buff
 static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
     struct wsp_ggml_backend_metal_buffer_context * ctx = (struct wsp_ggml_backend_metal_buffer_context *)buffer->context;
 
+    for (int i = 0; i < ctx->n_buffers; i++) {
+        [ctx->buffers[i].metal release];
+    }
     wsp_ggml_backend_metal_device_rel(buffer->buft->device->context);
 
     if (ctx->owned) {
@@ -3534,7 +3552,11 @@ static void wsp_ggml_backend_metal_set_n_cb(wsp_ggml_backend_t backend, int n_cb
         }
     }
 
-    ctx->encode_async = ^(size_t iter) {
+    if (ctx->encode_async) {
+        Block_release(ctx->encode_async);
+    }
+
+    ctx->encode_async = Block_copy(^(size_t iter) {
         const int cb_idx = iter;
         const int n_cb_l = ctx->n_cb;
 
@@ -3573,7 +3595,7 @@ static void wsp_ggml_backend_metal_set_n_cb(wsp_ggml_backend_t backend, int n_cb
         if (cb_idx < 2 || ctx->abort_callback == NULL) {
             [command_buffer commit];
         }
-    };
+    });
 }
 
 static struct wsp_ggml_backend_i wsp_ggml_backend_metal_i = {
