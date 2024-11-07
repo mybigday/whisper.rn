@@ -84,7 +84,6 @@ std::string bench(struct whisper_context * ctx, int n_threads) {
         }
     }
 
-    const int64_t t_end_us = wsp_ggml_time_us();
     const struct whisper_timings * timings = whisper_get_timings(ctx);
 
     const int32_t n_encode = std::max(1, timings->n_encode);

@@ -133,7 +133,6 @@ export default function App() {
               const startTime = Date.now()
               const ctx = await initWhisper({
                 filePath: require('../assets/ggml-base.bin'),
-                useFlashAttn: true,
                 ...contextOpts,
               })
               const endTime = Date.now()
