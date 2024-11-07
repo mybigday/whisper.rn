@@ -28,8 +28,8 @@ const modelList = [
   { name: 'medium-q5_0' },
   { name: 'medium-q8_0' },
   { name: 'large-v1' },
-  { name: 'large-v1-q5_0', },
-  { name: 'large-v1-q8_0', },
+  { name: 'large-v1-q5_0' },
+  { name: 'large-v1-q8_0' },
   { name: 'large-v2' },
   { name: 'large-v2-q5_0' },
   { name: 'large-v2-q8_0' },
@@ -300,27 +300,41 @@ export default function Bench() {
       <Pressable
         style={styles.button}
         onPress={async () => {
-          await Object.entries(downloadMap).reduce(async (acc, [modelName, downloadNeeded]) => {
-            if (!downloadNeeded) return acc
-            const filePath = `${fileDir}/ggml-${modelName}.bin`
-            if (!(await RNFS.exists(filePath))) {
-              log(`${modelName} not found, skipping`)
+          log('Start benchmark')
+          log(
+            '| CPU | OS | Config | Model | Th | FA | Enc. | Dec. | Bch5 | PP | Commit |',
+          )
+          log(
+            '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+          )
+          await Object.entries(downloadMap).reduce(
+            async (acc, [modelName, downloadNeeded]) => {
+              if (!downloadNeeded) return acc
+              const filePath = `${fileDir}/ggml-${modelName}.bin`
+              if (!(await RNFS.exists(filePath))) {
+                log(`${modelName} not found, skipping`)
+                return acc
+              }
+              const ctx = await initWhisper({
+                filePath,
+                useCoreMLIos: false,
+                useGpu: Platform.OS === 'ios',
+                useFlashAttn: Platform.OS === 'ios',
+              })
+              try {
+                const result = await ctx.bench(-1)
+                const { nThreads, nEncode, nDecode, nBatchd, nPrompt } = result
+                const fa = Platform.OS === 'ios' ? '1' : '0'
+                log(
+                  `| <todo> | ${Platform.OS} | METAL | ${modelName} | ${nThreads} | ${fa} | ${nEncode} | ${nDecode} | ${nBatchd} | ${nPrompt} | <todo> |`,
+                )
+              } finally {
+                await ctx.release()
+              }
               return acc
-            }
-            const ctx = await initWhisper({
-              filePath,
-              useCoreMLIos: false,
-              useGpu: Platform.OS === 'ios',
-              useFlashAttn: Platform.OS === 'ios',
-            })
-            try {
-              const result = await ctx.bench(-1)
-              log(result)
-            } finally {
-              await ctx.release()
-            }
-            return acc
-          }, Promise.resolve())
+            },
+            Promise.resolve(),
+          )
         }}
       >
         <Text style={styles.buttonText}>Run benchmark</Text>

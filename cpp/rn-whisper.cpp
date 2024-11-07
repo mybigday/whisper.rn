@@ -64,13 +64,7 @@ std::string bench(struct whisper_context * ctx, int n_threads) {
     const int64_t t_end_us = wsp_ggml_time_us();
     whisper_timings timings = whisper_get_timings(ctx);
     return std::string("[") +
-        std::to_string(timings.load_us) + "," +
-        std::to_string(timings.t_start_us) + "," +
-        std::to_string(t_end_us) + "," +
-        std::to_string(timings.fail_p) + "," +
-        std::to_string(timings.fail_h) + "," +
-        std::to_string(timings.t_mel_us) + "," +
-        std::to_string(timings.n_sample) + "," +
+        std::to_string(n_threads) + "," +
         std::to_string(timings.n_encode) + "," +
         std::to_string(timings.n_decode) + "," +
         std::to_string(timings.n_batchd) + "," +
