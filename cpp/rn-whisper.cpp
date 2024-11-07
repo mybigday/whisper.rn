@@ -63,12 +63,13 @@ std::string bench(struct whisper_context * ctx, int n_threads) {
 
     const int64_t t_end_us = wsp_ggml_time_us();
     whisper_timings timings = whisper_get_timings(ctx);
+
     return std::string("[") +
         std::to_string(n_threads) + "," +
-        std::to_string(timings.n_encode) + "," +
-        std::to_string(timings.n_decode) + "," +
-        std::to_string(timings.n_batchd) + "," +
-        std::to_string(timings.n_prompt) + "]";
+        std::to_string(timings.encode_ms) + "," +
+        std::to_string(timings.decode_ms) + "," +
+        std::to_string(timings.batchd_ms) + "," +
+        std::to_string(timings.prompt_ms) + "]";
 }
 
 void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate) {

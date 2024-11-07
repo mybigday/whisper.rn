@@ -4191,33 +4191,37 @@ whisper_token whisper_token_transcribe(struct whisper_context * ctx) {
 }
 
 struct whisper_timings whisper_get_timings(struct whisper_context * ctx) {
-    const int64_t t_end_us = wsp_ggml_time_us();
     if (ctx->state == nullptr) {
         return {
             .load_us = ctx->t_load_us,
             .t_start_us = ctx->t_start_us,
             .fail_p = 0,
             .fail_h = 0,
-            .t_mel_us = 0,
-            .n_sample = 0,
-            .n_encode = 0,
-            .n_decode = 0,
-            .n_batchd = 0,
-            .n_prompt = 0,
+            .mel_ms = 0,
+            .sample_ms = 0,
+            .encode_ms = 0,
+            .decode_ms = 0,
+            .batchd_ms = 0,
+            .prompt_ms = 0,
         };
     }
 
+    const int32_t n_sample = std::max(1, ctx->state->n_sample);
+    const int32_t n_encode = std::max(1, ctx->state->n_encode);
+    const int32_t n_decode = std::max(1, ctx->state->n_decode);
+    const int32_t n_batchd = std::max(1, ctx->state->n_batchd);
+    const int32_t n_prompt = std::max(1, ctx->state->n_prompt);
     return {
         .load_us = ctx->t_load_us,
         .t_start_us = ctx->t_start_us,
         .fail_p = ctx->state->n_fail_p,
         .fail_h = ctx->state->n_fail_h,
-        .t_mel_us = ctx->state->t_mel_us,
-        .n_sample = std::max(1, ctx->state->n_sample),
-        .n_encode = std::max(1, ctx->state->n_encode),
-        .n_decode = std::max(1, ctx->state->n_decode),
-        .n_batchd = std::max(1, ctx->state->n_batchd),
-        .n_prompt = std::max(1, ctx->state->n_prompt),
+        .mel_ms = ctx->state->t_mel_us / 1000.0f,
+        .sample_ms = 1e-3f * ctx->state->t_sample_us / n_sample,
+        .encode_ms = 1e-3f * ctx->state->t_encode_us / n_encode,
+        .decode_ms = 1e-3f * ctx->state->t_decode_us / n_decode,
+        .batchd_ms = 1e-3f * ctx->state->t_batchd_us / n_batchd,
+        .prompt_ms = 1e-3f * ctx->state->t_prompt_us / n_prompt,
     };
 }
 
@@ -4228,13 +4232,19 @@ void whisper_print_timings(struct whisper_context * ctx) {
     WHISPER_LOG_INFO("\n");
     WHISPER_LOG_INFO("%s:     load time = %8.2f ms\n", __func__, timings.load_us / 1000.0f);
     if (ctx->state != nullptr) {
+        const int32_t n_sample = std::max(1, ctx->state->n_sample);
+        const int32_t n_encode = std::max(1, ctx->state->n_encode);
+        const int32_t n_decode = std::max(1, ctx->state->n_decode);
+        const int32_t n_batchd = std::max(1, ctx->state->n_batchd);
+        const int32_t n_prompt = std::max(1, ctx->state->n_prompt);
+
         WHISPER_LOG_INFO("%s:     fallbacks = %3d p / %3d h\n", __func__, timings.fail_p, timings.fail_h);
-        WHISPER_LOG_INFO("%s:      mel time = %8.2f ms\n", __func__, timings.t_mel_us / 1000.0f);
-        WHISPER_LOG_INFO("%s:   sample time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * timings.n_sample, timings.n_sample, 1e-3f * timings.n_sample / timings.n_sample);
-        WHISPER_LOG_INFO("%s:   encode time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * timings.n_encode, timings.n_encode, 1e-3f * timings.n_encode / timings.n_encode);
-        WHISPER_LOG_INFO("%s:   decode time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * timings.n_decode, timings.n_decode, 1e-3f * timings.n_decode / timings.n_decode);
-        WHISPER_LOG_INFO("%s:   batchd time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * timings.n_batchd, timings.n_batchd, 1e-3f * timings.n_batchd / timings.n_batchd);
-        WHISPER_LOG_INFO("%s:   prompt time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * timings.n_prompt, timings.n_prompt, 1e-3f * timings.n_prompt / timings.n_prompt);
+        WHISPER_LOG_INFO("%s:      mel time = %8.2f ms\n", __func__, timings.mel_ms);
+        WHISPER_LOG_INFO("%s:   sample time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_sample_us, n_sample, timings.sample_ms);
+        WHISPER_LOG_INFO("%s:   encode time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_encode_us, n_encode, timings.encode_ms);
+        WHISPER_LOG_INFO("%s:   decode time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_decode_us, n_decode, timings.decode_ms);
+        WHISPER_LOG_INFO("%s:   batchd time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_batchd_us, n_batchd, timings.batchd_ms);
+        WHISPER_LOG_INFO("%s:   prompt time = %8.2f ms / %5d runs (%8.2f ms per run)\n", __func__, 1e-3f * ctx->state->t_prompt_us, n_prompt, timings.prompt_ms);
     }
     WHISPER_LOG_INFO("%s:    total time = %8.2f ms\n", __func__, (t_end_us - timings.t_start_us)/1000.0f);
 }

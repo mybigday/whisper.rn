@@ -8,8 +8,7 @@ import {
   Pressable,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
-import type { WhisperContext } from '../../src'
+import { initWhisper } from '../../src' // whisper.rn
 import contextOpts from './context-opts'
 
 const baseURL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'
@@ -326,7 +325,14 @@ export default function Bench() {
                 const { nThreads, nEncode, nDecode, nBatchd, nPrompt } = result
                 const fa = Platform.OS === 'ios' ? '1' : '0'
                 log(
-                  `| <todo> | ${Platform.OS} | METAL | ${modelName} | ${nThreads} | ${fa} | ${nEncode} | ${nDecode} | ${nBatchd} | ${nPrompt} | <todo> |`,
+                  // TODO: config
+                  `| <todo> | ${
+                    Platform.OS
+                  } | NEON BLAS METAL | ${modelName} | ${nThreads} | ${fa} | ${nEncode.toFixed(
+                    2,
+                  )} | ${nDecode.toFixed(2)} | ${nBatchd.toFixed(
+                    2,
+                  )} | ${nPrompt.toFixed(2)} | <todo> |`,
                 )
               } finally {
                 await ctx.release()

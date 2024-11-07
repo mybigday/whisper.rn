@@ -9,6 +9,7 @@
     "pods": "pod-install --quiet"
   },
   "dependencies": {
+    "@react-native-clipboard/clipboard": "^1.14.3",
     "@react-native/babel-preset": "0.74.88",
     "@react-native/metro-config": "^0.74.79",
     "@react-navigation/native": "^6.1.18",
