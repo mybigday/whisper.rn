@@ -429,15 +429,19 @@ extern "C" {
         int64_t t_start_us;
         int32_t fail_p;
         int32_t fail_h;
-        float mel_ms;
-        float sample_ms;
-        float encode_ms;
-        float decode_ms;
-        float batchd_ms;
-        float prompt_ms;
+        int64_t t_mel_us;
+        int32_t n_sample;
+        int32_t n_encode;
+        int32_t n_decode;
+        int32_t n_batchd;
+        int32_t n_prompt;
+        int64_t t_sample_us;
+        int64_t t_encode_us;
+        int64_t t_decode_us;
+        int64_t t_batchd_us;
+        int64_t t_prompt_us;
     };
-
-    WHISPER_API struct whisper_timings whisper_get_timings(struct whisper_context * ctx);
+    WHISPER_API struct whisper_timings * whisper_get_timings(struct whisper_context * ctx);
     WHISPER_API void whisper_print_timings(struct whisper_context * ctx);
     WHISPER_API void whisper_reset_timings(struct whisper_context * ctx);
 
