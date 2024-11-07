@@ -429,12 +429,12 @@ extern "C" {
         int64_t t_start_us;
         int32_t fail_p;
         int32_t fail_h;
-        int64_t t_mel_us;
-        int32_t n_sample;
-        int32_t n_encode;
-        int32_t n_decode;
-        int32_t n_batchd;
-        int32_t n_prompt;
+        float mel_ms;
+        float sample_ms;
+        float encode_ms;
+        float decode_ms;
+        float batchd_ms;
+        float prompt_ms;
     };
 
     WHISPER_API struct whisper_timings whisper_get_timings(struct whisper_context * ctx);

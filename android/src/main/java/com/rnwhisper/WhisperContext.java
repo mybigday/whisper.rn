@@ -423,6 +423,10 @@ public class WhisperContext {
     stopTranscribe(this.jobId);
   }
 
+  public String bench(int n_threads) {
+    return bench(context, n_threads);
+  }
+
   public void release() {
     stopCurrentTranscribe();
     freeContext(context);
@@ -527,4 +531,5 @@ public class WhisperContext {
     int slice_index,
     int n_samples
   );
+  protected static native String bench(long context, int n_threads);
 }

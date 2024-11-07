@@ -443,8 +443,8 @@ export class WhisperContext {
 
   async bench(maxThreads: number): Promise<BenchResult> {
     const result = await RNWhisper.bench(this.id, maxThreads)
-    const [nThreads, nEncode, nDecode, nBatchd, nPrompt] = JSON.parse(result)
-    return { nThreads, nEncode, nDecode, nBatchd, nPrompt } as BenchResult
+    const [config, nThreads, nEncode, nDecode, nBatchd, nPrompt] = JSON.parse(result)
+    return { config, nThreads, nEncode, nDecode, nBatchd, nPrompt } as BenchResult
   }
 
   async release(): Promise<void> {

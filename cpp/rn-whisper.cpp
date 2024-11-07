@@ -9,6 +9,29 @@
 
 namespace rnwhisper {
 
+const char * system_info(void) {
+  static std::string s;
+  s = "";
+  if (wsp_ggml_cpu_has_avx() == 1) s += "AVX ";
+  if (wsp_ggml_cpu_has_avx2() == 1) s += "AVX2 ";
+  if (wsp_ggml_cpu_has_avx512() == 1) s += "AVX512 ";
+  if (wsp_ggml_cpu_has_fma() == 1) s += "FMA ";
+  if (wsp_ggml_cpu_has_neon() == 1) s += "NEON ";
+  if (wsp_ggml_cpu_has_arm_fma() == 1) s += "ARM_FMA ";
+  if (wsp_ggml_cpu_has_metal() == 1) s += "METAL ";
+  if (wsp_ggml_cpu_has_f16c() == 1) s += "F16C ";
+  if (wsp_ggml_cpu_has_fp16_va() == 1) s += "FP16_VA ";
+  if (wsp_ggml_cpu_has_blas() == 1) s += "BLAS ";
+  if (wsp_ggml_cpu_has_sse3() == 1) s += "SSE3 ";
+  if (wsp_ggml_cpu_has_ssse3() == 1) s += "SSSE3 ";
+  if (wsp_ggml_cpu_has_vsx() == 1) s += "VSX ";
+#ifdef WHISPER_USE_COREML
+  s += "COREML ";
+#endif
+  s.erase(s.find_last_not_of(" ") + 1);
+  return s.c_str();
+}
+
 std::string bench(struct whisper_context * ctx, int n_threads) {
     const int n_mels = whisper_model_n_mels(ctx);
 
@@ -65,6 +88,7 @@ std::string bench(struct whisper_context * ctx, int n_threads) {
     whisper_timings timings = whisper_get_timings(ctx);
 
     return std::string("[") +
+        system_info() + "," +
         std::to_string(n_threads) + "," +
         std::to_string(timings.encode_ms) + "," +
         std::to_string(timings.decode_ms) + "," +

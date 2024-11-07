@@ -508,4 +508,17 @@ Java_com_rnwhisper_WhisperContext_getTextSegmentSpeakerTurnNext(
     return whisper_full_get_segment_speaker_turn_next(context, index);
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_rnwhisper_WhisperContext_bench(
+    JNIEnv *env,
+    jobject thiz,
+    jlong context_ptr,
+    jint n_threads
+) {
+    UNUSED(thiz);
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    std::string result = rnwhisper::bench(context, n_threads);
+    return env->NewStringUTF(result.c_str());
+}
+
 } // extern "C"

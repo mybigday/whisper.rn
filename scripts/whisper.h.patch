@@ -1,5 +1,5 @@
---- whisper.h.orig	2024-11-07 13:09:13
-+++ whisper.h	2024-11-07 13:01:44
+--- whisper.h.orig	2024-11-07 14:41:36
++++ whisper.h	2024-11-07 14:37:28
 @@ -114,6 +114,7 @@
 
      struct whisper_context_params {
@@ -17,12 +17,12 @@
 +        int64_t t_start_us;
 +        int32_t fail_p;
 +        int32_t fail_h;
-+        int64_t t_mel_us;
-+        int32_t n_sample;
-+        int32_t n_encode;
-+        int32_t n_decode;
-+        int32_t n_batchd;
-+        int32_t n_prompt;
++        float mel_ms;
++        float sample_ms;
++        float encode_ms;
++        float decode_ms;
++        float batchd_ms;
++        float prompt_ms;
 +    };
 +
 +    WHISPER_API struct whisper_timings whisper_get_timings(struct whisper_context * ctx);
