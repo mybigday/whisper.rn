@@ -58,6 +58,11 @@ public class RNWhisperModule extends NativeRNWhisperSpec {
   }
 
   @ReactMethod
+  public void bench(double id, double nThreads, Promise promise) {
+    rnwhisper.bench(id, nThreads, promise);
+  }
+
+  @ReactMethod
   public void releaseContext(double id, Promise promise) {
     rnwhisper.releaseContext(id, promise);
   }

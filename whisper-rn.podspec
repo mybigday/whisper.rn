@@ -31,8 +31,10 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "11.0", :tvos => "11.0" }
   s.source       = { :git => "https://github.com/mybigday/whisper.rn.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,c,m,mm}"
+  s.source_files = "ios/**/*.{h,m,mm}", "cpp/*.{h,cpp,c}", "cpp/coreml/*.{h,m,mm}"
   s.resources = "cpp/*.{metallib}"
+
+  s.requires_arc = true
 
   s.dependency "React-Core"
 
@@ -59,5 +61,10 @@ Pod::Spec.new do |s|
     s.dependency "RCTRequired"
     s.dependency "RCTTypeSafety"
     s.dependency "ReactCommon/turbomodule/core"
+  end
+
+  s.subspec "no-require-arc" do |ss|
+    ss.requires_arc = false
+    ss.source_files = "cpp/*.m"
   end
 end

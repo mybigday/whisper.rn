@@ -1,5 +1,5 @@
---- whisper.h.orig	2024-11-03 12:37:43
-+++ whisper.h	2024-11-03 12:38:27
+--- whisper.h.orig	2024-11-07 18:16:16
++++ whisper.h	2024-11-07 16:42:51
 @@ -114,6 +114,7 @@
 
      struct whisper_context_params {
@@ -7,4 +7,29 @@
 +        bool  use_coreml;
          bool  flash_attn;
          int   gpu_device;  // CUDA device
+
+@@ -423,6 +424,24 @@
+     WHISPER_API whisper_token whisper_token_transcribe(struct whisper_context * ctx);
+
+     // Performance information from the default state.
++    struct whisper_timings {
++        int64_t load_us;
++        int64_t t_start_us;
++        int32_t fail_p;
++        int32_t fail_h;
++        int64_t t_mel_us;
++        int32_t n_sample;
++        int32_t n_encode;
++        int32_t n_decode;
++        int32_t n_batchd;
++        int32_t n_prompt;
++        int64_t t_sample_us;
++        int64_t t_encode_us;
++        int64_t t_decode_us;
++        int64_t t_batchd_us;
++        int64_t t_prompt_us;
++    };
++    WHISPER_API struct whisper_timings * whisper_get_timings(struct whisper_context * ctx);
+     WHISPER_API void whisper_print_timings(struct whisper_context * ctx);
+     WHISPER_API void whisper_reset_timings(struct whisper_context * ctx);
 

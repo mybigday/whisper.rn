@@ -15,4 +15,5 @@ export default {
         }
       : undefined,
   useGpu: false, // Enable Metal (Will skip Core ML if enabled)
+  useFlashAttn: false,
 }

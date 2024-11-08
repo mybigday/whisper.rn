@@ -17,6 +17,7 @@ whisper.rn
 ### Type Aliases
 
 - [AudioSessionSettingIos](README.md#audiosessionsettingios)
+- [BenchResult](README.md#benchresult)
 - [ContextOptions](README.md#contextoptions)
 - [TranscribeFileOptions](README.md#transcribefileoptions)
 - [TranscribeNewSegmentsNativeEvent](README.md#transcribenewsegmentsnativeevent)
@@ -58,7 +59,28 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:76](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L76)
+[index.ts:76](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L76)
+
+___
+
+### BenchResult
+
+Ƭ **BenchResult**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `batchMs` | `number` |
+| `config` | `string` |
+| `decodeMs` | `number` |
+| `encodeMs` | `number` |
+| `nThreads` | `number` |
+| `promptMs` | `number` |
+
+#### Defined in
+
+[index.ts:177](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L177)
 
 ___
 
@@ -76,11 +98,12 @@ ___
 | `filePath` | `string` \| `number` | - |
 | `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
 | `useCoreMLIos?` | `boolean` | Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. |
+| `useFlashAttn?` | `boolean` | Use Flash Attention, only recommended if GPU available |
 | `useGpu?` | `boolean` | Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. |
 
 #### Defined in
 
-[index.ts:441](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L441)
+[index.ts:456](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L456)
 
 ___
 
@@ -90,7 +113,7 @@ ___
 
 #### Defined in
 
-[index.ts:59](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L59)
+[index.ts:59](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L59)
 
 ___
 
@@ -108,7 +131,7 @@ ___
 
 #### Defined in
 
-[index.ts:52](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L52)
+[index.ts:52](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L52)
 
 ___
 
@@ -127,7 +150,7 @@ ___
 
 #### Defined in
 
-[index.ts:45](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L45)
+[index.ts:45](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L45)
 
 ___
 
@@ -148,7 +171,6 @@ ___
 | `maxThreads?` | `number` | Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) |
 | `offset?` | `number` | Time offset in milliseconds |
 | `prompt?` | `string` | Initial Prompt |
-| `speedUp?` | `boolean` | Speed up audio by x2 (reduced accuracy) |
 | `tdrzEnable?` | `boolean` | Enable tinydiarize (requires a tdrz model) |
 | `temperature?` | `number` | Tnitial decoding temperature |
 | `temperatureInc?` | `number` | - |
@@ -158,7 +180,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -176,7 +198,7 @@ ___
 
 #### Defined in
 
-[index.ts:70](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L70)
+[index.ts:70](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L70)
 
 ___
 
@@ -201,7 +223,7 @@ ___
 
 #### Defined in
 
-[index.ts:138](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L138)
+[index.ts:138](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L138)
 
 ___
 
@@ -219,7 +241,7 @@ ___
 
 #### Defined in
 
-[index.ts:171](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L171)
+[index.ts:171](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L171)
 
 ___
 
@@ -243,7 +265,7 @@ ___
 
 #### Defined in
 
-[index.ts:158](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L158)
+[index.ts:158](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L158)
 
 ___
 
@@ -253,7 +275,7 @@ ___
 
 #### Defined in
 
-[index.ts:84](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L84)
+[index.ts:84](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L84)
 
 ___
 
@@ -271,7 +293,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:39](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/NativeRNWhisper.ts#L39)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/NativeRNWhisper.ts#L37)
 
 ## Variables
 
@@ -296,7 +318,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -308,7 +330,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:543](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L543)
+[index.ts:562](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L562)
 
 ___
 
@@ -320,7 +342,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:540](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L540)
+[index.ts:559](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L559)
 
 ___
 
@@ -332,7 +354,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:535](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L535)
+[index.ts:554](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L554)
 
 ## Functions
 
@@ -352,7 +374,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:467](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L467)
+[index.ts:484](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L484)
 
 ___
 
@@ -366,4 +388,4 @@ ___
 
 #### Defined in
 
-[index.ts:530](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L530)
+[index.ts:549](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L549)

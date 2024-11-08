@@ -45,11 +45,19 @@ if (!NativeModules.RNWhisper) {
         })
       })
     }),
+    bench: jest.fn(() => Promise.resolve({
+      config: 'NEON',
+      nThreads: 1,
+      encodeMs: 1,
+      decodeMs: 1,
+      batchMs: 1,
+      promptMs: 1,
+    })),
     releaseContext: jest.fn(() => Promise.resolve()),
     releaseAllContexts: jest.fn(() => Promise.resolve()),
 
     // iOS AudioSession utils
-    getAudioSessionCurrentCategory: jest.fn(() => Promise.resolve({ 
+    getAudioSessionCurrentCategory: jest.fn(() => Promise.resolve({
       category: 'AVAudioSessionCategoryPlayAndRecord',
       options: [],
     })),

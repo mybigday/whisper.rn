@@ -9,6 +9,8 @@
 
 namespace rnwhisper {
 
+std::string bench(whisper_context * ctx, int n_threads);
+
 struct vad_params {
     bool use_vad = false;
     float vad_thold = 0.6f;
