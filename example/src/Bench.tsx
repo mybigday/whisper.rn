@@ -304,8 +304,14 @@ export default function Bench() {
               const fa = useGpu ? '1' : '0'
               try {
                 const result = await ctx.bench(-1)
-                const { config, nThreads, nEncode, nDecode, nBatchd, nPrompt } =
-                  result
+                const {
+                  config,
+                  nThreads,
+                  encodeMs,
+                  decodeMs,
+                  batchMs,
+                  promptMs,
+                } = result
                 const systemInfo = config
                   .split(' ')
                   .filter((c) => ['NEON', 'BLAS', 'METAL'].includes(c))
@@ -313,11 +319,11 @@ export default function Bench() {
                 log(
                   `| <todo> | ${
                     Platform.OS
-                  } | ${systemInfo} | ${modelName} | ${nThreads} | ${fa} | ${nEncode.toFixed(
+                  } | ${systemInfo} | ${modelName} | ${nThreads} | ${fa} | ${encodeMs.toFixed(
                     2,
-                  )} | ${nDecode.toFixed(2)} | ${nBatchd.toFixed(
+                  )} | ${decodeMs.toFixed(2)} | ${batchMs.toFixed(
                     2,
-                  )} | ${nPrompt.toFixed(2)} | <todo> |`,
+                  )} | ${promptMs.toFixed(2)} | <todo> |`,
                 )
               } finally {
                 await ctx.release()
