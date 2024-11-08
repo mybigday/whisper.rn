@@ -65,16 +65,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modelItemUnselected: {
-    backgroundColor: '#aaa',
+    backgroundColor: '#33333388',
   },
   modelItemText: {
     margin: 6,
     color: '#ccc',
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  modelItemTextUnselected: {
-    color: '#666',
   },
   progressBar: {
     backgroundColor: '#3388ff',
