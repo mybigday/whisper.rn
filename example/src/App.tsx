@@ -8,6 +8,7 @@ import { enableScreens } from 'react-native-screens'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import Transcribe from './Transcribe'
+import TranscribeData from './TranscribeData'
 import Bench from './Bench'
 
 enableScreens()
@@ -41,6 +42,12 @@ function HomeScreen({ navigation }: { navigation: any }) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
+        onPress={() => navigation.navigate('TranscribeData')}
+      >
+        <Text style={styles.buttonText}>Transcribe Data Example</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
         onPress={() => navigation.navigate('Bench')}
       >
         <Text style={styles.buttonText}>Benchmark</Text>
@@ -58,6 +65,7 @@ function App() {
         <Stack.Navigator>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Transcribe" component={Transcribe} />
+          <Stack.Screen name="TranscribeData" component={TranscribeData} />
           <Stack.Screen name="Bench" component={Bench} />
         </Stack.Navigator>
       </NavigationContainer>

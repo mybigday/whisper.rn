@@ -1230,6 +1230,8 @@ PODS:
     - React-logger (= 0.74.6)
     - React-perflogger (= 0.74.6)
     - React-utils (= 0.74.6)
+  - RNAudioPcmStream (1.1.4):
+    - React
   - RNCClipboard (1.14.3):
     - DoubleConversion
     - glog
@@ -1404,6 +1406,7 @@ DEPENDENCIES:
   - React-runtimescheduler (from `../node_modules/react-native/ReactCommon/react/renderer/runtimescheduler`)
   - React-utils (from `../node_modules/react-native/ReactCommon/react/utils`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
+  - "RNAudioPcmStream (from `../node_modules/@fugood/react-native-audio-pcm-stream`)"
   - "RNCClipboard (from `../node_modules/@react-native-clipboard/clipboard`)"
   - RNFS (from `../node_modules/react-native-fs`)
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
@@ -1528,6 +1531,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/utils"
   ReactCommon:
     :path: "../node_modules/react-native/ReactCommon"
+  RNAudioPcmStream:
+    :path: "../node_modules/@fugood/react-native-audio-pcm-stream"
   RNCClipboard:
     :path: "../node_modules/@react-native-clipboard/clipboard"
   RNFS:
@@ -1600,6 +1605,7 @@ SPEC CHECKSUMS:
   React-runtimescheduler: b63ebebd3e000e0ba4ac19ca69bdac071559ad57
   React-utils: 2955bdc1b2ed495f14dc7d3bfbbb7e3624cfc0fc
   ReactCommon: 5c504a77030c7ab89eee75b1725b80d8cee7f5d7
+  RNAudioPcmStream: d7491fdfe6bddcebd6ab325df8327014be16743f
   RNCClipboard: 99d86f515e6262a8a1d0915f1f6e6b410698aa3a
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
   RNGestureHandler: e723a54dfedabf2a6be36bbcb6c7d5c96de8a379
