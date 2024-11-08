@@ -246,7 +246,7 @@ export default function App() {
             }}
           />
           <Button
-            title={stopTranscribe?.stop ? 'Stop' : 'Transcribe File'}
+            title={stopTranscribe?.stop ? 'Stop' : 'Realtime'}
             style={[
               stopTranscribe?.stop ? styles.buttonClear : null,
             ]}
