@@ -17,17 +17,13 @@ const styles = StyleSheet.create({
   },
 })
 
-export function Button({
-  style,
-  title,
-  onPress,
-  disabled,
-}: {
+export function Button(options: {
   style?: StyleProp<ViewStyle>
   title: string
   onPress: () => void
   disabled?: boolean
 }) {
+  const { style, title, onPress, disabled } = options
   return (
     <TouchableOpacity
       style={[styles.button, style]}
@@ -37,9 +33,4 @@ export function Button({
       <Text style={styles.buttonText}>{title}</Text>
     </TouchableOpacity>
   )
-}
-
-Button.defaultProps = {
-  style: undefined,
-  disabled: false,
 }

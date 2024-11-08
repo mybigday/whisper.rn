@@ -294,17 +294,18 @@ export default function Bench() {
                 log(`${modelName} not found, skipping`)
                 return
               }
+              const useGpu = Platform.OS === 'ios'
               const ctx = await initWhisper({
                 filePath,
                 useCoreMLIos: false,
-                useGpu: Platform.OS === 'ios',
-                useFlashAttn: Platform.OS === 'ios',
+                useGpu,
+                useFlashAttn: useGpu,
               })
+              const fa = useGpu ? '1' : '0'
               try {
                 const result = await ctx.bench(-1)
                 const { config, nThreads, nEncode, nDecode, nBatchd, nPrompt } =
                   result
-                const fa = Platform.OS === 'ios' ? '1' : '0'
                 const systemInfo = config
                   .split(' ')
                   .filter((c) => ['NEON', 'BLAS', 'METAL'].includes(c))
