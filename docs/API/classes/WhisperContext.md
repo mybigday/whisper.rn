@@ -16,6 +16,7 @@
 
 ### Methods
 
+- [bench](WhisperContext.md#bench)
 - [release](WhisperContext.md#release)
 - [transcribe](WhisperContext.md#transcribe)
 - [transcribeRealtime](WhisperContext.md#transcriberealtime)
@@ -34,7 +35,7 @@
 
 #### Defined in
 
-[index.ts:195](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L195)
+[index.ts:204](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L204)
 
 ## Properties
 
@@ -44,7 +45,7 @@
 
 #### Defined in
 
-[index.ts:191](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L191)
+[index.ts:200](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L200)
 
 ___
 
@@ -54,7 +55,7 @@ ___
 
 #### Defined in
 
-[index.ts:189](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L189)
+[index.ts:198](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L198)
 
 ___
 
@@ -64,9 +65,29 @@ ___
 
 #### Defined in
 
-[index.ts:193](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L193)
+[index.ts:202](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L202)
 
 ## Methods
+
+### bench
+
+▸ **bench**(`maxThreads`): `Promise`<[`BenchResult`](../README.md#benchresult)\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `maxThreads` | `number` |
+
+#### Returns
+
+`Promise`<[`BenchResult`](../README.md#benchresult)\>
+
+#### Defined in
+
+[index.ts:445](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L445)
+
+___
 
 ### release
 
@@ -78,7 +99,7 @@ ___
 
 #### Defined in
 
-[index.ts:436](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L436)
+[index.ts:451](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L451)
 
 ___
 
@@ -106,7 +127,7 @@ Transcribe audio file
 
 #### Defined in
 
-[index.ts:206](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L206)
+[index.ts:215](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L215)
 
 ___
 
@@ -128,4 +149,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:302](https://github.com/mybigday/whisper.rn/blob/8f61e46/src/index.ts#L302)
+[index.ts:311](https://github.com/mybigday/whisper.rn/blob/b8babc8/src/index.ts#L311)
