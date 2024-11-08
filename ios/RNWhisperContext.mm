@@ -232,10 +232,9 @@ void AudioInputCallback(void * inUserData,
 - (void)finishRealtimeTranscribe:(RNWhisperContextRecordState*) state result:(NSDictionary*)result {
     // Save wav if needed
     if (state->job->audio_output_path != nullptr) {
-        // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-        rnaudioutils::save_wav_file(
-            rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
-            state->job->audio_output_path
+        rnaudioutils::add_wav_header_to_file(
+            state->job->audio_output_path,
+            state->job->pcm_data_size
         );
     }
     state->transcribeHandler(state->job->job_id, @"end", result);
@@ -284,6 +283,14 @@ void AudioInputCallback(void * inUserData,
       state->nSamplesTranscribing == nSamplesOfIndex &&
       state->transcribeSliceIndex != state->sliceIndex
     ) {
+        if (state->job->audio_output_path != nullptr) {
+            rnaudioutils::append_wav_data(
+                state->job->pcm_slices[state->transcribeSliceIndex],
+                state->sliceNSamples[state->transcribeSliceIndex],
+                state->job->audio_output_path
+            );
+        }
+        // TODO: Clean up the previous slice
         state->transcribeSliceIndex++;
         state->nSamplesTranscribing = 0;
     }
