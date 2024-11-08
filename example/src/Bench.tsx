@@ -5,6 +5,7 @@ import RNFS from 'react-native-fs'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { initWhisper } from '../../src' // whisper.rn
 import { createDir, fileDir, modelHost } from './util'
+import { Button } from './Button'
 
 const modelList = [
   // TODO: Add coreml model download
@@ -74,18 +75,6 @@ const styles = StyleSheet.create({
   },
   modelItemTextUnselected: {
     color: '#666',
-  },
-  button: {
-    backgroundColor: '#333',
-    borderRadius: 5,
-    padding: 8,
-    margin: 4,
-    width: 'auto',
-  },
-  buttonText: {
-    color: '#ccc',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   progressBar: {
     backgroundColor: '#3388ff',
@@ -271,8 +260,12 @@ export default function Bench() {
           />
         ))}
       </View>
-      <TouchableOpacity
-        style={styles.button}
+      <Button
+        title={
+          modelState === 'select'
+            ? `Download ${downloadCount} Models`
+            : 'Cancel Download'
+        }
         onPress={() => {
           if (modelState === 'select') {
             downloadedModelsRef.current = []
@@ -281,15 +274,9 @@ export default function Bench() {
             setModelState('select')
           }
         }}
-      >
-        <Text style={styles.buttonText}>
-          {modelState === 'select'
-            ? `Download ${downloadCount} Models`
-            : 'Cancel Download'}
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.button}
+      />
+      <Button
+        title="Start benchmark"
         onPress={async () => {
           log('Start benchmark')
           log(
@@ -338,9 +325,7 @@ export default function Bench() {
             Promise.resolve(),
           )
         }}
-      >
-        <Text style={styles.buttonText}>Run benchmark</Text>
-      </TouchableOpacity>
+      />
       <View style={styles.logContainer}>
         {logs.map((msg, index) => (
           <Text key={index} style={styles.logText}>
@@ -349,17 +334,13 @@ export default function Bench() {
         ))}
       </View>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.button}
+        <Button
+          title="Copy Logs"
           onPress={() => Clipboard.setString(logs.join('\n'))}
-        >
-          <Text style={styles.buttonText}>Copy Logs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => setLogs([])}>
-          <Text style={styles.buttonText}>Clear Logs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
+        />
+        <Button title="Clear Logs" onPress={() => setLogs([])} />
+        <Button
+          title="Delete Models"
           onPress={() => {
             setModelState('select')
             RNFS.readDir(fileDir).then((files) => {
@@ -368,9 +349,7 @@ export default function Bench() {
               })
             })
           }}
-        >
-          <Text style={styles.buttonText}>Delete Models</Text>
-        </TouchableOpacity>
+        />
       </View>
     </ScrollView>
   )

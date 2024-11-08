@@ -7,12 +7,12 @@ import {
   Platform,
   PermissionsAndroid,
 } from 'react-native'
-import { TouchableOpacity } from 'react-native-gesture-handler'
 import RNFS from 'react-native-fs'
 import { unzip } from 'react-native-zip-archive'
 import Sound from 'react-native-sound'
 import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
+import { Button } from './Button'
 import contextOpts from './context-opts'
 import { createDir, fileDir, modelHost } from './util'
 
@@ -120,8 +120,8 @@ export default function App() {
     >
       <View style={styles.container}>
         <View style={styles.buttons}>
-          <TouchableOpacity
-            style={styles.button}
+          <Button
+            title="Initialize (Use Asset)"
             onPress={async () => {
               if (whisperContext) {
                 log('Found previous context')
@@ -140,11 +140,9 @@ export default function App() {
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
               whisperContextRef.current = ctx
             }}
-          >
-            <Text style={styles.buttonText}>Initialize (Use Asset)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
+          />
+          <Button
+            title="Initialize (Download)"
             onPress={async () => {
               if (whisperContext) {
                 log('Found previous context')
@@ -203,13 +201,11 @@ export default function App() {
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
               whisperContextRef.current = ctx
             }}
-          >
-            <Text style={styles.buttonText}>Initialize (Download)</Text>
-          </TouchableOpacity>
+          />
         </View>
         <View style={styles.buttons}>
-          <TouchableOpacity
-            style={styles.button}
+          <Button
+            title="Transcribe File"
             disabled={!!stopTranscribe?.stop}
             onPress={async () => {
               if (!whisperContext) return log('No context')
@@ -248,12 +244,10 @@ export default function App() {
               )
               log('Finished transcribing')
             }}
-          >
-            <Text style={styles.buttonText}>Transcribe File</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          />
+          <Button
+            title={stopTranscribe?.stop ? 'Stop' : 'Transcribe File'}
             style={[
-              styles.button,
               stopTranscribe?.stop ? styles.buttonClear : null,
             ]}
             onPress={async () => {
@@ -322,11 +316,7 @@ export default function App() {
                 log('Error:', e)
               }
             }}
-          >
-            <Text style={styles.buttonText}>
-              {stopTranscribe?.stop ? 'Stop' : 'Realtime'}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
         <View style={styles.logContainer}>
           {logs.map((msg, index) => (
@@ -340,38 +330,35 @@ export default function App() {
             <Text style={styles.logText}>{transcibeResult}</Text>
           </View>
         )}
-
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
+        <Button
+          title="Release Context"
+          style={styles.buttonClear}
           onPress={async () => {
             if (!whisperContext) return
             await whisperContext.release()
             whisperContextRef.current = null
             log('Released context')
           }}
-        >
-          <Text style={styles.buttonText}>Release Context</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
+        />
+        <Button
+          title="Clear Logs"
+          style={styles.buttonClear}
           onPress={() => {
             setLogs([])
             setTranscibeResult('')
           }}
-        >
-          <Text style={styles.buttonText}>Clear Logs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
+        />
+        <Button
+          title="Clear Download files"
+          style={styles.buttonClear}
           onPress={async () => {
             await RNFS.unlink(fileDir).catch(() => {})
             log('Deleted files')
           }}
-        >
-          <Text style={styles.buttonText}>Clear Download files</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
+        />
+        <Button
+          title="Play Recorded file"
+          style={styles.buttonClear}
           onPress={async () => {
             if (!(await RNFS.exists(recordFile))) {
               log('Recorded file does not exist')
@@ -392,9 +379,7 @@ export default function App() {
               })
             })
           }}
-        >
-          <Text style={styles.buttonText}>Play Recorded file</Text>
-        </TouchableOpacity>
+        />
       </View>
     </ScrollView>
   )
