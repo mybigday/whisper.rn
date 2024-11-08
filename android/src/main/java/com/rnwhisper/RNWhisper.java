@@ -235,6 +235,15 @@ public class RNWhisper implements LifecycleEventListener {
     tasks.put(task, "abortTranscribe-" + id);
   }
 
+  public void bench(double id, double nThreads, Promise promise) {
+    final WhisperContext context = contexts.get((int) id);
+    if (context == null) {
+      promise.reject("Context not found");
+      return;
+    }
+    promise.resolve(context.bench((int) nThreads));
+  }
+
   public void releaseContext(double id, Promise promise) {
     final int contextId = (int) id;
     AsyncTask task = new AsyncTask<Void, Void, Void>() {

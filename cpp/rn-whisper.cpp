@@ -8,6 +8,97 @@
 
 namespace rnwhisper {
 
+const char * system_info(void) {
+  static std::string s;
+  s = "";
+  if (wsp_ggml_cpu_has_avx() == 1) s += "AVX ";
+  if (wsp_ggml_cpu_has_avx2() == 1) s += "AVX2 ";
+  if (wsp_ggml_cpu_has_avx512() == 1) s += "AVX512 ";
+  if (wsp_ggml_cpu_has_fma() == 1) s += "FMA ";
+  if (wsp_ggml_cpu_has_neon() == 1) s += "NEON ";
+  if (wsp_ggml_cpu_has_arm_fma() == 1) s += "ARM_FMA ";
+  if (wsp_ggml_cpu_has_metal() == 1) s += "METAL ";
+  if (wsp_ggml_cpu_has_f16c() == 1) s += "F16C ";
+  if (wsp_ggml_cpu_has_fp16_va() == 1) s += "FP16_VA ";
+  if (wsp_ggml_cpu_has_blas() == 1) s += "BLAS ";
+  if (wsp_ggml_cpu_has_sse3() == 1) s += "SSE3 ";
+  if (wsp_ggml_cpu_has_ssse3() == 1) s += "SSSE3 ";
+  if (wsp_ggml_cpu_has_vsx() == 1) s += "VSX ";
+#ifdef WHISPER_USE_COREML
+  s += "COREML ";
+#endif
+  s.erase(s.find_last_not_of(" ") + 1);
+  return s.c_str();
+}
+
+std::string bench(struct whisper_context * ctx, int n_threads) {
+    const int n_mels = whisper_model_n_mels(ctx);
+
+    if (int ret = whisper_set_mel(ctx, nullptr, 0, n_mels)) {
+        return "error: failed to set mel: " + std::to_string(ret);
+    }
+    // heat encoder
+    if (int ret = whisper_encode(ctx, 0, n_threads) != 0) {
+        return "error: failed to encode: " + std::to_string(ret);
+    }
+
+    whisper_token tokens[512];
+    memset(tokens, 0, sizeof(tokens));
+
+    // prompt heat
+    if (int ret = whisper_decode(ctx, tokens, 256, 0, n_threads) != 0) {
+        return "error: failed to decode: " + std::to_string(ret);
+    }
+
+    // text-generation heat
+    if (int ret = whisper_decode(ctx, tokens, 1, 256, n_threads) != 0) {
+        return "error: failed to decode: " + std::to_string(ret);
+    }
+
+    whisper_reset_timings(ctx);
+
+    // actual run
+    if (int ret = whisper_encode(ctx, 0, n_threads) != 0) {
+        return "error: failed to encode: " + std::to_string(ret);
+    }
+
+    // text-generation
+    for (int i = 0; i < 256; i++) {
+        if (int ret = whisper_decode(ctx, tokens, 1, i, n_threads) != 0) {
+            return "error: failed to decode: " + std::to_string(ret);
+        }
+    }
+
+    // batched decoding
+    for (int i = 0; i < 64; i++) {
+        if (int ret = whisper_decode(ctx, tokens, 5, 0, n_threads) != 0) {
+            return "error: failed to decode: " + std::to_string(ret);
+        }
+    }
+
+    // prompt processing
+    for (int i = 0; i < 16; i++) {
+        if (int ret = whisper_decode(ctx, tokens, 256, 0, n_threads) != 0) {
+            return "error: failed to decode: " + std::to_string(ret);
+        }
+    }
+
+    const struct whisper_timings * timings = whisper_get_timings(ctx);
+
+    const int32_t n_encode = std::max(1, timings->n_encode);
+    const int32_t n_decode = std::max(1, timings->n_decode);
+    const int32_t n_batchd = std::max(1, timings->n_batchd);
+    const int32_t n_prompt = std::max(1, timings->n_prompt);
+
+    return std::string("[") +
+        "\"" + system_info() + "\"," +
+        std::to_string(n_threads) + "," +
+        std::to_string(1e-3f * timings->t_encode_us / n_encode) + "," +
+        std::to_string(1e-3f * timings->t_decode_us / n_decode) + "," +
+        std::to_string(1e-3f * timings->t_batchd_us / n_batchd) + "," +
+        std::to_string(1e-3f * timings->t_prompt_us / n_prompt) + "]";
+}
+
 void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate) {
     const float rc = 1.0f / (2.0f * M_PI * cutoff);
     const float dt = 1.0f / sample_rate;

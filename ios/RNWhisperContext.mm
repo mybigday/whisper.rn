@@ -569,6 +569,16 @@ struct rnwhisper_segments_callback_data {
     return result;
 }
 
+- (NSString *)bench:(int)maxThreads {
+    const int n_threads = maxThreads > 0 ? maxThreads : 0;
+
+    const int max_threads = (int) [[NSProcessInfo processInfo] processorCount];
+    // Use 2 threads by default on 4-core devices, 4 threads on more cores
+    const int default_n_threads = max_threads == 4 ? 2 : MIN(4, max_threads);
+    NSString *result = [NSString stringWithUTF8String:rnwhisper::bench(self->ctx, n_threads).c_str()];
+    return result;
+}
+
 - (void)invalidate {
     [self stopCurrentTranscribe];
     whisper_free(self->ctx);

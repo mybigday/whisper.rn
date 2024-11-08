@@ -174,6 +174,15 @@ export type TranscribeRealtimeNativeEvent = {
   payload: TranscribeRealtimeNativePayload
 }
 
+export type BenchResult = {
+  config: string
+  nThreads: number
+  encodeMs: number
+  decodeMs: number
+  batchMs: number
+  promptMs: number
+}
+
 const updateAudioSession = async (setting: AudioSessionSettingIos) => {
   await AudioSessionIos.setCategory(
     setting.category,
@@ -431,6 +440,12 @@ export class WhisperContext {
         )
       },
     }
+  }
+
+  async bench(maxThreads: number): Promise<BenchResult> {
+    const result = await RNWhisper.bench(this.id, maxThreads)
+    const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] = JSON.parse(result)
+    return { config, nThreads, encodeMs, decodeMs, batchMs, promptMs } as BenchResult
   }
 
   async release(): Promise<void> {

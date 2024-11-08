@@ -246,6 +246,25 @@ RCT_REMAP_METHOD(abortTranscribe,
     resolve(nil);
 }
 
+RCT_REMAP_METHOD(bench,
+                 withContextId:(int)contextId
+                 withMaxThreads:(int)maxThreads
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
+    if (context == nil) {
+        reject(@"whisper_error", @"Context not found", nil);
+        return;
+    }
+    if ([context isTranscribing]) {
+        reject(@"whisper_error", @"The context is transcribing", nil);
+        return;
+    }
+    NSString *result = [context bench:maxThreads];
+    resolve(result);
+}
+
 RCT_REMAP_METHOD(releaseContext,
                  withContextId:(int)contextId
                  withResolver:(RCTPromiseResolveBlock)resolve

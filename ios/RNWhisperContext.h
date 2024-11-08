@@ -63,6 +63,7 @@ typedef struct {
 - (bool)isTranscribing;
 - (bool)isStoppedByAction;
 - (NSMutableDictionary *)getTextSegments;
+- (NSString *)bench:(int)maxThreads;
 - (void)invalidate;
 
 @end
