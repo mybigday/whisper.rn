@@ -1,0 +1,10 @@
+diff --git a/node_modules/@fugood/react-native-audio-pcm-stream/index.d.ts b/node_modules/@fugood/react-native-audio-pcm-stream/index.d.ts
+index b846438..9e180cd 100644
+--- a/node_modules/@fugood/react-native-audio-pcm-stream/index.d.ts
++++ b/node_modules/@fugood/react-native-audio-pcm-stream/index.d.ts
+@@ -1,4 +1,4 @@
+-declare module "react-native-live-audio-stream" {
++declare module "@fugood/react-native-audio-pcm-stream" {
+   export interface IAudioRecord {
+     init: (options: Options) => void
+     start: () => void

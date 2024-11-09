@@ -14,7 +14,7 @@ import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.
 import type { WhisperContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, modelHost } from './util'
+import { createDir, fileDir, modelHost, toTimestamp } from './util'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -52,31 +52,9 @@ const styles = StyleSheet.create({
   logText: { fontSize: 12, color: '#333' },
 })
 
-function toTimestamp(t: number, comma = false) {
-  let msec = t * 10
-  const hr = Math.floor(msec / (1000 * 60 * 60))
-  msec -= hr * (1000 * 60 * 60)
-  const min = Math.floor(msec / (1000 * 60))
-  msec -= min * (1000 * 60)
-  const sec = Math.floor(msec / 1000)
-  msec -= sec * 1000
-
-  const separator = comma ? ',' : '.'
-  const timestamp = `${String(hr).padStart(2, '0')}:${String(min).padStart(
-    2,
-    '0',
-  )}:${String(sec).padStart(2, '0')}${separator}${String(msec).padStart(
-    3,
-    '0',
-  )}`
-
-  return timestamp
-}
-
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
 const recordFile = `${fileDir}/realtime.wav`
-
 
 const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')

@@ -76,7 +76,13 @@ export interface Spec extends TurboModule {
   transcribeFile(
     contextId: number,
     jobId: number,
-    path: string,
+    pathOrBase64: string,
+    options: {}, // TranscribeOptions & { onProgress?: boolean, onNewSegments?: boolean }
+  ): Promise<TranscribeResult>;
+  transcribeData(
+    contextId: number,
+    jobId: number,
+    dataBase64: string,
     options: {}, // TranscribeOptions & { onProgress?: boolean, onNewSegments?: boolean }
   ): Promise<TranscribeResult>;
   startRealtimeTranscribe(

@@ -48,6 +48,11 @@ public class RNWhisperModule extends NativeRNWhisperSpec {
   }
 
   @ReactMethod
+  public void transcribeData(double id, double jobId, String dataBase64, ReadableMap options, Promise promise) {
+    rnwhisper.transcribeData(id, jobId, dataBase64, options, promise);
+  }
+
+  @ReactMethod
   public void startRealtimeTranscribe(double id, double jobId, ReadableMap options, Promise promise) {
     rnwhisper.startRealtimeTranscribe(id, jobId, options, promise);
   }
