@@ -38,13 +38,13 @@ function HomeScreen({ navigation }: { navigation: any }) {
         style={styles.button}
         onPress={() => navigation.navigate('Transcribe')}
       >
-        <Text style={styles.buttonText}>Transcribe Examples</Text>
+        <Text style={styles.buttonText}>Example: Transcribe File / Realtime</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
         onPress={() => navigation.navigate('TranscribeData')}
       >
-        <Text style={styles.buttonText}>Transcribe Data Example</Text>
+        <Text style={styles.buttonText}>Example: Transcribe Data</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
