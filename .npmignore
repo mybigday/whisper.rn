@@ -1,0 +1,14 @@
+# Exclude everything
+*
+
+# But include the following:
+!android/
+!cpp/
+!ios/
+!jest/
+!lib/
+!src/
+!package.json
+!README.md
+!LICENSE
+!whisper-rn.podspec
