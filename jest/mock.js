@@ -8,6 +8,11 @@ if (!NativeModules.RNWhisper) {
       segments: [{ text: ' Test', t0: 0, t1: 33 }],
       isAborted: false,
     })),
+    transcribeData: jest.fn(() => Promise.resolve({
+      result: ' Test',
+      segments: [{ text: ' Test', t0: 0, t1: 33 }],
+      isAborted: false,
+    })),
     startRealtimeTranscribe: jest.fn((contextId, jobId) => {
       setTimeout(() => {
         // Start
