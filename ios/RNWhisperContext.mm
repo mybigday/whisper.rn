@@ -19,8 +19,9 @@
     cparams.use_gpu = !noMetal;
     cparams.flash_attn = useFlashAttn;
 
-    // TODO: Figure out why it leads to re-init crash
+    // TODO: Expose dtw_token_timestamps and dtw_aheads_preset
     cparams.dtw_token_timestamps = false;
+    // cparams.dtw_aheads_preset = WHISPER_AHEADS_BASE;
 
     cparams.use_coreml = !noCoreML;
 #ifndef WHISPER_USE_COREML

@@ -155,7 +155,10 @@ Java_com_rnwhisper_WhisperContext_initContext(
         JNIEnv *env, jobject thiz, jstring model_path_str) {
     UNUSED(thiz);
     struct whisper_context_params cparams;
+
+    // TODO: Expose dtw_token_timestamps and dtw_aheads_preset
     cparams.dtw_token_timestamps = false;
+    // cparams.dtw_aheads_preset = WHISPER_AHEADS_BASE;
 
     struct whisper_context *context = nullptr;
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
@@ -173,7 +176,10 @@ Java_com_rnwhisper_WhisperContext_initContextWithAsset(
 ) {
     UNUSED(thiz);
     struct whisper_context_params cparams;
+
+    // TODO: Expose dtw_token_timestamps and dtw_aheads_preset
     cparams.dtw_token_timestamps = false;
+    // cparams.dtw_aheads_preset = WHISPER_AHEADS_BASE;
 
     struct whisper_context *context = nullptr;
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
@@ -190,7 +196,10 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
 ) {
     UNUSED(thiz);
     struct whisper_context_params cparams;
+
+    // TODO: Expose dtw_token_timestamps and dtw_aheads_preset
     cparams.dtw_token_timestamps = false;
+    // cparams.dtw_aheads_preset = WHISPER_AHEADS_BASE;
 
     struct whisper_context *context = nullptr;
     context = whisper_init_from_input_stream(env, input_stream, cparams);
