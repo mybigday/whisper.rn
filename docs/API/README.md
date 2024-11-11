@@ -59,7 +59,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:76](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L76)
+[index.ts:76](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L76)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[index.ts:177](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L177)
+[index.ts:177](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L177)
 
 ___
 
@@ -92,7 +92,7 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `coreMLModelAsset?` | { `assets`: `string`[] \| `number`[] ; `filename`: `string`  } | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
+| `coreMLModelAsset?` | \{ `assets`: `string`[] \| `number`[] ; `filename`: `string`  } | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
 | `coreMLModelAsset.assets` | `string`[] \| `number`[] | - |
 | `coreMLModelAsset.filename` | `string` | - |
 | `filePath` | `string` \| `number` | - |
@@ -103,17 +103,17 @@ ___
 
 #### Defined in
 
-[index.ts:456](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L456)
+[index.ts:456](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L456)
 
 ___
 
 ### TranscribeFileOptions
 
-Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `onNewSegments?`: (`result`: [`TranscribeNewSegmentsResult`](README.md#transcribenewsegmentsresult)) => `void` ; `onProgress?`: (`progress`: `number`) => `void`  }
+Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & \{ `onNewSegments?`: (`result`: [`TranscribeNewSegmentsResult`](README.md#transcribenewsegmentsresult)) => `void` ; `onProgress?`: (`progress`: `number`) => `void`  }
 
 #### Defined in
 
-[index.ts:59](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L59)
+[index.ts:59](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L59)
 
 ___
 
@@ -131,7 +131,7 @@ ___
 
 #### Defined in
 
-[index.ts:52](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L52)
+[index.ts:52](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L52)
 
 ___
 
@@ -150,7 +150,7 @@ ___
 
 #### Defined in
 
-[index.ts:45](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L45)
+[index.ts:45](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L45)
 
 ___
 
@@ -180,7 +180,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -198,7 +198,7 @@ ___
 
 #### Defined in
 
-[index.ts:70](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L70)
+[index.ts:70](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L70)
 
 ___
 
@@ -219,11 +219,11 @@ ___
 | `jobId` | `number` | - |
 | `processTime` | `number` | - |
 | `recordingTime` | `number` | - |
-| `slices?` | { `code`: `number` ; `data?`: [`TranscribeResult`](README.md#transcriberesult) ; `error?`: `string` ; `processTime`: `number` ; `recordingTime`: `number`  }[] | - |
+| `slices?` | \{ `code`: `number` ; `data?`: [`TranscribeResult`](README.md#transcriberesult) ; `error?`: `string` ; `processTime`: `number` ; `recordingTime`: `number`  }[] | - |
 
 #### Defined in
 
-[index.ts:138](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L138)
+[index.ts:138](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L138)
 
 ___
 
@@ -241,7 +241,7 @@ ___
 
 #### Defined in
 
-[index.ts:171](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L171)
+[index.ts:171](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L171)
 
 ___
 
@@ -265,17 +265,17 @@ ___
 
 #### Defined in
 
-[index.ts:158](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L158)
+[index.ts:158](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L158)
 
 ___
 
 ### TranscribeRealtimeOptions
 
-Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & { `audioOutputPath?`: `string` ; `audioSessionOnStartIos?`: [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `audioSessionOnStopIos?`: `string` \| [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `realtimeAudioMinSec?`: `number` ; `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number` ; `useVad?`: `boolean` ; `vadFreqThold?`: `number` ; `vadMs?`: `number` ; `vadThold?`: `number`  }
+Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](README.md#transcribeoptions) & \{ `audioOutputPath?`: `string` ; `audioSessionOnStartIos?`: [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `audioSessionOnStopIos?`: `string` \| [`AudioSessionSettingIos`](README.md#audiosessionsettingios) ; `realtimeAudioMinSec?`: `number` ; `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number` ; `useVad?`: `boolean` ; `vadFreqThold?`: `number` ; `vadMs?`: `number` ; `vadThold?`: `number`  }
 
 #### Defined in
 
-[index.ts:84](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L84)
+[index.ts:84](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L84)
 
 ___
 
@@ -289,11 +289,11 @@ ___
 | :------ | :------ |
 | `isAborted` | `boolean` |
 | `result` | `string` |
-| `segments` | { `t0`: `number` ; `t1`: `number` ; `text`: `string`  }[] |
+| `segments` | \{ `t0`: `number` ; `t1`: `number` ; `text`: `string`  }[] |
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/NativeRNWhisper.ts#L37)
 
 ## Variables
 
@@ -310,15 +310,15 @@ AudioSession Utility, iOS only.
 | `Category` | typeof [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) |
 | `CategoryOption` | typeof [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md) |
 | `Mode` | typeof [`AudioSessionModeIos`](enums/AudioSessionModeIos.md) |
-| `getCurrentCategory` | () => `Promise`<{ `category`: [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) ; `options`: [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[]  }\> |
-| `getCurrentMode` | () => `Promise`<[`AudioSessionModeIos`](enums/AudioSessionModeIos.md)\> |
-| `setActive` | (`active`: `boolean`) => `Promise`<`void`\> |
-| `setCategory` | (`category`: [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md), `options`: [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[]) => `Promise`<`void`\> |
-| `setMode` | (`mode`: [`AudioSessionModeIos`](enums/AudioSessionModeIos.md)) => `Promise`<`void`\> |
+| `getCurrentCategory` | () => `Promise`\<\{ `category`: [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md) ; `options`: [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[]  }\> |
+| `getCurrentMode` | () => `Promise`\<[`AudioSessionModeIos`](enums/AudioSessionModeIos.md)\> |
+| `setActive` | (`active`: `boolean`) => `Promise`\<`void`\> |
+| `setCategory` | (`category`: [`AudioSessionCategoryIos`](enums/AudioSessionCategoryIos.md), `options`: [`AudioSessionCategoryOptionIos`](enums/AudioSessionCategoryOptionIos.md)[]) => `Promise`\<`void`\> |
+| `setMode` | (`mode`: [`AudioSessionModeIos`](enums/AudioSessionModeIos.md)) => `Promise`\<`void`\> |
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -330,7 +330,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:562](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L562)
+[index.ts:562](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L562)
 
 ___
 
@@ -342,7 +342,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:559](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L559)
+[index.ts:559](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L559)
 
 ___
 
@@ -354,13 +354,13 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:554](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L554)
+[index.ts:554](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L554)
 
 ## Functions
 
 ### initWhisper
 
-▸ **initWhisper**(`«destructured»`): `Promise`<[`WhisperContext`](classes/WhisperContext.md)\>
+▸ **initWhisper**(`«destructured»`): `Promise`\<[`WhisperContext`](classes/WhisperContext.md)\>
 
 #### Parameters
 
@@ -370,22 +370,22 @@ Current version of whisper.cpp
 
 #### Returns
 
-`Promise`<[`WhisperContext`](classes/WhisperContext.md)\>
+`Promise`\<[`WhisperContext`](classes/WhisperContext.md)\>
 
 #### Defined in
 
-[index.ts:484](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L484)
+[index.ts:484](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L484)
 
 ___
 
 ### releaseAllWhisper
 
-▸ **releaseAllWhisper**(): `Promise`<`void`\>
+▸ **releaseAllWhisper**(): `Promise`\<`void`\>
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`void`\>
 
 #### Defined in
 
-[index.ts:549](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L549)
+[index.ts:549](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L549)

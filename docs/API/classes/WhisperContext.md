@@ -35,7 +35,7 @@
 
 #### Defined in
 
-[index.ts:204](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L204)
+[index.ts:204](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L204)
 
 ## Properties
 
@@ -45,7 +45,7 @@
 
 #### Defined in
 
-[index.ts:200](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L200)
+[index.ts:200](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L200)
 
 ___
 
@@ -55,7 +55,7 @@ ___
 
 #### Defined in
 
-[index.ts:198](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L198)
+[index.ts:198](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L198)
 
 ___
 
@@ -65,13 +65,13 @@ ___
 
 #### Defined in
 
-[index.ts:202](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L202)
+[index.ts:202](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L202)
 
 ## Methods
 
 ### bench
 
-▸ **bench**(`maxThreads`): `Promise`<[`BenchResult`](../README.md#benchresult)\>
+▸ **bench**(`maxThreads`): `Promise`\<[`BenchResult`](../README.md#benchresult)\>
 
 #### Parameters
 
@@ -81,25 +81,25 @@ ___
 
 #### Returns
 
-`Promise`<[`BenchResult`](../README.md#benchresult)\>
+`Promise`\<[`BenchResult`](../README.md#benchresult)\>
 
 #### Defined in
 
-[index.ts:445](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L445)
+[index.ts:445](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L445)
 
 ___
 
 ### release
 
-▸ **release**(): `Promise`<`void`\>
+▸ **release**(): `Promise`\<`void`\>
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`void`\>
 
 #### Defined in
 
-[index.ts:451](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L451)
+[index.ts:451](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L451)
 
 ___
 
@@ -122,18 +122,18 @@ Transcribe audio file
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `promise` | `Promise`<[`TranscribeResult`](../README.md#transcriberesult)\> | Transcribe result promise |
-| `stop` | () => `Promise`<`void`\> | Stop the transcribe |
+| `promise` | `Promise`\<[`TranscribeResult`](../README.md#transcriberesult)\> | Transcribe result promise |
+| `stop` | () => `Promise`\<`void`\> | Stop the transcribe |
 
 #### Defined in
 
-[index.ts:215](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L215)
+[index.ts:215](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L215)
 
 ___
 
 ### transcribeRealtime
 
-▸ **transcribeRealtime**(`options?`): `Promise`<{ `stop`: () => `Promise`<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+▸ **transcribeRealtime**(`options?`): `Promise`\<\{ `stop`: () => `Promise`\<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 Transcribe the microphone audio stream, the microphone user permission is required
 
@@ -145,8 +145,8 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Returns
 
-`Promise`<{ `stop`: () => `Promise`<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+`Promise`\<\{ `stop`: () => `Promise`\<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 #### Defined in
 
-[index.ts:311](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L311)
+[index.ts:311](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L311)
