@@ -3,12 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "postinstall": "patch-package",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "start": "react-native start",
     "pods": "pod-install --quiet"
   },
   "dependencies": {
+    "@fugood/react-native-audio-pcm-stream": "^1.1.4",
     "@react-native-clipboard/clipboard": "^1.14.3",
     "@react-native/babel-preset": "0.74.88",
     "@react-native/metro-config": "^0.74.79",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@babel/core": "^7.23.9",
     "@babel/preset-env": "^7.24.4",
-    "@babel/runtime": "^7.23.9"
+    "@babel/runtime": "^7.23.9",
+    "patch-package": "^8.0.0"
   }
 }

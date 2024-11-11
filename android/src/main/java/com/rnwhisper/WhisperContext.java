@@ -332,7 +332,7 @@ public class WhisperContext {
     }
   }
 
-  public WritableMap transcribeInputStream(int jobId, InputStream inputStream, ReadableMap options) throws IOException, Exception {
+  public WritableMap transcribe(int jobId, float[] audioData, ReadableMap options) throws IOException, Exception {
     if (isCapturing || isTranscribing) {
       throw new Exception("Context is already in capturing or transcribing");
     }
@@ -341,7 +341,6 @@ public class WhisperContext {
     this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
     isTranscribing = true;
-    float[] audioData = AudioUtils.decodeWaveFile(inputStream);
 
     boolean hasProgressCallback = options.hasKey("onProgress") && options.getBoolean("onProgress");
     boolean hasNewSegmentsCallback = options.hasKey("onNewSegments") && options.getBoolean("onNewSegments");

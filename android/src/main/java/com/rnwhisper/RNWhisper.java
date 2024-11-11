@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Random;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.PushbackInputStream;
 
 public class RNWhisper implements LifecycleEventListener {
@@ -119,44 +120,16 @@ public class RNWhisper implements LifecycleEventListener {
     tasks.put(task, "initContext");
   }
 
-  public void transcribeFile(double id, double jobId, String filePath, ReadableMap options, Promise promise) {
-    final WhisperContext context = contexts.get((int) id);
-    if (context == null) {
-      promise.reject("Context not found");
-      return;
-    }
-    if (context.isCapturing()) {
-      promise.reject("The context is in realtime transcribe mode");
-      return;
-    }
-    if (context.isTranscribing()) {
-      promise.reject("Context is already transcribing");
-      return;
-    }
+  private AsyncTask transcribe(WhisperContext context, double jobId, final float[] audioData, final ReadableMap options, Promise promise) {
     AsyncTask task = new AsyncTask<Void, Void, WritableMap>() {
       private Exception exception;
 
       @Override
       protected WritableMap doInBackground(Void... voids) {
         try {
-          String waveFilePath = filePath;
-
-          if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-            waveFilePath = downloader.downloadFile(filePath);
-          }
-
-          int resId = getResourceIdentifier(waveFilePath);
-          if (resId > 0) {
-            return context.transcribeInputStream(
-              (int) jobId,
-              reactContext.getResources().openRawResource(resId),
-              options
-            );
-          }
-
-          return context.transcribeInputStream(
+          return context.transcribe(
             (int) jobId,
-            new FileInputStream(new File(waveFilePath)),
+            audioData,
             options
           );
         } catch (Exception e) {
@@ -175,7 +148,66 @@ public class RNWhisper implements LifecycleEventListener {
         tasks.remove(this);
       }
     }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-    tasks.put(task, "transcribeFile-" + id);
+    return task;
+  }
+
+  public void transcribeFile(double id, double jobId, String filePathOrBase64, ReadableMap options, Promise promise) {
+    final WhisperContext context = contexts.get((int) id);
+    if (context == null) {
+      promise.reject("Context not found");
+      return;
+    }
+    if (context.isCapturing()) {
+      promise.reject("The context is in realtime transcribe mode");
+      return;
+    }
+    if (context.isTranscribing()) {
+      promise.reject("Context is already transcribing");
+      return;
+    }
+
+    String waveFilePath = filePathOrBase64;
+    try {
+      if (filePathOrBase64.startsWith("http://") || filePathOrBase64.startsWith("https://")) {
+        waveFilePath = downloader.downloadFile(filePathOrBase64);
+      }
+
+      float[] audioData;
+      int resId = getResourceIdentifier(waveFilePath);
+      if (resId > 0) {
+        audioData = AudioUtils.decodeWaveFile(reactContext.getResources().openRawResource(resId));
+      } else if (filePathOrBase64.startsWith("data:audio/wav;base64,")) {
+        audioData = AudioUtils.decodeWaveData(filePathOrBase64);
+      } else {
+        audioData = AudioUtils.decodeWaveFile(new FileInputStream(new File(waveFilePath)));
+      }
+
+      AsyncTask task = transcribe(context, jobId, audioData, options, promise);
+      tasks.put(task, "transcribeFile-" + id);
+    } catch (Exception e) {
+      promise.reject(e);
+    }
+  }
+
+  public void transcribeData(double id, double jobId, String dataBase64, ReadableMap options, Promise promise) {
+    final WhisperContext context = contexts.get((int) id);
+    if (context == null) {
+      promise.reject("Context not found");
+      return;
+    }
+    if (context.isCapturing()) {
+      promise.reject("The context is in realtime transcribe mode");
+      return;
+    }
+    if (context.isTranscribing()) {
+      promise.reject("Context is already transcribing");
+      return;
+    }
+
+    float[] audioData = AudioUtils.decodePcmData(dataBase64);
+    AsyncTask task = transcribe(context, jobId, audioData, options, promise);
+
+    tasks.put(task, "transcribeData-" + id);
   }
 
   public void startRealtimeTranscribe(double id, double jobId, ReadableMap options, Promise promise) {
@@ -211,7 +243,7 @@ public class RNWhisper implements LifecycleEventListener {
           context.stopTranscribe((int) jobId);
           AsyncTask completionTask = null;
           for (AsyncTask task : tasks.keySet()) {
-            if (tasks.get(task).equals("transcribeFile-" + id)) {
+            if (tasks.get(task).equals("transcribeFile-" + id) || tasks.get(task).equals("transcribeData-" + id)) {
               task.get();
               break;
             }
@@ -259,7 +291,7 @@ public class RNWhisper implements LifecycleEventListener {
           context.stopCurrentTranscribe();
           AsyncTask completionTask = null;
           for (AsyncTask task : tasks.keySet()) {
-            if (tasks.get(task).equals("transcribeFile-" + contextId)) {
+            if (tasks.get(task).equals("transcribeFile-" + contextId) || tasks.get(task).equals("transcribeData-" + contextId)) {
               task.get();
               break;
             }

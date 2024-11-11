@@ -361,7 +361,7 @@ struct rnwhisper_segments_callback_data {
     bool tdrzEnable;
 };
 
-- (void)transcribeFile:(int)jobId
+- (void)transcribeData:(int)jobId
     audioData:(float *)audioData
     audioDataCount:(int)audioDataCount
     options:(NSDictionary *)options
