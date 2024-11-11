@@ -19,6 +19,7 @@
 - [bench](WhisperContext.md#bench)
 - [release](WhisperContext.md#release)
 - [transcribe](WhisperContext.md#transcribe)
+- [transcribeData](WhisperContext.md#transcribedata)
 - [transcribeRealtime](WhisperContext.md#transcriberealtime)
 
 ## Constructors
@@ -35,7 +36,7 @@
 
 #### Defined in
 
-[index.ts:204](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L204)
+[index.ts:204](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L204)
 
 ## Properties
 
@@ -45,7 +46,7 @@
 
 #### Defined in
 
-[index.ts:200](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L200)
+[index.ts:200](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L200)
 
 ___
 
@@ -55,7 +56,7 @@ ___
 
 #### Defined in
 
-[index.ts:198](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L198)
+[index.ts:198](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L198)
 
 ___
 
@@ -65,7 +66,7 @@ ___
 
 #### Defined in
 
-[index.ts:202](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L202)
+[index.ts:202](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L202)
 
 ## Methods
 
@@ -85,7 +86,7 @@ ___
 
 #### Defined in
 
-[index.ts:445](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L445)
+[index.ts:465](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L465)
 
 ___
 
@@ -99,21 +100,22 @@ ___
 
 #### Defined in
 
-[index.ts:451](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L451)
+[index.ts:471](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L471)
 
 ___
 
 ### transcribe
 
-▸ **transcribe**(`filePath`, `options?`): `Object`
+▸ **transcribe**(`filePathOrBase64`, `options?`): `Object`
 
-Transcribe audio file
+Transcribe audio file (path or base64 encoded wav file)
+base64: need add `data:audio/wav;base64,` prefix
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `filePath` | `string` \| `number` |
+| `filePathOrBase64` | `string` \| `number` |
 | `options` | [`TranscribeFileOptions`](../README.md#transcribefileoptions) |
 
 #### Returns
@@ -127,7 +129,35 @@ Transcribe audio file
 
 #### Defined in
 
-[index.ts:215](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L215)
+[index.ts:292](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L292)
+
+___
+
+### transcribeData
+
+▸ **transcribeData**(`data`, `options?`): `Object`
+
+Transcribe audio data (base64 encoded float32 PCM data)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `string` |
+| `options` | [`TranscribeFileOptions`](../README.md#transcribefileoptions) |
+
+#### Returns
+
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `promise` | `Promise`<[`TranscribeResult`](../README.md#transcriberesult)\> |
+| `stop` | () => `Promise`<`void`\> |
+
+#### Defined in
+
+[index.ts:323](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L323)
 
 ___
 
@@ -149,4 +179,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:311](https://github.com/mybigday/whisper.rn/blob/5effdc8/src/index.ts#L311)
+[index.ts:331](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L331)
