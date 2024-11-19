@@ -8,6 +8,7 @@ set(RNWHISPER_LIB_DIR ${CMAKE_SOURCE_DIR}/../../../cpp)
 set(
     SOURCE_FILES
     ${RNWHISPER_LIB_DIR}/ggml.c
+    ${RNWHISPER_LIB_DIR}/ggml-cpu.c
     ${RNWHISPER_LIB_DIR}/ggml-alloc.c
     ${RNWHISPER_LIB_DIR}/ggml-backend.cpp
     ${RNWHISPER_LIB_DIR}/ggml-quants.c

@@ -7,8 +7,10 @@ cp ./whisper.cpp/ggml/include/ggml.h ./cpp/ggml.h
 cp ./whisper.cpp/ggml/include/ggml-alloc.h ./cpp/ggml-alloc.h
 cp ./whisper.cpp/ggml/include/ggml-backend.h ./cpp/ggml-backend.h
 cp ./whisper.cpp/ggml/include/ggml-metal.h ./cpp/ggml-metal.h
+cp ./whisper.cpp/ggml/include/ggml-cpu.h ./cpp/ggml-cpu.h
 
 cp ./whisper.cpp/ggml/src/ggml.c ./cpp/ggml.c
+cp ./whisper.cpp/ggml/src/ggml-cpu.c ./cpp/ggml-cpu.c
 cp ./whisper.cpp/ggml/src/ggml-metal.m ./cpp/ggml-metal.m
 cp ./whisper.cpp/ggml/src/ggml-alloc.c ./cpp/ggml-alloc.c
 cp ./whisper.cpp/ggml/src/ggml-backend.cpp ./cpp/ggml-backend.cpp
@@ -31,6 +33,8 @@ cp -R ./whisper.cpp/src/coreml/ ./cpp/coreml/
 files=(
   "./cpp/ggml.h"
   "./cpp/ggml.c"
+  "./cpp/ggml-cpu.h"
+  "./cpp/ggml-cpu.c"
   "./cpp/ggml-metal.h"
   "./cpp/ggml-metal.m"
   "./cpp/ggml-quants.h"

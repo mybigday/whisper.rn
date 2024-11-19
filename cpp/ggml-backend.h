@@ -114,11 +114,12 @@ extern "C" {
     //
 
     enum wsp_ggml_backend_dev_type {
+        // CPU device using system memory
         WSP_GGML_BACKEND_DEVICE_TYPE_CPU,
+        // GPU device using dedicated memory
         WSP_GGML_BACKEND_DEVICE_TYPE_GPU,
-        // devices with full capabilities (excludes backends such as BLAS that only support matrix multiplication)
-        WSP_GGML_BACKEND_DEVICE_TYPE_CPU_FULL,
-        WSP_GGML_BACKEND_DEVICE_TYPE_GPU_FULL
+        // accelerator devices intended to be used together with the CPU backend (e.g. BLAS or AMX)
+        WSP_GGML_BACKEND_DEVICE_TYPE_ACCEL
     };
 
     // functionality supported by the device
@@ -167,10 +168,14 @@ extern "C" {
     WSP_GGML_API wsp_ggml_backend_dev_t wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_reg_t reg, size_t index);
     WSP_GGML_API void *             wsp_ggml_backend_reg_get_proc_address(wsp_ggml_backend_reg_t reg, const char * name);
 
+    // Common functions that may be obtained using wsp_ggml_backend_reg_get_proc_address
 
-    // Functions that may be obtained using wsp_ggml_backend_reg_get_proc_address
-    typedef wsp_ggml_backend_buffer_type_t (*wsp_ggml_backend_split_buffer_type_t)(const float *);
-    typedef void (*wsp_ggml_backend_set_n_threads_t)(wsp_ggml_backend_t, int);
+    // Split buffer type for tensor parallelism
+    typedef wsp_ggml_backend_buffer_type_t   (*wsp_ggml_backend_split_buffer_type_t)(int main_device, const float * tensor_split);
+    // Set the number of threads for the backend
+    typedef void                         (*wsp_ggml_backend_set_n_threads_t)(wsp_ggml_backend_t backend, int n_threads);
+    // Get additional buffer types provided by the device (returns a NULL-terminated array)
+    typedef wsp_ggml_backend_buffer_type_t * (*wsp_ggml_backend_dev_get_extra_bufts_t)(wsp_ggml_backend_dev_t device);
 
     //
     // Backend registry
@@ -192,7 +197,7 @@ extern "C" {
     WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_init_by_name(const char * name, const char * params);
     // = wsp_ggml_backend_dev_init(wsp_ggml_backend_dev_by_type(type), params)
     WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_init_by_type(enum wsp_ggml_backend_dev_type type, const char * params);
-    // = wsp_ggml_backend_dev_init(wsp_ggml_backend_dev_by_type(GPU_FULL) OR wsp_ggml_backend_dev_by_type(CPU_FULL), NULL)
+    // = wsp_ggml_backend_dev_init(wsp_ggml_backend_dev_by_type(GPU) OR wsp_ggml_backend_dev_by_type(CPU), NULL)
     WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_init_best(void);
 
     //
@@ -300,26 +305,9 @@ extern "C" {
     WSP_GGML_API void wsp_ggml_backend_tensor_alloc(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, void * addr);
     WSP_GGML_API void wsp_ggml_backend_view_init(struct wsp_ggml_tensor * tensor);
 
-    //
-    // CPU backend
-    //
-
-    WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_cpu_init(void);
-
-    WSP_GGML_API bool wsp_ggml_backend_is_cpu                (wsp_ggml_backend_t backend);
-    WSP_GGML_API void wsp_ggml_backend_cpu_set_n_threads     (wsp_ggml_backend_t backend_cpu, int n_threads);
-    WSP_GGML_API void wsp_ggml_backend_cpu_set_threadpool    (wsp_ggml_backend_t backend_cpu, wsp_ggml_threadpool_t threadpool);
-    WSP_GGML_API void wsp_ggml_backend_cpu_set_abort_callback(wsp_ggml_backend_t backend_cpu, wsp_ggml_abort_callback abort_callback, void * abort_callback_data);
-
-    // Create a backend buffer from an existing pointer
+    // CPU buffer types are always available
     WSP_GGML_API wsp_ggml_backend_buffer_t      wsp_ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size);
     WSP_GGML_API wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_buffer_type(void);
-
-    WSP_GGML_API wsp_ggml_backend_reg_t wsp_ggml_backend_cpu_reg(void);
-
-#ifdef WSP_GGML_USE_CPU_HBM
-    WSP_GGML_API wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_hbm_buffer_type(void);
-#endif
 
 #ifdef  __cplusplus
 }

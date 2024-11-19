@@ -1,6 +1,6 @@
---- ggml-backend.cpp.orig	2024-11-03 12:39:40
-+++ ggml-backend.cpp	2024-11-03 12:39:41
-@@ -574,8 +574,11 @@
+--- ggml-backend.cpp.orig	2024-11-19 13:30:22
++++ ggml-backend.cpp	2024-11-19 13:30:23
+@@ -578,8 +578,11 @@
          register_backend(wsp_ggml_backend_cuda_reg());
  #endif
  #ifdef WSP_GGML_USE_METAL

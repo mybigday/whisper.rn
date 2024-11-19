@@ -8,6 +8,7 @@
 #include <stdlib.h> // load `stdlib.h` before other headers to work around MinGW bug: https://sourceforge.net/p/mingw-w64/bugs/192/
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,20 @@ extern "C" {
 #endif
 #endif
 
+static inline int wsp_ggml_up32(int n) {
+    return (n + 31) & ~31;
+}
+
+//static inline int wsp_ggml_up64(int n) {
+//    return (n + 63) & ~63;
+//}
+
+static inline int wsp_ggml_up(int n, int m) {
+    // assert m is a power of 2
+    WSP_GGML_ASSERT((m & (m - 1)) == 0);
+    return (n + m - 1) & ~(m - 1);
+}
+
 //
 // logging
 //
@@ -50,6 +65,74 @@ void wsp_ggml_log_callback_default(enum wsp_ggml_log_level level, const char * t
 #define WSP_GGML_LOG_ERROR(...) wsp_ggml_log_internal(WSP_GGML_LOG_LEVEL_ERROR, __VA_ARGS__)
 #define WSP_GGML_LOG_DEBUG(...) wsp_ggml_log_internal(WSP_GGML_LOG_LEVEL_DEBUG, __VA_ARGS__)
 #define WSP_GGML_LOG_CONT(...)  wsp_ggml_log_internal(WSP_GGML_LOG_LEVEL_CONT , __VA_ARGS__)
+
+#define WSP_GGML_DEBUG 0
+
+#if (WSP_GGML_DEBUG >= 1)
+#define WSP_GGML_PRINT_DEBUG(...) WSP_GGML_LOG_DEBUG(__VA_ARGS__)
+#else
+#define WSP_GGML_PRINT_DEBUG(...)
+#endif
+
+#if (WSP_GGML_DEBUG >= 5)
+#define WSP_GGML_PRINT_DEBUG_5(...) WSP_GGML_LOG_DEBUG(__VA_ARGS__)
+#else
+#define WSP_GGML_PRINT_DEBUG_5(...)
+#endif
+
+#if (WSP_GGML_DEBUG >= 10)
+#define WSP_GGML_PRINT_DEBUG_10(...) WSP_GGML_LOG_DEBUG(__VA_ARGS__)
+#else
+#define WSP_GGML_PRINT_DEBUG_10(...)
+#endif
+
+// tensor params
+
+static void wsp_ggml_set_op_params(struct wsp_ggml_tensor * tensor, const void * params, size_t params_size) {
+    WSP_GGML_ASSERT(tensor != NULL); // silence -Warray-bounds warnings
+    assert(params_size <= WSP_GGML_MAX_OP_PARAMS);
+    memcpy(tensor->op_params, params, params_size);
+}
+
+static int32_t wsp_ggml_get_op_params_i32(const struct wsp_ggml_tensor * tensor, uint32_t i) {
+    assert(i < WSP_GGML_MAX_OP_PARAMS / sizeof(int32_t));
+    return ((const int32_t *)(tensor->op_params))[i];
+}
+
+static float wsp_ggml_get_op_params_f32(const struct wsp_ggml_tensor * tensor, uint32_t i) {
+    assert(i < WSP_GGML_MAX_OP_PARAMS / sizeof(float));
+    return ((const float *)(tensor->op_params))[i];
+}
+
+static void wsp_ggml_set_op_params_i32(struct wsp_ggml_tensor * tensor, uint32_t i, int32_t value) {
+    assert(i < WSP_GGML_MAX_OP_PARAMS / sizeof(int32_t));
+    ((int32_t *)(tensor->op_params))[i] = value;
+}
+
+static void wsp_ggml_set_op_params_f32(struct wsp_ggml_tensor * tensor, uint32_t i, float value) {
+    assert(i < WSP_GGML_MAX_OP_PARAMS / sizeof(float));
+    ((float *)(tensor->op_params))[i] = value;
+}
+
+struct wsp_ggml_map_custom1_op_params {
+    wsp_ggml_custom1_op_t  fun;
+    int                n_tasks;
+    void             * userdata;
+};
+
+
+struct wsp_ggml_map_custom2_op_params {
+    wsp_ggml_custom2_op_t   fun;
+    int                 n_tasks;
+    void              * userdata;
+};
+
+
+struct wsp_ggml_map_custom3_op_params {
+    wsp_ggml_custom3_op_t fun;
+    int n_tasks;
+    void * userdata;
+};
 
 // bitset
 
@@ -203,6 +286,10 @@ struct wsp_ggml_cgraph wsp_ggml_graph_view(struct wsp_ggml_cgraph * cgraph, int 
 
 void * wsp_ggml_aligned_malloc(size_t size);
 void wsp_ggml_aligned_free(void * ptr, size_t size);
+
+// TODO: move to threading file
+void wsp_ggml_critical_section_start(void);
+void wsp_ggml_critical_section_end(void);
 
 #ifdef __cplusplus
 }

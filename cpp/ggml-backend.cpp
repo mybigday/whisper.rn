@@ -8,6 +8,7 @@
 #include <windows.h>
 #endif
 
+#include "ggml-backend.h"
 #include "ggml-backend-impl.h"
 #include "ggml-alloc.h"
 #include "ggml-impl.h"
@@ -34,6 +35,11 @@ const char * wsp_ggml_backend_buft_name(wsp_ggml_backend_buffer_type_t buft) {
 }
 
 wsp_ggml_backend_buffer_t wsp_ggml_backend_buft_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
+    if (size == 0) {
+        // return a dummy buffer for zero-sized allocations
+        return wsp_ggml_backend_buffer_init(buft, {}, NULL, 0);
+    }
+
     return buft->iface.alloc_buffer(buft, size);
 }
 
@@ -89,7 +95,7 @@ wsp_ggml_backend_buffer_t wsp_ggml_backend_buffer_init(
 }
 
 const char * wsp_ggml_backend_buffer_name(wsp_ggml_backend_buffer_t buffer) {
-    return buffer->iface.get_name(buffer);
+    return wsp_ggml_backend_buft_name(wsp_ggml_backend_buffer_get_type(buffer));
 }
 
 void wsp_ggml_backend_buffer_free(wsp_ggml_backend_buffer_t buffer) {
@@ -108,6 +114,11 @@ size_t wsp_ggml_backend_buffer_get_size(wsp_ggml_backend_buffer_t buffer) {
 }
 
 void * wsp_ggml_backend_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
+    // get_base is optional if the buffer is zero-sized
+    if (buffer->size == 0) {
+        return NULL;
+    }
+
     void * base = buffer->iface.get_base(buffer);
 
     WSP_GGML_ASSERT(base != NULL && "backend buffer base cannot be NULL");
@@ -122,6 +133,15 @@ void wsp_ggml_backend_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, struc
     }
 }
 
+void wsp_ggml_backend_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
+    // clear is optional if the buffer is zero-sized
+    if (buffer->size == 0) {
+        return;
+    }
+
+    buffer->iface.clear(buffer, value);
+}
+
 size_t wsp_ggml_backend_buffer_get_alignment(wsp_ggml_backend_buffer_t buffer) {
     return wsp_ggml_backend_buft_get_alignment(wsp_ggml_backend_buffer_get_type(buffer));
 }
@@ -132,10 +152,6 @@ size_t wsp_ggml_backend_buffer_get_max_size(wsp_ggml_backend_buffer_t buffer) {
 
 size_t wsp_ggml_backend_buffer_get_alloc_size(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
     return wsp_ggml_backend_buft_get_alloc_size(wsp_ggml_backend_buffer_get_type(buffer), tensor);
-}
-
-void wsp_ggml_backend_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
-    buffer->iface.clear(buffer, value);
 }
 
 bool wsp_ggml_backend_buffer_is_host(wsp_ggml_backend_buffer_t buffer) {
@@ -198,7 +214,7 @@ void wsp_ggml_backend_free(wsp_ggml_backend_t backend) {
 }
 
 wsp_ggml_backend_buffer_type_t wsp_ggml_backend_get_default_buffer_type(wsp_ggml_backend_t backend) {
-    return backend->iface.get_default_buffer_type(backend);
+    return wsp_ggml_backend_dev_buffer_type(backend->device);
 }
 
 wsp_ggml_backend_buffer_t wsp_ggml_backend_alloc_buffer(wsp_ggml_backend_t backend, size_t size) {
@@ -238,13 +254,13 @@ void wsp_ggml_backend_tensor_get_async(wsp_ggml_backend_t backend, const struct 
 void wsp_ggml_backend_tensor_set(struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
+    if (size == 0) {
+        return;
+    }
+
     WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
     WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
-
-    if (!size) {
-        return;
-    }
 
     buf->iface.set_tensor(buf, tensor, data, offset, size);
 }
@@ -252,13 +268,13 @@ void wsp_ggml_backend_tensor_set(struct wsp_ggml_tensor * tensor, const void * d
 void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
+    if (size == 0) {
+        return;
+    }
+
     WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
     WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor read out of bounds");
-
-    if (!size) {
-        return;
-    }
 
     buf->iface.get_tensor(buf, tensor, data, offset, size);
 }
@@ -266,15 +282,14 @@ void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor, void * d
 WSP_GGML_API void wsp_ggml_backend_tensor_memset(struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
-    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
-    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
-    WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
-
-    if (!size) {
+    if (size == 0) {
         return;
     }
 
-    WSP_GGML_ASSERT(buf->iface.memset_tensor != NULL && "memset not supported by backend buffer");
+    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+    WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
+    WSP_GGML_ASSERT(buf->iface.memset_tensor != NULL && "memset not implemented by backend buffer");
 
     buf->iface.memset_tensor(buf, tensor, value, offset, size);
 }
@@ -316,32 +331,15 @@ enum wsp_ggml_status wsp_ggml_backend_graph_compute_async(wsp_ggml_backend_t bac
 }
 
 bool wsp_ggml_backend_supports_op(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * op) {
-    // helper to ease transition to device interface
-    if (backend->device) {
-        return wsp_ggml_backend_dev_supports_op(backend->device, op);
-    }
-
-    return backend->iface.supports_op(backend, op);
+    return wsp_ggml_backend_dev_supports_op(backend->device, op);
 }
 
 bool wsp_ggml_backend_supports_buft(wsp_ggml_backend_t backend, wsp_ggml_backend_buffer_type_t buft) {
-    // helper to ease transition to device interface
-    if (backend->device) {
-        return wsp_ggml_backend_dev_supports_buft(backend->device, buft);
-    }
-    return backend->iface.supports_buft(backend, buft);
+    return wsp_ggml_backend_dev_supports_buft(backend->device, buft);
 }
 
 bool wsp_ggml_backend_offload_op(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * op) {
-    // helper to ease transition to device interface
-    if (backend->device) {
-        return wsp_ggml_backend_dev_offload_op(backend->device, op);
-    }
-
-    if (backend->iface.offload_op != NULL) {
-        return backend->iface.offload_op(backend, op);
-    }
-    return false;
+    return wsp_ggml_backend_dev_offload_op(backend->device, op);
 }
 
 wsp_ggml_backend_dev_t wsp_ggml_backend_get_device(wsp_ggml_backend_t backend) {
@@ -565,6 +563,12 @@ void * wsp_ggml_backend_reg_get_proc_address(wsp_ggml_backend_reg_t reg, const c
 #include "ggml-cann.h"
 #endif
 
+#ifdef WSP_GGML_USE_KOMPUTE
+#include "ggml-kompute.h"
+#endif
+
+#include "ggml-cpu.h"
+
 struct wsp_ggml_backend_registry {
     std::vector<wsp_ggml_backend_reg_t> backends;
     std::vector<wsp_ggml_backend_dev_t> devices;
@@ -585,6 +589,9 @@ struct wsp_ggml_backend_registry {
 #ifdef WSP_GGML_USE_VULKAN
         register_backend(wsp_ggml_backend_vk_reg());
 #endif
+#ifdef WSP_GGML_USE_CANN
+        register_backend(wsp_ggml_backend_cann_reg());
+#endif
 #ifdef WSP_GGML_USE_BLAS
         register_backend(wsp_ggml_backend_blas_reg());
 #endif
@@ -594,11 +601,9 @@ struct wsp_ggml_backend_registry {
 #ifdef WSP_GGML_USE_AMX
         register_backend(wsp_ggml_backend_amx_reg());
 #endif
-#ifdef WSP_GGML_USE_CANN
-        register_backend(wsp_ggml_backend_cann_reg());
+#ifdef WSP_GGML_USE_KOMPUTE
+        register_backend(wsp_ggml_backend_kompute_reg());
 #endif
-
-        // TODO: kompute
 
         register_backend(wsp_ggml_backend_cpu_reg());
     }
@@ -704,611 +709,14 @@ wsp_ggml_backend_t wsp_ggml_backend_init_by_type(enum wsp_ggml_backend_dev_type 
 }
 
 wsp_ggml_backend_t wsp_ggml_backend_init_best(void) {
-    wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_GPU_FULL);
+    wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_GPU);
     if (!dev) {
-        dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU_FULL);
+        dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU);
     }
     if (!dev) {
         return NULL;
     }
     return wsp_ggml_backend_dev_init(dev, NULL);
-}
-
-// backend CPU
-
-static const char * wsp_ggml_backend_cpu_buffer_get_name(wsp_ggml_backend_buffer_t buffer) {
-    return "CPU";
-
-    WSP_GGML_UNUSED(buffer);
-}
-
-static void * wsp_ggml_backend_cpu_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
-    uintptr_t data = (uintptr_t)buffer->context;
-
-    // align the buffer
-    if (data % TENSOR_ALIGNMENT != 0) {
-        data = WSP_GGML_PAD(data, TENSOR_ALIGNMENT);
-    }
-
-    return (void *)data;
-}
-
-static void wsp_ggml_backend_cpu_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
-    wsp_ggml_aligned_free(buffer->context, buffer->size);
-}
-
-static void wsp_ggml_backend_cpu_buffer_memset_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
-    memset((char *)tensor->data + offset, value, size);
-
-    WSP_GGML_UNUSED(buffer);
-}
-
-static void wsp_ggml_backend_cpu_buffer_set_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
-    memcpy((char *)tensor->data + offset, data, size);
-
-    WSP_GGML_UNUSED(buffer);
-}
-
-static void wsp_ggml_backend_cpu_buffer_get_tensor(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
-    memcpy(data, (const char *)tensor->data + offset, size);
-
-    WSP_GGML_UNUSED(buffer);
-}
-
-static bool wsp_ggml_backend_cpu_buffer_cpy_tensor(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
-    if (wsp_ggml_backend_buffer_is_host(src->buffer)) {
-        memcpy(dst->data, src->data, wsp_ggml_nbytes(src));
-        return true;
-    }
-    return false;
-
-    WSP_GGML_UNUSED(buffer);
-}
-
-static void wsp_ggml_backend_cpu_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
-    memset(buffer->context, value, buffer->size);
-}
-
-static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_cpu_buffer_i = {
-    /* .get_name        = */ wsp_ggml_backend_cpu_buffer_get_name,
-    /* .free_buffer     = */ wsp_ggml_backend_cpu_buffer_free_buffer,
-    /* .get_base        = */ wsp_ggml_backend_cpu_buffer_get_base,
-    /* .init_tensor     = */ NULL, // no initialization required
-    /* .memset_tensor   = */ wsp_ggml_backend_cpu_buffer_memset_tensor,
-    /* .set_tensor      = */ wsp_ggml_backend_cpu_buffer_set_tensor,
-    /* .get_tensor      = */ wsp_ggml_backend_cpu_buffer_get_tensor,
-    /* .cpy_tensor      = */ wsp_ggml_backend_cpu_buffer_cpy_tensor,
-    /* .clear           = */ wsp_ggml_backend_cpu_buffer_clear,
-    /* .reset           = */ NULL,
-};
-
-static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_cpu_buffer_from_ptr_i = {
-    /* .get_name        = */ wsp_ggml_backend_cpu_buffer_get_name,
-    /* .free_buffer     = */ NULL, // ptr is not owned by the buffer, so it does not need to be freed
-    /* .get_base        = */ wsp_ggml_backend_cpu_buffer_get_base,
-    /* .init_tensor     = */ NULL, // no initialization required
-    /* .memset_tensor   = */ wsp_ggml_backend_cpu_buffer_memset_tensor,
-    /* .set_tensor      = */ wsp_ggml_backend_cpu_buffer_set_tensor,
-    /* .get_tensor      = */ wsp_ggml_backend_cpu_buffer_get_tensor,
-    /* .cpy_tensor      = */ wsp_ggml_backend_cpu_buffer_cpy_tensor,
-    /* .clear           = */ wsp_ggml_backend_cpu_buffer_clear,
-    /* .reset           = */ NULL,
-};
-
-static const char * wsp_ggml_backend_cpu_buffer_type_get_name(wsp_ggml_backend_buffer_type_t buft) {
-    return "CPU";
-
-    WSP_GGML_UNUSED(buft);
-}
-
-static wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_buffer_type_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
-    auto alloc_size = size;
-    if (alloc_size == 0) {
-        alloc_size = 1;
-    }
-
-    void * data = wsp_ggml_aligned_malloc(alloc_size);
-
-    if (data == NULL) {
-        WSP_GGML_LOG_ERROR("%s: failed to allocate buffer of size %zu\n", __func__, alloc_size);
-        return NULL;
-    }
-
-    return wsp_ggml_backend_buffer_init(buft, wsp_ggml_backend_cpu_buffer_i, data, alloc_size);
-}
-
-static size_t wsp_ggml_backend_cpu_buffer_type_get_alignment(wsp_ggml_backend_buffer_type_t buft) {
-    return TENSOR_ALIGNMENT;
-
-    WSP_GGML_UNUSED(buft);
-}
-
-static bool wsp_ggml_backend_cpu_buffer_type_is_host(wsp_ggml_backend_buffer_type_t buft) {
-    return true;
-
-    WSP_GGML_UNUSED(buft);
-}
-
-wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_buffer_type(void) {
-    static struct wsp_ggml_backend_buffer_type wsp_ggml_backend_cpu_buffer_type = {
-        /* .iface   = */ {
-            /* .get_name         = */ wsp_ggml_backend_cpu_buffer_type_get_name,
-            /* .alloc_buffer     = */ wsp_ggml_backend_cpu_buffer_type_alloc_buffer,
-            /* .get_alignment    = */ wsp_ggml_backend_cpu_buffer_type_get_alignment,
-            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
-            /* .get_alloc_size   = */ NULL, // defaults to wsp_ggml_nbytes
-            /* .is_host          = */ wsp_ggml_backend_cpu_buffer_type_is_host,
-        },
-        /* .device  = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
-        /* .context = */ NULL,
-    };
-
-    return &wsp_ggml_backend_cpu_buffer_type;
-}
-
-#ifdef WSP_GGML_USE_CPU_HBM
-
-// buffer type HBM
-
-#include <hbwmalloc.h>
-
-static const char * wsp_ggml_backend_cpu_hbm_buffer_type_get_name(wsp_ggml_backend_buffer_type_t buft) {
-    return "CPU_HBM";
-
-    WSP_GGML_UNUSED(buft);
-}
-
-static const char * wsp_ggml_backend_cpu_hbm_buffer_get_name(wsp_ggml_backend_buffer_t buf) {
-    return "CPU_HBM";
-
-    WSP_GGML_UNUSED(buf);
-}
-
-static void wsp_ggml_backend_cpu_hbm_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
-    hbw_free(buffer->context);
-}
-
-static wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_hbm_buffer_type_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
-    //void * ptr = hbw_malloc(size);
-    void * ptr;
-    int result = hbw_posix_memalign(&ptr, wsp_ggml_backend_cpu_buffer_type_get_alignment(buft), size);
-    if (result != 0) {
-        WSP_GGML_LOG_ERROR("failed to allocate HBM buffer of size %zu\n", size);
-        return NULL;
-    }
-
-    wsp_ggml_backend_buffer_t buffer = wsp_ggml_backend_cpu_buffer_from_ptr(ptr, size);
-    buffer->buft = buft;
-    buffer->iface.get_name = wsp_ggml_backend_cpu_hbm_buffer_get_name;
-    buffer->iface.free_buffer = wsp_ggml_backend_cpu_hbm_buffer_free_buffer;
-
-    return buffer;
-}
-
-wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_hbm_buffer_type(void) {
-    static struct wsp_ggml_backend_buffer_type wsp_ggml_backend_cpu_buffer_type_hbm = {
-        /* .iface    = */ {
-            /* .get_name         = */ wsp_ggml_backend_cpu_hbm_buffer_type_get_name,
-            /* .alloc_buffer     = */ wsp_ggml_backend_cpu_hbm_buffer_type_alloc_buffer,
-            /* .get_alignment    = */ wsp_ggml_backend_cpu_buffer_type_get_alignment,
-            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
-            /* .get_alloc_size   = */ NULL, // defaults to wsp_ggml_nbytes
-            /* .is_host          = */ wsp_ggml_backend_cpu_buffer_type_is_host,
-        },
-        /* .context  = */ NULL,
-    };
-
-    return &wsp_ggml_backend_cpu_buffer_type_hbm;
-}
-#endif
-
-struct wsp_ggml_backend_cpu_context {
-    int                 n_threads;
-    wsp_ggml_threadpool_t   threadpool;
-
-    uint8_t *           work_data;
-    size_t              work_size;
-
-    wsp_ggml_abort_callback abort_callback;
-    void *              abort_callback_data;
-};
-
-static const char * wsp_ggml_backend_cpu_get_name(wsp_ggml_backend_t backend) {
-    return "CPU";
-
-    WSP_GGML_UNUSED(backend);
-}
-
-static void wsp_ggml_backend_cpu_free(wsp_ggml_backend_t backend) {
-    struct wsp_ggml_backend_cpu_context * cpu_ctx = (struct wsp_ggml_backend_cpu_context *)backend->context;
-    delete[] cpu_ctx->work_data;
-    delete cpu_ctx;
-    delete backend;
-}
-
-static wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_get_default_buffer_type(wsp_ggml_backend_t backend) {
-    return wsp_ggml_backend_cpu_buffer_type();
-
-    WSP_GGML_UNUSED(backend);
-}
-
-struct wsp_ggml_backend_plan_cpu {
-    struct wsp_ggml_cplan cplan;
-    struct wsp_ggml_cgraph cgraph;
-};
-
-static wsp_ggml_backend_graph_plan_t wsp_ggml_backend_cpu_graph_plan_create(wsp_ggml_backend_t backend, const struct wsp_ggml_cgraph * cgraph) {
-    struct wsp_ggml_backend_cpu_context * cpu_ctx = (struct wsp_ggml_backend_cpu_context *)backend->context;
-
-    struct wsp_ggml_backend_plan_cpu * cpu_plan = new wsp_ggml_backend_plan_cpu;
-
-    cpu_plan->cplan = wsp_ggml_graph_plan(cgraph, cpu_ctx->n_threads, cpu_ctx->threadpool);
-    cpu_plan->cgraph = *cgraph; // FIXME: deep copy
-
-    if (cpu_plan->cplan.work_size > 0) {
-        cpu_plan->cplan.work_data = new uint8_t[cpu_plan->cplan.work_size];
-        if (cpu_plan->cplan.work_data == NULL) {
-            delete cpu_plan;
-            return NULL;
-        }
-    }
-
-    cpu_plan->cplan.abort_callback      = cpu_ctx->abort_callback;
-    cpu_plan->cplan.abort_callback_data = cpu_ctx->abort_callback_data;
-
-    return cpu_plan;
-}
-
-static void wsp_ggml_backend_cpu_graph_plan_free(wsp_ggml_backend_t backend, wsp_ggml_backend_graph_plan_t plan) {
-    struct wsp_ggml_backend_plan_cpu * cpu_plan = (struct wsp_ggml_backend_plan_cpu *)plan;
-
-    delete[] cpu_plan->cplan.work_data;
-    delete cpu_plan;
-
-    WSP_GGML_UNUSED(backend);
-}
-
-static enum wsp_ggml_status wsp_ggml_backend_cpu_graph_plan_compute(wsp_ggml_backend_t backend, wsp_ggml_backend_graph_plan_t plan) {
-    struct wsp_ggml_backend_plan_cpu * cpu_plan = (struct wsp_ggml_backend_plan_cpu *)plan;
-
-    return wsp_ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
-
-    WSP_GGML_UNUSED(backend);
-}
-
-static enum wsp_ggml_status wsp_ggml_backend_cpu_graph_compute(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph) {
-    struct wsp_ggml_backend_cpu_context * cpu_ctx = (struct wsp_ggml_backend_cpu_context *)backend->context;
-
-    struct wsp_ggml_cplan cplan = wsp_ggml_graph_plan(cgraph, cpu_ctx->n_threads, cpu_ctx->threadpool);
-
-    if (cpu_ctx->work_size < cplan.work_size) {
-        delete[] cpu_ctx->work_data;
-        cpu_ctx->work_data = new uint8_t[cplan.work_size];
-        if (cpu_ctx->work_data == NULL) {
-            cpu_ctx->work_size = 0;
-            return WSP_GGML_STATUS_ALLOC_FAILED;
-        }
-        cpu_ctx->work_size = cplan.work_size;
-    }
-    cplan.work_data = (uint8_t *)cpu_ctx->work_data;
-
-    cplan.abort_callback      = cpu_ctx->abort_callback;
-    cplan.abort_callback_data = cpu_ctx->abort_callback_data;
-
-    return wsp_ggml_graph_compute(cgraph, &cplan);
-}
-
-static const struct wsp_ggml_backend_i wsp_ggml_backend_cpu_i = {
-    /* .get_name                = */ wsp_ggml_backend_cpu_get_name,
-    /* .free                    = */ wsp_ggml_backend_cpu_free,
-    /* .get_default_buffer_type = */ wsp_ggml_backend_cpu_get_default_buffer_type,
-    /* .set_tensor_async        = */ NULL,
-    /* .get_tensor_async        = */ NULL,
-    /* .cpy_tensor_async        = */ NULL,
-    /* .synchronize             = */ NULL,
-    /* .graph_plan_create       = */ wsp_ggml_backend_cpu_graph_plan_create,
-    /* .graph_plan_free         = */ wsp_ggml_backend_cpu_graph_plan_free,
-    /* .graph_plan_update       = */ NULL,
-    /* .graph_plan_compute      = */ wsp_ggml_backend_cpu_graph_plan_compute,
-    /* .graph_compute           = */ wsp_ggml_backend_cpu_graph_compute,
-    /* .supports_op             = */ NULL,
-    /* .supports_buft           = */ NULL,
-    /* .offload_op              = */ NULL,
-    /* .event_record            = */ NULL,
-    /* .event_wait              = */ NULL,
-};
-
-static wsp_ggml_guid_t wsp_ggml_backend_cpu_guid(void) {
-    static wsp_ggml_guid guid = { 0xaa, 0x67, 0xc7, 0x43, 0x96, 0xe6, 0xa3, 0x8a, 0xe3, 0xaf, 0xea, 0x92, 0x36, 0xbc, 0xfc, 0x89 };
-    return &guid;
-}
-
-wsp_ggml_backend_t wsp_ggml_backend_cpu_init(void) {
-    struct wsp_ggml_backend_cpu_context * ctx = new wsp_ggml_backend_cpu_context;
-    if (ctx == NULL) {
-        return NULL;
-    }
-
-    ctx->n_threads           = WSP_GGML_DEFAULT_N_THREADS;
-    ctx->threadpool          = NULL;
-    ctx->work_data           = NULL;
-    ctx->work_size           = 0;
-    ctx->abort_callback      = NULL;
-    ctx->abort_callback_data = NULL;
-
-    wsp_ggml_backend_t cpu_backend = new wsp_ggml_backend {
-        /* .guid      = */ wsp_ggml_backend_cpu_guid(),
-        /* .interface = */ wsp_ggml_backend_cpu_i,
-        /* .device    = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
-        /* .context   = */ ctx,
-    };
-
-    if (cpu_backend == NULL) {
-        delete ctx;
-        return NULL;
-    }
-
-    return cpu_backend;
-}
-
-bool wsp_ggml_backend_is_cpu(wsp_ggml_backend_t backend) {
-    return backend != NULL && wsp_ggml_guid_matches(backend->guid, wsp_ggml_backend_cpu_guid());
-}
-
-void wsp_ggml_backend_cpu_set_n_threads(wsp_ggml_backend_t backend_cpu, int n_threads) {
-    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
-
-    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
-    ctx->n_threads = n_threads;
-}
-
-void wsp_ggml_backend_cpu_set_threadpool(wsp_ggml_backend_t backend_cpu, wsp_ggml_threadpool_t threadpool) {
-    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
-
-    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
-
-    if (ctx->threadpool && ctx->threadpool != threadpool) {
-        // already had a different threadpool, pause/suspend it before switching
-        wsp_ggml_threadpool_pause(ctx->threadpool);
-    }
-    ctx->threadpool = threadpool;
-}
-
-void wsp_ggml_backend_cpu_set_abort_callback(wsp_ggml_backend_t backend_cpu, wsp_ggml_abort_callback abort_callback, void * abort_callback_data) {
-    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
-
-    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
-    ctx->abort_callback = abort_callback;
-    ctx->abort_callback_data = abort_callback_data;
-}
-
-wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) {
-    WSP_GGML_ASSERT((uintptr_t)ptr % TENSOR_ALIGNMENT == 0 && "buffer pointer must be aligned");
-    return wsp_ggml_backend_buffer_init(wsp_ggml_backend_cpu_buffer_type(), wsp_ggml_backend_cpu_buffer_from_ptr_i, ptr, size);
-}
-
-////////////////////////
-
-struct wsp_ggml_backend_cpu_device_context {
-    std::string description = "CPU";
-
-    wsp_ggml_backend_cpu_device_context() {
-#ifdef __APPLE__
-        size_t len = 0;
-        if (!sysctlbyname("machdep.cpu.brand_string", NULL, &len, NULL, 0)) {
-            description.resize(len);
-            sysctlbyname("machdep.cpu.brand_string", &description[0], &len, NULL, 0); // NOLINT
-        }
-#elif defined(__linux__)
-        FILE * f = fopen("/proc/cpuinfo", "r");
-        if (f) {
-            char buf[1024];
-            while (fgets(buf, sizeof(buf), f)) {
-                if (strncmp(buf, "model name", 10) == 0) {
-                    char * p = strchr(buf, ':');
-                    if (p) {
-                        p++;
-                        while (std::isspace(*p)) {
-                            p++;
-                        }
-                        while (std::isspace(p[strlen(p) - 1])) {
-                            p[strlen(p) - 1] = '\0';
-                        }
-                        description = p;
-                        break;
-                    }
-                }
-            }
-            fclose(f);
-        }
-#elif defined(_WIN32)
-        HKEY hKey;
-        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                        TEXT("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0"),
-                        0,
-                        KEY_READ,
-                        &hKey) == ERROR_SUCCESS) {
-            DWORD cpu_brand_size = 0;
-            if (RegQueryValueExA(hKey,
-                                TEXT("ProcessorNameString"),
-                                NULL,
-                                NULL,
-                                NULL,
-                                &cpu_brand_size) == ERROR_SUCCESS) {
-                description.resize(cpu_brand_size);
-                if (RegQueryValueExA(hKey,
-                                    TEXT("ProcessorNameString"),
-                                    NULL,
-                                    NULL,
-                                    (LPBYTE)&description[0], // NOLINT
-                                    &cpu_brand_size) == ERROR_SUCCESS) {
-                    if (description.find('\0') != std::string::npos) {
-                        description.resize(description.find('\0'));
-                    }
-                }
-            }
-            RegCloseKey(hKey);
-        }
-#endif
-    }
-};
-
-static const char * wsp_ggml_backend_cpu_device_get_name(wsp_ggml_backend_dev_t dev) {
-    return "CPU";
-
-    WSP_GGML_UNUSED(dev);
-}
-
-static const char * wsp_ggml_backend_cpu_device_get_description(wsp_ggml_backend_dev_t dev) {
-    struct wsp_ggml_backend_cpu_device_context * ctx = (struct wsp_ggml_backend_cpu_device_context *)dev->context;
-
-    return ctx->description.c_str();
-}
-
-static void wsp_ggml_backend_cpu_device_get_memory(wsp_ggml_backend_dev_t dev, size_t * free, size_t * total) {
-    // TODO
-    *free = 0;
-    *total = 0;
-
-    WSP_GGML_UNUSED(dev);
-}
-
-static enum wsp_ggml_backend_dev_type wsp_ggml_backend_cpu_device_get_type(wsp_ggml_backend_dev_t dev) {
-    return WSP_GGML_BACKEND_DEVICE_TYPE_CPU_FULL;
-
-    WSP_GGML_UNUSED(dev);
-}
-
-static void wsp_ggml_backend_cpu_device_get_props(wsp_ggml_backend_dev_t dev, struct wsp_ggml_backend_dev_props * props) {
-    props->name        = wsp_ggml_backend_cpu_device_get_name(dev);
-    props->description = wsp_ggml_backend_cpu_device_get_description(dev);
-    props->type        = wsp_ggml_backend_cpu_device_get_type(dev);
-    wsp_ggml_backend_cpu_device_get_memory(dev, &props->memory_free, &props->memory_total);
-    props->caps = {
-        /* .async                 = */ false,
-        /* .host_buffer           = */ false,
-        /* .buffer_from_host_ptr  = */ true,
-        /* .events                = */ false,
-    };
-}
-
-static wsp_ggml_backend_t wsp_ggml_backend_cpu_device_init(wsp_ggml_backend_dev_t dev, const char * params) {
-    return wsp_ggml_backend_cpu_init();
-
-    WSP_GGML_UNUSED(dev);
-    WSP_GGML_UNUSED(params);
-}
-
-static wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_device_get_buffer_type(wsp_ggml_backend_dev_t dev) {
-    return wsp_ggml_backend_cpu_buffer_type();
-
-    WSP_GGML_UNUSED(dev);
-}
-
-static wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_device_buffer_from_ptr(wsp_ggml_backend_dev_t dev, void * ptr, size_t size, size_t max_tensor_size) {
-    return wsp_ggml_backend_cpu_buffer_from_ptr(ptr, size);
-
-    WSP_GGML_UNUSED(dev);
-    WSP_GGML_UNUSED(max_tensor_size);
-}
-
-static bool wsp_ggml_backend_cpu_device_supports_op(wsp_ggml_backend_dev_t dev, const struct wsp_ggml_tensor * op) {
-    switch (op->op) {
-        case WSP_GGML_OP_CPY:
-            return
-                op->type != WSP_GGML_TYPE_IQ2_XXS &&
-                op->type != WSP_GGML_TYPE_IQ2_XS  &&
-                op->type != WSP_GGML_TYPE_IQ1_S   &&
-                op->type != WSP_GGML_TYPE_IQ1_M; // missing type_traits.from_float
-        case WSP_GGML_OP_MUL_MAT:
-            return op->src[1]->type == WSP_GGML_TYPE_F32 || op->src[1]->type == wsp_ggml_get_type_traits(op->src[0]->type)->vec_dot_type;
-        case WSP_GGML_OP_ROPE_BACK:
-            return op->src[2] == NULL && (op->op_params[2] & 4) == 0;
-        case WSP_GGML_OP_IM2COL_BACK:
-            return op->src[0]->type == WSP_GGML_TYPE_F32 && op->src[1]->type == WSP_GGML_TYPE_F32;
-        case WSP_GGML_OP_OUT_PROD:
-            return (op->src[0]->type == WSP_GGML_TYPE_F32 || wsp_ggml_is_quantized(op->src[0]->type)) && op->src[1]->type == WSP_GGML_TYPE_F32;
-        default:
-            return true;
-    }
-
-    WSP_GGML_UNUSED(dev);
-}
-
-static bool wsp_ggml_backend_cpu_device_supports_buft(wsp_ggml_backend_dev_t dev, wsp_ggml_backend_buffer_type_t buft) {
-    return wsp_ggml_backend_buft_is_host(buft);
-
-    WSP_GGML_UNUSED(dev);
-}
-
-static const struct wsp_ggml_backend_device_i wsp_ggml_backend_cpu_device_i = {
-    /* .get_name             = */ wsp_ggml_backend_cpu_device_get_name,
-    /* .get_description      = */ wsp_ggml_backend_cpu_device_get_description,
-    /* .get_memory           = */ wsp_ggml_backend_cpu_device_get_memory,
-    /* .get_type             = */ wsp_ggml_backend_cpu_device_get_type,
-    /* .get_props            = */ wsp_ggml_backend_cpu_device_get_props,
-    /* .init_backend         = */ wsp_ggml_backend_cpu_device_init,
-    /* .get_buffer_type      = */ wsp_ggml_backend_cpu_device_get_buffer_type,
-    /* .get_host_buffer_type = */ NULL,
-    /* .buffer_from_host_ptr = */ wsp_ggml_backend_cpu_device_buffer_from_ptr,
-    /* .supports_op          = */ wsp_ggml_backend_cpu_device_supports_op,
-    /* .supports_buft        = */ wsp_ggml_backend_cpu_device_supports_buft,
-    /* .offload_op           = */ NULL,
-    /* .event_new            = */ NULL,
-    /* .event_free           = */ NULL,
-    /* .event_synchronize    = */ NULL,
-};
-
-////////////////////////
-
-static const char * wsp_ggml_backend_cpu_reg_get_name(wsp_ggml_backend_reg_t reg) {
-    return "CPU";
-
-    WSP_GGML_UNUSED(reg);
-}
-
-static size_t wsp_ggml_backend_cpu_reg_get_device_count(wsp_ggml_backend_reg_t reg) {
-    return 1;
-
-    WSP_GGML_UNUSED(reg);
-}
-
-static wsp_ggml_backend_dev_t wsp_ggml_backend_cpu_reg_get_device(wsp_ggml_backend_reg_t reg, size_t index) {
-    WSP_GGML_ASSERT(index == 0);
-
-    static wsp_ggml_backend_cpu_device_context ctx;
-    static wsp_ggml_backend_device wsp_ggml_backend_cpu_device = {
-        /* .iface   = */ wsp_ggml_backend_cpu_device_i,
-        /* .reg     = */ reg,
-        /* .context = */ &ctx,
-    };
-
-    return &wsp_ggml_backend_cpu_device;
-}
-
-static void * wsp_ggml_backend_cpu_get_proc_address(wsp_ggml_backend_reg_t reg, const char * name) {
-    if (strcmp(name, "wsp_ggml_backend_set_n_threads") == 0) {
-        return (void *)wsp_ggml_backend_cpu_set_n_threads;
-    }
-    return NULL;
-
-    WSP_GGML_UNUSED(reg);
-}
-
-static const struct wsp_ggml_backend_reg_i wsp_ggml_backend_cpu_reg_i = {
-    /* .get_name         = */ wsp_ggml_backend_cpu_reg_get_name,
-    /* .get_device_count = */ wsp_ggml_backend_cpu_reg_get_device_count,
-    /* .get_device       = */ wsp_ggml_backend_cpu_reg_get_device,
-    /* .get_proc_address = */ wsp_ggml_backend_cpu_get_proc_address,
-};
-
-wsp_ggml_backend_reg_t wsp_ggml_backend_cpu_reg(void) {
-    static struct wsp_ggml_backend_reg wsp_ggml_backend_cpu_reg = {
-        /* .iface   = */ wsp_ggml_backend_cpu_reg_i,
-        /* .context = */ NULL,
-    };
-
-    return &wsp_ggml_backend_cpu_reg;
 }
 
 // multi-buffer buffer
@@ -1317,12 +725,6 @@ struct wsp_ggml_backend_multi_buffer_context {
     wsp_ggml_backend_buffer_t * buffers;
     size_t n_buffers;
 };
-
-static const char * wsp_ggml_backend_multi_buffer_get_name(wsp_ggml_backend_buffer_t buffer) {
-    wsp_ggml_backend_multi_buffer_context * ctx = (wsp_ggml_backend_multi_buffer_context *) buffer->context;
-
-    return ctx->buffers[0]->iface.get_name(ctx->buffers[0]);
-}
 
 static void wsp_ggml_backend_multi_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
     wsp_ggml_backend_multi_buffer_context * ctx = (wsp_ggml_backend_multi_buffer_context *) buffer->context;
@@ -1342,7 +744,6 @@ static void wsp_ggml_backend_multi_buffer_clear(wsp_ggml_backend_buffer_t buffer
 }
 
 static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_multi_buffer_i = {
-    /* .get_name        = */ wsp_ggml_backend_multi_buffer_get_name,
     /* .free_buffer     = */ wsp_ggml_backend_multi_buffer_free_buffer,
     /* .get_base        = */ NULL,
     /* .init_tensor     = */ NULL,
@@ -1371,7 +772,7 @@ wsp_ggml_backend_buffer_t wsp_ggml_backend_multi_buffer_alloc_buffer(wsp_ggml_ba
 }
 
 bool wsp_ggml_backend_buffer_is_multi_buffer(wsp_ggml_backend_buffer_t buffer) {
-    return buffer->iface.get_name == wsp_ggml_backend_multi_buffer_get_name;
+    return buffer->iface.free_buffer == wsp_ggml_backend_multi_buffer_free_buffer;
 }
 
 void wsp_ggml_backend_multi_buffer_set_usage(wsp_ggml_backend_buffer_t buffer, enum wsp_ggml_backend_buffer_usage usage) {
@@ -1463,7 +864,7 @@ struct wsp_ggml_backend_sched {
     char * context_buffer;
     size_t context_buffer_size;
 
-    bool debug;
+    int debug;
 };
 
 #define hash_id(tensor) wsp_ggml_hash_find_or_insert(&sched->hash_set, tensor)
@@ -1551,7 +952,9 @@ static int wsp_ggml_backend_sched_backend_id_from_cur(wsp_ggml_backend_sched_t s
         if (src == NULL) {
             continue;
         }
-        if (src->buffer != NULL && src->buffer->usage == WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
+        // skip ROPE since the rope freqs tensor is too small to choose a backend based on it
+        // not an ideal solution
+        if (tensor->op != WSP_GGML_OP_ROPE && src->buffer != NULL && src->buffer->usage == WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
             int src_backend_id = wsp_ggml_backend_sched_backend_from_buffer(sched, src, tensor);
             // check if a backend with higher prio wants to offload the op
             if (src_backend_id == sched->n_backends - 1) {
@@ -1598,19 +1001,21 @@ static void wsp_ggml_backend_sched_print_assignments(wsp_ggml_backend_sched_t sc
         if (wsp_ggml_is_view_op(node->op)) {
             continue;
         }
-        wsp_ggml_backend_t tensor_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, node);
-        WSP_GGML_LOG_DEBUG("node #%3d (%10.10s): %20.20s (%5.5s) [%5.5s %8.8s]:", i, wsp_ggml_op_name(node->op), node->name,
-            fmt_size(wsp_ggml_nbytes(node)), tensor_backend ? wsp_ggml_backend_name(tensor_backend) : "NULL", GET_CAUSE(node));
-        for (int j = 0; j < WSP_GGML_MAX_SRC; j++) {
-            struct wsp_ggml_tensor * src = node->src[j];
-            if (src == NULL) {
-                continue;
+        if (sched->debug > 1) {
+            wsp_ggml_backend_t tensor_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, node);
+            WSP_GGML_LOG_DEBUG("node #%3d (%10.10s): %20.20s (%5.5s) [%5.5s %8.8s]:", i, wsp_ggml_op_name(node->op), node->name,
+                fmt_size(wsp_ggml_nbytes(node)), tensor_backend ? wsp_ggml_backend_name(tensor_backend) : "NULL", GET_CAUSE(node));
+            for (int j = 0; j < WSP_GGML_MAX_SRC; j++) {
+                struct wsp_ggml_tensor * src = node->src[j];
+                if (src == NULL) {
+                    continue;
+                }
+                wsp_ggml_backend_t src_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, src);
+                WSP_GGML_LOG_DEBUG(" %20.20s (%5.5s) [%5.5s %8.8s]", src->name,
+                    fmt_size(wsp_ggml_nbytes(src)), src_backend ? wsp_ggml_backend_name(src_backend) : "NULL", GET_CAUSE(src));
             }
-            wsp_ggml_backend_t src_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, src);
-            WSP_GGML_LOG_DEBUG(" %20.20s (%5.5s) [%5.5s %8.8s]", src->name,
-                fmt_size(wsp_ggml_nbytes(src)), src_backend ? wsp_ggml_backend_name(src_backend) : "NULL", GET_CAUSE(src));
+            WSP_GGML_LOG_DEBUG("\n");
         }
-        WSP_GGML_LOG_DEBUG("\n");
     }
 }
 
@@ -1902,11 +1307,11 @@ static void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, s
                     if (src == NULL) {
                         continue;
                     }
-                    // check if a weight is on a different backend
+                    // check if a weight is on a different and incompatible backend
                     // by starting a new split, the memory of the previously offloaded weights can be reused
                     if (src->buffer != NULL && src->buffer->usage == WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
                         int src_backend_id = tensor_backend_id(src);
-                        if (src_backend_id != cur_backend_id) {
+                        if (src_backend_id != cur_backend_id && !wsp_ggml_backend_sched_buffer_supported(sched, src, cur_backend_id)) {
                             need_new_split = true;
                             break;
                         }
@@ -1918,7 +1323,6 @@ static void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, s
                         int src_backend_id = sched->hv_tensor_backend_ids[id];
                         bool supported = wsp_ggml_backend_sched_buffer_supported(sched, src, cur_backend_id);
                         if (src_backend_id != cur_backend_id && tensor_id_copy(id, cur_backend_id, 0) == NULL && !supported) {
-                            //printf("starting new split because of too many inputs: node %s, input %s\n", node->name, src->name);
                             need_new_split = true;
                             break;
                         }
@@ -2243,7 +1647,8 @@ wsp_ggml_backend_sched_t wsp_ggml_backend_sched_new(
 
     struct wsp_ggml_backend_sched * sched = (wsp_ggml_backend_sched *) calloc(1, sizeof(struct wsp_ggml_backend_sched));
 
-    sched->debug = getenv("WSP_GGML_SCHED_DEBUG") != NULL;
+    const char * WSP_GGML_SCHED_DEBUG = getenv("WSP_GGML_SCHED_DEBUG");
+    sched->debug = WSP_GGML_SCHED_DEBUG ? atoi(WSP_GGML_SCHED_DEBUG) : 0;
     sched->n_backends = n_backends;
     sched->n_copies = parallel ? WSP_GGML_SCHED_MAX_COPIES : 1;
 
@@ -2632,4 +2037,629 @@ bool wsp_ggml_backend_compare_graph_backend(wsp_ggml_backend_t backend1, wsp_ggm
     wsp_ggml_backend_graph_copy_free(copy);
 
     return true;
+}
+
+
+
+#include "ggml-backend.h"
+#include "ggml-backend-impl.h"
+#include "ggml-cpu.h"
+#include "ggml-impl.h"
+#include <cctype>
+#include <string>
+
+// ggml-backend interface
+
+// CPU backend - buffer
+
+static void * wsp_ggml_backend_cpu_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
+    uintptr_t data = (uintptr_t)buffer->context;
+
+    // align the buffer
+    if (data % TENSOR_ALIGNMENT != 0) {
+        data = WSP_GGML_PAD(data, TENSOR_ALIGNMENT);
+    }
+
+    return (void *)data;
+}
+
+static void wsp_ggml_backend_cpu_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
+    wsp_ggml_aligned_free(buffer->context, buffer->size);
+}
+
+static void wsp_ggml_backend_cpu_buffer_memset_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
+    memset((char *)tensor->data + offset, value, size);
+
+    WSP_GGML_UNUSED(buffer);
+}
+
+static void wsp_ggml_backend_cpu_buffer_set_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    memcpy((char *)tensor->data + offset, data, size);
+
+    WSP_GGML_UNUSED(buffer);
+}
+
+static void wsp_ggml_backend_cpu_buffer_get_tensor(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    memcpy(data, (const char *)tensor->data + offset, size);
+
+    WSP_GGML_UNUSED(buffer);
+}
+
+static bool wsp_ggml_backend_cpu_buffer_cpy_tensor(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+    if (wsp_ggml_backend_buffer_is_host(src->buffer)) {
+        memcpy(dst->data, src->data, wsp_ggml_nbytes(src));
+        return true;
+    }
+    return false;
+
+    WSP_GGML_UNUSED(buffer);
+}
+
+static void wsp_ggml_backend_cpu_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
+    memset(buffer->context, value, buffer->size);
+}
+
+static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_cpu_buffer_i = {
+    /* .free_buffer     = */ wsp_ggml_backend_cpu_buffer_free_buffer,
+    /* .get_base        = */ wsp_ggml_backend_cpu_buffer_get_base,
+    /* .init_tensor     = */ NULL, // no initialization required
+    /* .memset_tensor   = */ wsp_ggml_backend_cpu_buffer_memset_tensor,
+    /* .set_tensor      = */ wsp_ggml_backend_cpu_buffer_set_tensor,
+    /* .get_tensor      = */ wsp_ggml_backend_cpu_buffer_get_tensor,
+    /* .cpy_tensor      = */ wsp_ggml_backend_cpu_buffer_cpy_tensor,
+    /* .clear           = */ wsp_ggml_backend_cpu_buffer_clear,
+    /* .reset           = */ NULL,
+};
+
+static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_cpu_buffer_from_ptr_i = {
+    /* .free_buffer     = */ NULL, // ptr is not owned by the buffer, so it does not need to be freed
+    /* .get_base        = */ wsp_ggml_backend_cpu_buffer_get_base,
+    /* .init_tensor     = */ NULL, // no initialization required
+    /* .memset_tensor   = */ wsp_ggml_backend_cpu_buffer_memset_tensor,
+    /* .set_tensor      = */ wsp_ggml_backend_cpu_buffer_set_tensor,
+    /* .get_tensor      = */ wsp_ggml_backend_cpu_buffer_get_tensor,
+    /* .cpy_tensor      = */ wsp_ggml_backend_cpu_buffer_cpy_tensor,
+    /* .clear           = */ wsp_ggml_backend_cpu_buffer_clear,
+    /* .reset           = */ NULL,
+};
+
+// CPU backend - buffer type
+
+static const char * wsp_ggml_backend_cpu_buffer_type_get_name(wsp_ggml_backend_buffer_type_t buft) {
+    return "CPU";
+
+    WSP_GGML_UNUSED(buft);
+}
+
+static wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_buffer_type_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
+    void * data = wsp_ggml_aligned_malloc(size);
+
+    if (data == NULL) {
+        WSP_GGML_LOG_ERROR("%s: failed to allocate buffer of size %zu\n", __func__, size);
+        return NULL;
+    }
+
+    return wsp_ggml_backend_buffer_init(buft, wsp_ggml_backend_cpu_buffer_i, data, size);
+}
+
+static size_t wsp_ggml_backend_cpu_buffer_type_get_alignment(wsp_ggml_backend_buffer_type_t buft) {
+    return TENSOR_ALIGNMENT;
+
+    WSP_GGML_UNUSED(buft);
+}
+
+static bool wsp_ggml_backend_cpu_buffer_type_is_host(wsp_ggml_backend_buffer_type_t buft) {
+    return true;
+
+    WSP_GGML_UNUSED(buft);
+}
+
+wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_buffer_type(void) {
+    static struct wsp_ggml_backend_buffer_type wsp_ggml_backend_cpu_buffer_type = {
+        /* .iface   = */ {
+            /* .get_name         = */ wsp_ggml_backend_cpu_buffer_type_get_name,
+            /* .alloc_buffer     = */ wsp_ggml_backend_cpu_buffer_type_alloc_buffer,
+            /* .get_alignment    = */ wsp_ggml_backend_cpu_buffer_type_get_alignment,
+            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
+            /* .get_alloc_size   = */ NULL, // defaults to wsp_ggml_nbytes
+            /* .is_host          = */ wsp_ggml_backend_cpu_buffer_type_is_host,
+        },
+        /* .device  = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
+        /* .context = */ NULL,
+    };
+
+    return &wsp_ggml_backend_cpu_buffer_type;
+}
+
+static const char * wsp_ggml_backend_cpu_buffer_from_ptr_type_get_name(wsp_ggml_backend_buffer_type_t buft) {
+    return "CPU_Mapped";
+
+    WSP_GGML_UNUSED(buft);
+}
+
+static wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_buffer_from_ptr_type(void) {
+    static struct wsp_ggml_backend_buffer_type wsp_ggml_backend_cpu_buffer_type = {
+        /* .iface   = */ {
+            /* .get_name         = */ wsp_ggml_backend_cpu_buffer_from_ptr_type_get_name,
+            /* .alloc_buffer     = */ wsp_ggml_backend_cpu_buffer_type_alloc_buffer,
+            /* .get_alignment    = */ wsp_ggml_backend_cpu_buffer_type_get_alignment,
+            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
+            /* .get_alloc_size   = */ NULL, // defaults to wsp_ggml_nbytes
+            /* .is_host          = */ wsp_ggml_backend_cpu_buffer_type_is_host,
+        },
+        /* .device  = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
+        /* .context = */ NULL,
+    };
+
+    return &wsp_ggml_backend_cpu_buffer_type;
+}
+
+#ifdef WSP_GGML_USE_CPU_HBM
+
+// buffer type HBM
+
+#include <hbwmalloc.h>
+
+static const char * wsp_ggml_backend_cpu_hbm_buffer_type_get_name(wsp_ggml_backend_buffer_type_t buft) {
+    return "CPU_HBM";
+
+    WSP_GGML_UNUSED(buft);
+}
+
+static void wsp_ggml_backend_cpu_hbm_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
+    hbw_free(buffer->context);
+}
+
+static wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_hbm_buffer_type_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
+    void * ptr;
+    int result = hbw_posix_memalign(&ptr, wsp_ggml_backend_cpu_buffer_type_get_alignment(buft), size);
+    if (result != 0) {
+        WSP_GGML_LOG_ERROR("failed to allocate HBM buffer of size %zu\n", size);
+        return NULL;
+    }
+
+    wsp_ggml_backend_buffer_t buffer = wsp_ggml_backend_cpu_buffer_from_ptr(ptr, size);
+    buffer->buft = buft;
+    buffer->iface.free_buffer = wsp_ggml_backend_cpu_hbm_buffer_free_buffer;
+
+    return buffer;
+}
+
+wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_hbm_buffer_type(void) {
+    static struct wsp_ggml_backend_buffer_type wsp_ggml_backend_cpu_buffer_type_hbm = {
+        /* .iface    = */ {
+            /* .get_name         = */ wsp_ggml_backend_cpu_hbm_buffer_type_get_name,
+            /* .alloc_buffer     = */ wsp_ggml_backend_cpu_hbm_buffer_type_alloc_buffer,
+            /* .get_alignment    = */ wsp_ggml_backend_cpu_buffer_type_get_alignment,
+            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
+            /* .get_alloc_size   = */ NULL, // defaults to wsp_ggml_nbytes
+            /* .is_host          = */ wsp_ggml_backend_cpu_buffer_type_is_host,
+        },
+        /* .context  = */ NULL,
+    };
+
+    return &wsp_ggml_backend_cpu_buffer_type_hbm;
+}
+#endif
+
+static wsp_ggml_backend_buffer_type_t * wsp_ggml_backend_cpu_get_extra_bufts(wsp_ggml_backend_dev_t device) {
+    static wsp_ggml_backend_buffer_type_t bufts[] = {
+#ifdef WSP_GGML_USE_CPU_HBM
+        wsp_ggml_backend_cpu_hbm_buffer_type(),
+#endif
+        NULL
+    };
+
+    return bufts;
+
+    WSP_GGML_UNUSED(device);
+}
+
+// CPU backend - backend (stream)
+
+struct wsp_ggml_backend_cpu_context {
+    int                 n_threads;
+    wsp_ggml_threadpool_t   threadpool;
+
+    uint8_t *           work_data;
+    size_t              work_size;
+
+    wsp_ggml_abort_callback abort_callback;
+    void *              abort_callback_data;
+};
+
+static const char * wsp_ggml_backend_cpu_get_name(wsp_ggml_backend_t backend) {
+    return "CPU";
+
+    WSP_GGML_UNUSED(backend);
+}
+
+static void wsp_ggml_backend_cpu_free(wsp_ggml_backend_t backend) {
+    struct wsp_ggml_backend_cpu_context * cpu_ctx = (struct wsp_ggml_backend_cpu_context *)backend->context;
+    delete[] cpu_ctx->work_data;
+    delete cpu_ctx;
+    delete backend;
+}
+
+struct wsp_ggml_backend_plan_cpu {
+    struct wsp_ggml_cplan cplan;
+    struct wsp_ggml_cgraph cgraph;
+};
+
+static wsp_ggml_backend_graph_plan_t wsp_ggml_backend_cpu_graph_plan_create(wsp_ggml_backend_t backend, const struct wsp_ggml_cgraph * cgraph) {
+    struct wsp_ggml_backend_cpu_context * cpu_ctx = (struct wsp_ggml_backend_cpu_context *)backend->context;
+
+    struct wsp_ggml_backend_plan_cpu * cpu_plan = new wsp_ggml_backend_plan_cpu;
+
+    cpu_plan->cplan = wsp_ggml_graph_plan(cgraph, cpu_ctx->n_threads, cpu_ctx->threadpool);
+    cpu_plan->cgraph = *cgraph; // FIXME: deep copy
+
+    if (cpu_plan->cplan.work_size > 0) {
+        cpu_plan->cplan.work_data = new uint8_t[cpu_plan->cplan.work_size];
+        if (cpu_plan->cplan.work_data == NULL) {
+            delete cpu_plan;
+            return NULL;
+        }
+    }
+
+    cpu_plan->cplan.abort_callback      = cpu_ctx->abort_callback;
+    cpu_plan->cplan.abort_callback_data = cpu_ctx->abort_callback_data;
+
+    return cpu_plan;
+}
+
+static void wsp_ggml_backend_cpu_graph_plan_free(wsp_ggml_backend_t backend, wsp_ggml_backend_graph_plan_t plan) {
+    struct wsp_ggml_backend_plan_cpu * cpu_plan = (struct wsp_ggml_backend_plan_cpu *)plan;
+
+    delete[] cpu_plan->cplan.work_data;
+    delete cpu_plan;
+
+    WSP_GGML_UNUSED(backend);
+}
+
+static enum wsp_ggml_status wsp_ggml_backend_cpu_graph_plan_compute(wsp_ggml_backend_t backend, wsp_ggml_backend_graph_plan_t plan) {
+    struct wsp_ggml_backend_plan_cpu * cpu_plan = (struct wsp_ggml_backend_plan_cpu *)plan;
+
+    return wsp_ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
+
+    WSP_GGML_UNUSED(backend);
+}
+
+static enum wsp_ggml_status wsp_ggml_backend_cpu_graph_compute(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph) {
+    struct wsp_ggml_backend_cpu_context * cpu_ctx = (struct wsp_ggml_backend_cpu_context *)backend->context;
+
+    struct wsp_ggml_cplan cplan = wsp_ggml_graph_plan(cgraph, cpu_ctx->n_threads, cpu_ctx->threadpool);
+
+    if (cpu_ctx->work_size < cplan.work_size) {
+        delete[] cpu_ctx->work_data;
+        cpu_ctx->work_data = new uint8_t[cplan.work_size];
+        if (cpu_ctx->work_data == NULL) {
+            cpu_ctx->work_size = 0;
+            return WSP_GGML_STATUS_ALLOC_FAILED;
+        }
+        cpu_ctx->work_size = cplan.work_size;
+    }
+    cplan.work_data = (uint8_t *)cpu_ctx->work_data;
+
+    cplan.abort_callback      = cpu_ctx->abort_callback;
+    cplan.abort_callback_data = cpu_ctx->abort_callback_data;
+
+    return wsp_ggml_graph_compute(cgraph, &cplan);
+}
+
+static const struct wsp_ggml_backend_i wsp_ggml_backend_cpu_i = {
+    /* .get_name                = */ wsp_ggml_backend_cpu_get_name,
+    /* .free                    = */ wsp_ggml_backend_cpu_free,
+    /* .set_tensor_async        = */ NULL,
+    /* .get_tensor_async        = */ NULL,
+    /* .cpy_tensor_async        = */ NULL,
+    /* .synchronize             = */ NULL,
+    /* .graph_plan_create       = */ wsp_ggml_backend_cpu_graph_plan_create,
+    /* .graph_plan_free         = */ wsp_ggml_backend_cpu_graph_plan_free,
+    /* .graph_plan_update       = */ NULL,
+    /* .graph_plan_compute      = */ wsp_ggml_backend_cpu_graph_plan_compute,
+    /* .graph_compute           = */ wsp_ggml_backend_cpu_graph_compute,
+    /* .event_record            = */ NULL,
+    /* .event_wait              = */ NULL,
+};
+
+static wsp_ggml_guid_t wsp_ggml_backend_cpu_guid(void) {
+    static wsp_ggml_guid guid = { 0xaa, 0x67, 0xc7, 0x43, 0x96, 0xe6, 0xa3, 0x8a, 0xe3, 0xaf, 0xea, 0x92, 0x36, 0xbc, 0xfc, 0x89 };
+    return &guid;
+}
+
+wsp_ggml_backend_t wsp_ggml_backend_cpu_init(void) {
+    // initialize CPU backend now to avoid slowing the first graph computation
+    wsp_ggml_cpu_init();
+
+    struct wsp_ggml_backend_cpu_context * ctx = new wsp_ggml_backend_cpu_context;
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    ctx->n_threads           = WSP_GGML_DEFAULT_N_THREADS;
+    ctx->threadpool          = NULL;
+    ctx->work_data           = NULL;
+    ctx->work_size           = 0;
+    ctx->abort_callback      = NULL;
+    ctx->abort_callback_data = NULL;
+
+    wsp_ggml_backend_t cpu_backend = new wsp_ggml_backend {
+        /* .guid      = */ wsp_ggml_backend_cpu_guid(),
+        /* .interface = */ wsp_ggml_backend_cpu_i,
+        /* .device    = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
+        /* .context   = */ ctx,
+    };
+
+    if (cpu_backend == NULL) {
+        delete ctx;
+        return NULL;
+    }
+
+    return cpu_backend;
+}
+
+bool wsp_ggml_backend_is_cpu(wsp_ggml_backend_t backend) {
+    return backend != NULL && wsp_ggml_guid_matches(backend->guid, wsp_ggml_backend_cpu_guid());
+}
+
+void wsp_ggml_backend_cpu_set_n_threads(wsp_ggml_backend_t backend_cpu, int n_threads) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
+
+    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
+    ctx->n_threads = n_threads;
+}
+
+void wsp_ggml_backend_cpu_set_threadpool(wsp_ggml_backend_t backend_cpu, wsp_ggml_threadpool_t threadpool) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
+
+    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
+
+    if (ctx->threadpool && ctx->threadpool != threadpool) {
+        // already had a different threadpool, pause/suspend it before switching
+        wsp_ggml_threadpool_pause(ctx->threadpool);
+    }
+    ctx->threadpool = threadpool;
+}
+
+void wsp_ggml_backend_cpu_set_abort_callback(wsp_ggml_backend_t backend_cpu, wsp_ggml_abort_callback abort_callback, void * abort_callback_data) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
+
+    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
+    ctx->abort_callback = abort_callback;
+    ctx->abort_callback_data = abort_callback_data;
+}
+
+wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) {
+    WSP_GGML_ASSERT((uintptr_t)ptr % TENSOR_ALIGNMENT == 0 && "buffer pointer must be aligned");
+    return wsp_ggml_backend_buffer_init(wsp_ggml_backend_cpu_buffer_from_ptr_type(), wsp_ggml_backend_cpu_buffer_from_ptr_i, ptr, size);
+}
+
+// CPU backend - device
+
+struct wsp_ggml_backend_cpu_device_context {
+    std::string description = "CPU";
+
+    wsp_ggml_backend_cpu_device_context() {
+#ifdef __APPLE__
+        size_t len = 0;
+        if (!sysctlbyname("machdep.cpu.brand_string", NULL, &len, NULL, 0)) {
+            description.resize(len);
+            sysctlbyname("machdep.cpu.brand_string", &description[0], &len, NULL, 0); // NOLINT
+        }
+#elif defined(__linux__)
+        FILE * f = fopen("/proc/cpuinfo", "r");
+        if (f) {
+            char buf[1024];
+            while (fgets(buf, sizeof(buf), f)) {
+                if (strncmp(buf, "model name", 10) == 0) {
+                    char * p = strchr(buf, ':');
+                    if (p) {
+                        p++;
+                        while (std::isspace(*p)) {
+                            p++;
+                        }
+                        while (std::isspace(p[strlen(p) - 1])) {
+                            p[strlen(p) - 1] = '\0';
+                        }
+                        description = p;
+                        break;
+                    }
+                }
+            }
+            fclose(f);
+        }
+#elif defined(_WIN32)
+        HKEY hKey;
+        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                        TEXT("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0"),
+                        0,
+                        KEY_READ,
+                        &hKey) == ERROR_SUCCESS) {
+            DWORD cpu_brand_size = 0;
+            if (RegQueryValueExA(hKey,
+                                TEXT("ProcessorNameString"),
+                                NULL,
+                                NULL,
+                                NULL,
+                                &cpu_brand_size) == ERROR_SUCCESS) {
+                description.resize(cpu_brand_size);
+                if (RegQueryValueExA(hKey,
+                                    TEXT("ProcessorNameString"),
+                                    NULL,
+                                    NULL,
+                                    (LPBYTE)&description[0], // NOLINT
+                                    &cpu_brand_size) == ERROR_SUCCESS) {
+                    if (description.find('\0') != std::string::npos) {
+                        description.resize(description.find('\0'));
+                    }
+                }
+            }
+            RegCloseKey(hKey);
+        }
+#endif
+    }
+};
+
+static const char * wsp_ggml_backend_cpu_device_get_name(wsp_ggml_backend_dev_t dev) {
+    return "CPU";
+
+    WSP_GGML_UNUSED(dev);
+}
+
+static const char * wsp_ggml_backend_cpu_device_get_description(wsp_ggml_backend_dev_t dev) {
+    struct wsp_ggml_backend_cpu_device_context * ctx = (struct wsp_ggml_backend_cpu_device_context *)dev->context;
+
+    return ctx->description.c_str();
+}
+
+static void wsp_ggml_backend_cpu_device_get_memory(wsp_ggml_backend_dev_t dev, size_t * free, size_t * total) {
+    // TODO
+    *free = 0;
+    *total = 0;
+
+    WSP_GGML_UNUSED(dev);
+}
+
+static enum wsp_ggml_backend_dev_type wsp_ggml_backend_cpu_device_get_type(wsp_ggml_backend_dev_t dev) {
+    return WSP_GGML_BACKEND_DEVICE_TYPE_CPU;
+
+    WSP_GGML_UNUSED(dev);
+}
+
+static void wsp_ggml_backend_cpu_device_get_props(wsp_ggml_backend_dev_t dev, struct wsp_ggml_backend_dev_props * props) {
+    props->name        = wsp_ggml_backend_cpu_device_get_name(dev);
+    props->description = wsp_ggml_backend_cpu_device_get_description(dev);
+    props->type        = wsp_ggml_backend_cpu_device_get_type(dev);
+    wsp_ggml_backend_cpu_device_get_memory(dev, &props->memory_free, &props->memory_total);
+    props->caps = {
+        /* .async                 = */ false,
+        /* .host_buffer           = */ false,
+        /* .buffer_from_host_ptr  = */ true,
+        /* .events                = */ false,
+    };
+}
+
+static wsp_ggml_backend_t wsp_ggml_backend_cpu_device_init_backend(wsp_ggml_backend_dev_t dev, const char * params) {
+    return wsp_ggml_backend_cpu_init();
+
+    WSP_GGML_UNUSED(dev);
+    WSP_GGML_UNUSED(params);
+}
+
+static wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_device_get_buffer_type(wsp_ggml_backend_dev_t dev) {
+    return wsp_ggml_backend_cpu_buffer_type();
+
+    WSP_GGML_UNUSED(dev);
+}
+
+static wsp_ggml_backend_buffer_t wsp_ggml_backend_cpu_device_buffer_from_host_ptr(wsp_ggml_backend_dev_t dev, void * ptr, size_t size, size_t max_tensor_size) {
+    return wsp_ggml_backend_cpu_buffer_from_ptr(ptr, size);
+
+    WSP_GGML_UNUSED(dev);
+    WSP_GGML_UNUSED(max_tensor_size);
+}
+
+static bool wsp_ggml_backend_cpu_device_supports_op(wsp_ggml_backend_dev_t dev, const struct wsp_ggml_tensor * op) {
+    switch (op->op) {
+        case WSP_GGML_OP_CPY:
+            return
+                op->type != WSP_GGML_TYPE_IQ2_XXS &&
+                op->type != WSP_GGML_TYPE_IQ2_XS  &&
+                op->type != WSP_GGML_TYPE_IQ1_S   &&
+                op->type != WSP_GGML_TYPE_IQ1_M; // missing type_traits.from_float
+        case WSP_GGML_OP_MUL_MAT:
+            //return op->src[1]->type == WSP_GGML_TYPE_F32; // TMP: workaround until sync with latest ggml
+            return op->src[1]->type == WSP_GGML_TYPE_F32 || op->src[1]->type == wsp_ggml_get_type_traits_cpu(op->src[0]->type)->vec_dot_type;
+        case WSP_GGML_OP_ROPE_BACK:
+            return op->src[2] == NULL && (op->op_params[2] & 4) == 0;
+        case WSP_GGML_OP_IM2COL_BACK:
+            return op->src[0]->type == WSP_GGML_TYPE_F32 && op->src[1]->type == WSP_GGML_TYPE_F32;
+        case WSP_GGML_OP_OUT_PROD:
+            return (op->src[0]->type == WSP_GGML_TYPE_F32 || wsp_ggml_is_quantized(op->src[0]->type)) && op->src[1]->type == WSP_GGML_TYPE_F32;
+        default:
+            return true;
+    }
+
+    WSP_GGML_UNUSED(dev);
+}
+
+static bool wsp_ggml_backend_cpu_device_supports_buft(wsp_ggml_backend_dev_t dev, wsp_ggml_backend_buffer_type_t buft) {
+    return wsp_ggml_backend_buft_is_host(buft);
+
+    WSP_GGML_UNUSED(dev);
+}
+
+static const struct wsp_ggml_backend_device_i wsp_ggml_backend_cpu_device_i = {
+    /* .get_name             = */ wsp_ggml_backend_cpu_device_get_name,
+    /* .get_description      = */ wsp_ggml_backend_cpu_device_get_description,
+    /* .get_memory           = */ wsp_ggml_backend_cpu_device_get_memory,
+    /* .get_type             = */ wsp_ggml_backend_cpu_device_get_type,
+    /* .get_props            = */ wsp_ggml_backend_cpu_device_get_props,
+    /* .init_backend         = */ wsp_ggml_backend_cpu_device_init_backend,
+    /* .get_buffer_type      = */ wsp_ggml_backend_cpu_device_get_buffer_type,
+    /* .get_host_buffer_type = */ NULL,
+    /* .buffer_from_host_ptr = */ wsp_ggml_backend_cpu_device_buffer_from_host_ptr,
+    /* .supports_op          = */ wsp_ggml_backend_cpu_device_supports_op,
+    /* .supports_buft        = */ wsp_ggml_backend_cpu_device_supports_buft,
+    /* .offload_op           = */ NULL,
+    /* .event_new            = */ NULL,
+    /* .event_free           = */ NULL,
+    /* .event_synchronize    = */ NULL,
+};
+
+// CPU backend - backend (reg)
+
+static const char * wsp_ggml_backend_cpu_reg_get_name(wsp_ggml_backend_reg_t reg) {
+    return "CPU";
+
+    WSP_GGML_UNUSED(reg);
+}
+
+static size_t wsp_ggml_backend_cpu_reg_get_device_count(wsp_ggml_backend_reg_t reg) {
+    return 1;
+
+    WSP_GGML_UNUSED(reg);
+}
+
+static wsp_ggml_backend_dev_t wsp_ggml_backend_cpu_reg_get_device(wsp_ggml_backend_reg_t reg, size_t index) {
+    WSP_GGML_ASSERT(index == 0);
+
+    static wsp_ggml_backend_cpu_device_context ctx;
+    static wsp_ggml_backend_device wsp_ggml_backend_cpu_device = {
+        /* .iface   = */ wsp_ggml_backend_cpu_device_i,
+        /* .reg     = */ reg,
+        /* .context = */ &ctx,
+    };
+
+    return &wsp_ggml_backend_cpu_device;
+}
+
+static void * wsp_ggml_backend_cpu_get_proc_address(wsp_ggml_backend_reg_t reg, const char * name) {
+    if (strcmp(name, "wsp_ggml_backend_set_n_threads") == 0) {
+        return (void *)wsp_ggml_backend_cpu_set_n_threads;
+    }
+    if (strcmp(name, "wsp_ggml_backend_dev_get_extra_bufts") == 0) {
+        return (void *)wsp_ggml_backend_cpu_get_extra_bufts;
+    }
+
+    return NULL;
+
+    WSP_GGML_UNUSED(reg);
+}
+
+static const struct wsp_ggml_backend_reg_i wsp_ggml_backend_cpu_reg_i = {
+    /* .get_name         = */ wsp_ggml_backend_cpu_reg_get_name,
+    /* .get_device_count = */ wsp_ggml_backend_cpu_reg_get_device_count,
+    /* .get_device       = */ wsp_ggml_backend_cpu_reg_get_device,
+    /* .get_proc_address = */ wsp_ggml_backend_cpu_get_proc_address,
+};
+
+wsp_ggml_backend_reg_t wsp_ggml_backend_cpu_reg(void) {
+    static struct wsp_ggml_backend_reg wsp_ggml_backend_cpu_reg = {
+        /* .iface   = */ wsp_ggml_backend_cpu_reg_i,
+        /* .context = */ NULL,
+    };
+
+    return &wsp_ggml_backend_cpu_reg;
 }
