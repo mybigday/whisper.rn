@@ -3,9 +3,11 @@
 
 #include "ggml-backend.h"
 #include "ggml-impl.h"
-#include "ggml-cpu-impl.h"
-#include "ggml-quants.h"
+#include "ggml-threading.h"
 #include "ggml.h"
+
+// FIXME: required here for quantization functions
+#include "ggml-quants.h"
 #include "ggml-aarch64.h"
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
@@ -46,6 +48,17 @@
 #endif
 
 #define UNUSED WSP_GGML_UNUSED
+
+#if defined(_MSC_VER)
+#define m512bh(p) p
+#define m512i(p) p
+#else
+#define m512bh(p) (__m512bh)(p)
+#define m512i(p) (__m512i)(p)
+#endif
+
+// precomputed f32 table for f16 (256 KB) (ggml-impl.h)
+float wsp_ggml_table_f32_f16[1 << 16];
 
 #if (defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && \
     (!defined(TARGET_OS_TV) && !defined(TARGET_OS_WATCH))
@@ -363,7 +376,7 @@ void wsp_ggml_fp16_to_fp32_row(const wsp_ggml_fp16_t * x, float * y, int64_t n) 
 void wsp_ggml_fp32_to_fp16_row(const float * x, wsp_ggml_fp16_t * y, int64_t n) {
     int64_t i = 0;
 #if defined(__F16C__)
-    if (wsp_ggml_cpu_has_f16c()) {
+    //if (wsp_ggml_cpu_has_f16c()) {
         for (; i + 7 < n; i += 8) {
             __m256 x_vec = _mm256_loadu_ps(x + i);
             __m128i y_vec = _mm256_cvtps_ph(x_vec, _MM_FROUND_TO_NEAREST_INT);
@@ -374,7 +387,7 @@ void wsp_ggml_fp32_to_fp16_row(const float * x, wsp_ggml_fp16_t * y, int64_t n) 
             __m128i y_vec = _mm_cvtps_ph(x_vec, _MM_FROUND_TO_NEAREST_INT);
             _mm_storel_epi64((__m128i *)(y + i), y_vec);
         }
-    }
+    //}
 #endif
     for (; i < n; i++) {
         y[i] = WSP_GGML_FP32_TO_FP16(x[i]);
@@ -384,7 +397,7 @@ void wsp_ggml_fp32_to_fp16_row(const float * x, wsp_ggml_fp16_t * y, int64_t n) 
 void wsp_ggml_bf16_to_fp32_row(const wsp_ggml_bf16_t * x, float * y, int64_t n) {
     int64_t i = 0;
 #if defined(__AVX512F__)
-    if (wsp_ggml_cpu_has_avx512()) {
+    //if (wsp_ggml_cpu_has_avx512()) {
         for (; i + 16 <= n; i += 16) {
             _mm512_storeu_ps(y + i,
                             _mm512_castsi512_ps(
@@ -394,10 +407,10 @@ void wsp_ggml_bf16_to_fp32_row(const wsp_ggml_bf16_t * x, float * y, int64_t n) 
                                             (const __m256i *)(x + i))),
                                     16)));
         }
-    }
+    //}
 #endif
 #if defined(__AVX2__)
-    if (wsp_ggml_cpu_has_avx2()) {
+    //if (wsp_ggml_cpu_has_avx2()) {
         for (; i + 8 <= n; i += 8) {
             _mm256_storeu_ps(y + i,
                             _mm256_castsi256_ps(
@@ -407,7 +420,7 @@ void wsp_ggml_bf16_to_fp32_row(const wsp_ggml_bf16_t * x, float * y, int64_t n) 
                                             (const __m128i *)(x + i))),
                                     16)));
         }
-    }
+    //}
 #endif
     for (; i < n; i++) {
         y[i] = WSP_GGML_BF16_TO_FP32(x[i]);
@@ -588,7 +601,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(wsp_ggml_fp16_t),
         .is_quantized             = false,
         .to_float                 = (wsp_ggml_to_float_t) wsp_ggml_fp16_to_fp32_row,
-        .from_float               = (wsp_ggml_from_float_t) wsp_ggml_fp32_to_fp16_row,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_ggml_fp32_to_fp16_row,
     },
     [WSP_GGML_TYPE_Q4_0] = {
@@ -597,7 +609,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q4_0),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q4_0,
-        .from_float               = wsp_quantize_row_q4_0,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q4_0_ref,
     },
     [WSP_GGML_TYPE_Q4_1] = {
@@ -606,7 +617,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q4_1),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q4_1,
-        .from_float               = wsp_quantize_row_q4_1,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q4_1_ref,
     },
     [4] = { // WSP_GGML_TYPE_Q4_2
@@ -614,18 +624,12 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = 0,
         .type_size                = 0,
         .is_quantized             = false,
-        .to_float                 = NULL,
-        .from_float               = NULL,
-        .from_float_ref           = NULL,
     },
     [5] = { // WSP_GGML_TYPE_Q4_3
         .type_name                = "DEPRECATED",
         .blck_size                = 0,
         .type_size                = 0,
         .is_quantized             = false,
-        .to_float                 = NULL,
-        .from_float               = NULL,
-        .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_Q5_0] = {
         .type_name                = "q5_0",
@@ -633,7 +637,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q5_0),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q5_0,
-        .from_float               = wsp_quantize_row_q5_0,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q5_0_ref,
     },
     [WSP_GGML_TYPE_Q5_1] = {
@@ -642,7 +645,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q5_1),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q5_1,
-        .from_float               = wsp_quantize_row_q5_1,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q5_1_ref,
     },
     [WSP_GGML_TYPE_Q8_0] = {
@@ -651,7 +653,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q8_0),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q8_0,
-        .from_float               = wsp_quantize_row_q8_0,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q8_0_ref,
     },
     [WSP_GGML_TYPE_Q8_1] = {
@@ -659,7 +660,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK8_1,
         .type_size                = sizeof(block_q8_1),
         .is_quantized             = true,
-        .from_float               = wsp_quantize_row_q8_1,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q8_1_ref,
     },
     [WSP_GGML_TYPE_Q2_K] = {
@@ -668,7 +668,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q2_K),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q2_K,
-        .from_float               = wsp_quantize_row_q2_K,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q2_K_ref,
     },
     [WSP_GGML_TYPE_Q3_K] = {
@@ -677,7 +676,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q3_K),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q3_K,
-        .from_float               = wsp_quantize_row_q3_K,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q3_K_ref,
     },
     [WSP_GGML_TYPE_Q4_K] = {
@@ -686,7 +684,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q4_K),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q4_K,
-        .from_float               = wsp_quantize_row_q4_K,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q4_K_ref,
     },
     [WSP_GGML_TYPE_Q5_K] = {
@@ -695,7 +692,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q5_K),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q5_K,
-        .from_float               = wsp_quantize_row_q5_K,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q5_K_ref,
     },
     [WSP_GGML_TYPE_Q6_K] = {
@@ -704,7 +700,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q6_K),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q6_K,
-        .from_float               = wsp_quantize_row_q6_K,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q6_K_ref,
     },
     [WSP_GGML_TYPE_IQ2_XXS] = {
@@ -713,7 +708,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq2_xxs),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq2_xxs,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_IQ2_XS] = {
@@ -722,7 +716,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq2_xs),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq2_xs,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_IQ3_XXS] = {
@@ -731,7 +724,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq3_xxs),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq3_xxs,
-        .from_float               = wsp_quantize_row_iq3_xxs,
         .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_iq3_xxs_ref,
     },
     [WSP_GGML_TYPE_IQ3_S] = {
@@ -740,7 +732,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq3_s),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq3_s,
-        .from_float               = wsp_quantize_row_iq3_s,
         .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_iq3_s_ref,
     },
     [WSP_GGML_TYPE_IQ2_S] = {
@@ -749,7 +740,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq2_s),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq2_s,
-        .from_float               = wsp_quantize_row_iq2_s,
         .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_iq2_s_ref,
     },
     [WSP_GGML_TYPE_IQ1_S] = {
@@ -758,7 +748,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq1_s),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq1_s,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_IQ1_M] = {
@@ -767,7 +756,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq1_m),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq1_m,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_IQ4_NL] = {
@@ -776,7 +764,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq4_nl),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq4_nl,
-        .from_float               = wsp_quantize_row_iq4_nl,
         .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_iq4_nl_ref,
     },
     [WSP_GGML_TYPE_IQ4_XS] = {
@@ -785,7 +772,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_iq4_xs),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_iq4_xs,
-        .from_float               = wsp_quantize_row_iq4_xs,
         .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_iq4_xs_ref,
     },
     [WSP_GGML_TYPE_Q8_K] = {
@@ -793,7 +779,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .blck_size                = QK_K,
         .type_size                = sizeof(block_q8_K),
         .is_quantized             = true,
-        .from_float               = wsp_quantize_row_q8_K,
     },
     [WSP_GGML_TYPE_BF16] = {
         .type_name                = "bf16",
@@ -801,7 +786,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(wsp_ggml_bf16_t),
         .is_quantized             = false,
         .to_float                 = (wsp_ggml_to_float_t) wsp_ggml_bf16_to_fp32_row,
-        .from_float               = (wsp_ggml_from_float_t) wsp_ggml_fp32_to_bf16_row,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_ggml_fp32_to_bf16_row_ref,
     },
     [WSP_GGML_TYPE_Q4_0_4_4] = {
@@ -811,7 +795,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q4_0),
         .is_quantized             = true,
         .to_float                 = NULL,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_Q4_0_4_8] = {
@@ -821,7 +804,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q4_0),
         .is_quantized             = true,
         .to_float                 = NULL,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_Q4_0_8_8] = {
@@ -831,7 +813,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_q4_0),
         .is_quantized             = true,
         .to_float                 = NULL,
-        .from_float               = NULL,
         .from_float_ref           = NULL,
     },
     [WSP_GGML_TYPE_TQ1_0] = {
@@ -840,7 +821,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_tq1_0),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_tq1_0,
-        .from_float               = wsp_quantize_row_tq1_0,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_tq1_0_ref,
     },
     [WSP_GGML_TYPE_TQ2_0] = {
@@ -849,7 +829,6 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .type_size                = sizeof(block_tq2_0),
         .is_quantized             = true,
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_tq2_0,
-        .from_float               = wsp_quantize_row_tq2_0,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_tq2_0_ref,
     },
 };
@@ -1613,14 +1592,13 @@ static struct wsp_ggml_tensor * wsp_ggml_new_tensor_impl(
         /*.op           =*/ WSP_GGML_OP_NONE,
         /*.op_params    =*/ { 0 },
         /*.flags        =*/ 0,
-        /*.grad         =*/ NULL,
         /*.src          =*/ { NULL },
         /*.view_src     =*/ view_src,
         /*.view_offs    =*/ view_offs,
         /*.data         =*/ obj_alloc_size > 0 ? (void *)(result + 1) : data,
         /*.name         =*/ { 0 },
         /*.extra        =*/ NULL,
-        ///*.padding      =*/ { 0 },
+        /*.padding      =*/ { 0 },
     };
 
 #ifdef __clang__
@@ -3646,6 +3624,22 @@ struct wsp_ggml_tensor * wsp_ggml_rope_custom_inplace(
     );
 }
 
+// Apparently solving `n_rot = 2pi * x * base^((2 * max_pos_emb) / n_dims)` for x, we get
+// `corr_dim(n_rot) = n_dims * log(max_pos_emb / (n_rot * 2pi)) / (2 * log(base))`
+static float wsp_ggml_rope_yarn_corr_dim(int n_dims, int n_ctx_orig, float n_rot, float base) {
+    return n_dims * logf(n_ctx_orig / (n_rot * 2 * (float)M_PI)) / (2 * logf(base));
+}
+
+void wsp_ggml_rope_yarn_corr_dims(
+    int n_dims, int n_ctx_orig, float freq_base, float beta_fast, float beta_slow, float dims[2]
+) {
+    // start and end correction dims
+    float start = floorf(wsp_ggml_rope_yarn_corr_dim(n_dims, n_ctx_orig, beta_fast, freq_base));
+    float end   =  ceilf(wsp_ggml_rope_yarn_corr_dim(n_dims, n_ctx_orig, beta_slow, freq_base));
+    dims[0] = MAX(0, start);
+    dims[1] = MIN(n_dims - 1, end);
+}
+
 // wsp_ggml_rope_back
 
 struct wsp_ggml_tensor * wsp_ggml_rope_back(
@@ -4199,8 +4193,6 @@ struct wsp_ggml_tensor * wsp_ggml_flash_attn_ext(
         WSP_GGML_ASSERT(mask);
     }
 
-    bool is_node = false;
-
     // permute(0, 2, 1, 3)
     int64_t ne[4] = { q->ne[0], q->ne[2], q->ne[1], q->ne[3] };
     struct wsp_ggml_tensor * result = wsp_ggml_new_tensor(ctx, WSP_GGML_TYPE_F32, 4, ne);
@@ -4208,8 +4200,7 @@ struct wsp_ggml_tensor * wsp_ggml_flash_attn_ext(
     float params[] = { scale, max_bias, logit_softcap };
     wsp_ggml_set_op_params(result, params, sizeof(params));
 
-    result->op   = WSP_GGML_OP_FLASH_ATTN_EXT;
-    result->grad = is_node ? wsp_ggml_dup_tensor(ctx, result) : NULL;
+    result->op     = WSP_GGML_OP_FLASH_ATTN_EXT;
     result->src[0] = q;
     result->src[1] = k;
     result->src[2] = v;
@@ -4277,14 +4268,6 @@ struct wsp_ggml_tensor * wsp_ggml_flash_attn_back(
 
     WSP_GGML_ASSERT(ne2 % kvne2 == 0);
 
-    bool is_node = false;
-
-    if (q->grad || k->grad || v->grad) {
-        // when using this operation (in backwards pass) these grads are set.
-        // we don't want to create (big) grad of our result, so is_node is false.
-        is_node = false;
-    }
-
     // store gradients of q, k and v as continuous tensors concatenated in result.
     // note: v and gradv are actually transposed, i.e. v->ne[0] != D.
     const int64_t elem_q = wsp_ggml_nelements(q);
@@ -4307,8 +4290,7 @@ struct wsp_ggml_tensor * wsp_ggml_flash_attn_back(
     int32_t masked_i = masked ? 1 : 0;
     wsp_ggml_set_op_params(result, &masked_i, sizeof(masked_i));
 
-    result->op   = WSP_GGML_OP_FLASH_ATTN_BACK;
-    result->grad = is_node ? wsp_ggml_dup_tensor(ctx, result) : NULL;
+    result->op     = WSP_GGML_OP_FLASH_ATTN_BACK;
     result->src[0] = q;
     result->src[1] = k;
     result->src[2] = v;
@@ -4950,34 +4932,24 @@ struct wsp_ggml_tensor * wsp_ggml_opt_step_adamw(
         struct wsp_ggml_context * ctx,
         struct wsp_ggml_tensor  * a,
         struct wsp_ggml_tensor  * grad,
-        float                 alpha,
-        float                 beta1,
-        float                 beta2,
-        float                 eps,
-        float                 wd) {
+        struct wsp_ggml_tensor  * m,
+        struct wsp_ggml_tensor  * v,
+        struct wsp_ggml_tensor  * adamw_params) {
     WSP_GGML_ASSERT(a->flags & WSP_GGML_TENSOR_FLAG_PARAM);
     WSP_GGML_ASSERT(wsp_ggml_are_same_shape(a, grad));
-    WSP_GGML_ASSERT(alpha >  0.0f);
-    WSP_GGML_ASSERT(beta1 >= 0.0f && beta1 <= 1.0f);
-    WSP_GGML_ASSERT(beta2 >= 0.0f && beta2 <= 1.0f);
-    WSP_GGML_ASSERT(eps   >= 0.0f);
-    WSP_GGML_ASSERT(wd    >= 0.0f && wd    <= 1.0f);
+    WSP_GGML_ASSERT(wsp_ggml_are_same_shape(a, m));
+    WSP_GGML_ASSERT(wsp_ggml_are_same_shape(a, v));
+    WSP_GGML_ASSERT(adamw_params->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(wsp_ggml_nelements(adamw_params) == 7);
 
     struct wsp_ggml_tensor * result = wsp_ggml_view_tensor(ctx, a);
-
-    const int64_t iter = 1;
-    memcpy(&result->op_params[0], &iter, sizeof(int64_t));
-    wsp_ggml_set_op_params_f32(result, 2, alpha);
-    wsp_ggml_set_op_params_f32(result, 3, beta1);
-    wsp_ggml_set_op_params_f32(result, 4, beta2);
-    wsp_ggml_set_op_params_f32(result, 5, eps);
-    wsp_ggml_set_op_params_f32(result, 6, wd);
 
     result->op     = WSP_GGML_OP_OPT_STEP_ADAMW;
     result->src[0] = a;
     result->src[1] = grad;
-    result->src[2] = wsp_ggml_dup_tensor(ctx, grad);
-    result->src[3] = wsp_ggml_dup_tensor(ctx, grad);
+    result->src[2] = m;
+    result->src[3] = v;
+    result->src[4] = adamw_params;
 
     return result;
 }
@@ -5046,1112 +5018,514 @@ static void wsp_ggml_hash_map_free(struct hash_map * map) {
     WSP_GGML_FREE(map);
 }
 
-// gradient checkpointing
-
-static struct wsp_ggml_tensor * wsp_ggml_recompute_graph_node(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_cgraph  * graph,
-        struct hash_map     * replacements,
-        struct wsp_ggml_tensor  * node) {
-
-    if (node == NULL) {
-        return NULL;
-    }
-
-    if (node->flags & WSP_GGML_TENSOR_FLAG_PARAM) {
-        return node;
-    }
-
-    if (!wsp_ggml_hash_contains(&graph->visited_hash_set, node)) {
-        return node;
-    }
-
-    int count_children = 0;
-    for (int k = 0; k < WSP_GGML_MAX_SRC; ++k) {
-        if (node->src[k]) {
-            ++count_children;
-        }
-    }
-
-    if (count_children == 0) {
-        return node;
-    }
-
-    size_t i = wsp_ggml_hash_find(&replacements->set, node);
-    WSP_GGML_ASSERT(i != WSP_GGML_HASHSET_FULL); // assert that not full
-    if (replacements->set.keys[i] == node) {
-        return replacements->vals[i];
-    }
-
-    struct wsp_ggml_tensor * clone = wsp_ggml_new_tensor(ctx, node->type, WSP_GGML_MAX_DIMS, node->ne);
-
-    // insert clone into replacements
-    WSP_GGML_ASSERT(replacements->set.keys[i] == NULL); // assert that we don't overwrite
-    replacements->set.keys[i] = node;
-    replacements->vals[i] = clone;
-
-    clone->op       = node->op;
-    clone->grad     = node->grad;
-    clone->flags    = node->flags;
-    clone->extra    = node->extra;
-    for (int k = 0; k < WSP_GGML_MAX_DIMS; ++k) {
-        clone->nb[k] = node->nb[k];
-    }
-    for (int k = 0; k < WSP_GGML_MAX_SRC; ++k) {
-        clone->src[k] = wsp_ggml_recompute_graph_node(ctx, graph, replacements, node->src[k]);
-    }
-    if (node->view_src != NULL) {
-        clone->data = (node->view_src->data == NULL)
-                        ? NULL // view_src not yet allocated
-                        : (char *) node->view_src->data // view_src already allocated
-                                 + node->view_offs;
-        clone->view_src  = node->view_src;
-        clone->view_offs = node->view_offs;
-    }
-
-    WSP_GGML_ASSERT(sizeof(node->op_params) == sizeof(int32_t) * (WSP_GGML_MAX_OP_PARAMS / sizeof(int32_t)));
-    WSP_GGML_ASSERT(sizeof(node->name)      == WSP_GGML_MAX_NAME);
-    memcpy(clone->op_params, node->op_params, sizeof(node->op_params));
-    wsp_ggml_format_name(clone, "%s (clone)", wsp_ggml_get_name(node));
-
-    return clone;
-}
-
-void wsp_ggml_build_backward_gradient_checkpointing(
-        struct wsp_ggml_context   * ctx,
-        struct wsp_ggml_cgraph    * gf,
-        struct wsp_ggml_cgraph    * gb,
-        struct wsp_ggml_cgraph    * gb_tmp,
-        struct wsp_ggml_tensor  * * checkpoints,
-        int                     n_checkpoints) {
-    wsp_ggml_graph_cpy(gf, gb_tmp);
-    wsp_ggml_build_backward_expand(ctx, gf, gb_tmp, false);
-
-    if (n_checkpoints <= 0) {
-        wsp_ggml_graph_cpy(gb_tmp, gb);
-        return;
-    }
-
-    struct hash_map * replacements = wsp_ggml_new_hash_map(gf->n_nodes + gf->n_leafs + n_checkpoints);
-
-    // insert checkpoints in replacements
-    for (int i = 0; i < n_checkpoints; ++i) {
-        size_t k = wsp_ggml_hash_find(&replacements->set, checkpoints[i]);
-        WSP_GGML_ASSERT(k != WSP_GGML_HASHSET_FULL); // assert that not full
-        WSP_GGML_ASSERT(replacements->set.keys[k] == NULL); // assert that we don't overwrite
-        replacements->set.keys[k] = checkpoints[i];
-        replacements->vals[k]     = checkpoints[i];
-    }
-
-    wsp_ggml_graph_cpy(gf, gb);
-    // rewrite gb_tmp->nodes[gf->n_nodes:gb_tmp->n_nodes],
-    // replacing references to gb_tmp->nodes[0:gf->n_nodes] ( == gf->nodes[0:gf->n_nodes]),
-    // by recomputing them from checkpoints
-    for (int i = gf->n_nodes; i<gb_tmp->n_nodes; ++i) {
-        struct wsp_ggml_tensor * node = gb_tmp->nodes[i];
-        for (int k = 0; k < WSP_GGML_MAX_SRC; ++k) {
-            // insert new tensors recomputing src, reusing already made replacements,
-            // remember replacements: remember new tensors with mapping from corresponding gf nodes
-            // recurse for input tensors,
-            // unless (i.e. terminating when) input tensors are replacements (like checkpoints)
-            node->src[k] = wsp_ggml_recompute_graph_node(ctx, gf, replacements, node->src[k]);
-        }
-        // insert rewritten backward node with replacements made into resulting backward graph gb
-        wsp_ggml_build_forward_expand(gb, node);
-    }
-
-    wsp_ggml_hash_map_free(replacements);
-}
-
 // utility functions to change gradients
 // if a is in acc_table, modify gradients in-place and mark result as gradient accumulator
 // else if a is in zero_table, replace a
 // else, just add/subtract/etc. the gradients
 
-static struct wsp_ggml_tensor * wsp_ggml_add_or_set(
-        struct wsp_ggml_context  * ctx,
-        struct wsp_ggml_tensor   * a,
-        struct wsp_ggml_tensor   * b,
-        struct wsp_ggml_hash_set * zero_table,
-        struct wsp_ggml_hash_set * acc_table) {
-    if (wsp_ggml_hash_contains(acc_table, a)) {
-        struct wsp_ggml_tensor * ret = wsp_ggml_add_impl(ctx, a, b, true);
-        const size_t insert_result = wsp_ggml_hash_insert(acc_table, ret);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_FULL);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_ALREADY_EXISTS);
-        return ret;
+static void wsp_ggml_add_or_set(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_cgraph  * cgraph,
+        size_t                isrc,
+        struct wsp_ggml_tensor  * tensor) {
+    if (cgraph->grads[isrc]) {
+        cgraph->grads[isrc] = wsp_ggml_add_impl(ctx, cgraph->grads[isrc], tensor, cgraph->grad_accs[isrc]);
+    } else {
+        cgraph->grads[isrc] = tensor;
     }
-    if (wsp_ggml_hash_contains(zero_table, a)) {
-        return b;
-    }
-    return wsp_ggml_add_impl(ctx, a, b, false);
+    wsp_ggml_build_forward_expand(cgraph, cgraph->grads[isrc]);
 }
 
-static struct wsp_ggml_tensor * wsp_ggml_acc_or_set(
-        struct wsp_ggml_context  * ctx,
-        struct wsp_ggml_tensor   * a,
-        struct wsp_ggml_tensor   * b,
-        const  size_t          nb1,
-        const  size_t          nb2,
-        const  size_t          nb3,
-        const  size_t          offset,
-        struct wsp_ggml_hash_set * zero_table,
-        struct wsp_ggml_hash_set * acc_table) {
-    if (wsp_ggml_hash_contains(acc_table, a)) {
-        struct wsp_ggml_tensor * ret = wsp_ggml_acc_impl(ctx, a, b, nb1, nb2, nb3, offset, true);
-        const size_t insert_result = wsp_ggml_hash_insert(acc_table, ret);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_FULL);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_ALREADY_EXISTS);
-        return ret;
+static void wsp_ggml_acc_or_set(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_cgraph  * cgraph,
+        size_t                isrc,
+        struct wsp_ggml_tensor  * src,
+        struct wsp_ggml_tensor  * tensor,
+        const  size_t         nb1,
+        const  size_t         nb2,
+        const  size_t         nb3,
+        const  size_t         offset) {
+    if (cgraph->grads[isrc]) {
+        cgraph->grads[isrc] = wsp_ggml_acc_impl(ctx, cgraph->grads[isrc], tensor, nb1, nb2, nb3, offset, cgraph->grad_accs[isrc]);
+    } else {
+        struct wsp_ggml_tensor * a_zero = wsp_ggml_scale(ctx, src, 0.0f); // FIXME this is going to produce NaN if a contains inf/NaN
+        cgraph->grads[isrc] = wsp_ggml_acc_impl(ctx, a_zero, tensor, nb1, nb2, nb3, offset, false);
     }
-    if (wsp_ggml_hash_contains(zero_table, a)) {
-        struct wsp_ggml_tensor * a_zero = wsp_ggml_scale(ctx, a, 0.0f); // FIXME this is going to produce NaN if a contains inf/NaN
-        return wsp_ggml_acc_impl(ctx, a_zero, b, nb1, nb2, nb3, offset, false);
-    }
-    return wsp_ggml_acc_impl(ctx, a, b, nb1, nb2, nb3, offset, false);
+    wsp_ggml_build_forward_expand(cgraph, cgraph->grads[isrc]);
 }
 
-static struct wsp_ggml_tensor * wsp_ggml_add1_or_set(
-        struct wsp_ggml_context  * ctx,
-        struct wsp_ggml_tensor   * a,
-        struct wsp_ggml_tensor   * b,
-        struct wsp_ggml_hash_set * zero_table,
-        struct wsp_ggml_hash_set * acc_table) {
-    if (wsp_ggml_hash_contains(acc_table, a)) {
-        struct wsp_ggml_tensor * ret = wsp_ggml_add1_impl(ctx, a, b, true);
-        const size_t insert_result = wsp_ggml_hash_insert(acc_table, ret);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_FULL);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_ALREADY_EXISTS);
-        return ret;
+static void wsp_ggml_add1_or_set(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_cgraph  * cgraph,
+        size_t                isrc,
+        struct wsp_ggml_tensor  * src,
+        struct wsp_ggml_tensor  * tensor) {
+    if (cgraph->grads[isrc]) {
+        cgraph->grads[isrc] = wsp_ggml_add1_impl(ctx, cgraph->grads[isrc], tensor, cgraph->grad_accs[isrc]);
+    } else {
+        cgraph->grads[isrc] = wsp_ggml_repeat(ctx, tensor, src);
     }
-    if (wsp_ggml_hash_contains(zero_table, a)) {
-        return wsp_ggml_repeat(ctx, b, a);
-    }
-    return wsp_ggml_add1_impl(ctx, a, b, false);
+    wsp_ggml_build_forward_expand(cgraph, cgraph->grads[isrc]);
 }
 
-static struct wsp_ggml_tensor * wsp_ggml_sub_or_set(
-        struct wsp_ggml_context  * ctx,
-        struct wsp_ggml_tensor   * a,
-        struct wsp_ggml_tensor   * b,
-        struct wsp_ggml_hash_set * zero_table,
-        struct wsp_ggml_hash_set * acc_table) {
-    if (wsp_ggml_hash_contains(acc_table, a)) {
-        struct wsp_ggml_tensor * ret = wsp_ggml_sub_impl(ctx, a, b, true);
-        const size_t insert_result = wsp_ggml_hash_insert(acc_table, ret);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_FULL);
-        WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_ALREADY_EXISTS);
-        return ret;
+static void wsp_ggml_sub_or_set(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_cgraph  * cgraph,
+        size_t                isrc,
+        struct wsp_ggml_tensor  * tensor) {
+    if (cgraph->grads[isrc]) {
+        cgraph->grads[isrc] = wsp_ggml_sub_impl(ctx, cgraph->grads[isrc], tensor, cgraph->grad_accs[isrc]);
+    } else {
+        cgraph->grads[isrc] = wsp_ggml_neg(ctx, tensor);
     }
-    if (wsp_ggml_hash_contains(zero_table, a)) {
-        return wsp_ggml_neg(ctx, b);
-    }
-    return wsp_ggml_sub_impl(ctx, a, b, false);
+    wsp_ggml_build_forward_expand(cgraph, cgraph->grads[isrc]);
 }
 
-static void wsp_ggml_compute_backward(struct wsp_ggml_context * ctx, struct wsp_ggml_tensor * tensor, struct wsp_ggml_hash_set * zero_table, struct wsp_ggml_hash_set * acc_table) {
+static void wsp_ggml_compute_backward(
+        struct wsp_ggml_context * ctx, struct wsp_ggml_cgraph * cgraph, int i, bool * grads_needed) {
+    struct wsp_ggml_tensor * tensor = cgraph->nodes[i];
+    struct wsp_ggml_tensor * grad   = wsp_ggml_graph_get_grad(cgraph, tensor);
+
+    if (!grad) {
+        return;
+    }
+
     struct wsp_ggml_tensor * src0 = tensor->src[0];
     struct wsp_ggml_tensor * src1 = tensor->src[1];
     struct wsp_ggml_tensor * src2 = tensor->src[2];
+    struct wsp_ggml_hash_set * hash_set = &cgraph->visited_hash_set;
+    const size_t isrc0 = wsp_ggml_hash_find(hash_set, src0);
+    const size_t isrc1 = wsp_ggml_hash_find(hash_set, src1);
+    const size_t isrc2 = wsp_ggml_hash_find(hash_set, src2);
+    const bool src0_needs_grads = isrc0 != WSP_GGML_HASHSET_FULL && wsp_ggml_bitset_get(hash_set->used, isrc0) && grads_needed[isrc0];
+    const bool src1_needs_grads = isrc1 != WSP_GGML_HASHSET_FULL && wsp_ggml_bitset_get(hash_set->used, isrc1) && grads_needed[isrc1];
+    const bool src2_needs_grads = isrc2 != WSP_GGML_HASHSET_FULL && wsp_ggml_bitset_get(hash_set->used, isrc2) && grads_needed[isrc2];
 
     switch (tensor->op) {
-        case WSP_GGML_OP_DUP:
-            {
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_ADD:
-            {
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    if (wsp_ggml_are_same_shape(src0, src1)) {
-                        src1->grad = wsp_ggml_add_or_set(ctx, src1->grad,                       tensor->grad,        zero_table, acc_table);
-                    } else {
-                        src1->grad = wsp_ggml_add_or_set(ctx, src1->grad, wsp_ggml_repeat_back(ctx, tensor->grad, src1), zero_table, acc_table);
-                    }
-                }
-            } break;
-        case WSP_GGML_OP_ADD1:
-            {
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    src1->grad = wsp_ggml_add_or_set(ctx,
-                        src1->grad,
-                        wsp_ggml_mean(ctx, tensor->grad), // TODO: should probably be sum instead of mean
-                        zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_ACC:
-            {
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    const size_t nb1     = ((int32_t *) tensor->op_params)[0];
-                    const size_t nb2     = ((int32_t *) tensor->op_params)[1];
-                    const size_t nb3     = ((int32_t *) tensor->op_params)[2];
-                    const size_t offset  = ((int32_t *) tensor->op_params)[3];
-
-                    struct wsp_ggml_tensor * tensor_grad_view = wsp_ggml_view_4d(ctx,
-                        tensor->grad,
-                        src1->grad->ne[0],
-                        src1->grad->ne[1],
-                        src1->grad->ne[2],
-                        src1->grad->ne[3],
-                        nb1, nb2, nb3, offset);
-
-                    src1->grad =
-                        wsp_ggml_add_or_set(ctx,
-                            src1->grad,
-                            wsp_ggml_reshape(ctx,
-                                wsp_ggml_cont(ctx, tensor_grad_view),
-                                src1->grad),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SUB:
-            {
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    src1->grad = wsp_ggml_sub_or_set(ctx, src1->grad, tensor->grad, zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_MUL:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_mul(ctx, src1, tensor->grad),
-                                zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    src1->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src1->grad,
-                                wsp_ggml_mul(ctx, src0, tensor->grad),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_DIV:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_div(ctx, tensor->grad, src1),
-                                zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    src1->grad =
-                        wsp_ggml_sub_or_set(ctx,
-                                src1->grad,
-                                wsp_ggml_mul(ctx,
-                                    tensor->grad,
-                                    wsp_ggml_div(ctx, tensor, src1)),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SQR:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_scale(ctx,
-                                    wsp_ggml_mul(ctx, src0, tensor->grad),
-                                    2.0f),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SQRT:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_scale(ctx,
-                                    wsp_ggml_div(ctx,
-                                        tensor->grad,
-                                        tensor),
-                                    0.5f),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_LOG:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_div(ctx,
-                                    tensor->grad,
-                                    src0),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SIN:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_mul(ctx,
-                                    tensor->grad,
-                                    wsp_ggml_cos(ctx, src0)),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_COS:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_sub_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_mul(ctx,
-                                    tensor->grad,
-                                    wsp_ggml_sin(ctx, src0)),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SUM:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add1_or_set(ctx,
-                                src0->grad,
-                                tensor->grad,
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SUM_ROWS:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_repeat(ctx,
-                                    tensor->grad,
-                                    src0->grad),
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_MEAN:
-        case WSP_GGML_OP_ARGMAX:
-        case WSP_GGML_OP_COUNT_EQUAL:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: implement
+        case WSP_GGML_OP_DUP: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_REPEAT:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_repeat_back(ctx, tensor->grad, src0->grad),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_REPEAT_BACK:
-            {
-                if (src0->grad) {
-                    // TODO: test this
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_repeat(ctx, tensor->grad, src0->grad),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_CONCAT:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: implement
+        } break;
+        case WSP_GGML_OP_ADD: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_SILU_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+            if (src1_needs_grads) {
+                struct wsp_ggml_tensor * tmp = grad;
+                if (!wsp_ggml_are_same_shape(src0, src1)) {
+                    tmp = wsp_ggml_repeat_back(ctx, tmp, src1);
+                }
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1, tmp);
             }
-        case WSP_GGML_OP_NORM:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_ADD1: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_RMS_NORM:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    float eps;
-                    memcpy(&eps, tensor->op_params, sizeof(float));
-
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_rms_norm_back(ctx, src0, tensor->grad, eps),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_RMS_NORM_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+            if (src1_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1, wsp_ggml_mean(ctx, grad)); // TODO: should probably be sum instead of mean
             }
-        case WSP_GGML_OP_GROUP_NORM:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_ACC: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_MUL_MAT:
-            {
-                // https://cs231n.github.io/optimization-2/#staged
-                // # forward pass
-                // s0 = np.random.randn(5, 10)
-                // s1 = np.random.randn(10, 3)
-                // t = s0.dot(s1)
+            if (src1_needs_grads) {
+                const size_t nb1    = ((int32_t *) tensor->op_params)[0];
+                const size_t nb2    = ((int32_t *) tensor->op_params)[1];
+                const size_t nb3    = ((int32_t *) tensor->op_params)[2];
+                const size_t offset = ((int32_t *) tensor->op_params)[3];
 
-                // # now suppose we had the gradient on t from above in the circuit
-                // dt = np.random.randn(*t.shape) # same shape as t
-                // ds0 = dt.dot(s1.T) #.T gives the transpose of the matrix
-                // ds1 = t.T.dot(dt)
+                struct wsp_ggml_tensor * tensor_grad_view = wsp_ggml_view_4d(ctx,
+                    grad, src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
+                    nb1, nb2, nb3, offset);
 
-                // tensor.shape [m,p,qq,rr]
-                // src0.shape   [n,m,q1,r1]
-                // src1.shape   [n,p,qq,rr]
-
-                // necessary for llama
-                if (src0->grad) {
-                    struct wsp_ggml_tensor * s1_tg =
-                        wsp_ggml_out_prod(ctx, // [n,m,qq,rr]
-                            src1,          // [n,p,qq,rr]
-                            tensor->grad); // [m,p,qq,rr]
-                    const int64_t qq = s1_tg->ne[2];
-                    const int64_t rr = s1_tg->ne[3];
-                    const int64_t q1 = src0->ne[2];
-                    const int64_t r1 = src0->ne[3];
-                    const bool ne2_broadcasted = qq > q1;
-                    const bool ne3_broadcasted = rr > r1;
-                    if (ne2_broadcasted || ne3_broadcasted) {
-                        // sum broadcast repetitions of s1_tg into shape of src0
-                        s1_tg = wsp_ggml_repeat_back(ctx, s1_tg, src0);
-                    }
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src0->grad, // [n,m,q1,r1]
-                                s1_tg,      // [n,m,q1,r1]
-                                zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    src1->grad =
-                        wsp_ggml_add_or_set(ctx,
-                                src1->grad,                            // [n,p,qq,rr]
-                                // wsp_ggml_mul_mat(ctx,                   // [n,p,qq,rr]
-                                //     wsp_ggml_cont(ctx,                  // [m,n,q1,r1]
-                                //         wsp_ggml_transpose(ctx, src0)), // [m,n,q1,r1]
-                                //     tensor->grad),                  // [m,p,qq,rr]
-
-                                // // when src0 is bigger than tensor->grad (this is mostly the case in llama),
-                                // // avoid transpose of src0, rather transpose smaller tensor->grad
-                                // // and then use wsp_ggml_out_prod
-                                wsp_ggml_out_prod(ctx,                  // [n,p,qq,rr]
-                                    src0,                           // [n,m,q1,r1]
-                                    wsp_ggml_transpose(ctx,             // [p,m,qq,rr]
-                                        tensor->grad)),             // [m,p,qq,rr]
-                                zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_MUL_MAT_ID:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1, wsp_ggml_reshape(ctx, wsp_ggml_cont(ctx, tensor_grad_view), src1));
             }
-        case WSP_GGML_OP_OUT_PROD:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_SUB: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_SCALE:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    float s;
-                    memcpy(&s, tensor->op_params, sizeof(float));
-
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_scale_impl(ctx, tensor->grad, s, false),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SET:
-            {
-                const size_t nb1     = ((int32_t *) tensor->op_params)[0];
-                const size_t nb2     = ((int32_t *) tensor->op_params)[1];
-                const size_t nb3     = ((int32_t *) tensor->op_params)[2];
-                const size_t offset  = ((int32_t *) tensor->op_params)[3];
-
-                struct wsp_ggml_tensor * tensor_grad_view = NULL;
-
-                if (src0->grad || src1->grad) {
-                    WSP_GGML_ASSERT(src0->type == tensor->type);
-                    WSP_GGML_ASSERT(tensor->grad->type == tensor->type);
-                    WSP_GGML_ASSERT(!src1->grad || src1->grad->type == tensor->grad->type);
-
-                    tensor_grad_view = wsp_ggml_view_4d(ctx,
-                        tensor->grad, src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
-                        nb1, nb2, nb3, offset);
-                }
-
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                        src0->grad,
-                        wsp_ggml_acc_impl(ctx,
-                            tensor->grad,
-                            wsp_ggml_neg(ctx, tensor_grad_view),
-                            nb1, nb2, nb3, offset, false),
-                        zero_table, acc_table);
-                }
-
-                if (src1->grad) {
-                    src1->grad =
-                        wsp_ggml_add_or_set(ctx,
-                            src1->grad,
-                            wsp_ggml_reshape(ctx,
-                                wsp_ggml_cont(ctx, tensor_grad_view),
-                                src1->grad),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_CPY:
-            {
-                // necessary for llama
-                // cpy overwrites value of src1 by src0 and returns view(src1)
-                // the overwriting is mathematically equivalent to:
-                // tensor = src0 * 1 + src1 * 0
-                if (src0->grad) {
-                    // dsrc0 = dtensor * 1
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    // dsrc1 = dtensor * 0 -> noop
-                }
-            } break;
-        case WSP_GGML_OP_CONT:
-            {
-                // same as cpy
-                if (src0->grad) {
-                    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(src0->grad));
-                    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(tensor->grad));
-                    src0->grad = wsp_ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_RESHAPE:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            wsp_ggml_reshape(ctx,
-                                wsp_ggml_is_contiguous(tensor->grad)
-                                    ? tensor->grad
-                                    : wsp_ggml_cont(ctx, tensor->grad),
-                                src0->grad),
-                        zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_VIEW:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    size_t offset;
-
-                    memcpy(&offset, tensor->op_params, sizeof(offset));
-
-                    size_t nb1 = tensor->nb[1];
-                    size_t nb2 = tensor->nb[2];
-                    size_t nb3 = tensor->nb[3];
-
-                    if (src0->type != src0->grad->type) {
-                        // gradient is typically F32, but src0 could be other type
-                        size_t ng = wsp_ggml_element_size(src0->grad);
-                        size_t n0 = wsp_ggml_element_size(src0);
-                        WSP_GGML_ASSERT(offset % n0 == 0);
-                        WSP_GGML_ASSERT(nb1 % n0 == 0);
-                        WSP_GGML_ASSERT(nb2 % n0 == 0);
-                        WSP_GGML_ASSERT(nb3 % n0 == 0);
-                        offset = (offset / n0) * ng;
-                        nb1 = (nb1 / n0) * ng;
-                        nb2 = (nb2 / n0) * ng;
-                        nb3 = (nb3 / n0) * ng;
-                    }
-
-                    src0->grad = wsp_ggml_acc_or_set(ctx, src0->grad, tensor->grad, nb1, nb2, nb3, offset, zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_PERMUTE:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    int32_t * axes = (int32_t *) tensor->op_params;
-                    int axis0 = axes[0] & 0x3;
-                    int axis1 = axes[1] & 0x3;
-                    int axis2 = axes[2] & 0x3;
-                    int axis3 = axes[3] & 0x3;
-                    int axes_backward[4] = {0,0,0,0};
-                    axes_backward[axis0] = 0;
-                    axes_backward[axis1] = 1;
-                    axes_backward[axis2] = 2;
-                    axes_backward[axis3] = 3;
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            wsp_ggml_permute(ctx,
-                                tensor->grad,
-                                axes_backward[0],
-                                axes_backward[1],
-                                axes_backward[2],
-                                axes_backward[3]),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_TRANSPOSE:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            wsp_ggml_transpose(ctx, tensor->grad),
-                        zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_GET_ROWS:
-            {
-                // necessary for llama (only for tokenizer)
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            // last wsp_ggml_get_rows_back argument src0->grad is only
-                            // necessary to setup correct output shape
-                            wsp_ggml_get_rows_back(ctx, tensor->grad, src1, src0->grad),
-                        zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    // noop
-                }
-            } break;
-        case WSP_GGML_OP_GET_ROWS_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+            if (src1_needs_grads) {
+                wsp_ggml_sub_or_set(ctx, cgraph, isrc1, grad);
             }
-        case WSP_GGML_OP_DIAG:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_MUL: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_mul(ctx, src1, grad));
             }
-        case WSP_GGML_OP_DIAG_MASK_INF:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    const int n_past = ((int32_t *) tensor->op_params)[0];
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            /* wsp_ggml_diag_mask_inf_impl() shouldn't be here */
-                            /* ref:  https://github.com/ggerganov/llama.cpp/pull/4203#discussion_r1412377992 */
-                            wsp_ggml_diag_mask_zero_impl(ctx, tensor->grad, n_past, false),
-                        zero_table, acc_table);
+            if (src1_needs_grads) {
+                struct wsp_ggml_tensor * tmp = wsp_ggml_mul(ctx, src0, grad);
+                if (!wsp_ggml_are_same_shape(src0, src1)) {
+                    tmp = wsp_ggml_repeat_back(ctx, tmp, src1);
                 }
-            } break;
-        case WSP_GGML_OP_DIAG_MASK_ZERO:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    const int n_past = ((int32_t *) tensor->op_params)[0];
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            wsp_ggml_diag_mask_zero_impl(ctx, tensor->grad, n_past, false),
-                        zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_SOFT_MAX:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    src0->grad =
-                        wsp_ggml_add_or_set(ctx, src0->grad,
-                            wsp_ggml_soft_max_back(ctx, tensor->grad, tensor),
-                        zero_table, acc_table);
-                }
-                WSP_GGML_ASSERT((!src1 || !src1->grad) && "backward pass for softmax mask not implemented");
-            } break;
-        case WSP_GGML_OP_SOFT_MAX_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1, tmp);
             }
-        case WSP_GGML_OP_ROPE:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    //const int n_past = ((int32_t *) tensor->op_params)[0];
-                    const int n_dims     = ((int32_t *) tensor->op_params)[1];
-                    const int mode       = ((int32_t *) tensor->op_params)[2];
-                    //const int n_ctx      = ((int32_t *) tensor->op_params)[3];
-                    const int n_ctx_orig = ((int32_t *) tensor->op_params)[4];
-                    float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
+        } break;
+        case WSP_GGML_OP_DIV: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_div(ctx, grad, src1));
+            }
+            if (src1_needs_grads) {
+                wsp_ggml_sub_or_set(ctx, cgraph, isrc1, wsp_ggml_mul(ctx, grad, wsp_ggml_div(ctx, tensor, src1)));
+            }
+        } break;
+        case WSP_GGML_OP_SQR: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_scale(ctx, wsp_ggml_mul(ctx, src0, grad), 2.0f));
+            }
+        } break;
+        case WSP_GGML_OP_SQRT: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_scale(ctx, wsp_ggml_div(ctx, grad, tensor), 0.5f));
+            }
+        } break;
+        case WSP_GGML_OP_LOG: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_div(ctx, grad, src0));
+            }
+        } break;
+        case WSP_GGML_OP_SIN: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_mul(ctx, grad, wsp_ggml_cos(ctx, src0)));
+            }
+        } break;
+        case WSP_GGML_OP_COS: {
+            if (src0_needs_grads) {
+                wsp_ggml_sub_or_set(ctx, cgraph, isrc0, wsp_ggml_mul(ctx, grad, wsp_ggml_sin(ctx, src0)));
+            }
+        } break;
+        case WSP_GGML_OP_SUM: {
+            if (src0_needs_grads) {
+                wsp_ggml_add1_or_set(ctx, cgraph, isrc0, src0, grad);
+            }
+        } break;
+        case WSP_GGML_OP_SUM_ROWS: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_repeat(ctx, grad, src0));
+            }
+        } break;
+        case WSP_GGML_OP_MEAN: {
+            if (src0_needs_grads) {
+                wsp_ggml_add1_or_set(ctx, cgraph, isrc0, src0, wsp_ggml_scale_impl(ctx, grad, 1.0f/src0->ne[0], false));
+            }
+        } break;
+        case WSP_GGML_OP_REPEAT: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_repeat_back(ctx, grad, src0));
+            }
+        } break;
+        case WSP_GGML_OP_REPEAT_BACK: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_repeat(ctx, grad, src0));
+            }
+        } break;
+        case WSP_GGML_OP_RMS_NORM: {
+            if (src0_needs_grads) {
+                float eps;
+                memcpy(&eps, tensor->op_params, sizeof(float));
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_rms_norm_back(ctx, src0, grad, eps));
+            }
+        } break;
+        case WSP_GGML_OP_MUL_MAT: {
+            // https://cs231n.github.io/optimization-2/#staged
+            // # forward pass
+            // s0 = np.random.randn(5, 10)
+            // s1 = np.random.randn(10, 3)
+            // t = s0.dot(s1)
 
-                    memcpy(&freq_base,   (int32_t *) tensor->op_params +  5, sizeof(float));
-                    memcpy(&freq_scale,  (int32_t *) tensor->op_params +  6, sizeof(float));
-                    memcpy(&ext_factor,  (int32_t *) tensor->op_params +  7, sizeof(float));
-                    memcpy(&attn_factor, (int32_t *) tensor->op_params +  8, sizeof(float));
-                    memcpy(&beta_fast,   (int32_t *) tensor->op_params +  9, sizeof(float));
-                    memcpy(&beta_slow,   (int32_t *) tensor->op_params + 10, sizeof(float));
+            // # now suppose we had the gradient on t from above in the circuit
+            // dt = np.random.randn(*t.shape) # same shape as t
+            // ds0 = dt.dot(s1.T) #.T gives the transpose of the matrix
+            // ds1 = t.T.dot(dt)
 
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_rope_back(ctx,
-                                tensor->grad,
-                                src1,
-                                src2,
-                                n_dims,
-                                mode,
-                                n_ctx_orig,
-                                freq_base,
-                                freq_scale,
-                                ext_factor,
-                                attn_factor,
-                                beta_fast,
-                                beta_slow),
-                            zero_table, acc_table);
+            // tensor.shape [m,p,qq,rr]
+            // src0.shape   [n,m,q1,r1]
+            // src1.shape   [n,p,qq,rr]
+
+            if (src0_needs_grads) {
+                struct wsp_ggml_tensor * s1_tg =
+                    wsp_ggml_out_prod(ctx, // [n,m,qq,rr]
+                        src1,          // [n,p,qq,rr]
+                        grad);         // [m,p,qq,rr]
+                const int64_t qq = s1_tg->ne[2];
+                const int64_t rr = s1_tg->ne[3];
+                const int64_t q1 = src0->ne[2];
+                const int64_t r1 = src0->ne[3];
+                const bool ne2_broadcasted = qq > q1;
+                const bool ne3_broadcasted = rr > r1;
+                if (ne2_broadcasted || ne3_broadcasted) {
+                    // sum broadcast repetitions of s1_tg into shape of src0
+                    s1_tg = wsp_ggml_repeat_back(ctx, s1_tg, src0);
                 }
-                WSP_GGML_ASSERT((!src2 || !src2->grad) && "gradients for freq factors not implemented");
-            } break;
-        case WSP_GGML_OP_ROPE_BACK:
-            {
-                if (src0->grad) {
-                    //const int n_past = ((int32_t *) tensor->op_params)[0];
-                    const int n_dims     = ((int32_t *) tensor->op_params)[1];
-                    const int mode       = ((int32_t *) tensor->op_params)[2];
-                    //const int n_ctx      = ((int32_t *) tensor->op_params)[3];
-                    const int n_ctx_orig = ((int32_t *) tensor->op_params)[4];
-                    float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, s1_tg /*= [n,m,q1,r1]*/);
+            }
+            if (src1_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1,
+                        // wsp_ggml_mul_mat(ctx,                   // [n,p,qq,rr]
+                        //     wsp_ggml_cont(ctx,                  // [m,n,q1,r1]
+                        //         wsp_ggml_transpose(ctx, src0)), // [m,n,q1,r1]
+                        //     grad),                          // [m,p,qq,rr]
 
-                    memcpy(&freq_base,   (int32_t *) tensor->op_params +  5, sizeof(float));
-                    memcpy(&freq_scale,  (int32_t *) tensor->op_params +  6, sizeof(float));
-                    memcpy(&ext_factor,  (int32_t *) tensor->op_params +  7, sizeof(float));
-                    memcpy(&attn_factor, (int32_t *) tensor->op_params +  8, sizeof(float));
-                    memcpy(&beta_fast,   (int32_t *) tensor->op_params +  9, sizeof(float));
-                    memcpy(&beta_slow,   (int32_t *) tensor->op_params + 10, sizeof(float));
+                        // when src0 is bigger than tensor->grad (this is mostly the case in llama),
+                        // avoid transpose of src0, rather transpose smaller tensor->grad
+                        // and then use wsp_ggml_out_prod
+                        wsp_ggml_out_prod(ctx,      // [n,p,qq,rr]
+                            src0,               // [n,m,q1,r1]
+                            wsp_ggml_transpose(ctx, // [p,m,qq,rr]
+                                grad)));        // [m,p,qq,rr]
+            }
+        } break;
+        case WSP_GGML_OP_SCALE: {
+            if (src0_needs_grads) {
+                float s;
+                memcpy(&s, tensor->op_params, sizeof(float));
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_scale_impl(ctx, grad, s, false));
+            }
+        } break;
+        case WSP_GGML_OP_SET: {
+            const size_t nb1    = ((const int32_t *) tensor->op_params)[0];
+            const size_t nb2    = ((const int32_t *) tensor->op_params)[1];
+            const size_t nb3    = ((const int32_t *) tensor->op_params)[2];
+            const size_t offset = ((const int32_t *) tensor->op_params)[3];
 
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_rope_impl(ctx,
-                                tensor->grad,
-                                src1,
-                                src2,
-                                n_dims,
-                                mode,
-                                n_ctx_orig,
-                                freq_base,
-                                freq_scale,
-                                ext_factor,
-                                attn_factor,
-                                beta_fast,
-                                beta_slow,
-                                false),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_CLAMP:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-            }
-        case WSP_GGML_OP_CONV_TRANSPOSE_1D:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-            }
-        case WSP_GGML_OP_IM2COL:
-            {
-                if (src1->grad) {
-                    const int32_t s0    = wsp_ggml_get_op_params_i32(tensor, 0);
-                    const int32_t s1    = wsp_ggml_get_op_params_i32(tensor, 1);
-                    const int32_t p0    = wsp_ggml_get_op_params_i32(tensor, 2);
-                    const int32_t p1    = wsp_ggml_get_op_params_i32(tensor, 3);
-                    const int32_t d0    = wsp_ggml_get_op_params_i32(tensor, 4);
-                    const int32_t d1    = wsp_ggml_get_op_params_i32(tensor, 5);
-                    const bool    is_2D = wsp_ggml_get_op_params_i32(tensor, 6) == 1;
+            struct wsp_ggml_tensor * tensor_grad_view = NULL;
 
-                    src1->grad = wsp_ggml_add_or_set(ctx,
-                            src1->grad,
-                            wsp_ggml_im2col_back(ctx, src0, tensor->grad, src1->ne, s0, s1, p0, p1, d0, d1, is_2D),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_IM2COL_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-            }
-        case WSP_GGML_OP_CONV_TRANSPOSE_2D:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-            }
-        case WSP_GGML_OP_POOL_1D:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-            }
-        case WSP_GGML_OP_POOL_2D:
-            {
-                if (src0->grad) {
-                    const enum wsp_ggml_op_pool op = wsp_ggml_get_op_params_i32(tensor, 0);
-                    const      int32_t      k0 = wsp_ggml_get_op_params_i32(tensor, 1);
-                    const      int32_t      k1 = wsp_ggml_get_op_params_i32(tensor, 2);
-                    const      int32_t      s0 = wsp_ggml_get_op_params_i32(tensor, 3);
-                    const      int32_t      s1 = wsp_ggml_get_op_params_i32(tensor, 4);
-                    const      int32_t      p0 = wsp_ggml_get_op_params_i32(tensor, 5);
-                    const      int32_t      p1 = wsp_ggml_get_op_params_i32(tensor, 6);
+            if (src0_needs_grads || src1_needs_grads) {
+                WSP_GGML_ASSERT(src0->type == tensor->type);
+                WSP_GGML_ASSERT(!cgraph->grads[isrc0] ||                      cgraph->grads[isrc0]->type == grad->type);
+                WSP_GGML_ASSERT(!cgraph->grads[isrc1] || !src1_needs_grads || cgraph->grads[isrc1]->type == grad->type);
 
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            wsp_ggml_pool_2d_back(ctx, tensor->grad, src0, op, k0, k1, s0, s1, p0, p1),
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_POOL_2D_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+                tensor_grad_view = wsp_ggml_view_4d(ctx,
+                    grad, src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
+                    nb1, nb2, nb3, offset);
             }
-        case WSP_GGML_OP_UPSCALE:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+
+            if (src0_needs_grads) {
+                struct wsp_ggml_tensor * tmp = wsp_ggml_neg(ctx, tensor_grad_view);
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_acc_impl(ctx, grad, tmp, nb1, nb2, nb3, offset, false));
             }
-        case WSP_GGML_OP_PAD:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+
+            if (src1_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1, wsp_ggml_reshape(ctx, wsp_ggml_cont(ctx, tensor_grad_view), src1));
             }
-        case WSP_GGML_OP_ARANGE:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_CPY: {
+            // cpy overwrites value of src1 by src0 and returns view(src1)
+            // the overwriting is mathematically equivalent to:
+            // tensor = src0 * 1 + src1 * 0
+            if (src0_needs_grads) {
+                // dsrc0 = dtensor * 1
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_TIMESTEP_EMBEDDING:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+            if (src1_needs_grads) {
+                // dsrc1 = dtensor * 0 -> noop
             }
-        case WSP_GGML_OP_ARGSORT:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_CONT: {
+            // same as cpy
+            if (src0_needs_grads) {
+                WSP_GGML_ASSERT(!cgraph->grads[isrc0] || wsp_ggml_is_contiguous(cgraph->grads[isrc0]));
+                WSP_GGML_ASSERT(wsp_ggml_is_contiguous(grad));
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
-        case WSP_GGML_OP_LEAKY_RELU:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_RESHAPE: {
+            if (src0_needs_grads) {
+                struct wsp_ggml_tensor * grad_cont = wsp_ggml_is_contiguous(grad) ? grad : wsp_ggml_cont(ctx, grad);
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_reshape(ctx, grad_cont, src0));
             }
-        case WSP_GGML_OP_FLASH_ATTN_EXT:
-            {
-                WSP_GGML_ABORT("FA backward pass not adapted after rework");
-                struct wsp_ggml_tensor * flash_grad = NULL;
-                if (src0->grad || src1->grad || tensor->src[2]->grad) {
-                    int32_t t = wsp_ggml_get_op_params_i32(tensor, 0);
-                    WSP_GGML_ASSERT(t == 0 || t == 1);
-                    bool masked = t != 0;
-                    flash_grad =
-                        wsp_ggml_flash_attn_back(ctx,
-                            src0,
-                            src1,
-                            tensor->src[2],
-                            tensor->grad,
-                            masked);
+        } break;
+        case WSP_GGML_OP_VIEW: {
+            if (src0_needs_grads) {
+                size_t offset;
+
+                memcpy(&offset, tensor->op_params, sizeof(offset));
+
+                size_t nb1 = tensor->nb[1];
+                size_t nb2 = tensor->nb[2];
+                size_t nb3 = tensor->nb[3];
+
+                if (cgraph->grads[isrc0] && src0->type != cgraph->grads[isrc0]->type) {
+                    // gradient is typically F32, but src0 could be other type
+                    size_t ng = wsp_ggml_element_size(cgraph->grads[isrc0]);
+                    size_t n0 = wsp_ggml_element_size(src0);
+                    WSP_GGML_ASSERT(offset % n0 == 0);
+                    WSP_GGML_ASSERT(nb1 % n0 == 0);
+                    WSP_GGML_ASSERT(nb2 % n0 == 0);
+                    WSP_GGML_ASSERT(nb3 % n0 == 0);
+                    offset = (offset / n0) * ng;
+                    nb1 = (nb1 / n0) * ng;
+                    nb2 = (nb2 / n0) * ng;
+                    nb3 = (nb3 / n0) * ng;
                 }
 
-                const int64_t elem_q = wsp_ggml_nelements(src0);
-                const int64_t elem_k = wsp_ggml_nelements(src1);
-                const int64_t elem_v = wsp_ggml_nelements(src2);
-
-                enum wsp_ggml_type result_type = flash_grad->type;
-                WSP_GGML_ASSERT(wsp_ggml_blck_size(result_type) == 1);
-                const size_t tsize = wsp_ggml_type_size(result_type);
-
-                const size_t offs_q = 0;
-                const size_t offs_k = offs_q + WSP_GGML_PAD(elem_q * tsize, WSP_GGML_MEM_ALIGN);
-                const size_t offs_v = offs_k + WSP_GGML_PAD(elem_k * tsize, WSP_GGML_MEM_ALIGN);
-
-                if (src0->grad) {
-                    struct wsp_ggml_tensor * view_q = wsp_ggml_view_1d(ctx, flash_grad, elem_q, offs_q);
-                    struct wsp_ggml_tensor * grad_q = wsp_ggml_reshape(ctx, view_q, src0);
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                            src0->grad,
-                            grad_q,
-                            zero_table, acc_table);
-                }
-                if (src1->grad) {
-                    struct wsp_ggml_tensor * view_k = wsp_ggml_view_1d(ctx, flash_grad, elem_k, offs_k);
-                    struct wsp_ggml_tensor * grad_k = wsp_ggml_reshape(ctx, view_k, src1);
-                    src1->grad = wsp_ggml_add_or_set(ctx,
-                            src1->grad,
-                            grad_k,
-                            zero_table, acc_table);
-                }
-                if (src2->grad) {
-                    struct wsp_ggml_tensor * view_v = wsp_ggml_view_1d(ctx, flash_grad, elem_v, offs_v);
-                    struct wsp_ggml_tensor * grad_v = wsp_ggml_reshape(ctx, view_v, src2);
-                    src2->grad = wsp_ggml_add_or_set(ctx,
-                            src2->grad,
-                            grad_v,
-                            zero_table, acc_table);
-                }
-            } break;
-        case WSP_GGML_OP_FLASH_ATTN_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // not supported
+                wsp_ggml_acc_or_set(ctx, cgraph, isrc0, src0, grad, nb1, nb2, nb3, offset);
             }
-        case WSP_GGML_OP_SSM_CONV:
-        case WSP_GGML_OP_SSM_SCAN:
-            {
-                WSP_GGML_ABORT("fatal error"); // TODO: not implemented
+        } break;
+        case WSP_GGML_OP_PERMUTE: {
+            if (src0_needs_grads) {
+                const int32_t * axes = (const int32_t *) tensor->op_params;
+                const int axis0 = axes[0] & 0x3;
+                const int axis1 = axes[1] & 0x3;
+                const int axis2 = axes[2] & 0x3;
+                const int axis3 = axes[3] & 0x3;
+                int axb[4] = {0,0,0,0}; // axes backward
+                axb[axis0] = 0;
+                axb[axis1] = 1;
+                axb[axis2] = 2;
+                axb[axis3] = 3;
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_permute(ctx, grad, axb[0], axb[1], axb[2], axb[3]));
             }
+        } break;
+        case WSP_GGML_OP_TRANSPOSE: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_transpose(ctx, grad));
+            }
+        } break;
+        case WSP_GGML_OP_GET_ROWS: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_get_rows_back(ctx, grad, src1, src0));
+            }
+            if (src1_needs_grads) {
+                // noop
+            }
+        } break;
+        case WSP_GGML_OP_DIAG_MASK_INF: {
+            if (src0_needs_grads) {
+                /* wsp_ggml_diag_mask_inf_impl() shouldn't be here */
+                /* ref:  https://github.com/ggerganov/llama.cpp/pull/4203#discussion_r1412377992 */
+                const int n_past = ((const int32_t *) tensor->op_params)[0];
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_diag_mask_zero_impl(ctx, grad, n_past, false));
+            }
+        } break;
+        case WSP_GGML_OP_DIAG_MASK_ZERO: {
+            if (src0_needs_grads) {
+                const int n_past = ((const int32_t *) tensor->op_params)[0];
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_diag_mask_zero_impl(ctx, grad, n_past, false));
+            }
+        } break;
+        case WSP_GGML_OP_SOFT_MAX: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_soft_max_back(ctx, grad, tensor));
+            }
+            WSP_GGML_ASSERT((!src1 || !src1_needs_grads) && "backward pass for softmax mask not implemented");
+        } break;
+        case WSP_GGML_OP_ROPE: {
+            if (src0_needs_grads) {
+                //const int n_past = ((int32_t *) tensor->op_params)[0];
+                const int n_dims     = ((const int32_t *) tensor->op_params)[1];
+                const int mode       = ((const int32_t *) tensor->op_params)[2];
+                //const int n_ctx      = ((int32_t *) tensor->op_params)[3];
+                const int n_ctx_orig = ((const int32_t *) tensor->op_params)[4];
+                float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow;
+
+                memcpy(&freq_base,   (const float *) tensor->op_params +  5, sizeof(float));
+                memcpy(&freq_scale,  (const float *) tensor->op_params +  6, sizeof(float));
+                memcpy(&ext_factor,  (const float *) tensor->op_params +  7, sizeof(float));
+                memcpy(&attn_factor, (const float *) tensor->op_params +  8, sizeof(float));
+                memcpy(&beta_fast,   (const float *) tensor->op_params +  9, sizeof(float));
+                memcpy(&beta_slow,   (const float *) tensor->op_params + 10, sizeof(float));
+
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0,
+                    wsp_ggml_rope_back(ctx, grad, src1, src2, n_dims, mode, n_ctx_orig, freq_base,
+                        freq_scale, ext_factor, attn_factor, beta_fast, beta_slow));
+            }
+            WSP_GGML_ASSERT((!src2 || !src2_needs_grads) && "gradients for freq factors not implemented");
+        } break;
+        case WSP_GGML_OP_IM2COL: {
+            if (src1_needs_grads) {
+                const int32_t s0    = wsp_ggml_get_op_params_i32(tensor, 0);
+                const int32_t s1    = wsp_ggml_get_op_params_i32(tensor, 1);
+                const int32_t p0    = wsp_ggml_get_op_params_i32(tensor, 2);
+                const int32_t p1    = wsp_ggml_get_op_params_i32(tensor, 3);
+                const int32_t d0    = wsp_ggml_get_op_params_i32(tensor, 4);
+                const int32_t d1    = wsp_ggml_get_op_params_i32(tensor, 5);
+                const bool    is_2D = wsp_ggml_get_op_params_i32(tensor, 6) == 1;
+
+                wsp_ggml_add_or_set(ctx, cgraph, isrc1, wsp_ggml_im2col_back(ctx, src0, grad, src1->ne, s0, s1, p0, p1, d0, d1, is_2D));
+            }
+        } break;
+        case WSP_GGML_OP_POOL_2D: {
+            if (src0_needs_grads) {
+                const enum wsp_ggml_op_pool op = wsp_ggml_get_op_params_i32(tensor, 0);
+                const      int32_t      k0 = wsp_ggml_get_op_params_i32(tensor, 1);
+                const      int32_t      k1 = wsp_ggml_get_op_params_i32(tensor, 2);
+                const      int32_t      s0 = wsp_ggml_get_op_params_i32(tensor, 3);
+                const      int32_t      s1 = wsp_ggml_get_op_params_i32(tensor, 4);
+                const      int32_t      p0 = wsp_ggml_get_op_params_i32(tensor, 5);
+                const      int32_t      p1 = wsp_ggml_get_op_params_i32(tensor, 6);
+
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_pool_2d_back(ctx, grad, src0, op, k0, k1, s0, s1, p0, p1));
+            }
+        } break;
         case WSP_GGML_OP_WIN_PART:
         case WSP_GGML_OP_WIN_UNPART:
-        case WSP_GGML_OP_UNARY:
-            {
-                switch (wsp_ggml_get_unary_op(tensor)) {
-                    case WSP_GGML_UNARY_OP_ABS:
-                        {
-                            if (src0->grad) {
-                                src0->grad =
-                                    wsp_ggml_add_or_set(ctx,
-                                            src0->grad,
-                                            wsp_ggml_mul(ctx,
-                                                wsp_ggml_sgn(ctx, src0),
-                                                tensor->grad),
-                                            zero_table, acc_table);
-                            }
-                        } break;
-                    case WSP_GGML_UNARY_OP_SGN:
-                        {
-                            if (src0->grad) {
-                                // noop
-                            }
-                        } break;
-                    case WSP_GGML_UNARY_OP_NEG:
-                        {
-                            if (src0->grad) {
-                                src0->grad = wsp_ggml_sub_or_set(ctx, src0->grad, tensor->grad, zero_table, acc_table);
-                            }
-                        } break;
-                    case WSP_GGML_UNARY_OP_STEP:
-                        {
-                            if (src0->grad) {
-                                // noop
-                            }
-                        } break;
-                    case WSP_GGML_UNARY_OP_TANH:
-                        {
-                            WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
-                    case WSP_GGML_UNARY_OP_ELU:
-                        {
-                            WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
-                    case WSP_GGML_UNARY_OP_RELU:
-                        {
-                            if (src0->grad) {
-                                src0->grad = wsp_ggml_add_or_set(ctx,
-                                        src0->grad,
-                                        wsp_ggml_mul(ctx,
-                                            wsp_ggml_step(ctx, src0),
-                                            tensor->grad),
-                                        zero_table, acc_table);
-                            }
-                        } break;
-                    case WSP_GGML_UNARY_OP_SIGMOID:
-                        {
-                            WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
-                    case WSP_GGML_UNARY_OP_GELU:
-                        {
-                            WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
-                    case WSP_GGML_UNARY_OP_GELU_QUICK:
-                        {
-                            WSP_GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
-                    case WSP_GGML_UNARY_OP_SILU:
-                        {
-                            // necessary for llama
-                            if (src0->grad) {
-                                src0->grad = wsp_ggml_add_or_set(ctx,
-                                        src0->grad,
-                                        wsp_ggml_silu_back(ctx, src0, tensor->grad),
-                                        zero_table, acc_table);
-                            }
-                        } break;
-                    case WSP_GGML_UNARY_OP_EXP:
-                        {
-                            if (src0->grad) {
-                                src0->grad = wsp_ggml_add_or_set(ctx,
-                                        src0->grad,
-                                        wsp_ggml_mul(ctx, tensor, tensor->grad),
-                                        zero_table, acc_table);
-                            }
-                        } break;
-                    default:
-                        WSP_GGML_ABORT("fatal error");
-                }
-            } break;
-        case WSP_GGML_OP_GET_REL_POS:
-        case WSP_GGML_OP_ADD_REL_POS:
-        case WSP_GGML_OP_RWKV_WKV6:
-        case WSP_GGML_OP_MAP_UNARY:
-        case WSP_GGML_OP_MAP_BINARY:
-        case WSP_GGML_OP_MAP_CUSTOM1_F32:
-        case WSP_GGML_OP_MAP_CUSTOM2_F32:
-        case WSP_GGML_OP_MAP_CUSTOM3_F32:
-        case WSP_GGML_OP_MAP_CUSTOM1:
-        case WSP_GGML_OP_MAP_CUSTOM2:
-        case WSP_GGML_OP_MAP_CUSTOM3:
-            {
-                WSP_GGML_ABORT("fatal error"); // not supported
+        case WSP_GGML_OP_UNARY: {
+            switch (wsp_ggml_get_unary_op(tensor)) {
+                case WSP_GGML_UNARY_OP_ABS: {
+                    if (src0_needs_grads) {
+                        wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_mul(ctx, wsp_ggml_sgn(ctx, src0), grad));
+                    }
+                } break;
+                case WSP_GGML_UNARY_OP_SGN: {
+                    // noop
+                } break;
+                case WSP_GGML_UNARY_OP_NEG: {
+                    if (src0_needs_grads) {
+                        wsp_ggml_sub_or_set(ctx, cgraph, isrc0, grad);
+                    }
+                } break;
+                case WSP_GGML_UNARY_OP_STEP: {
+                    // noop
+                } break;
+                case WSP_GGML_UNARY_OP_RELU: {
+                    if (src0_needs_grads) {
+                        wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_mul(ctx, wsp_ggml_step(ctx, src0), grad));
+                    }
+                } break;
+                case WSP_GGML_UNARY_OP_SILU: {
+                    if (src0_needs_grads) {
+                        wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_silu_back(ctx, src0, grad));
+                    }
+                } break;
+                case WSP_GGML_UNARY_OP_EXP: {
+                    if (src0_needs_grads) {
+                        wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_mul(ctx, tensor, grad));
+                    }
+                } break;
+                default: {
+                    fprintf(stderr, "%s: unsupported unary op for backward pass: %s\n",
+                        __func__, wsp_ggml_unary_op_name(wsp_ggml_get_unary_op(tensor)));
+                    WSP_GGML_ABORT("fatal error");
+                } //break;
             }
-        case WSP_GGML_OP_CROSS_ENTROPY_LOSS:
-            {
-                if (src0->grad) {
-                    src0->grad = wsp_ggml_add_or_set(ctx,
-                                src0->grad,
-                                wsp_ggml_cross_entropy_loss_back(ctx,
-                                    src0,
-                                    src1,
-                                    tensor->grad),
-                                zero_table, acc_table);
-                }
-                WSP_GGML_ASSERT(!src1->grad && "backward pass for labels not implemented");
-            } break;
-        case WSP_GGML_OP_CROSS_ENTROPY_LOSS_BACK:
-            {
-                WSP_GGML_ABORT("fatal error"); // not supported
+        } break;
+        case WSP_GGML_OP_CROSS_ENTROPY_LOSS: {
+            if (src0_needs_grads) {
+                wsp_ggml_add_or_set(ctx, cgraph, isrc0, wsp_ggml_cross_entropy_loss_back(ctx, src0, src1, grad));
             }
-        case WSP_GGML_OP_OPT_STEP_ADAMW:
-            {
-                WSP_GGML_ABORT("fatal error"); // not supported
-            }
-        case WSP_GGML_OP_NONE:
-            {
-                // nop
-            } break;
+            WSP_GGML_ASSERT(!src1_needs_grads && "backward pass for labels not implemented");
+        } break;
+        case WSP_GGML_OP_NONE: {
+            // noop
+        } break;
         case WSP_GGML_OP_COUNT:
-            {
-                WSP_GGML_ABORT("fatal error");
-            }
+        default: {
+            fprintf(stderr, "%s: unsupported ggml op for backward pass: %s\n", __func__, wsp_ggml_op_name(tensor->op));
+            WSP_GGML_ABORT("fatal error");
+        } //break;
     }
 
-    for (int i = 0; i < WSP_GGML_MAX_SRC; ++i) {
-        if (tensor->src[i] && tensor->src[i]->grad) {
-            WSP_GGML_ASSERT(wsp_ggml_are_same_shape(tensor->src[i], tensor->src[i]->grad));
-        }
-    }
+    WSP_GGML_ASSERT(!src0_needs_grads || wsp_ggml_are_same_shape(src0, cgraph->grads[isrc0]));
+    WSP_GGML_ASSERT(!src1_needs_grads || wsp_ggml_are_same_shape(src1, cgraph->grads[isrc1]));
+    WSP_GGML_ASSERT(!src2_needs_grads || wsp_ggml_are_same_shape(src2, cgraph->grads[isrc2]));
 }
 
 static void wsp_ggml_visit_parents(struct wsp_ggml_cgraph * cgraph, struct wsp_ggml_tensor * node) {
-    if (node->grad == NULL) {
-        // this usually happens when we generate intermediate nodes from constants in the backward pass
-        // it can also happen during forward pass, if the user performs computations with constants
-        if (node->op != WSP_GGML_OP_NONE) {
-            //WSP_GGML_PRINT_DEBUG("%s: warning: node %p has no grad, but op %d\n", __func__, (void *) node, node->op);
-        }
-    }
-
     // check if already visited
     if (wsp_ggml_hash_insert(&cgraph->visited_hash_set, node) == WSP_GGML_HASHSET_ALREADY_EXISTS) {
         return;
@@ -6212,18 +5586,42 @@ void wsp_ggml_build_forward_expand(struct wsp_ggml_cgraph * cgraph, struct wsp_g
     wsp_ggml_build_forward_impl(cgraph, tensor, true);
 }
 
-void wsp_ggml_build_backward_expand(struct wsp_ggml_context * ctx, struct wsp_ggml_cgraph * gf, struct wsp_ggml_cgraph * gb, bool accumulate) {
-    WSP_GGML_ASSERT(gf->n_nodes > 0);
-    WSP_GGML_ASSERT(gf->grads);
+void wsp_ggml_build_backward_expand(
+        struct wsp_ggml_context * ctx_static,
+        struct wsp_ggml_context * ctx_compute,
+        struct wsp_ggml_cgraph  * cgraph,
+        bool                  accumulate) {
+    WSP_GGML_ASSERT(cgraph->n_nodes > 0);
+    WSP_GGML_ASSERT(cgraph->grads);
+    WSP_GGML_ASSERT(cgraph->grad_accs);
 
-    for (int i = 0; i < gf->n_nodes; ++i) {
-        struct wsp_ggml_tensor * node = gf->nodes[i];
+    const int n_nodes_f = cgraph->n_nodes;
+
+    const size_t hash_size = wsp_ggml_hash_size(2*cgraph->size);
+    memset(cgraph->grads,     0, hash_size*sizeof(struct wsp_ggml_tensor *));
+    memset(cgraph->grad_accs, 0, hash_size*sizeof(struct wsp_ggml_tensor *));
+    bool * grads_needed = calloc(hash_size, sizeof(bool));
+
+    {
+        bool any_params = false;
+        bool any_loss   = false;
+        for (int i = 0; i < n_nodes_f; ++i) {
+            struct wsp_ggml_tensor * node = cgraph->nodes[i];
+            any_params = any_params || (node->flags & WSP_GGML_TENSOR_FLAG_PARAM);
+            any_loss   = any_loss   || (node->flags & WSP_GGML_TENSOR_FLAG_LOSS);
+        }
+        WSP_GGML_ASSERT(any_params && "no trainable parameters found, did you forget to call wsp_ggml_set_param?");
+        WSP_GGML_ASSERT(any_loss && "no training loss found, did you forget to call wsp_ggml_set_loss?");
+    }
+
+    for (int i = 0; i < n_nodes_f; ++i) {
+        struct wsp_ggml_tensor * node = cgraph->nodes[i];
 
         if (node->type == WSP_GGML_TYPE_I32) {
             continue;
         }
 
-        bool needs_grad = node->flags & WSP_GGML_TENSOR_FLAG_PARAM;
+        bool node_needs_grad = node->flags & WSP_GGML_TENSOR_FLAG_PARAM;
         bool ignore_src[WSP_GGML_MAX_SRC] = {false};
         switch (node->op) {
             // gradients in node->src[0] for one reason or another have no effect on output gradients
@@ -6251,14 +5649,14 @@ void wsp_ggml_build_backward_expand(struct wsp_ggml_context * ctx, struct wsp_gg
                 break;
         }
         for (int j = 0; j < WSP_GGML_MAX_SRC; ++j) {
-            if (!node->src[j] || !node->src[j]->grad || ignore_src[j]) {
+            if (!node->src[j] || ignore_src[j] || !grads_needed[wsp_ggml_hash_find(&cgraph->visited_hash_set, node->src[j])]) {
                 continue;
             }
             WSP_GGML_ASSERT(node->src[j]->type == WSP_GGML_TYPE_F32 || node->src[j]->type == WSP_GGML_TYPE_F16);
-            needs_grad = true;
+            node_needs_grad = true;
             break;
         }
-        if (!needs_grad) {
+        if (!node_needs_grad) {
             continue;
         }
 
@@ -6266,73 +5664,21 @@ void wsp_ggml_build_backward_expand(struct wsp_ggml_context * ctx, struct wsp_gg
         WSP_GGML_ASSERT(!node->view_src || node->op == WSP_GGML_OP_CPY || node->op == WSP_GGML_OP_VIEW ||
             node->op == WSP_GGML_OP_RESHAPE || node->op == WSP_GGML_OP_PERMUTE || node->op == WSP_GGML_OP_TRANSPOSE);
 
-        // create a new tensor with the same type and shape as the node and set it as grad
-        node->grad = wsp_ggml_dup_tensor(ctx, node);
-    }
-
-    // keep tables of original gradients for replacement/accumulation logic
-    struct wsp_ggml_hash_set zero_table = wsp_ggml_hash_set_new(gf->size);
-    struct wsp_ggml_hash_set acc_table  = wsp_ggml_hash_set_new(gf->size);
-    for (int i = 0; i < gf->n_nodes; i++) {
-        struct wsp_ggml_tensor * node = gf->nodes[i];
-
-        if (node->grad) {
-            {
-                const size_t insert_result = wsp_ggml_hash_insert(&zero_table, node->grad);
-                WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_FULL);
-                WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_ALREADY_EXISTS);
-            }
-
-            // only gradients of trainable parameters should be accumulated
-            if (accumulate && (node->flags & WSP_GGML_TENSOR_FLAG_PARAM)) {
-                const size_t insert_result = wsp_ggml_hash_insert(&acc_table, node->grad);
-                WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_FULL);
-                WSP_GGML_ASSERT(insert_result != WSP_GGML_HASHSET_ALREADY_EXISTS);
-            }
+        const size_t igrad = wsp_ggml_hash_find(&cgraph->visited_hash_set, node);
+        if ((accumulate && (node->flags & WSP_GGML_TENSOR_FLAG_PARAM)) || (node->flags & WSP_GGML_TENSOR_FLAG_LOSS)) {
+            cgraph->grads[igrad]     = wsp_ggml_dup_tensor(ctx_static, node);
+            cgraph->grad_accs[igrad] = cgraph->grads[igrad];
         }
+        grads_needed[igrad] = true;
     }
 
-    for (int i = gf->n_nodes - 1; i >= 0; i--) {
-        struct wsp_ggml_tensor * node = gf->nodes[i];
-
+    for (int i = n_nodes_f - 1; i >= 0; --i) {
         // inplace operations to add gradients are not created by wsp_ggml_compute_backward except for gradient accumulation
         // use allocator to automatically make inplace operations
-        if (node->grad) {
-            wsp_ggml_compute_backward(ctx, node, &zero_table, &acc_table);
-        }
+        wsp_ggml_compute_backward(ctx_compute, cgraph, i, grads_needed);
     }
 
-    for (int i = 0; i < gf->n_nodes; i++) {
-        struct wsp_ggml_tensor * node = gf->nodes[i];
-
-        if (node->flags & WSP_GGML_TENSOR_FLAG_PARAM) {
-            WSP_GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            wsp_ggml_build_forward_expand(gb, node->grad);
-        }
-    }
-
-    wsp_ggml_hash_set_free(&zero_table);
-    wsp_ggml_hash_set_free(&acc_table);
-}
-
-void wsp_ggml_build_opt_adamw(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_cgraph  * gf,
-        struct wsp_ggml_cgraph  * gb,
-        float                 alpha,
-        float                 beta1,
-        float                 beta2,
-        float                 eps,
-        float                 wd) {
-    for (int i = 0; i < gf->n_nodes; i++) {
-        struct wsp_ggml_tensor * node = gf->nodes[i];
-
-        if (node->flags & WSP_GGML_TENSOR_FLAG_PARAM) {
-            WSP_GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            struct wsp_ggml_tensor * opt_step = wsp_ggml_opt_step_adamw(ctx, node, node->grad, alpha, beta1, beta2, eps, wd);
-            wsp_ggml_build_forward_expand(gb, opt_step);
-        }
-    }
+    free(grads_needed);
 }
 
 static void * incr_ptr_aligned(void ** p, size_t size, size_t align) {
@@ -6350,7 +5696,8 @@ static size_t wsp_ggml_graph_nbytes(size_t size, bool grads) {
     incr_ptr_aligned(&p, size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)); // leafs
     incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)); // hash keys
     if (grads) {
-        incr_ptr_aligned(&p, size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)); // grads
+        incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)); // grads
+        incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)); // grad_accs
     }
     incr_ptr_aligned(&p, wsp_ggml_bitset_size(hash_size) * sizeof(wsp_ggml_bitset_t), sizeof(wsp_ggml_bitset_t));
 
@@ -6376,10 +5723,12 @@ struct wsp_ggml_cgraph * wsp_ggml_new_graph_custom(struct wsp_ggml_context * ctx
 
     void * p = cgraph + 1;
 
-    struct wsp_ggml_tensor ** nodes_ptr = incr_ptr_aligned(&p, size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *));
-    struct wsp_ggml_tensor ** leafs_ptr = incr_ptr_aligned(&p, size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *));
-    struct wsp_ggml_tensor ** hash_keys_ptr = incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *));
-    struct wsp_ggml_tensor ** grads_ptr = grads ? incr_ptr_aligned(&p, size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)) : NULL;
+    struct wsp_ggml_tensor ** nodes_ptr     =         incr_ptr_aligned(&p, size      * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *));
+    struct wsp_ggml_tensor ** leafs_ptr     =         incr_ptr_aligned(&p, size      * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *));
+    struct wsp_ggml_tensor ** hash_keys_ptr =         incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *));
+    struct wsp_ggml_tensor ** grads_ptr     = grads ? incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)) : NULL;
+    struct wsp_ggml_tensor ** grad_accs_ptr = grads ? incr_ptr_aligned(&p, hash_size * sizeof(struct wsp_ggml_tensor *), sizeof(struct wsp_ggml_tensor *)) : NULL;
+
     wsp_ggml_bitset_t * hash_used = incr_ptr_aligned(&p, wsp_ggml_bitset_size(hash_size) * sizeof(wsp_ggml_bitset_t), sizeof(wsp_ggml_bitset_t));
 
     // check that we allocated the correct amount of memory
@@ -6391,12 +5740,17 @@ struct wsp_ggml_cgraph * wsp_ggml_new_graph_custom(struct wsp_ggml_context * ctx
         /*.n_leafs      =*/ 0,
         /*.nodes        =*/ nodes_ptr,
         /*.grads        =*/ grads_ptr,
+        /*.grad_accs    =*/ grad_accs_ptr,
         /*.leafs        =*/ leafs_ptr,
         /*.hash_table   =*/ { hash_size, hash_used, hash_keys_ptr },
         /*.order        =*/ WSP_GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
     };
 
     wsp_ggml_hash_set_reset(&cgraph->visited_hash_set);
+    if (grads) {
+        memset(cgraph->grads,     0, hash_size*sizeof(struct wsp_ggml_tensor *));
+        memset(cgraph->grad_accs, 0, hash_size*sizeof(struct wsp_ggml_tensor *));
+    }
 
     return cgraph;
 }
@@ -6412,6 +5766,7 @@ struct wsp_ggml_cgraph wsp_ggml_graph_view(struct wsp_ggml_cgraph * cgraph0, int
         /*.n_leafs      =*/ 0,
         /*.nodes        =*/ cgraph0->nodes + i0,
         /*.grads        =*/ cgraph0->grads ? cgraph0->grads + i0 : NULL,
+        /*.grad_accs    =*/ cgraph0->grad_accs ? cgraph0->grad_accs + i0 : NULL,
         /*.leafs        =*/ NULL,
         /*.hash_table   =*/ { 0, NULL, NULL },
         /*.order        =*/ cgraph0->order,
@@ -6437,17 +5792,21 @@ void wsp_ggml_graph_cpy(struct wsp_ggml_cgraph * src, struct wsp_ggml_cgraph * d
         dst->nodes[i] = src->nodes[i];
     }
 
-    if (src->grads) {
-        WSP_GGML_ASSERT(dst->grads != NULL);
-        for (int i = 0; i < src->n_nodes; ++i) {
-            dst->grads[i] = src->grads[i];
-        }
-    }
-
     for (size_t i = 0; i < src->visited_hash_set.size; ++i) {
         // copy all hashset keys (tensors) that are in use
         if (wsp_ggml_bitset_get(src->visited_hash_set.used, i)) {
             wsp_ggml_hash_insert(&dst->visited_hash_set, src->visited_hash_set.keys[i]);
+        }
+    }
+
+    if (src->grads) {
+        WSP_GGML_ASSERT(dst->grads     != NULL);
+        WSP_GGML_ASSERT(dst->grad_accs != NULL);
+        for (int i = 0; i < src->n_nodes; ++i) {
+            const size_t igrad_src = wsp_ggml_hash_find(&src->visited_hash_set, src->nodes[i]);
+            const size_t igrad_dst = wsp_ggml_hash_find(&dst->visited_hash_set, dst->nodes[i]);
+            dst->grads[igrad_dst]     = src->grads[igrad_src];
+            dst->grad_accs[igrad_dst] = src->grad_accs[igrad_src];
         }
     }
 }
@@ -6475,28 +5834,35 @@ void wsp_ggml_graph_reset(struct wsp_ggml_cgraph * cgraph) {
     WSP_GGML_ASSERT(cgraph->grads != NULL);
 
     for (int i = 0; i < cgraph->n_nodes; i++) {
-        struct wsp_ggml_tensor * node = cgraph->nodes[i];
+        struct wsp_ggml_tensor * node     = cgraph->nodes[i];
+        struct wsp_ggml_tensor * grad_acc = wsp_ggml_graph_get_grad_acc(cgraph, node);
 
-        // initial gradients of loss should be 1, 0 otherwise
-        if (node->grad) {
-            if (node->flags & WSP_GGML_TENSOR_FLAG_LOSS) {
-                WSP_GGML_ASSERT(node->grad->buffer);
-                WSP_GGML_ASSERT(node->type == WSP_GGML_TYPE_F32);
-                WSP_GGML_ASSERT(wsp_ggml_is_scalar(node));
-
-                const float onef = 1.0f;
-                wsp_ggml_backend_tensor_set(node->grad, &onef, 0, wsp_ggml_nbytes(node->grad));
-            } else {
-                wsp_ggml_set_zero(node->grad);
+        if (node->op == WSP_GGML_OP_OPT_STEP_ADAMW) {
+            // clear momenta
+            if (node->src[2]->data) {
+                wsp_ggml_set_zero(node->src[2]);
+            }
+            if (node->src[3]->data) {
+                wsp_ggml_set_zero(node->src[3]);
             }
         }
 
-        WSP_GGML_ASSERT(node);
-        if (node->op == WSP_GGML_OP_OPT_STEP_ADAMW) {
-            // set iteration to 1 and clear momenta
-            wsp_ggml_set_op_params_i32(node, 0, 1);
-            wsp_ggml_set_zero(node->src[2]);
-            wsp_ggml_set_zero(node->src[3]);
+        // initial gradients of loss should be 1, 0 otherwise
+        if (grad_acc) {
+            if (node->flags & WSP_GGML_TENSOR_FLAG_LOSS) {
+                WSP_GGML_ASSERT(grad_acc->type == WSP_GGML_TYPE_F32);
+                WSP_GGML_ASSERT(wsp_ggml_is_scalar(grad_acc));
+
+                const float onef = 1.0f;
+                if (grad_acc->buffer) {
+                    wsp_ggml_backend_tensor_set(grad_acc, &onef, 0, sizeof(float));
+                } else {
+                    WSP_GGML_ASSERT(grad_acc->data);
+                    *((float *) grad_acc->data) = onef;
+                }
+            } else {
+                wsp_ggml_set_zero(grad_acc);
+            }
         }
     }
 }
@@ -6535,7 +5901,7 @@ void wsp_ggml_graph_add_node(struct wsp_ggml_cgraph * cgraph, struct wsp_ggml_te
     cgraph->n_nodes++;
 }
 
-struct wsp_ggml_tensor * wsp_ggml_graph_get_tensor(struct wsp_ggml_cgraph * cgraph, const char * name) {
+struct wsp_ggml_tensor * wsp_ggml_graph_get_tensor(const struct wsp_ggml_cgraph * cgraph, const char * name) {
     for (int i = 0; i < cgraph->n_leafs; i++) {
         struct wsp_ggml_tensor * leaf = cgraph->leafs[i];
 
@@ -6555,6 +5921,16 @@ struct wsp_ggml_tensor * wsp_ggml_graph_get_tensor(struct wsp_ggml_cgraph * cgra
     return NULL;
 }
 
+struct wsp_ggml_tensor * wsp_ggml_graph_get_grad(const struct wsp_ggml_cgraph * cgraph, const struct wsp_ggml_tensor * node) {
+    const size_t igrad = wsp_ggml_hash_find(&cgraph->visited_hash_set, node);
+    return igrad != WSP_GGML_HASHSET_FULL && wsp_ggml_bitset_get(cgraph->visited_hash_set.used, igrad) ? cgraph->grads[igrad] : NULL;
+}
+
+struct wsp_ggml_tensor * wsp_ggml_graph_get_grad_acc(const struct wsp_ggml_cgraph * cgraph, const struct wsp_ggml_tensor * node) {
+    const size_t igrad = wsp_ggml_hash_find(&cgraph->visited_hash_set, node);
+    return igrad != WSP_GGML_HASHSET_FULL && wsp_ggml_bitset_get(cgraph->visited_hash_set.used, igrad) ? cgraph->grad_accs[igrad] : NULL;
+}
+
 void wsp_ggml_graph_print(const struct wsp_ggml_cgraph * cgraph) {
     WSP_GGML_LOG_INFO("=== GRAPH ===\n");
 
@@ -6565,7 +5941,8 @@ void wsp_ggml_graph_print(const struct wsp_ggml_cgraph * cgraph) {
         WSP_GGML_LOG_INFO(" - %3d: [ %5" PRId64 ", %5" PRId64 ", %5" PRId64 "] %16s %s\n",
                 i,
                 node->ne[0], node->ne[1], node->ne[2],
-                wsp_ggml_op_name(node->op), (node->flags & WSP_GGML_TENSOR_FLAG_PARAM) ? "x" : node->grad ? "g" : " ");
+                wsp_ggml_op_name(node->op), (node->flags & WSP_GGML_TENSOR_FLAG_PARAM) ? "x" :
+                      wsp_ggml_graph_get_grad(cgraph, node) ? "g" : " ");
     }
 
     WSP_GGML_LOG_INFO("n_leafs = %d\n", cgraph->n_leafs);
@@ -6600,8 +5977,9 @@ static bool wsp_ggml_graph_find(const struct wsp_ggml_cgraph * cgraph, const str
 static struct wsp_ggml_tensor * wsp_ggml_graph_get_parent(const struct wsp_ggml_cgraph * cgraph, const struct wsp_ggml_tensor * node) {
     for (int i = 0; i < cgraph->n_nodes; i++) {
         struct wsp_ggml_tensor * parent = cgraph->nodes[i];
+        struct wsp_ggml_tensor * grad = wsp_ggml_graph_get_grad(cgraph, parent);
 
-        if (parent->grad == node) {
+        if (grad == node) {
             return parent;
         }
     }
@@ -6641,6 +6019,7 @@ void wsp_ggml_graph_dump_dot(const struct wsp_ggml_cgraph * gb, const struct wsp
 
     for (int i = 0; i < gb->n_nodes; i++) {
         struct wsp_ggml_tensor * node = gb->nodes[i];
+        struct wsp_ggml_tensor * grad = wsp_ggml_graph_get_grad(gb, node);
 
         if (wsp_ggml_graph_get_parent(gb, node) != NULL) {
             continue;
@@ -6648,7 +6027,7 @@ void wsp_ggml_graph_dump_dot(const struct wsp_ggml_cgraph * gb, const struct wsp
 
         if (node->flags & WSP_GGML_TENSOR_FLAG_PARAM) {
             snprintf(color, sizeof(color), "yellow");
-        } else if (node->grad) {
+        } else if (grad) {
             if (wsp_ggml_graph_find(gf, node)) {
                 snprintf(color, sizeof(color), "green");
             } else {
@@ -6675,8 +6054,8 @@ void wsp_ggml_graph_dump_dot(const struct wsp_ggml_cgraph * gb, const struct wsp
             fprintf(fp, "%d [%" PRId64 ", %" PRId64 ", %" PRId64 "] | <x>%s", i, node->ne[0], node->ne[1], node->ne[2], wsp_ggml_op_symbol(node->op));
         }
 
-        if (node->grad) {
-            fprintf(fp, " | <g>%s\"; ]\n", wsp_ggml_op_symbol(node->grad->op));
+        if (grad) {
+            fprintf(fp, " | <g>%s\"; ]\n", wsp_ggml_op_symbol(grad->op));
         } else {
             fprintf(fp, "\"; ]\n");
         }
@@ -8166,222 +7545,7 @@ void wsp_gguf_get_meta_data(const struct wsp_gguf_context * ctx, void * data) {
     wsp_gguf_buf_free(buf);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-int wsp_ggml_cpu_has_avx(void) {
-#if defined(__AVX__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_avx_vnni(void) {
-#if defined(__AVXVNNI__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_avx2(void) {
-#if defined(__AVX2__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_avx512(void) {
-#if defined(__AVX512F__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_avx512_vbmi(void) {
-#if defined(__AVX512VBMI__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_avx512_vnni(void) {
-#if defined(__AVX512VNNI__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_avx512_bf16(void) {
-#if defined(__AVX512BF16__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_amx_int8(void) {
-#if defined(__AMX_INT8__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_fma(void) {
-#if defined(__FMA__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_arm_fma(void) {
-#if defined(__ARM_FEATURE_FMA)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_riscv_v(void) {
-#if defined(__riscv_v_intrinsic)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_metal(void) {
-#if defined(WSP_GGML_USE_METAL)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_f16c(void) {
-#if defined(__F16C__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_fp16_va(void) {
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_wasm_simd(void) {
-#if defined(__wasm_simd128__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_blas(void) {
-#if defined(WSP_GGML_USE_BLAS) || defined(WSP_GGML_USE_CUDA) || defined(WSP_GGML_USE_VULKAN) || defined(WSP_GGML_USE_SYCL)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_cuda(void) {
-#if defined(WSP_GGML_USE_CUDA)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_vulkan(void) {
-#if defined(WSP_GGML_USE_VULKAN)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_kompute(void) {
-#if defined(WSP_GGML_USE_KOMPUTE)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_sycl(void) {
-#if defined(WSP_GGML_USE_SYCL)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_rpc(void) {
-#if defined(WSP_GGML_USE_RPC)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_cann(void) {
-#if defined(WSP_GGML_USE_CANN)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_llamafile(void) {
-#if defined(WSP_GGML_USE_LLAMAFILE)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_gpublas(void) {
-    return wsp_ggml_cpu_has_cuda() || wsp_ggml_cpu_has_vulkan() || wsp_ggml_cpu_has_kompute() || wsp_ggml_cpu_has_sycl();
-}
-
-int wsp_ggml_cpu_has_sse3(void) {
-#if defined(__SSE3__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_ssse3(void) {
-#if defined(__SSSE3__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_vsx(void) {
-#if defined(__POWER9_VECTOR__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
 void wsp_ggml_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
     g_logger_state.log_callback = log_callback ? log_callback : wsp_ggml_log_callback_default;
     g_logger_state.log_callback_user_data = user_data;
 }
-////////////////////////////////////////////////////////////////////////////////

@@ -17,10 +17,8 @@ const char * system_info(void) {
   if (wsp_ggml_cpu_has_fma() == 1) s += "FMA ";
   if (wsp_ggml_cpu_has_neon() == 1) s += "NEON ";
   if (wsp_ggml_cpu_has_arm_fma() == 1) s += "ARM_FMA ";
-  if (wsp_ggml_cpu_has_metal() == 1) s += "METAL ";
   if (wsp_ggml_cpu_has_f16c() == 1) s += "F16C ";
   if (wsp_ggml_cpu_has_fp16_va() == 1) s += "FP16_VA ";
-  if (wsp_ggml_cpu_has_blas() == 1) s += "BLAS ";
   if (wsp_ggml_cpu_has_sse3() == 1) s += "SSE3 ";
   if (wsp_ggml_cpu_has_ssse3() == 1) s += "SSSE3 ";
   if (wsp_ggml_cpu_has_vsx() == 1) s += "VSX ";

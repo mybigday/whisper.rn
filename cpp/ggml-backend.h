@@ -3,6 +3,20 @@
 #include "ggml.h"
 #include "ggml-alloc.h"
 
+#ifdef WSP_GGML_BACKEND_SHARED
+#    if defined(_WIN32) && !defined(__MINGW32__)
+#        ifdef WSP_GGML_BACKEND_BUILD
+#            define WSP_GGML_BACKEND_API __declspec(dllexport) extern
+#        else
+#            define WSP_GGML_BACKEND_API __declspec(dllimport) extern
+#        endif
+#    else
+#        define WSP_GGML_BACKEND_API __attribute__ ((visibility ("default"))) extern
+#    endif
+#else
+#    define WSP_GGML_BACKEND_API extern
+#endif
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -72,7 +86,7 @@ extern "C" {
     WSP_GGML_API void wsp_ggml_backend_tensor_set_async(wsp_ggml_backend_t backend,       struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);
     WSP_GGML_API void wsp_ggml_backend_tensor_get_async(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size);
 
-    // "offset" refers to the offset of the tensor data for setting/getting data
+    // "offset" refers to the offset in tensor->data for setting/getting data
     WSP_GGML_API void wsp_ggml_backend_tensor_set(      struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);
     WSP_GGML_API void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size);
     WSP_GGML_API void wsp_ggml_backend_tensor_memset(   struct wsp_ggml_tensor * tensor,     uint8_t value, size_t offset, size_t size);
@@ -228,14 +242,20 @@ extern "C" {
         wsp_ggml_backend_sched_reserve(sched, reserve_graph);
 
         // compute
-        graph = build_graph(sched);
-        wsp_ggml_backend_sched_graph_compute(sched, graph);
+        graph = build_graph(sched); // the graph and its tensors are single-use in terms of allocation, multi-use in terms of computation
+        for (int i = 0; i < 10; ++i) {
+            wsp_ggml_backend_sched_graph_compute(sched, graph); // on the first iteration the graph is allocated automatically
+        }
 
         // if there are graph inputs:
-        wsp_ggml_backend_sched_reset(sched);
-        wsp_ggml_backend_sched_alloc_graph(sched, graph);
-        wsp_ggml_backend_tensor_set(input_tensor, ...);
-        wsp_ggml_backend_sched_graph_compute(sched, graph);
+        graph = build_graph(sched); // get a new graph that is not allocated (the metadata for the old graph is freed once wsp_ggml_free is called)
+        wsp_ggml_backend_sched_reset(sched); // clear the allocation of the previous graph
+        wsp_ggml_backend_sched_alloc_graph(sched, graph); // explicitly allocate the new graph but do not execute it
+        wsp_ggml_backend_tensor_set(input_tensor, ...); // copy data to the newly allocated graph tensors
+        wsp_ggml_backend_sched_graph_compute(sched, graph); // execute the graph
+
+        // as an alternative to the above it is also possible to assign the inputs to a dedicated context and
+        // allocate them statically via wsp_ggml_backend_alloc_ctx_tensors
     }
     */
 
@@ -250,7 +270,7 @@ extern "C" {
     //
     typedef bool (*wsp_ggml_backend_sched_eval_callback)(struct wsp_ggml_tensor * t, bool ask, void * user_data);
 
-    // Initialize a backend scheduler
+    // Initialize a backend scheduler, backends with low index are given priority over backends with high index
     WSP_GGML_API wsp_ggml_backend_sched_t wsp_ggml_backend_sched_new(wsp_ggml_backend_t * backends, wsp_ggml_backend_buffer_type_t * bufts, int n_backends, size_t graph_size, bool parallel);
     WSP_GGML_API void                 wsp_ggml_backend_sched_free(wsp_ggml_backend_sched_t sched);
 
@@ -275,7 +295,9 @@ extern "C" {
     WSP_GGML_API enum wsp_ggml_status     wsp_ggml_backend_sched_graph_compute_async(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * graph);
     WSP_GGML_API void                 wsp_ggml_backend_sched_synchronize(wsp_ggml_backend_sched_t sched);
 
-    // Reset all assignments and allocators - must be called before changing the node backends
+    // Reset all assignments and allocators - must be called before changing the node backends or allocating a new graph.
+    // This in effect deallocates all tensors that were previously allocated and leaves them with dangling pointers.
+    // The correct way to use this API is to discard the deallocated tensors and create new ones.
     WSP_GGML_API void                 wsp_ggml_backend_sched_reset(wsp_ggml_backend_sched_t sched);
 
     // Set a callback to be called for each resulting node during graph compute
