@@ -19,7 +19,9 @@
 - [bench](WhisperContext.md#bench)
 - [release](WhisperContext.md#release)
 - [transcribe](WhisperContext.md#transcribe)
+- [transcribeData](WhisperContext.md#transcribedata)
 - [transcribeRealtime](WhisperContext.md#transcriberealtime)
+- [transcribeWithNativeMethod](WhisperContext.md#transcribewithnativemethod)
 
 ## Constructors
 
@@ -35,7 +37,7 @@
 
 #### Defined in
 
-[index.ts:204](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L204)
+[index.ts:203](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L203)
 
 ## Properties
 
@@ -45,7 +47,7 @@
 
 #### Defined in
 
-[index.ts:200](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L200)
+[index.ts:199](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L199)
 
 ___
 
@@ -55,7 +57,7 @@ ___
 
 #### Defined in
 
-[index.ts:198](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L198)
+[index.ts:197](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L197)
 
 ___
 
@@ -65,7 +67,7 @@ ___
 
 #### Defined in
 
-[index.ts:202](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L202)
+[index.ts:201](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L201)
 
 ## Methods
 
@@ -85,7 +87,7 @@ ___
 
 #### Defined in
 
-[index.ts:445](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L445)
+[index.ts:466](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L466)
 
 ___
 
@@ -99,21 +101,22 @@ ___
 
 #### Defined in
 
-[index.ts:451](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L451)
+[index.ts:472](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L472)
 
 ___
 
 ### transcribe
 
-▸ **transcribe**(`filePath`, `options?`): `Object`
+▸ **transcribe**(`filePathOrBase64`, `options?`): `Object`
 
-Transcribe audio file
+Transcribe audio file (path or base64 encoded wav file)
+base64: need add `data:audio/wav;base64,` prefix
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `filePath` | `string` \| `number` |
+| `filePathOrBase64` | `string` \| `number` |
 | `options` | [`TranscribeFileOptions`](../README.md#transcribefileoptions) |
 
 #### Returns
@@ -127,7 +130,35 @@ Transcribe audio file
 
 #### Defined in
 
-[index.ts:215](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L215)
+[index.ts:292](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L292)
+
+___
+
+### transcribeData
+
+▸ **transcribeData**(`data`, `options?`): `Object`
+
+Transcribe audio data (base64 encoded float32 PCM data)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `string` |
+| `options` | [`TranscribeFileOptions`](../README.md#transcribefileoptions) |
+
+#### Returns
+
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `promise` | `Promise`\<[`TranscribeResult`](../README.md#transcriberesult)\> |
+| `stop` | () => `Promise`\<`void`\> |
+
+#### Defined in
+
+[index.ts:324](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L324)
 
 ___
 
@@ -149,4 +180,31 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:311](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L311)
+[index.ts:332](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L332)
+
+___
+
+### transcribeWithNativeMethod
+
+▸ `Private` **transcribeWithNativeMethod**(`method`, `data`, `options?`): `Object`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `method` | ``"transcribeFile"`` \| ``"transcribeData"`` |
+| `data` | `string` |
+| `options` | [`TranscribeFileOptions`](../README.md#transcribefileoptions) |
+
+#### Returns
+
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `promise` | `Promise`\<[`TranscribeResult`](../README.md#transcriberesult)\> |
+| `stop` | () => `Promise`\<`void`\> |
+
+#### Defined in
+
+[index.ts:213](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L213)

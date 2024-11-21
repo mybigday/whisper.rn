@@ -487,6 +487,7 @@ struct rnwhisper_segments_callback_data {
     params.n_threads        = n_threads > 0 ? n_threads : default_n_threads;
     params.offset_ms        = 0;
     params.no_context       = true;
+    params.split_on_word = false;
     params.single_segment   = false;
 
     if (options[@"maxLen"] != nil) {

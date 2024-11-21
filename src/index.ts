@@ -1,22 +1,22 @@
 import {
-  NativeEventEmitter,
   DeviceEventEmitter,
-  Platform,
   DeviceEventEmitterStatic,
   Image,
+  NativeEventEmitter,
+  Platform,
 } from 'react-native'
-import RNWhisper, { NativeWhisperContext } from './NativeRNWhisper'
-import type {
-  TranscribeOptions,
-  TranscribeResult,
-  CoreMLAsset,
-} from './NativeRNWhisper'
-import AudioSessionIos from './AudioSessionIos'
 import type {
   AudioSessionCategoryIos,
   AudioSessionCategoryOptionIos,
   AudioSessionModeIos,
 } from './AudioSessionIos'
+import AudioSessionIos from './AudioSessionIos'
+import type {
+  CoreMLAsset,
+  TranscribeOptions,
+  TranscribeResult,
+} from './NativeRNWhisper'
+import RNWhisper, { NativeWhisperContext } from './NativeRNWhisper'
 import { version } from './version.json'
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
@@ -29,11 +29,10 @@ if (Platform.OS === 'android') {
 }
 
 export type {
-  TranscribeOptions,
-  TranscribeResult,
   AudioSessionCategoryIos,
   AudioSessionCategoryOptionIos,
-  AudioSessionModeIos,
+  AudioSessionModeIos, TranscribeOptions,
+  TranscribeResult
 }
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
@@ -246,6 +245,7 @@ export class WhisperContext {
         (evt: TranscribeNewSegmentsNativeEvent) => {
           const { contextId, result } = evt
           if (contextId !== this.id || evt.jobId !== jobId) return
+          (result as any).newBetterStuff = true; 
           onNewSegments(result)
         },
       )
@@ -298,6 +298,7 @@ export class WhisperContext {
     /** Transcribe result promise */
     promise: Promise<TranscribeResult>
   } {
+    console.log("came to transcribe")
     let path = ''
     if (typeof filePathOrBase64 === 'number') {
       try {

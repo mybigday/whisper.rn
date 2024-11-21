@@ -59,7 +59,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:76](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L76)
+[index.ts:75](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L75)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[index.ts:177](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L177)
+[index.ts:176](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L176)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[index.ts:456](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L456)
+[index.ts:477](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L477)
 
 ___
 
@@ -113,7 +113,7 @@ ___
 
 #### Defined in
 
-[index.ts:59](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L59)
+[index.ts:58](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L58)
 
 ___
 
@@ -131,7 +131,7 @@ ___
 
 #### Defined in
 
-[index.ts:52](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L52)
+[index.ts:51](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L51)
 
 ___
 
@@ -150,7 +150,7 @@ ___
 
 #### Defined in
 
-[index.ts:45](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L45)
+[index.ts:44](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L44)
 
 ___
 
@@ -180,7 +180,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -198,7 +198,7 @@ ___
 
 #### Defined in
 
-[index.ts:70](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L70)
+[index.ts:69](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L69)
 
 ___
 
@@ -223,7 +223,7 @@ ___
 
 #### Defined in
 
-[index.ts:138](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L138)
+[index.ts:137](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L137)
 
 ___
 
@@ -241,7 +241,7 @@ ___
 
 #### Defined in
 
-[index.ts:171](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L171)
+[index.ts:170](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L170)
 
 ___
 
@@ -265,7 +265,7 @@ ___
 
 #### Defined in
 
-[index.ts:158](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L158)
+[index.ts:157](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L157)
 
 ___
 
@@ -275,7 +275,7 @@ ___
 
 #### Defined in
 
-[index.ts:84](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L84)
+[index.ts:83](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L83)
 
 ___
 
@@ -293,7 +293,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/NativeRNWhisper.ts#L37)
 
 ## Variables
 
@@ -318,7 +318,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -330,7 +330,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:562](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L562)
+[index.ts:583](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L583)
 
 ___
 
@@ -342,7 +342,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:559](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L559)
+[index.ts:580](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L580)
 
 ___
 
@@ -354,7 +354,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:554](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L554)
+[index.ts:575](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L575)
 
 ## Functions
 
@@ -374,7 +374,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:484](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L484)
+[index.ts:505](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L505)
 
 ___
 
@@ -388,4 +388,4 @@ ___
 
 #### Defined in
 
-[index.ts:549](https://github.com/Shonn-Li/whisper.rn/blob/512126a/src/index.ts#L549)
+[index.ts:570](https://github.com/Shonn-Li/whisper.rn/blob/1a76343/src/index.ts#L570)
