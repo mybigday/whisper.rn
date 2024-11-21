@@ -466,18 +466,12 @@ static bool wsp_ggml_gallocr_is_own(wsp_ggml_gallocr_t galloc, struct wsp_ggml_t
     return wsp_ggml_gallocr_hash_get(galloc, t)->allocated;
 }
 
-static void wsp_ggml_gallocr_set_node_offset(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * node, int buffer_id, size_t offset) {
-    struct hash_node * hn = wsp_ggml_gallocr_hash_get(galloc, node);
-    hn->buffer_id = buffer_id;
-    hn->offset = offset;
-    hn->allocated = true;
-}
-
 static bool wsp_ggml_gallocr_is_allocated(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * t) {
     return t->data != NULL || wsp_ggml_gallocr_hash_get(galloc, t)->allocated;
 }
 
 static void wsp_ggml_gallocr_allocate_node(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * node, int buffer_id) {
+    WSP_GGML_ASSERT(buffer_id >= 0);
     struct hash_node * hn = wsp_ggml_gallocr_hash_get(galloc, node);
 
     if (!wsp_ggml_gallocr_is_allocated(galloc, node) && !wsp_ggml_is_view(node)) {
@@ -816,7 +810,11 @@ static void wsp_ggml_gallocr_init_tensor(wsp_ggml_gallocr_t galloc, struct wsp_g
 }
 
 static bool wsp_ggml_gallocr_node_needs_realloc(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * node, struct tensor_alloc * talloc) {
-    size_t node_size = (node->data || node->view_src) ? 0 : wsp_ggml_backend_buft_get_alloc_size(galloc->bufts[talloc->buffer_id], node);
+    size_t node_size = 0;
+    if (!node->data && !node->view_src) {
+        WSP_GGML_ASSERT(talloc->buffer_id >= 0); // prevent segfault when misusing the API
+        node_size = wsp_ggml_backend_buft_get_alloc_size(galloc->bufts[talloc->buffer_id], node);
+    }
     return talloc->size_max >= node_size;
 }
 

@@ -17,10 +17,8 @@ const char * system_info(void) {
   if (wsp_ggml_cpu_has_fma() == 1) s += "FMA ";
   if (wsp_ggml_cpu_has_neon() == 1) s += "NEON ";
   if (wsp_ggml_cpu_has_arm_fma() == 1) s += "ARM_FMA ";
-  if (wsp_ggml_cpu_has_metal() == 1) s += "METAL ";
   if (wsp_ggml_cpu_has_f16c() == 1) s += "F16C ";
   if (wsp_ggml_cpu_has_fp16_va() == 1) s += "FP16_VA ";
-  if (wsp_ggml_cpu_has_blas() == 1) s += "BLAS ";
   if (wsp_ggml_cpu_has_sse3() == 1) s += "SSE3 ";
   if (wsp_ggml_cpu_has_ssse3() == 1) s += "SSSE3 ";
   if (wsp_ggml_cpu_has_vsx() == 1) s += "VSX ";
@@ -85,18 +83,13 @@ std::string bench(struct whisper_context * ctx, int n_threads) {
 
     const struct whisper_timings * timings = whisper_get_timings(ctx);
 
-    const int32_t n_encode = std::max(1, timings->n_encode);
-    const int32_t n_decode = std::max(1, timings->n_decode);
-    const int32_t n_batchd = std::max(1, timings->n_batchd);
-    const int32_t n_prompt = std::max(1, timings->n_prompt);
-
     return std::string("[") +
         "\"" + system_info() + "\"," +
         std::to_string(n_threads) + "," +
-        std::to_string(1e-3f * timings->t_encode_us / n_encode) + "," +
-        std::to_string(1e-3f * timings->t_decode_us / n_decode) + "," +
-        std::to_string(1e-3f * timings->t_batchd_us / n_batchd) + "," +
-        std::to_string(1e-3f * timings->t_prompt_us / n_prompt) + "]";
+        std::to_string(timings->encode_ms) + "," +
+        std::to_string(timings->decode_ms) + "," +
+        std::to_string(timings->batchd_ms) + "," +
+        std::to_string(timings->prompt_ms) + "]";
 }
 
 void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate) {

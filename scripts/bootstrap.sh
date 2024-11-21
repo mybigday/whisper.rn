@@ -6,20 +6,34 @@ git submodule update --recursive
 cp ./whisper.cpp/ggml/include/ggml.h ./cpp/ggml.h
 cp ./whisper.cpp/ggml/include/ggml-alloc.h ./cpp/ggml-alloc.h
 cp ./whisper.cpp/ggml/include/ggml-backend.h ./cpp/ggml-backend.h
+cp ./whisper.cpp/ggml/include/ggml-cpu.h ./cpp/ggml-cpu.h
+cp ./whisper.cpp/ggml/include/ggml-cpp.h ./cpp/ggml-cpp.h
 cp ./whisper.cpp/ggml/include/ggml-metal.h ./cpp/ggml-metal.h
 
 cp ./whisper.cpp/ggml/src/ggml.c ./cpp/ggml.c
-cp ./whisper.cpp/ggml/src/ggml-metal.m ./cpp/ggml-metal.m
+cp ./whisper.cpp/ggml/src/ggml-impl.h ./cpp/ggml-impl.h
 cp ./whisper.cpp/ggml/src/ggml-alloc.c ./cpp/ggml-alloc.c
 cp ./whisper.cpp/ggml/src/ggml-backend.cpp ./cpp/ggml-backend.cpp
 cp ./whisper.cpp/ggml/src/ggml-backend-impl.h ./cpp/ggml-backend-impl.h
-cp ./whisper.cpp/ggml/src/ggml-impl.h ./cpp/ggml-impl.h
-cp ./whisper.cpp/ggml/src/ggml-cpu-impl.h ./cpp/ggml-cpu-impl.h
+cp ./whisper.cpp/ggml/src/ggml-backend-reg.cpp ./cpp/ggml-backend-reg.cpp
 cp ./whisper.cpp/ggml/src/ggml-common.h ./cpp/ggml-common.h
 cp ./whisper.cpp/ggml/src/ggml-quants.h ./cpp/ggml-quants.h
 cp ./whisper.cpp/ggml/src/ggml-quants.c ./cpp/ggml-quants.c
 cp ./whisper.cpp/ggml/src/ggml-aarch64.c ./cpp/ggml-aarch64.c
 cp ./whisper.cpp/ggml/src/ggml-aarch64.h ./cpp/ggml-aarch64.h
+cp ./whisper.cpp/ggml/src/ggml-threading.cpp ./cpp/ggml-threading.cpp
+cp ./whisper.cpp/ggml/src/ggml-threading.h ./cpp/ggml-threading.h
+
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c ./cpp/ggml-cpu.c
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp ./cpp/ggml-cpu.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h ./cpp/ggml-cpu-impl.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-aarch64.h ./cpp/ggml-cpu-aarch64.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-aarch64.c ./cpp/ggml-cpu-aarch64.c
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.h ./cpp/ggml-cpu-quants.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.c ./cpp/ggml-cpu-quants.c
+
+cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal.m ./cpp/ggml-metal.m
+cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal-impl.h ./cpp/ggml-metal-impl.h
 
 cp ./whisper.cpp/include/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/src/whisper.cpp ./cpp/whisper.cpp
@@ -29,10 +43,16 @@ cp -R ./whisper.cpp/src/coreml/ ./cpp/coreml/
 
 # List of files to process
 files=(
+  "./cpp/whisper.h"
+  "./cpp/whisper.cpp"
+  "./cpp/ggml-common.h"
   "./cpp/ggml.h"
   "./cpp/ggml.c"
+  "./cpp/ggml-impl.h"
+  "./cpp/ggml-cpp.h"
   "./cpp/ggml-metal.h"
   "./cpp/ggml-metal.m"
+  "./cpp/ggml-metal-impl.h"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
@@ -40,13 +60,19 @@ files=(
   "./cpp/ggml-backend.h"
   "./cpp/ggml-backend.cpp"
   "./cpp/ggml-backend-impl.h"
-  "./cpp/ggml-impl.h"
+  "./cpp/ggml-backend-reg.cpp"
   "./cpp/ggml-cpu-impl.h"
-  "./cpp/ggml-common.h"
+  "./cpp/ggml-cpu.h"
+  "./cpp/ggml-cpu.c"
+  "./cpp/ggml-cpu.cpp"
+  "./cpp/ggml-cpu-aarch64.h"
+  "./cpp/ggml-cpu-aarch64.c"
+  "./cpp/ggml-cpu-quants.h"
+  "./cpp/ggml-cpu-quants.c"
+  "./cpp/ggml-threading.h"
+  "./cpp/ggml-threading.cpp"
   "./cpp/ggml-aarch64.h"
   "./cpp/ggml-aarch64.c"
-  "./cpp/whisper.h"
-  "./cpp/whisper.cpp"
 )
 
 # Loop through each file and run the sed commands
@@ -82,18 +108,20 @@ cd ../../../
 yarn example
 
 # Apply patch
-patch -p0 -d ./cpp < ./scripts/ggml-backend.cpp.patch
 patch -p0 -d ./cpp < ./scripts/ggml-metal.m.patch
+patch -p0 -d ./cpp < ./scripts/ggml-backend-reg.cpp.patch
+patch -p0 -d ./cpp < ./scripts/ggml-quants.c.patch
+patch -p0 -d ./cpp < ./scripts/ggml-cpu-aarch64.c.patch
 patch -p0 -d ./cpp < ./scripts/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/whisper.cpp.patch
 
 if [ "$OS" = "Darwin" ]; then
   # Build metallib (~1.4MB)
-  cd whisper.cpp/ggml/src/
+  cd whisper.cpp/ggml/src/ggml-metal
   xcrun --sdk iphoneos metal -c ggml-metal.metal -o ggml-metal.air
   xcrun --sdk iphoneos metallib ggml-metal.air   -o ggml-whisper.metallib
   rm ggml-metal.air
-  cp ./ggml-whisper.metallib ../../../cpp/ggml-whisper.metallib
+  cp ./ggml-whisper.metallib ../../../../cpp/ggml-whisper.metallib
 
   cd -
 
@@ -103,7 +131,6 @@ if [ "$OS" = "Darwin" ]; then
 
   cd -
 fi
-
 
 # Download model for example
 cd whisper.cpp/models
