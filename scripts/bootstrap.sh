@@ -33,6 +33,7 @@ cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.h ./cpp/ggml-cpu-quants.h
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.c ./cpp/ggml-cpu-quants.c
 
 cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal.m ./cpp/ggml-metal.m
+cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal-impl.h ./cpp/ggml-metal-impl.h
 
 cp ./whisper.cpp/include/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/src/whisper.cpp ./cpp/whisper.cpp
@@ -51,6 +52,7 @@ files=(
   "./cpp/ggml-cpp.h"
   "./cpp/ggml-metal.h"
   "./cpp/ggml-metal.m"
+  "./cpp/ggml-metal-impl.h"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
