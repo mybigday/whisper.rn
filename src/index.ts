@@ -245,7 +245,6 @@ export class WhisperContext {
         (evt: TranscribeNewSegmentsNativeEvent) => {
           const { contextId, result } = evt
           if (contextId !== this.id || evt.jobId !== jobId) return
-          (result as any).newBetterStuff = true; 
           onNewSegments(result)
         },
       )

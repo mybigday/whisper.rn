@@ -156,6 +156,7 @@ void AudioInputCallback(void * inUserData,
     const AudioStreamPacketDescription * inPacketDescs)
 {
     RNWhisperContextRecordState *state = (RNWhisperContextRecordState *)inUserData;
+    NSLog(@"[custom-RNWhisper] AudioInputCallback");
 
     if (!state->isCapturing) {
         NSLog(@"[RNWhisper] Not capturing, ignoring audio");
@@ -208,7 +209,7 @@ void AudioInputCallback(void * inUserData,
         state->sliceNSamples.push_back(0);
     }
 
-    NSLog(@"[RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
+    NSLog(@"[custom-RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
 
     state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
 
@@ -231,12 +232,15 @@ void AudioInputCallback(void * inUserData,
 
 - (void)finishRealtimeTranscribe:(RNWhisperContextRecordState*) state result:(NSDictionary*)result {
     // Save wav if needed
+    NSLog(@"[custom-RNWhisper] audio output path: %s", state->job->audio_output_path);
     if (state->job->audio_output_path != nullptr) {
+        NSLog(@"[custom-RNWhisper] audio output path not null");
         // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
         rnaudioutils::save_wav_file(
             rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
             state->job->audio_output_path
         );
+        NSLog(@"[custom-RNWhisper] save_wav_file excuted");
     }
     state->transcribeHandler(state->job->job_id, @"end", result);
     rnwhisper::job_remove(state->job->job_id);
@@ -392,7 +396,15 @@ struct rnwhisper_segments_callback_data {
                 NSMutableArray *segments = [[NSMutableArray alloc] init];
                 for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
                     const char * text_cur = whisper_full_get_segment_text(ctx, i);
+                    if (text_cur == NULL) {
+                        // Skip this segment or handle it safely
+                        continue;
+                    }
                     NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
+                    if (!mutable_ns_text) {
+                        // This means text_cur could not be converted to a string; skip or handle
+                        continue;
+                    }
 
                     if (data->tdrzEnable && whisper_full_get_segment_speaker_turn_next(ctx, i)) {
                         [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
@@ -445,6 +457,7 @@ struct rnwhisper_segments_callback_data {
 }
 
 - (void)stopTranscribe:(int)jobId {
+    NSLog(@"[custom-RNWhisper] Stop transcribe");
     if (self->recordState.job) self->recordState.job->abort();
     if (self->recordState.isRealtime && self->recordState.isCapturing) {
         [self stopAudio];
@@ -542,9 +555,16 @@ struct rnwhisper_segments_callback_data {
     int n_segments = whisper_full_n_segments(self->ctx);
 
     NSMutableArray *segments = [[NSMutableArray alloc] init];
+    NSLog(@"[Custom-RNWhisper] getTextSegments");
     for (int i = 0; i < n_segments; i++) {
         const char * text_cur = whisper_full_get_segment_text(self->ctx, i);
         NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
+        if (!mutable_ns_text) {
+
+            NSLog(@"[Custom-RNWhisper] mutable_ns_text is nil");
+            // Handle gracefully or skip
+            continue;
+        }
 
         // Simplified condition
         if (self->recordState.options[@"tdrzEnable"] &&

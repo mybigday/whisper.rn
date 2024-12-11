@@ -4,6 +4,8 @@
 namespace rnaudioutils {
 
 std::vector<uint8_t> concat_short_buffers(const std::vector<short*>& buffers, const std::vector<int>& slice_n_samples) {
+    
+    RNWHISPER_LOG_INFO("Concating short buffer");
     std::vector<uint8_t> output_data;
 
     for (size_t i = 0; i < buffers.size(); i++) {
@@ -26,6 +28,8 @@ std::vector<uint8_t> remove_trailing_zeros(const std::vector<uint8_t>& audio_dat
 }
 
 void save_wav_file(const std::vector<uint8_t>& raw, const std::string& file) {
+
+    RNWHISPER_LOG_INFO("Saving audio file: %s\n", file.c_str());
     std::vector<uint8_t> data = remove_trailing_zeros(raw);
     
     std::ofstream output(file, std::ios::binary);
