@@ -260,6 +260,10 @@ void AudioInputCallback(void * inUserData,
 
     NSLog(@"[custom-RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
 
+    if (state->job->rawFile) {
+        state->job->append_raw_data((short*) inBuffer->mAudioData, n);
+    }
+
     state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
 
     bool isSpeech = vad(state, state->sliceIndex, nSamples, n);
@@ -282,15 +286,26 @@ void AudioInputCallback(void * inUserData,
 - (void)finishRealtimeTranscribe:(RNWhisperContextRecordState*) state result:(NSDictionary*)result {
     // Save wav if needed
     NSLog(@"[custom-RNWhisper] audio output path: %s", state->job->audio_output_path);
+    // if (state->job->audio_output_path != nullptr) {
+    //     NSLog(@"[custom-RNWhisper] audio output path not null");
+    //     // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
+    //     rnaudioutils::save_wav_file(
+    //         rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
+    //         state->job->audio_output_path
+    //     );
+    //     NSLog(@"[custom-RNWhisper] save_wav_file excuted");
+    // }
+
+    // 1) Close raw
+    state->job->close_raw_file();
+
+    // 2) Convert .raw -> .wav
     if (state->job->audio_output_path != nullptr) {
-        NSLog(@"[custom-RNWhisper] audio output path not null");
-        // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-        rnaudioutils::save_wav_file(
-            rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
-            state->job->audio_output_path
-        );
-        NSLog(@"[custom-RNWhisper] save_wav_file excuted");
+        std::string rawPath = state->job->audio_output_path;      // e.g. "/tmp/myAudio.raw"
+        std::string wavPath = rawPath + ".wav";                   // e.g. "/tmp/myAudio.raw.wav"
+        rnaudioutils::raw_to_wav(rawPath, wavPath);
     }
+
     state->transcribeHandler(state->job->job_id, @"end", result);
     rnwhisper::job_remove(state->job->job_id);
 }
@@ -342,6 +357,12 @@ void AudioInputCallback(void * inUserData,
     }
 
     nSamplesOfIndex = state->sliceNSamples[state->transcribeSliceIndex];
+    if (state->nSamplesTranscribing == nSamplesOfIndex) {
+
+        NSLog(@"[custom-RNWhisper] Remove unused slice called %d", state->transcribeSliceIndex);
+        // We are done with this slice
+        // state->job->free_slice(state->transcribeSliceIndex);
+    }
 
     bool isStopped = state->isStoppedByAction || (
         !state->isCapturing &&
@@ -404,6 +425,10 @@ void AudioInputCallback(void * inUserData,
     self->recordState.transcribeHandler = onTranscribe;
 
     [self prepareRealtime:jobId options:options];
+
+    if (options[@"audioOutputPath"] != nil) {
+        self->recordState.job->open_raw_file([options[@"audioOutputPath"] UTF8String]);
+    }
 
     OSStatus status = AudioQueueNewInput(
         &self->recordState.dataFormat,
@@ -478,12 +503,12 @@ struct rnwhisper_segments_callback_data {
                 for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
                     const char *text_cur = whisper_full_get_segment_text(ctx, i);
                     if (text_cur == NULL) {
-                        NSLog(@"[custom-RNWhisper] text_cur is NULL for segment %d", i);
+                        // NSLog(@"[custom-RNWhisper] text_cur is NULL for segment %d", i);
                         continue;
                     }
 
                     size_t text_cur_length = strlen(text_cur);
-                    NSLog(@"[custom-RNWhisper] text_cur for segment %d (length %zu): \"%s\"", i, text_cur_length, text_cur);
+                    // NSLog(@"[custom-RNWhisper] text_cur for segment %d (length %zu): \"%s\"", i, text_cur_length, text_cur);
 
                     [tempData appendBytes:text_cur length:text_cur_length];
                     [tempData appendBytes:"" length:1];
@@ -492,7 +517,7 @@ struct rnwhisper_segments_callback_data {
                     if (is_valid_utf8(buffer)) {
                         NSString *ns_text = [NSString stringWithUTF8String:buffer];
                         if (!ns_text) {
-                            NSLog(@"[custom-RNWhisper] Unable to convert buffer to NSString for segment %d", i);
+                            // NSLog(@"[custom-RNWhisper] Unable to convert buffer to NSString for segment %d", i);
                             [tempData setLength:0];
                             continue;
                         }
@@ -516,10 +541,10 @@ struct rnwhisper_segments_callback_data {
                         };
                         [segments addObject:segment];
 
-                        NSLog(@"[custom-RNWhisper] Final ns_text for segment %d: \"%@\"", i, ns_text);
+                        // NSLog(@"[custom-RNWhisper] Final ns_text for segment %d: \"%@\"", i, ns_text);
                     } else {
                         [tempData setLength:[tempData length] - 1];
-                        NSLog(@"[custom-RNWhisper] Current buffer not valid UTF-8 yet, waiting for next segment.");
+                        // NSLog(@"[custom-RNWhisper] Current buffer not valid UTF-8 yet, waiting for next segment.");
                     }
                 }
 
@@ -663,7 +688,7 @@ static BOOL is_valid_utf8(const char *str) {
     int n_segments = whisper_full_n_segments(self->ctx);
 
     NSMutableArray *segments = [[NSMutableArray alloc] init];
-    NSLog(@"[custom-RNWhisper] getTextSegments");
+    // NSLog(@"[custom-RNWhisper] getTextSegments");
 
     // Instead of an NSString temp buffer, let's store raw bytes.
     // We'll convert to NSString only after validating UTF-8.
@@ -673,12 +698,12 @@ static BOOL is_valid_utf8(const char *str) {
         const char *text_cur = whisper_full_get_segment_text(self->ctx, i);
 
         if (text_cur == NULL) {
-            NSLog(@"[custom-RNWhisper] text_cur is NULL for segment %d", i);
+            // NSLog(@"[custom-RNWhisper] text_cur is NULL for segment %d", i);
             continue;
         }
 
         size_t text_cur_length = strlen(text_cur);
-        NSLog(@"[custom-RNWhisper] text_cur for segment %d (length %zu): \"%s\"", i, text_cur_length, text_cur);
+        // NSLog(@"[custom-RNWhisper] text_cur for segment %d (length %zu): \"%s\"", i, text_cur_length, text_cur);
 
         // Append this segment's raw bytes to the temporary buffer.
         [tempData appendBytes:text_cur length:text_cur_length];
@@ -693,7 +718,7 @@ static BOOL is_valid_utf8(const char *str) {
             NSString *ns_text = [NSString stringWithUTF8String:buffer];
             if (!ns_text) {
                 // If still can't form NSString, fallback to a safe encoding or skip
-                NSLog(@"[custom-RNWhisper] Still unable to form a valid NSString from buffer for segment %d", i);
+                // NSLog(@"[custom-RNWhisper] Still unable to form a valid NSString from buffer for segment %d", i);
                 [tempData setLength:0];
                 continue;
             }
@@ -723,12 +748,12 @@ static BOOL is_valid_utf8(const char *str) {
             };
             [segments addObject:segment];
 
-            NSLog(@"[custom-RNWhisper] Final ns_text for segment %d: \"%@\"", i, ns_text);
+            // NSLog(@"[custom-RNWhisper] Final ns_text for segment %d: \"%@\"", i, ns_text);
         } else {
             // If not valid yet, remove the null terminator we added and wait for more segments.
             // We'll try again at the next iteration once we add more data.
             [tempData setLength:[tempData length] - 1];
-            NSLog(@"[custom-RNWhisper] Current buffer not valid UTF-8 yet, waiting for next segment.");
+            // NSLog(@"[custom-RNWhisper] Current buffer not valid UTF-8 yet, waiting for next segment.");
         }
     }
 

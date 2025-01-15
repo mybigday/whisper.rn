@@ -69,4 +69,18 @@ void save_wav_file(const std::vector<uint8_t>& raw, const std::string& file) {
     RNWHISPER_LOG_INFO("Saved audio file: %s\n", file.c_str());
 }
 
+void raw_to_wav(const std::string& rawFilePath, const std::string& wavFilePath) {
+    // 1) Read entire raw file
+    std::ifstream in(rawFilePath, std::ios::binary);
+    if (!in.is_open()) {
+        RNWHISPER_LOG_ERROR("Cannot open raw file: %s\n", rawFilePath.c_str());
+        return;
+    }
+    std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), {});
+    in.close();
+
+    // 2) Save as WAV
+    save_wav_file(data, wavFilePath);
+}
+
 } // namespace rnaudioutils

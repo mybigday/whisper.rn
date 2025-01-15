@@ -204,6 +204,42 @@ float* job::pcm_slice_to_f32(int slice_index, int size) {
     return nullptr;
 }
 
+// Open the .raw file for writing
+void job::open_raw_file(const char* path) {
+    if (!path) return;
+    rawFile = fopen(path, "wb");
+    if (!rawFile) {
+        RNWHISPER_LOG_ERROR("Failed to open raw file for writing: %s\n", path);
+    }
+}
+
+// Append short samples to the .raw file
+void job::append_raw_data(short* data, int n) {
+    if (!rawFile) return;
+    size_t written = fwrite(data, sizeof(short), n, rawFile);
+    if (written != (size_t)n) {
+        RNWHISPER_LOG_ERROR("Failed to write all raw samples\n");
+    }
+}
+
+// Close the .raw file
+void job::close_raw_file() {
+    if (rawFile) {
+        fclose(rawFile);
+        rawFile = nullptr;
+        RNWHISPER_LOG_INFO("Closed raw file\n");
+    }
+}
+
+// Free the slice array after we know it's no longer needed
+void job::free_slice(int slice_index) {
+    if (slice_index < 0 || slice_index >= (int)pcm_slices.size()) return;
+    if (pcm_slices[slice_index]) {
+        delete[] pcm_slices[slice_index];
+        pcm_slices[slice_index] = nullptr;
+    }
+}
+
 bool job::is_aborted() {
     return aborted;
 }
