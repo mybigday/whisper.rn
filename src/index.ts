@@ -40,6 +40,7 @@ const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
 
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
+const EVENT_ON_VOLUME_CHANGE = '@RNWhisper_onRealtimeTranscribeVolumeChange';
 
 export type TranscribeNewSegmentsResult = {
   nNew: number
@@ -172,6 +173,17 @@ export type TranscribeRealtimeNativeEvent = {
   jobId: number
   payload: TranscribeRealtimeNativePayload
 }
+
+export type TranscribeRealtimeVolumeNativePayload = {
+  /** Is capturing audio, when false, the event is the final result */
+  volume: number;
+}
+
+type VolumeChangeNativeEvent = {
+  contextId: number;
+  jobId: number;
+  payload: TranscribeRealtimeVolumeNativePayload;
+};
 
 export type BenchResult = {
   config: string
@@ -333,6 +345,7 @@ export class WhisperContext {
     stop: () => Promise<void>
     /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
+    onVolumeChange: (callback: (volume: number) => void) => void;
   }> {
     let lastTranscribePayload: TranscribeRealtimeNativePayload
 
@@ -459,6 +472,17 @@ export class WhisperContext {
           },
         )
       },
+      onVolumeChange: (callback: (volume: number) => void) => {
+        const volumeListener = EventEmitter.addListener(
+          EVENT_ON_VOLUME_CHANGE,
+          (evt: VolumeChangeNativeEvent) => {
+            const { contextId, payload } = evt;
+            if (contextId !== this.id || evt.jobId !== jobId) return;
+            callback(payload.volume);
+          },
+        );
+        return volumeListener;
+      },
     }
   }
 
@@ -470,6 +494,15 @@ export class WhisperContext {
 
   async release(): Promise<void> {
     return RNWhisper.releaseContext(this.id)
+  }
+
+
+  async pauseRealtime(): Promise<void> {
+    await RNWhisper.pauseRealtimeTranscribe(this.id);
+  }
+
+  async resumeRealtime(): Promise<void> {
+    await RNWhisper.resumeRealtimeTranscribe(this.id);
   }
 }
 

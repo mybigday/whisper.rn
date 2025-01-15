@@ -17,7 +17,9 @@
 ### Methods
 
 - [bench](WhisperContext.md#bench)
+- [pauseRealtime](WhisperContext.md#pauserealtime)
 - [release](WhisperContext.md#release)
+- [resumeRealtime](WhisperContext.md#resumerealtime)
 - [transcribe](WhisperContext.md#transcribe)
 - [transcribeData](WhisperContext.md#transcribedata)
 - [transcribeRealtime](WhisperContext.md#transcriberealtime)
@@ -37,7 +39,7 @@
 
 #### Defined in
 
-[index.ts:203](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L203)
+[index.ts:215](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L215)
 
 ## Properties
 
@@ -47,7 +49,7 @@
 
 #### Defined in
 
-[index.ts:199](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L199)
+[index.ts:211](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L211)
 
 ___
 
@@ -57,7 +59,7 @@ ___
 
 #### Defined in
 
-[index.ts:197](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L197)
+[index.ts:209](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L209)
 
 ___
 
@@ -67,7 +69,7 @@ ___
 
 #### Defined in
 
-[index.ts:201](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L201)
+[index.ts:213](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L213)
 
 ## Methods
 
@@ -87,7 +89,21 @@ ___
 
 #### Defined in
 
-[index.ts:465](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L465)
+[index.ts:489](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L489)
+
+___
+
+### pauseRealtime
+
+▸ **pauseRealtime**(): `Promise`\<`void`\>
+
+#### Returns
+
+`Promise`\<`void`\>
+
+#### Defined in
+
+[index.ts:500](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L500)
 
 ___
 
@@ -101,7 +117,21 @@ ___
 
 #### Defined in
 
-[index.ts:471](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L471)
+[index.ts:495](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L495)
+
+___
+
+### resumeRealtime
+
+▸ **resumeRealtime**(): `Promise`\<`void`\>
+
+#### Returns
+
+`Promise`\<`void`\>
+
+#### Defined in
+
+[index.ts:504](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L504)
 
 ___
 
@@ -130,7 +160,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:291](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L291)
+[index.ts:303](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L303)
 
 ___
 
@@ -158,13 +188,13 @@ Transcribe audio data (base64 encoded float32 PCM data)
 
 #### Defined in
 
-[index.ts:323](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L323)
+[index.ts:335](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L335)
 
 ___
 
 ### transcribeRealtime
 
-▸ **transcribeRealtime**(`options?`): `Promise`\<\{ `stop`: () => `Promise`\<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+▸ **transcribeRealtime**(`options?`): `Promise`\<\{ `onVolumeChange`: (`callback`: (`volume`: `number`) => `void`) => `void` ; `stop`: () => `Promise`\<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 Transcribe the microphone audio stream, the microphone user permission is required
 
@@ -176,11 +206,11 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Returns
 
-`Promise`\<\{ `stop`: () => `Promise`\<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
+`Promise`\<\{ `onVolumeChange`: (`callback`: (`volume`: `number`) => `void`) => `void` ; `stop`: () => `Promise`\<`void`\> ; `subscribe`: (`callback`: (`event`: [`TranscribeRealtimeEvent`](../README.md#transcriberealtimeevent)) => `void`) => `void`  }\>
 
 #### Defined in
 
-[index.ts:331](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L331)
+[index.ts:343](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L343)
 
 ___
 
@@ -207,4 +237,4 @@ ___
 
 #### Defined in
 
-[index.ts:213](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L213)
+[index.ts:225](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L225)

@@ -1332,21 +1332,49 @@ PODS:
     - SSZipArchive (~> 2.5.5)
   - SocketRocket (0.7.0)
   - SSZipArchive (2.5.5)
-  - whisper-rn (0.4.0-rc.8):
-    - RCT-Folly
+  - whisper-rn (0.4.0-rc.9):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.01.01.00)
     - RCTRequired
     - RCTTypeSafety
     - React-Codegen
     - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - whisper-rn/no-require-arc (= 0.4.0-rc.8)
-  - whisper-rn/no-require-arc (0.4.0-rc.8):
-    - RCT-Folly
+    - whisper-rn/no-require-arc (= 0.4.0-rc.9)
+    - Yoga
+  - whisper-rn/no-require-arc (0.4.0-rc.9):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.01.01.00)
     - RCTRequired
     - RCTTypeSafety
     - React-Codegen
     - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
+    - Yoga
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -1552,10 +1580,10 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   boost: d3f49c53809116a5d38da093a8aa78bf551aed09
-  DoubleConversion: fea03f2699887d960129cc54bba7e52542b6f953
+  DoubleConversion: 76ab83afb40bddeeee456813d9c04f67f78771b5
   FBLazyVector: 4b1589d37c9ff4dba11a63083fe7515fad3ac111
   fmt: 4c2741a687cc09f0634a2e2c72a838b99f1ff120
-  glog: c5d68082e772fa1c511173d6b30a9de2c05a69a2
+  glog: fdfdfe5479092de0c4bdbebedd9056951f092c4f
   hermes-engine: 2102c92e54a031a270fd1fe84169ec8a0901b7bd
   RCT-Folly: 02617c592a293bd6d418e0a88ff4ee1f88329b47
   RCTDeprecation: 5f1d7e1f8ef6c53f0207e3ac0d0ca23575e8a6ab
@@ -1614,9 +1642,9 @@ SPEC CHECKSUMS:
   RNZipArchive: 7bb4c70d6aa2dd235212c0a4a3de0a4e237e2569
   SocketRocket: abac6f5de4d4d62d24e11868d7a2f427e0ef940d
   SSZipArchive: c69881e8ac5521f0e622291387add5f60f30f3c4
-  whisper-rn: bbc8e83316260f5b4882a3c3f836b574649cc9e3
+  whisper-rn: 69609ace077211a0530836b8f9979efdfb1a2d56
   Yoga: 4f4f07a17818e76d1b04edc01b68b6d49a682100
 
 PODFILE CHECKSUM: b3b0da61591aeebfbbfe372a869068f21e963e16
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2

@@ -28,6 +28,7 @@ whisper.rn
 - [TranscribeRealtimeNativeEvent](README.md#transcriberealtimenativeevent)
 - [TranscribeRealtimeNativePayload](README.md#transcriberealtimenativepayload)
 - [TranscribeRealtimeOptions](README.md#transcriberealtimeoptions)
+- [TranscribeRealtimeVolumeNativePayload](README.md#transcriberealtimevolumenativepayload)
 - [TranscribeResult](README.md#transcriberesult)
 
 ### Variables
@@ -59,7 +60,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:75](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L75)
+[index.ts:76](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L76)
 
 ___
 
@@ -80,7 +81,7 @@ ___
 
 #### Defined in
 
-[index.ts:176](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L176)
+[index.ts:188](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L188)
 
 ___
 
@@ -103,7 +104,7 @@ ___
 
 #### Defined in
 
-[index.ts:476](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L476)
+[index.ts:509](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L509)
 
 ___
 
@@ -113,7 +114,7 @@ ___
 
 #### Defined in
 
-[index.ts:58](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L58)
+[index.ts:59](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L59)
 
 ___
 
@@ -131,7 +132,7 @@ ___
 
 #### Defined in
 
-[index.ts:51](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L51)
+[index.ts:52](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L52)
 
 ___
 
@@ -150,7 +151,7 @@ ___
 
 #### Defined in
 
-[index.ts:44](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L44)
+[index.ts:45](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L45)
 
 ___
 
@@ -180,7 +181,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -198,7 +199,7 @@ ___
 
 #### Defined in
 
-[index.ts:69](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L69)
+[index.ts:70](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L70)
 
 ___
 
@@ -223,7 +224,7 @@ ___
 
 #### Defined in
 
-[index.ts:137](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L137)
+[index.ts:138](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L138)
 
 ___
 
@@ -241,7 +242,7 @@ ___
 
 #### Defined in
 
-[index.ts:170](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L170)
+[index.ts:171](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L171)
 
 ___
 
@@ -265,7 +266,7 @@ ___
 
 #### Defined in
 
-[index.ts:157](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L157)
+[index.ts:158](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L158)
 
 ___
 
@@ -275,7 +276,23 @@ ___
 
 #### Defined in
 
-[index.ts:83](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L83)
+[index.ts:84](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L84)
+
+___
+
+### TranscribeRealtimeVolumeNativePayload
+
+Ƭ **TranscribeRealtimeVolumeNativePayload**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `volume` | `number` | Is capturing audio, when false, the event is the final result |
+
+#### Defined in
+
+[index.ts:177](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L177)
 
 ___
 
@@ -293,7 +310,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/NativeRNWhisper.ts#L37)
 
 ## Variables
 
@@ -318,7 +335,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -330,7 +347,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:582](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L582)
+[index.ts:615](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L615)
 
 ___
 
@@ -342,7 +359,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:579](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L579)
+[index.ts:612](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L612)
 
 ___
 
@@ -354,7 +371,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:574](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L574)
+[index.ts:607](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L607)
 
 ## Functions
 
@@ -374,7 +391,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:504](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L504)
+[index.ts:537](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L537)
 
 ___
 
@@ -388,4 +405,4 @@ ___
 
 #### Defined in
 
-[index.ts:569](https://github.com/Shonn-Li/whisper.rn/blob/c1bd3f8/src/index.ts#L569)
+[index.ts:602](https://github.com/Shonn-Li/whisper.rn/blob/26a8058/src/index.ts#L602)

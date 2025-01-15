@@ -102,6 +102,7 @@ RCT_REMAP_METHOD(initContext,
     @"@RNWhisper_onTranscribeNewSegments",
     @"@RNWhisper_onRealtimeTranscribe",
     @"@RNWhisper_onRealtimeTranscribeEnd",
+    @"@RNWhisper_onRealtimeTranscribeVolumeChange",
   ];
 }
 
@@ -277,6 +278,8 @@ RCT_REMAP_METHOD(startRealtimeTranscribe,
                 eventName = @"@RNWhisper_onRealtimeTranscribe";
             } else if ([type isEqual:@"end"]) {
                 eventName = @"@RNWhisper_onRealtimeTranscribeEnd";
+            } else if ([type isEqualToString:@"volumeChange"]) { // Corrected line
+                eventName = @"@RNWhisper_onRealtimeTranscribeVolumeChange";
             }
             if (eventName == nil) {
                 return;
@@ -436,6 +439,34 @@ RCT_REMAP_METHOD(setAudioSessionActive,
     }
     resolve(nil);
 }
+
+
+RCT_EXPORT_METHOD(pauseRealtimeTranscribe:(int)contextId
+                  withResolver:(RCTPromiseResolveBlock)resolve
+                  withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperContext *context = contexts[@(contextId)];
+    if (context == nil) {
+        reject(@"whisper_error", @"Context not found", nil);
+        return;
+    }
+    [context pauseAudio];
+    resolve(nil);
+}
+
+RCT_EXPORT_METHOD(resumeRealtimeTranscribe:(int)contextId
+                  withResolver:(RCTPromiseResolveBlock)resolve
+                  withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperContext *context = contexts[@(contextId)];
+    if (context == nil) {
+        reject(@"whisper_error", @"Context not found", nil);
+        return;
+    }
+    [context resumeAudio];
+    resolve(nil);
+}
+
 
 #ifdef RCT_NEW_ARCH_ENABLED
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:

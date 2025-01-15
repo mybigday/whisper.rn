@@ -1,5 +1,5 @@
-import type { TurboModule } from 'react-native/Libraries/TurboModule/RCTExport'
 import { TurboModuleRegistry } from 'react-native'
+import type { TurboModule } from 'react-native/Libraries/TurboModule/RCTExport'
 
 // Common transcribe options
 export type TranscribeOptions = {
@@ -90,6 +90,11 @@ export interface Spec extends TurboModule {
     jobId: number,
     options: TranscribeOptions,
   ): Promise<void>;
+
+  // New methods for pausing and resuming transcription
+  pauseRealtimeTranscribe(contextId: number): Promise<void>;
+  resumeRealtimeTranscribe(contextId: number): Promise<void>;
+
   abortTranscribe(contextId: number, jobId: number): Promise<void>;
 
   bench(contextId: number, maxThreads: number): Promise<string>;

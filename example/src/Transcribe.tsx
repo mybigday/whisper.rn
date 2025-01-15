@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
-  Platform,
   PermissionsAndroid,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import { unzip } from 'react-native-zip-archive'
 import Sound from 'react-native-sound'
-import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
+import { unzip } from 'react-native-zip-archive'
 import type { WhisperContext } from '../../src'
+import { AudioSessionIos, initWhisper, libVersion } from '../../src' // whisper.rn
 import { Button } from './Button'
 import contextOpts from './context-opts'
 import { createDir, fileDir, modelHost, toTimestamp } from './util'
@@ -72,10 +72,13 @@ export default function App() {
     setLogs((prev) => [...prev, messages.join(' ')])
   }, [])
 
-  useEffect(() => () => {
-    whisperContextRef.current?.release()
-    whisperContextRef.current = null
-  }, [])
+  useEffect(
+    () => () => {
+      whisperContextRef.current?.release()
+      whisperContextRef.current = null
+    },
+    [],
+  )
 
   const progress = useCallback(
     ({
@@ -225,9 +228,7 @@ export default function App() {
           />
           <Button
             title={stopTranscribe?.stop ? 'Stop' : 'Realtime'}
-            style={[
-              stopTranscribe?.stop ? styles.buttonClear : null,
-            ]}
+            style={[stopTranscribe?.stop ? styles.buttonClear : null]}
             onPress={async () => {
               if (!whisperContext) return log('No context')
               if (stopTranscribe?.stop) {
@@ -244,13 +245,14 @@ export default function App() {
                 const { stop, subscribe } =
                   await whisperContext.transcribeRealtime({
                     maxLen: 1,
-                    language: 'en',
+                    language: 'auto',
+                    tokenTimestamps: true,
                     // Enable beam search (may be slower than greedy but more accurate)
                     // beamSize: 2,
                     // Record duration in seconds
-                    realtimeAudioSec: 60,
+                    realtimeAudioSec: 360,
                     // Slice audio into 25 (or < 30) sec chunks for better performance
-                    realtimeAudioSliceSec: 25,
+                    realtimeAudioSliceSec: 5,
                     // Save audio on stop
                     audioOutputPath: recordFile,
                     // iOS Audio Session

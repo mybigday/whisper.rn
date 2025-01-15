@@ -31,6 +31,9 @@ typedef struct {
     AudioQueueBufferRef buffers[NUM_BUFFERS];
 
     void (^transcribeHandler)(int, NSString *, NSDictionary *);
+    
+    bool isPaused;
+    int currentVolumeLevel;
 } RNWhisperContextRecordState;
 
 @interface RNWhisperContext : NSObject {
@@ -65,5 +68,6 @@ typedef struct {
 - (NSMutableDictionary *)getTextSegments;
 - (NSString *)bench:(int)maxThreads;
 - (void)invalidate;
-
+- (void)pauseAudio;
+- (void)resumeAudio;
 @end
