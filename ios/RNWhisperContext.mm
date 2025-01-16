@@ -5,6 +5,7 @@
 #include <unicode/ustring.h>
 
 #define NUM_BYTES_PER_BUFFER 16 * 1024
+#define SLICES_BACK_TO_KEEP 2
 
 @implementation RNWhisperContext
 
@@ -260,10 +261,12 @@ void AudioInputCallback(void * inUserData,
 
     NSLog(@"[custom-RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
 
-    if (state->job->rawFile) {
-        state->job->append_raw_data((short*) inBuffer->mAudioData, n);
+    // Append to WAV
+    if (state->wavWriter) {
+        const int n = inBuffer->mAudioDataByteSize / sizeof(short);
+        state->wavWriter->appendSamples((short*) inBuffer->mAudioData, n);
     }
-
+    
     state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
 
     bool isSpeech = vad(state, state->sliceIndex, nSamples, n);
@@ -286,24 +289,11 @@ void AudioInputCallback(void * inUserData,
 - (void)finishRealtimeTranscribe:(RNWhisperContextRecordState*) state result:(NSDictionary*)result {
     // Save wav if needed
     NSLog(@"[custom-RNWhisper] audio output path: %s", state->job->audio_output_path);
-    // if (state->job->audio_output_path != nullptr) {
-    //     NSLog(@"[custom-RNWhisper] audio output path not null");
-    //     // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-    //     rnaudioutils::save_wav_file(
-    //         rnaudioutils::concat_short_buffers(state->job->pcm_slices, state->sliceNSamples),
-    //         state->job->audio_output_path
-    //     );
-    //     NSLog(@"[custom-RNWhisper] save_wav_file excuted");
-    // }
-
-    // 1) Close raw
-    state->job->close_raw_file();
-
-    // 2) Convert .raw -> .wav
-    if (state->job->audio_output_path != nullptr) {
-        std::string rawPath = state->job->audio_output_path;      // e.g. "/tmp/myAudio.raw"
-        std::string wavPath = rawPath + ".wav";                   // e.g. "/tmp/myAudio.raw.wav"
-        rnaudioutils::raw_to_wav(rawPath, wavPath);
+    // 1) Finalize WAV if we had it
+    if (state->wavWriter) {
+        state->wavWriter->finalize();  // patch the header
+        delete state->wavWriter;       // free memory
+        state->wavWriter = nullptr;
     }
 
     state->transcribeHandler(state->job->job_id, @"end", result);
@@ -357,12 +347,12 @@ void AudioInputCallback(void * inUserData,
     }
 
     nSamplesOfIndex = state->sliceNSamples[state->transcribeSliceIndex];
-    if (state->nSamplesTranscribing == nSamplesOfIndex) {
+    // if (state->nSamplesTranscribing == nSamplesOfIndex) {
 
-        NSLog(@"[custom-RNWhisper] Remove unused slice called %d", state->transcribeSliceIndex);
-        // We are done with this slice
-        // state->job->free_slice(state->transcribeSliceIndex);
-    }
+    //     NSLog(@"[custom-RNWhisper] Remove unused slice called %d", state->transcribeSliceIndex);
+    //     // We are done with this slice
+    //     // state->job->free_slice(state->transcribeSliceIndex);
+    // }
 
     bool isStopped = state->isStoppedByAction || (
         !state->isCapturing &&
@@ -377,6 +367,12 @@ void AudioInputCallback(void * inUserData,
     ) {
         state->transcribeSliceIndex++;
         state->nSamplesTranscribing = 0;
+        NSLog(@"[custom-RNWhisper] Current Slice processing finished %d", state->transcribeSliceIndex);
+        int sliceToFree = (int)state->transcribeSliceIndex - SLICES_BACK_TO_KEEP;
+        if (sliceToFree >= 0) {
+            NSLog(@"[RNWhisper] free_slice(%d) since we have advanced past it", sliceToFree);
+            state->job->free_slice(sliceToFree);
+        }
     }
 
     bool continueNeeded = !state->isCapturing &&
@@ -426,10 +422,30 @@ void AudioInputCallback(void * inUserData,
 
     [self prepareRealtime:jobId options:options];
 
-    if (options[@"audioOutputPath"] != nil) {
-        self->recordState.job->open_raw_file([options[@"audioOutputPath"] UTF8String]);
-    }
+    // if (options[@"audioOutputPath"] != nil) {
+    //     self->recordState.job->open_raw_file([options[@"audioOutputPath"] UTF8String]);
+    // }
 
+    //////////////////////////////////////////////////////////////////////////
+    // If we want incremental WAV writing instead of raw:
+    if (options[@"audioOutputPath"] != nil) {
+        NSString *outPath = options[@"audioOutputPath"];
+        // Create the WavWriter
+        self->recordState.wavWriter = new rnaudioutils::WavWriter();
+        bool ok = self->recordState.wavWriter->initialize(
+            [outPath UTF8String],  // file path
+            16000,                 // sample rate
+            1,                     // channels
+            16                     // bits per sample
+        );
+        if (!ok) {
+            // handle error, or fallback to raw approach
+            delete self->recordState.wavWriter;
+            self->recordState.wavWriter = nullptr;
+        }
+    }
+    //////////////////////////////////////////////////////////////////////////
+    
     OSStatus status = AudioQueueNewInput(
         &self->recordState.dataFormat,
         AudioInputCallback,

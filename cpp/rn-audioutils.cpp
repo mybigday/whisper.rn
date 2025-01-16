@@ -1,7 +1,92 @@
 #include "rn-audioutils.h"
 #include "rn-whisper-log.h"
 
+#define WHISPER_SAMPLE_RATE 16000
+
 namespace rnaudioutils {
+
+// 1) Initialize: write a placeholder WAV header.
+bool WavWriter::initialize(const std::string &filePath,
+                           int sampleRate,
+                           int numChannels,
+                           int bitsPerSample) 
+{
+    // Store fields in header
+    header.sampleRate    = sampleRate;
+    header.numChannels   = numChannels;
+    header.bitsPerSample = bitsPerSample;
+    header.byteRate      = sampleRate * numChannels * (bitsPerSample / 8);
+    header.blockAlign    = numChannels * (bitsPerSample / 8);
+
+    // Try opening file
+    outFile.open(filePath, std::ios::binary);
+    if (!outFile.is_open()) {
+        RNWHISPER_LOG_ERROR("WavWriter::initialize: Failed to open file: %s\n", filePath.c_str());
+        return false;
+    }
+
+    // Write the placeholder header
+    outFile.write(reinterpret_cast<const char*>(&header), sizeof(WavHeader));
+    if (!outFile.good()) {
+        RNWHISPER_LOG_ERROR("WavWriter::initialize: Failed to write placeholder header\n");
+        outFile.close();
+        return false;
+    }
+
+    isOpen = true;
+    totalSamplesWritten = 0;
+    RNWHISPER_LOG_INFO("WavWriter::initialize: Created WAV file: %s\n", filePath.c_str());
+    return true;
+}
+
+// 2) Append PCM samples in real-time (16-bit).
+bool WavWriter::appendSamples(const short *samples, size_t nSamples) {
+    if (!isOpen) {
+        RNWHISPER_LOG_ERROR("WavWriter::appendSamples: File not open!\n");
+        return false;
+    }
+
+    // Write raw 16-bit samples
+    outFile.write(reinterpret_cast<const char*>(samples), nSamples * sizeof(short));
+    if (!outFile.good()) {
+        RNWHISPER_LOG_ERROR("WavWriter::appendSamples: Failed to write PCM samples\n");
+        return false;
+    }
+
+    // Keep track of how many samples total
+    totalSamplesWritten += nSamples;
+    return true;
+}
+
+// 3) Finalize: fix the chunk sizes in the WAV header & close the file.
+void WavWriter::finalize() {
+    if (!isOpen) {
+        return; // Already closed or never opened
+    }
+
+    // Current file position = total file size
+    std::streampos fileSize = outFile.tellp();
+
+    // subChunk2Size = number of bytes of audio data
+    // totalSamplesWritten is # of samples (each sample is 16 bits, 2 bytes)
+    uint32_t dataSize = static_cast<uint32_t>(totalSamplesWritten * sizeof(short));
+    // chunkSize = 4 (WAVE) + 8 (fmt chunk) + 16 (fmt data) + 8 (data chunk) + dataSize
+    //            = 36 + dataSize
+    uint32_t chunkSize = 36 + dataSize;
+
+    // Seek back and update header fields:
+    outFile.seekp(4, std::ios::beg);
+    outFile.write(reinterpret_cast<const char*>(&chunkSize), sizeof(chunkSize));
+
+    outFile.seekp(40, std::ios::beg);
+    outFile.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
+
+    outFile.close();
+    isOpen = false;
+
+    RNWHISPER_LOG_INFO("WavWriter::finalize: Finalized WAV. Total samples = %zu\n", totalSamplesWritten);
+}
+
 
 std::vector<uint8_t> concat_short_buffers(const std::vector<short*>& buffers, const std::vector<int>& slice_n_samples) {
     

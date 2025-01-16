@@ -34,6 +34,10 @@ typedef struct {
     
     bool isPaused;
     int currentVolumeLevel;
+
+    // NEW: pointer to incremental WAV writer
+    // Alternatively, you can store it as a std::unique_ptr<rnaudioutils::WavWriter> if you prefer modern C++ memory management.
+    rnaudioutils::WavWriter *wavWriter;
 } RNWhisperContextRecordState;
 
 @interface RNWhisperContext : NSObject {
