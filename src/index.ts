@@ -31,8 +31,9 @@ if (Platform.OS === 'android') {
 export type {
   AudioSessionCategoryIos,
   AudioSessionCategoryOptionIos,
-  AudioSessionModeIos, TranscribeOptions,
-  TranscribeResult
+  AudioSessionModeIos,
+  TranscribeOptions,
+  TranscribeResult,
 }
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
@@ -40,7 +41,7 @@ const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
 
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
-const EVENT_ON_VOLUME_CHANGE = '@RNWhisper_onRealtimeTranscribeVolumeChange';
+const EVENT_ON_VOLUME_CHANGE = '@RNWhisper_onRealtimeTranscribeVolumeChange'
 
 export type TranscribeNewSegmentsResult = {
   nNew: number
@@ -176,14 +177,14 @@ export type TranscribeRealtimeNativeEvent = {
 
 export type TranscribeRealtimeVolumeNativePayload = {
   /** Is capturing audio, when false, the event is the final result */
-  volume: number;
+  volume: number
 }
 
 type VolumeChangeNativeEvent = {
-  contextId: number;
-  jobId: number;
-  payload: TranscribeRealtimeVolumeNativePayload;
-};
+  contextId: number
+  jobId: number
+  payload: TranscribeRealtimeVolumeNativePayload
+}
 
 export type BenchResult = {
   config: string
@@ -195,10 +196,7 @@ export type BenchResult = {
 }
 
 const updateAudioSession = async (setting: AudioSessionSettingIos) => {
-  await AudioSessionIos.setCategory(
-    setting.category,
-    setting.options || [],
-  )
+  await AudioSessionIos.setCategory(setting.category, setting.options || [])
   if (setting.mode) {
     await AudioSessionIos.setMode(setting.mode)
   }
@@ -212,17 +210,17 @@ export class WhisperContext {
 
   reasonNoGPU: string = ''
 
-  constructor({
-    contextId,
-    gpu,
-    reasonNoGPU,
-  }: NativeWhisperContext) {
+  constructor({ contextId, gpu, reasonNoGPU }: NativeWhisperContext) {
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
   }
 
-  private transcribeWithNativeMethod(method: 'transcribeFile' | 'transcribeData', data: string, options: TranscribeFileOptions = {}): {
+  private transcribeWithNativeMethod(
+    method: 'transcribeFile' | 'transcribeData',
+    data: string,
+    options: TranscribeFileOptions = {},
+  ): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
@@ -309,7 +307,7 @@ export class WhisperContext {
     /** Transcribe result promise */
     promise: Promise<TranscribeResult>
   } {
-    console.log("came to transcribe")
+    console.log('came to transcribe')
     let path = ''
     if (typeof filePathOrBase64 === 'number') {
       try {
@@ -332,7 +330,10 @@ export class WhisperContext {
   /**
    * Transcribe audio data (base64 encoded float32 PCM data)
    */
-  transcribeData(data: string, options: TranscribeFileOptions = {}): {
+  transcribeData(
+    data: string,
+    options: TranscribeFileOptions = {},
+  ): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
@@ -345,7 +346,7 @@ export class WhisperContext {
     stop: () => Promise<void>
     /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
-    onVolumeChange: (callback: (volume: number) => void) => void;
+    onVolumeChange: (callback: (volume: number) => void) => void
   }> {
     let lastTranscribePayload: TranscribeRealtimeNativePayload
 
@@ -370,7 +371,7 @@ export class WhisperContext {
               t0: segment.t0 + tOffset,
               t1: segment.t1 + tOffset,
             })) || [],
-        }
+        },
       }
     }
 
@@ -413,7 +414,10 @@ export class WhisperContext {
       // iOS: Update audio session state
       await updateAudioSession(options?.audioSessionOnStartIos)
     }
-    if (Platform.OS === 'ios' && typeof options?.audioSessionOnStopIos === 'object') {
+    if (
+      Platform.OS === 'ios' &&
+      typeof options?.audioSessionOnStopIos === 'object'
+    ) {
       prevAudioSession = options?.audioSessionOnStopIos
     }
 
@@ -476,33 +480,44 @@ export class WhisperContext {
         const volumeListener = EventEmitter.addListener(
           EVENT_ON_VOLUME_CHANGE,
           (evt: VolumeChangeNativeEvent) => {
-            const { contextId, payload } = evt;
-            if (contextId !== this.id || evt.jobId !== jobId) return;
-            callback(payload.volume);
+            const { contextId, payload } = evt
+            if (contextId !== this.id || evt.jobId !== jobId) return
+            callback(payload.volume)
           },
-        );
-        return volumeListener;
+        )
+        return volumeListener
       },
     }
   }
 
   async bench(maxThreads: number): Promise<BenchResult> {
     const result = await RNWhisper.bench(this.id, maxThreads)
-    const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] = JSON.parse(result)
-    return { config, nThreads, encodeMs, decodeMs, batchMs, promptMs } as BenchResult
+    const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] =
+      JSON.parse(result)
+    return {
+      config,
+      nThreads,
+      encodeMs,
+      decodeMs,
+      batchMs,
+      promptMs,
+    } as BenchResult
   }
 
   async release(): Promise<void> {
     return RNWhisper.releaseContext(this.id)
   }
 
-
   async pauseRealtime(): Promise<void> {
-    await RNWhisper.pauseRealtimeTranscribe(this.id);
+    await RNWhisper.pauseRealtimeTranscribe(this.id)
   }
 
   async resumeRealtime(): Promise<void> {
-    await RNWhisper.resumeRealtimeTranscribe(this.id);
+    await RNWhisper.resumeRealtimeTranscribe(this.id)
+  }
+
+  static async finalizeWavFile(filePath: string): Promise<void> {
+    await RNWhisper.finalizeWavFile(filePath)
   }
 }
 
@@ -524,7 +539,7 @@ export type ContextOptions = {
   /** Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. */
   useGpu?: boolean
   /** Use Flash Attention, only recommended if GPU available */
-  useFlashAttn?: boolean,
+  useFlashAttn?: boolean
 }
 
 const coreMLModelAssetPaths = [

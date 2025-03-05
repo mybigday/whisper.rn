@@ -467,6 +467,19 @@ RCT_EXPORT_METHOD(resumeRealtimeTranscribe:(int)contextId
     resolve(nil);
 }
 
+RCT_EXPORT_METHOD(finalizeWavFile:(NSString *)filePath
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+//   std::string cppPath = [filePath UTF8String];
+  
+  try {
+    // rnaudioutils::WavWriter::finalizeExternalWav(cppPath);
+    resolve(@(YES));
+  } catch (const std::exception& e) {
+    reject(@"file_error", @(e.what()), nil);
+  }
+}
 
 #ifdef RCT_NEW_ARCH_ENABLED
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:

@@ -64,6 +64,7 @@ export default function App() {
   const whisperContext = whisperContextRef.current
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
   const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
+  const [volume, setVolume] = useState(0)
   const [stopTranscribe, setStopTranscribe] = useState<{
     stop: () => void
   } | null>(null)
@@ -242,7 +243,7 @@ export default function App() {
               log('Start realtime transcribing...')
               try {
                 await createDir(log)
-                const { stop, subscribe } =
+                const { stop, subscribe, onVolumeChange } =
                   await whisperContext.transcribeRealtime({
                     maxLen: 1,
                     language: 'auto',
@@ -269,10 +270,12 @@ export default function App() {
                     // useVad: true,
                   })
                 setStopTranscribe({ stop })
+                onVolumeChange((v) => setVolume(v))
                 subscribe((evt) => {
                   const { isCapturing, data, processTime, recordingTime } = evt
                   setTranscibeResult(
                     `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
+                      `Volume: ${volume}\n` +
                       `Result: ${data?.result}\n\n` +
                       `Process time: ${processTime}ms\n` +
                       `Recording time: ${recordingTime}ms` +

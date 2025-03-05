@@ -74,7 +74,7 @@
     if (cparams.use_gpu && cparams.use_coreml) {
         NSLog(@"[RNWhisper] Both use_gpu and use_coreml are enabled, ignoring use_coreml option");
         cparams.use_coreml = false; // Skip CoreML if Metal is enabled
-    }
+    } 
 
     context->ctx = whisper_init_from_file_with_params([modelPath UTF8String], cparams);
     context->dQueue = dispatch_queue_create(
@@ -84,6 +84,67 @@
     context->isMetalEnabled = cparams.use_gpu;
     context->reasonNoMetal = reasonNoMetal;
     return context;
+}
+
+- (struct whisper_full_params)createParams:(NSDictionary *)options jobId:(int)jobId {
+    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+
+    const int n_threads = options[@"maxThreads"] != nil ?
+      [options[@"maxThreads"] intValue] : 0;
+
+    const int max_threads = (int) [[NSProcessInfo processInfo] processorCount];
+    // Use 2 threads by default on 4-core devices, 4 threads on more cores
+    const int default_n_threads = max_threads == 4 ? 2 : MIN(4, max_threads);
+
+    if (options[@"beamSize"] != nil) {
+        params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
+        params.beam_search.beam_size = [options[@"beamSize"] intValue];
+    }
+
+    params.print_realtime   = false;
+    params.print_progress   = false;
+    params.print_timestamps = false;
+    params.print_special    = false;
+    params.translate        = options[@"translate"] != nil ? [options[@"translate"] boolValue] : false;
+    params.language         = options[@"language"] != nil ? strdup([options[@"language"] UTF8String]) : "auto";
+    params.n_threads        = n_threads > 0 ? n_threads : default_n_threads;
+    params.offset_ms        = 0;
+    params.no_context       = false;
+    params.split_on_word = false;
+    params.single_segment   = false;
+    // params.suppress_non_speech_tokens = true;
+    if (options[@"maxLen"] != nil) {
+        params.max_len = [options[@"maxLen"] intValue];
+    }
+    params.token_timestamps = options[@"tokenTimestamps"] != nil ? [options[@"tokenTimestamps"] boolValue] : false;
+    params.tdrz_enable = options[@"tdrzEnable"] != nil ? [options[@"tdrzEnable"] boolValue] : false;
+
+    if (options[@"bestOf"] != nil) {
+        params.greedy.best_of = [options[@"bestOf"] intValue];
+    }
+    if (options[@"maxContext"] != nil) {
+        params.n_max_text_ctx = [options[@"maxContext"] intValue];
+    }
+    if (options[@"offset"] != nil) {
+        params.offset_ms = [options[@"offset"] intValue];
+    }
+    if (options[@"duration"] != nil) {
+        params.duration_ms = [options[@"duration"] intValue];
+    }
+    if (options[@"wordThold"] != nil) {
+        params.thold_pt = [options[@"wordThold"] intValue];
+    }
+    if (options[@"temperature"] != nil) {
+        params.temperature = [options[@"temperature"] floatValue];
+    }
+    if (options[@"temperatureInc"] != nil) {
+        params.temperature_inc = [options[@"temperature_inc"] floatValue];
+    }
+    if (options[@"prompt"] != nil) {
+        params.initial_prompt = strdup([options[@"prompt"] UTF8String]);
+    }
+
+    return params;
 }
 
 - (bool)isMetalEnabled {
@@ -164,25 +225,9 @@ float calculateRMS(AudioQueueBufferRef buffer) {
     return sqrt(sum / frameCount);
 }
 
+void audioSoundLevelCallback(void * inUserData, AudioQueueBufferRef inBuffer) {
 
-void AudioInputCallback(void * inUserData,
-    AudioQueueRef inAQ,
-    AudioQueueBufferRef inBuffer,
-    const AudioTimeStamp * inStartTime,
-    UInt32 inNumberPacketDescriptions,
-    const AudioStreamPacketDescription * inPacketDescs)
-{
     RNWhisperContextRecordState *state = (RNWhisperContextRecordState *)inUserData;
-    NSLog(@"[custom-RNWhisper] AudioInputCallback");
-
-    if (!state->isCapturing || state->isPaused) {
-        if (!state->isTranscribing) {
-            [state->mSelf finishRealtimeTranscribe:state result:@{}];
-            return;
-        }
-        AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
-        return;
-    }
     // Calculate RMS
     float rms = calculateRMS(inBuffer);
 
@@ -215,6 +260,28 @@ void AudioInputCallback(void * inUserData,
         // Call transcribeHandler with eventType 'volumeChange'
         state->transcribeHandler(state->job->job_id, @"volumeChange", result);
     }
+}
+
+void AudioInputCallback(void * inUserData,
+    AudioQueueRef inAQ,
+    AudioQueueBufferRef inBuffer,
+    const AudioTimeStamp * inStartTime,
+    UInt32 inNumberPacketDescriptions,
+    const AudioStreamPacketDescription * inPacketDescs)
+{
+    RNWhisperContextRecordState *state = (RNWhisperContextRecordState *)inUserData;
+    // NSLog(@"[custom-RNWhisper] AudioInputCallback");
+
+    if (!state->isCapturing || state->isPaused) {
+        if (!state->isTranscribing) {
+            [state->mSelf finishRealtimeTranscribe:state result:@{}];
+            return;
+        }
+        AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
+        return;
+    }
+
+    audioSoundLevelCallback(inUserData, inBuffer);
 
     int totalNSamples = 0;
     for (int i = 0; i < state->sliceNSamples.size(); i++) {
@@ -259,30 +326,41 @@ void AudioInputCallback(void * inUserData,
         state->sliceNSamples.push_back(0);
     }
 
-    NSLog(@"[custom-RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
+    // NSLog(@"[custom-RNWhisper] Slice %d has %d samples, put %d samples", state->sliceIndex, nSamples, n);
 
     // Append to WAV
     if (state->wavWriter) {
         const int n = inBuffer->mAudioDataByteSize / sizeof(short);
+        // NSLog(@"[custom-RNWhisper] Append %d samples to WAV", n);
         state->wavWriter->appendSamples((short*) inBuffer->mAudioData, n);
+        // NSLog(@"[custom-RNWhisper] Append %d samples to WAV done", n);
     }
     
     state->job->put_pcm_data((short*) inBuffer->mAudioData, state->sliceIndex, nSamples, n);
 
     bool isSpeech = vad(state, state->sliceIndex, nSamples, n);
-    nSamples += n;
-    state->sliceNSamples[state->sliceIndex] = nSamples;
+    state->sliceNSamples[state->sliceIndex] += n;
 
     AudioQueueEnqueueBuffer(state->queue, inBuffer, 0, NULL);
 
-    bool isSamplesEnough = nSamples / WHISPER_SAMPLE_RATE >= state->job->audio_min_sec;
-    if (!isSamplesEnough || !isSpeech) return;
+    // Track previous and current slice duration to check if we cross the multiplier
+    float previousSliceDuration = (float)(nSamples) / WHISPER_SAMPLE_RATE;
+    float currentSliceDuration = (float)(state->sliceNSamples[state->sliceIndex]) / WHISPER_SAMPLE_RATE;
 
-    if (!state->isTranscribing) {
-        state->isTranscribing = true;
-        dispatch_async([state->mSelf getDispatchQueue], ^{
-            [state->mSelf fullTranscribeSamples:state];
-        });
+    int previousMultiplier = (int)(previousSliceDuration / state->job->audio_min_sec);
+    int currentMultiplier = (int)(currentSliceDuration / state->job->audio_min_sec);
+    // If the multipliers differ, we have crossed the threshold
+    if (previousMultiplier != currentMultiplier) {
+        bool isSamplesEnough = currentSliceDuration >= state->job->audio_min_sec;
+
+        if (isSamplesEnough) {
+            if (!state->isTranscribing) {
+                state->isTranscribing = true;
+                dispatch_async([state->mSelf getDispatchQueue], ^{
+                    [state->mSelf fullTranscribeSamples:state];
+                });
+            }
+        }
     }
 }
 
@@ -291,30 +369,15 @@ void AudioInputCallback(void * inUserData,
     NSLog(@"[custom-RNWhisper] audio output path: %s", state->job->audio_output_path);
     // 1) Finalize WAV if we had it
     if (state->wavWriter) {
+        NSLog(@"[custom-RNWhisper] Finalize WAV");
         state->wavWriter->finalize();  // patch the header
         delete state->wavWriter;       // free memory
         state->wavWriter = nullptr;
+        NSLog(@"[custom-RNWhisper] Finalize WAV done");
     }
 
     state->transcribeHandler(state->job->job_id, @"end", result);
     rnwhisper::job_remove(state->job->job_id);
-}
-
-
-- (void)pauseAudio {
-    if (self->recordState.queue != NULL && self->recordState.isCapturing && !self->recordState.isPaused) {
-        NSLog(@"[RNWhisper] Pausing audio queue");
-        AudioQueuePause(self->recordState.queue);
-        self->recordState.isPaused = true;
-    }
-}
-
-- (void)resumeAudio {
-    if (self->recordState.queue != NULL && self->recordState.isCapturing && self->recordState.isPaused) {
-        NSLog(@"[RNWhisper] Resuming audio queue");
-        AudioQueueStart(self->recordState.queue, NULL);
-        self->recordState.isPaused = false;
-    }
 }
 
 - (void)fullTranscribeSamples:(RNWhisperContextRecordState*) state {
@@ -379,7 +442,7 @@ void AudioInputCallback(void * inUserData,
         state->nSamplesTranscribing != nSamplesOfIndex;
 
     if (isStopped && !continueNeeded) {
-        NSLog(@"[RNWhisper] Transcribe end");
+        NSLog(@"[RNWhisper] Transcribe end because isStopped: %d, continueNeeded: %d", isStopped, continueNeeded);
         result[@"isStoppedByAction"] = @(state->isStoppedByAction);
         result[@"isCapturing"] = @(false);
 
@@ -469,6 +532,72 @@ void AudioInputCallback(void * inUserData,
     return status;
 }
 
+- (void)stopAudio {
+    AudioQueueStop(self->recordState.queue, true);
+    for (int i = 0; i < NUM_BUFFERS; i++) {
+        AudioQueueFreeBuffer(self->recordState.queue, self->recordState.buffers[i]);
+    }
+    AudioQueueDispose(self->recordState.queue, true);
+}
+
+- (void)stopTranscribe:(int)jobId {
+    NSLog(@"[custom-RNWhisper] Stop transcribe");
+    if (self->recordState.job) self->recordState.job->abort();
+    if (self->recordState.isRealtime && self->recordState.isCapturing) {
+        [self stopAudio];
+        if (!self->recordState.isTranscribing) {
+            // Handle for VAD case
+            self->recordState.transcribeHandler(jobId, @"end", @{});
+        }
+    }
+    self->recordState.isCapturing = false;
+    self->recordState.isStoppedByAction = true;
+    dispatch_barrier_sync(dQueue, ^{});
+}
+
+- (void)pauseAudio {
+    if (self->recordState.queue != NULL && self->recordState.isCapturing && !self->recordState.isPaused) {
+        NSLog(@"[RNWhisper] Pausing audio queue");
+        AudioQueuePause(self->recordState.queue);
+        self->recordState.isPaused = true;
+    }
+}
+
+- (void)resumeAudio {
+    if (self->recordState.queue != NULL && self->recordState.isCapturing && self->recordState.isPaused) {
+        NSLog(@"[RNWhisper] Resuming audio queue");
+        AudioQueueStart(self->recordState.queue, NULL);
+        self->recordState.isPaused = false;
+    }
+}
+
+- (void)stopCurrentTranscribe {
+    if (self->recordState.job == nullptr) return;
+    [self stopTranscribe:self->recordState.job->job_id];
+}
+
+- (int)fullTranscribe:(rnwhisper::job *)job
+  audioData:(float *)audioData
+  audioDataCount:(int)audioDataCount
+{
+    whisper_reset_timings(self->ctx);
+    int code = whisper_full(self->ctx, job->params, audioData, audioDataCount);
+    if (job && job->is_aborted()) code = -999;
+    // if (code == 0) {
+    //     whisper_print_timings(self->ctx);
+    // }
+    return code;
+}
+
+// Helper function to check if a given C-string is valid UTF-8
+static BOOL is_valid_utf8(const char *str) {
+    if (!str) return NO;
+    UErrorCode error = U_ZERO_ERROR;
+    // Attempt conversion to UTF-16 using ICU to validate UTF-8
+    u_strFromUTF8(NULL, 0, NULL, str, -1, &error);
+    return (error != U_INVALID_CHAR_FOUND);
+}
+
 struct rnwhisper_segments_callback_data {
     void (^onNewSegments)(NSDictionary *);
     int total_n_new;
@@ -476,6 +605,105 @@ struct rnwhisper_segments_callback_data {
     // Add fields for partial data accumulation:
     __strong NSMutableData *tempData;
 };
+
+- (NSMutableDictionary *)getTextSegments {
+    NSString *text = @"";
+    int n_segments = whisper_full_n_segments(self->ctx);
+
+    NSMutableArray *segments = [[NSMutableArray alloc] init];
+    // NSLog(@"[custom-RNWhisper] getTextSegments");
+
+    // Instead of an NSString temp buffer, let's store raw bytes.
+    // We'll convert to NSString only after validating UTF-8.
+    NSMutableData *tempData = [NSMutableData data];
+
+    for (int i = 0; i < n_segments; i++) {
+        const char *text_cur = whisper_full_get_segment_text(self->ctx, i);
+
+        if (text_cur == NULL) {
+            // NSLog(@"[custom-RNWhisper] text_cur is NULL for segment %d", i);
+            continue;
+        }
+
+        size_t text_cur_length = strlen(text_cur);
+        // NSLog(@"[custom-RNWhisper] text_cur for segment %d (length %zu): \"%s\"", i, text_cur_length, text_cur);
+
+        // Append this segment's raw bytes to the temporary buffer.
+        [tempData appendBytes:text_cur length:text_cur_length];
+
+        // After appending, check if the entire tempData forms a valid UTF-8 string.
+        // We must first null-terminate for safe checking.
+        [tempData appendBytes:"" length:1];
+        char *buffer = (char *)[tempData mutableBytes];
+
+        if (is_valid_utf8(buffer)) {
+            // If valid, convert the entire buffer to NSString
+            NSString *ns_text = [NSString stringWithUTF8String:buffer];
+            if (!ns_text) {
+                // If still can't form NSString, fallback to a safe encoding or skip
+                // NSLog(@"[custom-RNWhisper] Still unable to form a valid NSString from buffer for segment %d", i);
+                [tempData setLength:0];
+                continue;
+            }
+
+            // Clear the tempData now that we've consumed it
+            [tempData setLength:0];
+
+            // From here, handle speaker turn if needed
+            NSMutableString *mutable_ns_text = [NSMutableString stringWithString:ns_text];
+
+            if (self->recordState.options[@"tdrzEnable"] &&
+                [self->recordState.options[@"tdrzEnable"] boolValue] &&
+                whisper_full_get_segment_speaker_turn_next(self->ctx, i)) {
+                [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
+            }
+
+            // Append the text to the overall text
+            text = [text stringByAppendingString:mutable_ns_text];
+
+            const int64_t t0 = whisper_full_get_segment_t0(self->ctx, i);
+            const int64_t t1 = whisper_full_get_segment_t1(self->ctx, i);
+
+            NSDictionary *segment = @{
+                @"text": [NSString stringWithString:mutable_ns_text],
+                @"t0": [NSNumber numberWithLongLong:t0],
+                @"t1": [NSNumber numberWithLongLong:t1]
+            };
+            [segments addObject:segment];
+
+            // NSLog(@"[custom-RNWhisper] Final ns_text for segment %d: \"%@\"", i, ns_text);
+        } else {
+            // If not valid yet, remove the null terminator we added and wait for more segments.
+            // We'll try again at the next iteration once we add more data.
+            [tempData setLength:[tempData length] - 1];
+            // NSLog(@"[custom-RNWhisper] Current buffer not valid UTF-8 yet, waiting for next segment.");
+        }
+    }
+
+    // If we exit the loop and tempData still contains bytes, it means it never formed a valid UTF-8 sequence.
+    // Handle that gracefully if needed, or just discard.
+
+    NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
+    result[@"result"] = text;
+    result[@"segments"] = segments;
+    return result;
+}
+
+- (NSString *)bench:(int)maxThreads {
+    const int n_threads = maxThreads > 0 ? maxThreads : 0;
+
+    const int max_threads = (int) [[NSProcessInfo processInfo] processorCount];
+    // Use 2 threads by default on 4-core devices, 4 threads on more cores
+    const int default_n_threads = max_threads == 4 ? 2 : MIN(4, max_threads);
+    NSString *result = [NSString stringWithUTF8String:rnwhisper::bench(self->ctx, n_threads).c_str()];
+    return result;
+}
+
+- (void)invalidate {
+    [self stopCurrentTranscribe];
+    whisper_free(self->ctx);
+}
+
 
 - (void)transcribeData:(int)jobId
     audioData:(float *)audioData
@@ -587,214 +815,4 @@ struct rnwhisper_segments_callback_data {
         onEnd(code);
     });
 }
-
-- (void)stopAudio {
-    AudioQueueStop(self->recordState.queue, true);
-    for (int i = 0; i < NUM_BUFFERS; i++) {
-        AudioQueueFreeBuffer(self->recordState.queue, self->recordState.buffers[i]);
-    }
-    AudioQueueDispose(self->recordState.queue, true);
-}
-
-- (void)stopTranscribe:(int)jobId {
-    NSLog(@"[custom-RNWhisper] Stop transcribe");
-    if (self->recordState.job) self->recordState.job->abort();
-    if (self->recordState.isRealtime && self->recordState.isCapturing) {
-        [self stopAudio];
-        if (!self->recordState.isTranscribing) {
-            // Handle for VAD case
-            self->recordState.transcribeHandler(jobId, @"end", @{});
-        }
-    }
-    self->recordState.isCapturing = false;
-    self->recordState.isStoppedByAction = true;
-    dispatch_barrier_sync(dQueue, ^{});
-}
-
-- (void)stopCurrentTranscribe {
-    if (self->recordState.job == nullptr) return;
-    [self stopTranscribe:self->recordState.job->job_id];
-}
-
-- (struct whisper_full_params)createParams:(NSDictionary *)options jobId:(int)jobId {
-    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-
-    const int n_threads = options[@"maxThreads"] != nil ?
-      [options[@"maxThreads"] intValue] : 0;
-
-    const int max_threads = (int) [[NSProcessInfo processInfo] processorCount];
-    // Use 2 threads by default on 4-core devices, 4 threads on more cores
-    const int default_n_threads = max_threads == 4 ? 2 : MIN(4, max_threads);
-
-    if (options[@"beamSize"] != nil) {
-        params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
-        params.beam_search.beam_size = [options[@"beamSize"] intValue];
-    }
-
-    params.print_realtime   = false;
-    params.print_progress   = false;
-    params.print_timestamps = false;
-    params.print_special    = false;
-    params.translate        = options[@"translate"] != nil ? [options[@"translate"] boolValue] : false;
-    params.language         = options[@"language"] != nil ? strdup([options[@"language"] UTF8String]) : "auto";
-    params.n_threads        = n_threads > 0 ? n_threads : default_n_threads;
-    params.offset_ms        = 0;
-    params.no_context       = true;
-    params.split_on_word = false;
-    params.single_segment   = false;
-
-    if (options[@"maxLen"] != nil) {
-        params.max_len = [options[@"maxLen"] intValue];
-    }
-    params.token_timestamps = options[@"tokenTimestamps"] != nil ? [options[@"tokenTimestamps"] boolValue] : false;
-    params.tdrz_enable = options[@"tdrzEnable"] != nil ? [options[@"tdrzEnable"] boolValue] : false;
-
-    if (options[@"bestOf"] != nil) {
-        params.greedy.best_of = [options[@"bestOf"] intValue];
-    }
-    if (options[@"maxContext"] != nil) {
-        params.n_max_text_ctx = [options[@"maxContext"] intValue];
-    }
-    if (options[@"offset"] != nil) {
-        params.offset_ms = [options[@"offset"] intValue];
-    }
-    if (options[@"duration"] != nil) {
-        params.duration_ms = [options[@"duration"] intValue];
-    }
-    if (options[@"wordThold"] != nil) {
-        params.thold_pt = [options[@"wordThold"] intValue];
-    }
-    if (options[@"temperature"] != nil) {
-        params.temperature = [options[@"temperature"] floatValue];
-    }
-    if (options[@"temperatureInc"] != nil) {
-        params.temperature_inc = [options[@"temperature_inc"] floatValue];
-    }
-    if (options[@"prompt"] != nil) {
-        params.initial_prompt = strdup([options[@"prompt"] UTF8String]);
-    }
-
-    return params;
-}
-
-- (int)fullTranscribe:(rnwhisper::job *)job
-  audioData:(float *)audioData
-  audioDataCount:(int)audioDataCount
-{
-    whisper_reset_timings(self->ctx);
-    int code = whisper_full(self->ctx, job->params, audioData, audioDataCount);
-    if (job && job->is_aborted()) code = -999;
-    // if (code == 0) {
-    //     whisper_print_timings(self->ctx);
-    // }
-    return code;
-}
-
-// Helper function to check if a given C-string is valid UTF-8
-static BOOL is_valid_utf8(const char *str) {
-    if (!str) return NO;
-    UErrorCode error = U_ZERO_ERROR;
-    // Attempt conversion to UTF-16 using ICU to validate UTF-8
-    u_strFromUTF8(NULL, 0, NULL, str, -1, &error);
-    return (error != U_INVALID_CHAR_FOUND);
-}
-
-- (NSMutableDictionary *)getTextSegments {
-    NSString *text = @"";
-    int n_segments = whisper_full_n_segments(self->ctx);
-
-    NSMutableArray *segments = [[NSMutableArray alloc] init];
-    // NSLog(@"[custom-RNWhisper] getTextSegments");
-
-    // Instead of an NSString temp buffer, let's store raw bytes.
-    // We'll convert to NSString only after validating UTF-8.
-    NSMutableData *tempData = [NSMutableData data];
-
-    for (int i = 0; i < n_segments; i++) {
-        const char *text_cur = whisper_full_get_segment_text(self->ctx, i);
-
-        if (text_cur == NULL) {
-            // NSLog(@"[custom-RNWhisper] text_cur is NULL for segment %d", i);
-            continue;
-        }
-
-        size_t text_cur_length = strlen(text_cur);
-        // NSLog(@"[custom-RNWhisper] text_cur for segment %d (length %zu): \"%s\"", i, text_cur_length, text_cur);
-
-        // Append this segment's raw bytes to the temporary buffer.
-        [tempData appendBytes:text_cur length:text_cur_length];
-
-        // After appending, check if the entire tempData forms a valid UTF-8 string.
-        // We must first null-terminate for safe checking.
-        [tempData appendBytes:"" length:1];
-        char *buffer = (char *)[tempData mutableBytes];
-
-        if (is_valid_utf8(buffer)) {
-            // If valid, convert the entire buffer to NSString
-            NSString *ns_text = [NSString stringWithUTF8String:buffer];
-            if (!ns_text) {
-                // If still can't form NSString, fallback to a safe encoding or skip
-                // NSLog(@"[custom-RNWhisper] Still unable to form a valid NSString from buffer for segment %d", i);
-                [tempData setLength:0];
-                continue;
-            }
-
-            // Clear the tempData now that we've consumed it
-            [tempData setLength:0];
-
-            // From here, handle speaker turn if needed
-            NSMutableString *mutable_ns_text = [NSMutableString stringWithString:ns_text];
-
-            if (self->recordState.options[@"tdrzEnable"] &&
-                [self->recordState.options[@"tdrzEnable"] boolValue] &&
-                whisper_full_get_segment_speaker_turn_next(self->ctx, i)) {
-                [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
-            }
-
-            // Append the text to the overall text
-            text = [text stringByAppendingString:mutable_ns_text];
-
-            const int64_t t0 = whisper_full_get_segment_t0(self->ctx, i);
-            const int64_t t1 = whisper_full_get_segment_t1(self->ctx, i);
-
-            NSDictionary *segment = @{
-                @"text": [NSString stringWithString:mutable_ns_text],
-                @"t0": [NSNumber numberWithLongLong:t0],
-                @"t1": [NSNumber numberWithLongLong:t1]
-            };
-            [segments addObject:segment];
-
-            // NSLog(@"[custom-RNWhisper] Final ns_text for segment %d: \"%@\"", i, ns_text);
-        } else {
-            // If not valid yet, remove the null terminator we added and wait for more segments.
-            // We'll try again at the next iteration once we add more data.
-            [tempData setLength:[tempData length] - 1];
-            // NSLog(@"[custom-RNWhisper] Current buffer not valid UTF-8 yet, waiting for next segment.");
-        }
-    }
-
-    // If we exit the loop and tempData still contains bytes, it means it never formed a valid UTF-8 sequence.
-    // Handle that gracefully if needed, or just discard.
-
-    NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
-    result[@"result"] = text;
-    result[@"segments"] = segments;
-    return result;
-}
-
-- (NSString *)bench:(int)maxThreads {
-    const int n_threads = maxThreads > 0 ? maxThreads : 0;
-
-    const int max_threads = (int) [[NSProcessInfo processInfo] processorCount];
-    // Use 2 threads by default on 4-core devices, 4 threads on more cores
-    const int default_n_threads = max_threads == 4 ? 2 : MIN(4, max_threads);
-    NSString *result = [NSString stringWithUTF8String:rnwhisper::bench(self->ctx, n_threads).c_str()];
-    return result;
-}
-
-- (void)invalidate {
-    [self stopCurrentTranscribe];
-    whisper_free(self->ctx);
-}
-
 @end

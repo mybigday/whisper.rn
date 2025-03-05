@@ -48,14 +48,6 @@ private:
     bool isOpen = false;
     size_t totalSamplesWritten = 0;
 };
-
-// You can keep your old functions if you want:
-std::vector<uint8_t> concat_short_buffers(const std::vector<short*>& buffers,
-                                          const std::vector<int>& slice_n_samples);
-
-void save_wav_file(const std::vector<uint8_t>& raw, const std::string& file);
-void raw_to_wav(const std::string& rawFilePath, const std::string& wavFilePath);
-
 } // namespace rnaudioutils
 
 #endif // RN_AUDIOUTILS_H

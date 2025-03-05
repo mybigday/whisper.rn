@@ -6,16 +6,19 @@
 #include <sys/sysinfo.h>
 #include <string>
 #include <thread>
+#include <sstream>
 #include <vector>
 #include "whisper.h"
 #include "rn-whisper.h"
 #include "ggml.h"
 #include "jni-utils.h"
+// #include <unicode/ustring.h>
 
 #define UNUSED(x) (void)(x)
 #define TAG "JNI"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,     TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,    TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,     TAG, __VA_ARGS__)
 
 static inline int min(int a, int b) {
@@ -369,12 +372,6 @@ Java_com_rnwhisper_WhisperContext_finishRealtimeTranscribeJob(
         jint *slice_n_samples_arr = env->GetIntArrayElements(slice_n_samples, nullptr);
         slice_n_samples_vec = std::vector<int>(slice_n_samples_arr, slice_n_samples_arr + env->GetArrayLength(slice_n_samples));
         env->ReleaseIntArrayElements(slice_n_samples, slice_n_samples_arr, JNI_ABORT);
-
-        // TODO: Append in real time so we don't need to keep all slices & also reduce memory usage
-        rnaudioutils::save_wav_file(
-            rnaudioutils::concat_short_buffers(job->pcm_slices, slice_n_samples_vec),
-            job->audio_output_path
-        );
     }
     rnwhisper::job_remove(job_id);
 }
@@ -470,6 +467,184 @@ Java_com_rnwhisper_WhisperContext_getTextSegment(
     const char *text = whisper_full_get_segment_text(context, index);
     jstring string = env->NewStringUTF(text);
     return string;
+}
+
+// Helper function to validate UTF-8
+
+// Helper function to manually check if a string is valid UTF-8
+bool isValidUtf8S(const std::string& str) {
+    size_t i = 0;
+    while (i < str.size()) {
+        unsigned char c = str[i];
+        
+        // Single-byte characters (ASCII)
+        if (c <= 0x7F) {
+            ++i;
+        }
+        // Two-byte characters
+        else if ((c & 0xE0) == 0xC0) {
+            if (i + 1 < str.size() && (str[i+1] & 0xC0) == 0x80) {
+                i += 2;
+            } else {
+                return false;
+            }
+        }
+        // Three-byte characters
+        else if ((c & 0xF0) == 0xE0) {
+            if (i + 2 < str.size() && (str[i+1] & 0xC0) == 0x80 && (str[i+2] & 0xC0) == 0x80) {
+                i += 3;
+            } else {
+                return false;
+            }
+        }
+        // Four-byte characters
+        else if ((c & 0xF8) == 0xF0) {
+            if (i + 3 < str.size() && (str[i+1] & 0xC0) == 0x80 && (str[i+2] & 0xC0) == 0x80 && (str[i+3] & 0xC0) == 0x80) {
+                i += 4;
+            } else {
+                return false;
+            }
+        } else {
+            return false;  // Invalid byte
+        }
+    }
+    return true;
+}
+struct Segment {
+    std::string text;
+    int t0;
+    int t1;
+};
+
+// Utility function to convert the segments into a JSON string
+std::string toJson(const std::vector<Segment>& segments, const std::string& combinedText) {
+    std::stringstream jsonStream;
+    jsonStream << "{";
+    jsonStream << "\"result\": \"" << combinedText << "\",";
+    jsonStream << "\"segments\": [";
+
+    for (size_t i = 0; i < segments.size(); ++i) {
+        const Segment& segment = segments[i];
+        jsonStream << "{";
+        jsonStream << "\"text\": \"" << segment.text << "\",";
+        jsonStream << "\"t0\": " << segment.t0 << ",";
+        jsonStream << "\"t1\": " << segment.t1;
+        jsonStream << "}";
+        if (i < segments.size() - 1) {
+            jsonStream << ",";
+        }
+    }
+    jsonStream << "]}";
+    return jsonStream.str();
+}
+// Helper function to manually validate UTF-8
+bool isValidUtf8(const std::vector<char>& buffer) {
+    int i = 0;
+    while (i < buffer.size()) {
+        unsigned char byte = static_cast<unsigned char>(buffer[i]);
+        
+        // Check for 1-byte character (ASCII)
+        if ((byte & 0x80) == 0) {
+            i++;
+        }
+        // Check for 2-byte character
+        else if ((byte & 0xE0) == 0xC0) {
+            if (i + 1 < buffer.size() && (static_cast<unsigned char>(buffer[i + 1]) & 0xC0) == 0x80) {
+                i += 2;
+            } else {
+                return false;
+            }
+        }
+        // Check for 3-byte character
+        else if ((byte & 0xF0) == 0xE0) {
+            if (i + 2 < buffer.size() && (static_cast<unsigned char>(buffer[i + 1]) & 0xC0) == 0x80
+                && (static_cast<unsigned char>(buffer[i + 2]) & 0xC0) == 0x80) {
+                i += 3;
+            } else {
+                return false;
+            }
+        }
+        // Check for 4-byte character
+        else if ((byte & 0xF8) == 0xF0) {
+            if (i + 3 < buffer.size() && (static_cast<unsigned char>(buffer[i + 1]) & 0xC0) == 0x80
+                && (static_cast<unsigned char>(buffer[i + 2]) & 0xC0) == 0x80
+                && (static_cast<unsigned char>(buffer[i + 3]) & 0xC0) == 0x80) {
+                i += 4;
+            } else {
+                return false;
+            }
+        }
+        else {
+            return false;  // Invalid byte
+        }
+    }
+    return true;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_rnwhisper_WhisperContext_JNIGetTextSegments(
+    JNIEnv *env, jobject thiz, jlong context_ptr, jint start, jint count, jboolean tdrzEnable) {
+
+    LOGI("JNIGetTextSegments: Start");
+
+    UNUSED(thiz);
+
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    std::vector<Segment> segments;
+
+    std::vector<char> tempData;  // Buffer for raw text data
+    std::string combinedText;    // Final combined text result
+
+    LOGI("JNIGetTextSegments: Looping over segments, start: %d, count: %d", start, count);
+    for (int i = start; i < start + count; i++) {
+        LOGI("JNIGetTextSegments: Processing segment %d", i);
+
+        const char *text = whisper_full_get_segment_text(context, i);
+        if (text == NULL || strlen(text) == 0) {
+            LOGW("JNIGetTextSegments: Skipping empty or NULL text in segment %d", i);
+            continue;
+        }
+
+        size_t textLength = strlen(text);
+        LOGI("JNIGetTextSegments: Text length for segment %d: %zu", i, textLength);
+
+        tempData.insert(tempData.end(), text, text + textLength);
+
+        // Ensure valid UTF-8
+        tempData.push_back(0); // Null-terminate for UTF-8 validation
+        if (isValidUtf8(tempData)) {
+            std::string validText(tempData.begin(), tempData.end() - 1);  // Remove null terminator
+            combinedText += validText;
+
+            Segment segment;
+            segment.text = validText;
+            LOGI("JNIGetTextSegments: Text for segment %d: %s", i, segment.text.c_str());
+            segment.t0 = whisper_full_get_segment_t0(context, i);
+            segment.t1 = whisper_full_get_segment_t1(context, i);
+
+            // Handle speaker turn if enabled
+            if (tdrzEnable && whisper_full_get_segment_speaker_turn_next(context, i)) {
+                segment.text += " [SPEAKER_TURN]";
+                combinedText += " [SPEAKER_TURN]";
+            }
+
+            segments.push_back(segment);
+            tempData.clear();
+        } else {
+            LOGW("JNIGetTextSegments: UTF-8 validation failed for segment %d", i);
+            // If not valid yet, remove the null terminator and wait for next segment
+            tempData.pop_back(); // Remove last byte if invalid UTF-8
+        }
+    }
+
+    LOGI("JNIGetTextSegments: Finished processing segments with text: %s", combinedText.c_str());
+    
+    // Convert result into a JSON string
+    std::string jsonString = toJson(segments, combinedText);
+    LOGI("JNIGetTextSegments: JSON string: %s", jsonString.c_str());
+
+    // Return the JSON string as jstring
+    return env->NewStringUTF(jsonString.c_str());
 }
 
 JNIEXPORT jint JNICALL

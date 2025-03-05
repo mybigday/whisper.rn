@@ -39,7 +39,7 @@
 
 #### Defined in
 
-[index.ts:215](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L215)
+[index.ts:213](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L213)
 
 ## Properties
 
@@ -49,7 +49,7 @@
 
 #### Defined in
 
-[index.ts:211](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L211)
+[index.ts:209](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L209)
 
 ___
 
@@ -59,7 +59,7 @@ ___
 
 #### Defined in
 
-[index.ts:209](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L209)
+[index.ts:207](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L207)
 
 ___
 
@@ -69,7 +69,7 @@ ___
 
 #### Defined in
 
-[index.ts:213](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L213)
+[index.ts:211](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L211)
 
 ## Methods
 
@@ -89,7 +89,7 @@ ___
 
 #### Defined in
 
-[index.ts:489](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L489)
+[index.ts:493](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L493)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[index.ts:500](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L500)
+[index.ts:511](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L511)
 
 ___
 
@@ -117,7 +117,7 @@ ___
 
 #### Defined in
 
-[index.ts:495](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L495)
+[index.ts:507](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L507)
 
 ___
 
@@ -131,7 +131,7 @@ ___
 
 #### Defined in
 
-[index.ts:504](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L504)
+[index.ts:515](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L515)
 
 ___
 
@@ -160,7 +160,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:303](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L303)
+[index.ts:301](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L301)
 
 ___
 
@@ -188,7 +188,7 @@ Transcribe audio data (base64 encoded float32 PCM data)
 
 #### Defined in
 
-[index.ts:335](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L335)
+[index.ts:333](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L333)
 
 ___
 
@@ -210,7 +210,7 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:343](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L343)
+[index.ts:344](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L344)
 
 ___
 
@@ -237,4 +237,4 @@ ___
 
 #### Defined in
 
-[index.ts:225](https://github.com/Shonn-Li/whisper.rn/blob/d0fb9a8/src/index.ts#L225)
+[index.ts:219](https://github.com/Shonn-Li/whisper.rn/blob/78d762f/src/index.ts#L219)

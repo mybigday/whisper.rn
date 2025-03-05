@@ -6,6 +6,7 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
+import java.lang.reflect.Method;
 
 import android.util.Log;
 import android.os.Build;
@@ -22,7 +23,15 @@ import java.io.FileReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.io.PushbackInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONException;
+
 
 public class WhisperContext {
   public static final String NAME = "RNWhisperContext";
@@ -56,6 +65,9 @@ public class WhisperContext {
   private boolean isTdrzEnable = false;
   private Thread rootFullHandler = null;
   private Thread fullHandler = null;
+  // new fields
+  private WavWriter wavWriter = null;
+  private int previousVolumeLevel = -1;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
     this.id = id;
@@ -84,11 +96,74 @@ public class WhisperContext {
     return vadSimple(jobId, sliceIndex, nSamples, n);
   }
 
+  private int computeVolumeLevel(short[] buffer, int readSamples) {
+      double sum = 0;
+      for (int i = 0; i < readSamples; i++) {
+          double sample = buffer[i] / 32768.0;
+          sum += sample * sample;
+      }
+      double rms = Math.sqrt(sum / readSamples);
+      if (rms < 0.01) return 0;
+      else if (rms < 0.05) return 1;
+      else if (rms < 0.1) return 2;
+      else if (rms < 0.15) return 3;
+      else if (rms < 0.2) return 4;
+      else if (rms < 0.3) return 5;
+      else return 6;
+  }
+
+  private String cleanSegment(String text) {
+      return text.replaceAll("[^\\p{Print}]", "");
+  }
+
+  public void pauseRealtimeTranscribe() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {  // Only for API 24+
+      try {
+          // Use reflection to access the pause method
+          Method pauseMethod = AudioRecord.class.getMethod("pause");
+          if (recorder != null && recorder.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+              pauseMethod.invoke(recorder);  // Pause the recorder using reflection
+              Log.d("WhisperContext", "Transcription paused.");
+          }
+      } catch (Exception e) {
+          Log.e("WhisperContext", "Error pausing recorder: " + e.getMessage());
+      }
+    } else {
+        Log.w("WhisperContext", "Pause not supported for this API level.");
+    }
+  }
+
+  // Resume logic with reflection
+  public void resumeRealtimeTranscribe() {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {  // Only for API 24+
+          try {
+              // Use reflection to access the startRecording method
+              Method resumeMethod = AudioRecord.class.getMethod("startRecording");
+              if (recorder != null && recorder.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {
+                  resumeMethod.invoke(recorder);  // Resume the recorder using reflection
+                  Log.d("WhisperContext", "Transcription resumed.");
+              }
+          } catch (Exception e) {
+              Log.e("WhisperContext", "Error resuming recorder: " + e.getMessage());
+          }
+      } else {
+          Log.w("WhisperContext", "Resume not supported for this API level.");
+      }
+  }
+
   private void finishRealtimeTranscribe(WritableMap result) {
     emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
     finishRealtimeTranscribeJob(jobId, context, sliceNSamples.stream().mapToInt(i -> i).toArray());
   }
 
+  private void emitEvent(String eventName, WritableMap payload) {
+      WritableMap event = Arguments.createMap();
+      event.putInt("contextId", this.id);
+      event.putInt("jobId", this.jobId);
+      event.putMap("payload", payload);
+      eventEmitter.emit(eventName, event);
+  }
+  
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
     if (isCapturing || isTranscribing) {
       return -100;
@@ -117,6 +192,14 @@ public class WhisperContext {
 
     this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
+    if (options.hasKey("audioOutputPath")) {
+        String outPath = options.getString("audioOutputPath");
+        wavWriter = new WavWriter();
+        if (!wavWriter.initialize(outPath, SAMPLE_RATE, (short)1, (short)16)) {
+            wavWriter = null;
+        }
+    }
+
     createRealtimeTranscribeJob(jobId, context, options);
 
     sliceNSamples = new ArrayList<Integer>();
@@ -130,11 +213,25 @@ public class WhisperContext {
       public void run() {
         try {
           short[] buffer = new short[bufferSize];
+          Log.d("WhisperContext", "Buffer Size: " + bufferSize);
           while (isCapturing) {
             try {
               int n = recorder.read(buffer, 0, bufferSize);
               if (n == 0) continue;
 
+              // Append to WAV file if enabled:
+              if (wavWriter != null) {
+                  wavWriter.appendSamples(buffer, n);
+                  wavWriter.flush();
+              }
+
+              int currentVolume = computeVolumeLevel(buffer, n);
+              if (currentVolume != previousVolumeLevel) {
+                  previousVolumeLevel = currentVolume;
+                  WritableMap volEvent = Arguments.createMap();
+                  volEvent.putInt("volume", currentVolume);
+                  emitEvent("@RNWhisper_onRealtimeTranscribeVolumeChange", volEvent);
+              }
               int totalNSamples = 0;
               for (int i = 0; i < sliceNSamples.size(); i++) {
                 totalNSamples += sliceNSamples.get(i);
@@ -207,6 +304,9 @@ public class WhisperContext {
         } finally {
           recorder.release();
           recorder = null;
+          if (wavWriter != null) {
+              wavWriter.finalizeWav();
+          }
         }
       }
     });
@@ -336,6 +436,8 @@ public class WhisperContext {
     if (isCapturing || isTranscribing) {
       throw new Exception("Context is already in capturing or transcribing");
     }
+
+    Log.d("WhisperContext", "Transcribing: " + jobId);
     rewind();
     this.jobId = jobId;
     this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
@@ -362,39 +464,127 @@ public class WhisperContext {
     if (code != 0 && code != 999) {
       throw new Exception("Failed to transcribe the file. Code: " + code);
     }
+    Log.d("WhisperContext", "Trascribed, now calleing text segments: " + jobId);
     WritableMap result = getTextSegments(0, getTextSegmentCount(context));
     result.putBoolean("isAborted", isStoppedByAction);
     return result;
   }
-
   private WritableMap getTextSegments(int start, int count) {
-    StringBuilder builder = new StringBuilder();
+    Log.d("WhisperContext", "getTextSegments, calling JNIGetSegments: " + start + " " + count);
 
-    WritableMap data = Arguments.createMap();
-    WritableArray segments = Arguments.createArray();
+    // Call the JNI method to get the JSON string
+    String jsonString = JNIGetTextSegments(context, start, count, this.isTdrzEnable); 
+    Log.d("WhisperContext", "getTextSegments, got JSON string: " + jsonString);
+    // Parse the JSON string into a map or structure
+    try {
+        JSONObject jsonObject = new JSONObject(jsonString);
+        Log.d("WhisperContext", "getTextSegments, got JSON object: " + jsonObject.toString());
+        String resultText = jsonObject.getString("result");
+        Log.d("WhisperContext", "getTextSegments, got result text: " + resultText);
+        JSONArray segmentsArray = jsonObject.getJSONArray("segments");
+        Log.d("WhisperContext", "getTextSegments, got segments array: " + segmentsArray.toString());
 
-    for (int i = 0; i < count; i++) {
-      String text = getTextSegment(context, i);
-
-      // If tdrzEnable is enabled and speaker turn is detected
-      if (this.isTdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
-          text += " [SPEAKER_TURN]";
-      }
-
-      builder.append(text);
-
-      WritableMap segment = Arguments.createMap();
-      Log.d(NAME, "getTextSegments: " + text + " " + transcribeSliceIndex);
-      segment.putString("text", text);
-      segment.putInt("t0", getTextSegmentT0(context, i));
-      segment.putInt("t1", getTextSegmentT1(context, i));
-      segments.pushMap(segment);
+        WritableMap data = Arguments.createMap();
+        data.putString("result", resultText);
+        Log.d("WhisperContext", "getTextSegments, added result text to data: " + resultText);
+        WritableArray segments = Arguments.createArray();
+        for (int i = 0; i < segmentsArray.length(); i++) {
+            JSONObject segment = segmentsArray.getJSONObject(i);
+            WritableMap segmentMap = Arguments.createMap();
+            segmentMap.putString("text", segment.getString("text"));
+            segmentMap.putInt("t0", segment.getInt("t0"));
+            segmentMap.putInt("t1", segment.getInt("t1"));
+            segments.pushMap(segmentMap);
+        }
+        Log.d("WhisperContext", "getTextSegments, added segments to data: " + segments.toString());
+        data.putArray("segments", segments);
+        Log.d("WhisperContext", "getTextSegments, returning data: " + data.toString());
+        return data;
+    } catch (JSONException e) {
+        Log.e("WhisperContext", "Error parsing JSON", e);
+        return Arguments.createMap();
     }
-    data.putString("result", builder.toString());
-    data.putArray("segments", segments);
-    return data;
-  }
+}
 
+// private WritableMap getTextSegments(int start, int count) {
+//     Log.d("WhisperContext", "getTextSegments: " + start + " " + count);
+//     StringBuilder builder = new StringBuilder();
+//     WritableMap data = Arguments.createMap();
+//     WritableArray segments = Arguments.createArray();
+
+//     byte[] tempData = new byte[2048]; // Temporary buffer to accumulate bytes
+//     int tempDataIndex = 0; // To track where we are in the buffer
+//     String combinedText = ""; // To store final text
+
+//     for (int i = start; i < start + count; i++) {
+//         Log.d("WhisperContext", "Processing text segment " + i);
+//         getTextSegment(context, i); 
+//         Log.d("WhisperContext", "Processing text segment get TextSegments as bytes" );
+//         // Get the raw byte data for the segment 
+//         String text = getTextSegment(context, i);
+//         Log.d("WhisperContext", "Processing text segment " + i + ": " + text);
+
+//         if (this.isTdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
+//             text += " [SPEAKER_TURN]";
+//         }
+
+//         // Skip empty segments
+//         if (text == null || text.isEmpty()) {
+//             Log.d("WhisperContext", "Skipping empty text segment at index " + i);
+//             continue;
+//         }
+
+//         // Log the byte array
+//         byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
+//         Log.d("WhisperContext", "Bytes for segment " + i + ": " + Arrays.toString(textBytes));
+
+//         // Accumulate bytes in the temporary buffer
+//         for (byte b : textBytes) {
+//             tempData[tempDataIndex++] = b;
+
+//             // Prevent buffer overflow
+//             if (tempDataIndex >= tempData.length) {
+//                 Log.w("WhisperContext", "Buffer exceeded. Resetting tempDataIndex.");
+//                 tempDataIndex = 0;
+//             }
+//         }
+
+//         // After appending, check if the entire tempData forms a valid UTF-8 string
+//         if (isValidUtf8(tempData, tempDataIndex)) {
+//             String validText = new String(tempData, 0, tempDataIndex, StandardCharsets.UTF_8);
+//             combinedText += validText;
+//             Log.d("WhisperContext", "Valid UTF-8 segment: " + validText);
+
+//             // Reset the buffer after processing the segment
+//             tempDataIndex = 0;
+
+//             WritableMap segment = Arguments.createMap();
+//             segment.putString("text", validText);
+//             segment.putInt("t0", getTextSegmentT0(context, i));
+//             segment.putInt("t1", getTextSegmentT1(context, i));
+//             segments.pushMap(segment);
+//             Log.d("WhisperContext", "Added segment: " + validText);
+//         } else {
+//             Log.d("WhisperContext", "Invalid UTF-8 sequence detected, skipping segment " + i);
+//         }
+//     }
+
+//     data.putString("result", combinedText);
+//     data.putArray("segments", segments);
+
+//     Log.d("WhisperContext", "Finished processing " + count + " segments.");
+//     return data;
+// }
+
+// // Helper function to validate UTF-8 sequence
+// private boolean isValidUtf8(byte[] bytes, int length) {
+//     try {
+//         String testStr = new String(bytes, 0, length, StandardCharsets.UTF_8);
+//         return testStr.getBytes(StandardCharsets.UTF_8).length == length;
+//     } catch (Exception e) {
+//         return false;
+//     }
+// }
 
   public boolean isCapturing() {
     return isCapturing;
@@ -512,6 +702,7 @@ public class WhisperContext {
   protected static native void abortAllTranscribe();
   protected static native int getTextSegmentCount(long context);
   protected static native String getTextSegment(long context, int index);
+  protected static native String JNIGetTextSegments(long contextPtr, int start, int count, boolean tdrzEnable);
   protected static native int getTextSegmentT0(long context, int index);
   protected static native int getTextSegmentT1(long context, int index);
   protected static native boolean getTextSegmentSpeakerTurnNext(long context, int index);
