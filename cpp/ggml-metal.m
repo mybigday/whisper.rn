@@ -544,11 +544,7 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
         const bool try_metallib = true;
 #endif
 
-#if TARGET_OS_SIMULATOR
-        NSString * path_lib = [bundle pathForResource:@"ggml-whisper-sim" ofType:@"metallib"];
-#else
         NSString * path_lib = [bundle pathForResource:@"ggml-whisper" ofType:@"metallib"];
-#endif
         if (path_lib == nil) {
             // Try to find the resource in the directory where the current binary located.
             NSString * current_binary = [[NSProcessInfo processInfo] arguments][0];

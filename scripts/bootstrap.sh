@@ -137,11 +137,6 @@ if [ "$OS" = "Darwin" ]; then
   rm ggml-metal.air
   mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper.metallib
 
-  xcrun --sdk iphonesimulator metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
-  xcrun --sdk iphonesimulator metallib ggml-metal.air   -o ggml-whisper.metallib
-  rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper-sim.metallib
-
   cd -
 
   # Generate .xcode.env.local in iOS example
