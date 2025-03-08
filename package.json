@@ -15,6 +15,7 @@
     "ios",
     "cpp/*.*",
     "cpp/coreml/*.*",
+    "cpp/amx/*.*",
     "*.podspec",
     "!lib/typescript/example",
     "!ios/build",
