@@ -2,7 +2,7 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 base_ld_flags = "-framework Accelerate -framework Foundation -framework Metal -framework MetalKit"
-base_compiler_flags = "-DWSP_GGML_USE_ACCELERATE -Wno-shorten-64-to-32"
+base_compiler_flags = "-DWSP_GGML_USE_CPU -DWSP_GGML_USE_ACCELERATE -Wno-shorten-64-to-32"
 folly_compiler_flags = "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma"
 
 # Use base_optimizer_flags = "" for debug builds
@@ -42,7 +42,7 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS" => base_ld_flags,
     "OTHER_CFLAGS" => base_optimizer_flags,
-    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags
+    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags + " -std=c++17"
   }
 
   # Don't install the dependencies when we run `pod install` in the old architecture.

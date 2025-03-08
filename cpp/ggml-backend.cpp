@@ -252,6 +252,7 @@ void wsp_ggml_backend_tensor_get_async(wsp_ggml_backend_t backend, const struct 
 }
 
 void wsp_ggml_backend_tensor_set(struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(tensor);
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     if (size == 0) {
@@ -266,6 +267,7 @@ void wsp_ggml_backend_tensor_set(struct wsp_ggml_tensor * tensor, const void * d
 }
 
 void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(tensor);
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     if (size == 0) {
@@ -740,7 +742,8 @@ static int wsp_ggml_backend_sched_backend_id_from_cur(wsp_ggml_backend_sched_t s
 
     if (tensor->buffer || (tensor->view_src && tensor->view_src->buffer)) {
         // since the tensor is pre-allocated, it cannot be moved to another backend
-        WSP_GGML_ABORT("pre-allocated tensor (%s) in a backend that cannot run the operation", tensor->name);
+        wsp_ggml_backend_buffer_t buffer = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+        WSP_GGML_ABORT("pre-allocated tensor (%s) in a buffer (%s) that cannot run the operation (%s)", tensor->name, wsp_ggml_backend_buffer_name(buffer), wsp_ggml_op_name(tensor->op));
     }
 
     // graph input
@@ -761,7 +764,7 @@ static int wsp_ggml_backend_sched_backend_id_from_cur(wsp_ggml_backend_sched_t s
         if (tensor->op != WSP_GGML_OP_ROPE && src->buffer != NULL && src->buffer->usage == WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
             int src_backend_id = wsp_ggml_backend_sched_backend_from_buffer(sched, src, tensor);
             // check if a backend with higher prio wants to offload the op
-            if (src_backend_id == sched->n_backends - 1) {
+            if (src_backend_id == sched->n_backends - 1 && wsp_ggml_backend_buffer_is_host(src->buffer)) {
                 for (int b = 0; b < src_backend_id; b++) {
                     if (wsp_ggml_backend_supports_op(sched->backends[b], tensor) && wsp_ggml_backend_offload_op(sched->backends[b], tensor)) {
                         SET_CAUSE(tensor, "1.off");
@@ -792,9 +795,12 @@ static void wsp_ggml_backend_sched_print_assignments(wsp_ggml_backend_sched_t sc
     for (int i = 0; i < graph->n_nodes; i++) {
         if (cur_split < sched->n_splits && i == sched->splits[cur_split].i_start) {
             wsp_ggml_backend_t split_backend = sched->backends[sched->splits[cur_split].backend_id];
-            WSP_GGML_LOG_DEBUG("\n## SPLIT #%d: %s # %d inputs: ", cur_split, wsp_ggml_backend_name(split_backend),
+            WSP_GGML_LOG_DEBUG("\n## SPLIT #%d: %s # %d inputs", cur_split, wsp_ggml_backend_name(split_backend),
                 sched->splits[cur_split].n_inputs);
             for (int j = 0; j < sched->splits[cur_split].n_inputs; j++) {
+                if (j == 0) {
+                    WSP_GGML_LOG_DEBUG(": ");
+                }
                 WSP_GGML_LOG_DEBUG("[%s (%5.5s)] ", sched->splits[cur_split].inputs[j]->name,
                     fmt_size(wsp_ggml_nbytes(sched->splits[cur_split].inputs[j])));
             }

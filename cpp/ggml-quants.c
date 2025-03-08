@@ -5220,15 +5220,6 @@ bool wsp_ggml_validate_row_data(enum wsp_ggml_type type, const void * data, size
             {
                 VALIDATE_ROW_DATA_D_F16_IMPL(block_iq4_nl, data, nb);
             } break;
-        case WSP_GGML_TYPE_Q4_0_4_4:
-        case WSP_GGML_TYPE_Q4_0_4_8:
-            {
-                VALIDATE_ROW_DATA_DVEC_F16_IMPL(block_q4_0x4, data, nbytes / sizeof(block_q4_0x4), 4);
-            } break;
-        case WSP_GGML_TYPE_Q4_0_8_8:
-            {
-                VALIDATE_ROW_DATA_DVEC_F16_IMPL(block_q4_0x8, data, nbytes / sizeof(block_q4_0x8), 8);
-            } break;
 
         case WSP_GGML_TYPE_I8:
         case WSP_GGML_TYPE_I16:

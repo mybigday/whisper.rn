@@ -1,8 +1,7 @@
 #include "whisper.h"
 
-#include "ggml-cpu.h"
-
 #include "ggml.h"
+#include "ggml-cpp.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 
@@ -19,35 +18,38 @@
 #include <cassert>
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <cstdio>
+#include <codecvt>
 #include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <map>
+#include <mutex>
+#include <random>
+#include <regex>
 #include <set>
 #include <string>
 #include <thread>
 #include <vector>
-#include <regex>
-#include <random>
-#include <functional>
-#include <codecvt>
+
+// dummy
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
-#if defined(WSP_GGML_BIG_ENDIAN)
-#include <bit>
-
+#if defined(WHISPER_BIG_ENDIAN)
 template<typename T>
 static T byteswap(T value) {
-    return std::byteswap(value);
-}
-
-template<>
-float byteswap(float value) {
-    return std::bit_cast<float>(byteswap(std::bit_cast<std::uint32_t>(value)));
+    T value_swapped;
+    char * source = reinterpret_cast<char *>(&value);
+    char * target = reinterpret_cast<char *>(&value_swapped);
+    int size = sizeof(T);
+    for (int i = 0; i < size; i++) {
+        target[size - 1 - i] = source[i];
+    }
+    return value_swapped;
 }
 
 template<typename T>
@@ -83,14 +85,14 @@ static void byteswap_tensor(wsp_ggml_tensor * tensor) {
 }
 
 #define BYTESWAP_VALUE(d) d = byteswap(d)
-#define BYTESWAP_FILTERS(f)            \
+#define BYTESWAP_FILTERS(f)           \
     do {                              \
         for (auto & datum : f.data) { \
             datum = byteswap(datum);  \
         }                             \
     } while (0)
-#define BYTESWAP_TENSOR(t)       \
-    do {                         \
+#define BYTESWAP_TENSOR(t)  \
+    do {                    \
         byteswap_tensor(t); \
     } while (0)
 #else
@@ -147,21 +149,25 @@ static void whisper_log_callback_default(wsp_ggml_log_level level, const char * 
 
 static bool wsp_ggml_graph_compute_helper(
           struct wsp_ggml_cgraph * graph,
-        std::vector<uint8_t> & buf,
                          int   n_threads,
          wsp_ggml_abort_callback   abort_callback,
                         void * abort_callback_data) {
-    struct wsp_ggml_cplan plan = wsp_ggml_graph_plan(graph, n_threads, nullptr);
 
-    plan.abort_callback      = abort_callback;
-    plan.abort_callback_data = abort_callback_data;
+    wsp_ggml_backend_ptr backend { wsp_ggml_backend_init_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU, nullptr) };
 
-    if (plan.work_size > 0) {
-        buf.resize(plan.work_size);
-        plan.work_data = buf.data();
+    auto * reg = wsp_ggml_backend_dev_backend_reg(wsp_ggml_backend_get_device(backend.get()));
+
+    auto * set_abort_callback_fn = (wsp_ggml_backend_set_abort_callback_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_set_abort_callback");
+    if (set_abort_callback_fn) {
+        set_abort_callback_fn(backend.get(), abort_callback, abort_callback_data);
     }
 
-    return wsp_ggml_graph_compute(graph, &plan);
+    auto wsp_ggml_backend_set_n_threads_fn = (wsp_ggml_backend_set_n_threads_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_set_n_threads");
+    if (wsp_ggml_backend_set_n_threads_fn) {
+        wsp_ggml_backend_set_n_threads_fn(backend.get(), n_threads);
+    }
+
+    return wsp_ggml_backend_graph_compute(backend.get(), graph) == WSP_GGML_STATUS_SUCCESS;
 }
 
 static bool wsp_ggml_graph_compute_helper(
@@ -183,6 +189,61 @@ static bool wsp_ggml_graph_compute_helper(
     bool t = wsp_ggml_backend_sched_graph_compute(sched, graph) == WSP_GGML_STATUS_SUCCESS;
     wsp_ggml_backend_sched_reset(sched);
     return t;
+}
+
+static void whisper_load_backends() {
+#ifdef WSP_GGML_BACKEND_DL
+    static std::once_flag flag;
+    std::call_once(flag, []() {
+        wsp_ggml_backend_load_all();
+    });
+#endif
+}
+
+// TODO: move these functions to ggml-base with support for ggml-backend?
+
+static wsp_ggml_tensor * whisper_set_f32(struct wsp_ggml_tensor * t, float v) {
+    WSP_GGML_ASSERT(t->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(t));
+    size_t nels = wsp_ggml_nelements(t);
+    for (int64_t i = 0; i < nels; ++i) {
+        ((float *) t->data)[i] = v;
+    }
+    return t;
+}
+
+static wsp_ggml_tensor * whisper_set_i32(struct wsp_ggml_tensor * t, int32_t v) {
+    WSP_GGML_ASSERT(t->type == WSP_GGML_TYPE_I32);
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(t));
+    size_t nels = wsp_ggml_nelements(t);
+    for (int64_t i = 0; i < nels; ++i) {
+        ((int32_t *) t->data)[i] = v;
+    }
+    return t;
+}
+
+static float whisper_get_f32_nd(const struct wsp_ggml_tensor * t, int64_t i0, int64_t i1, int64_t i2, int64_t i3) {
+    WSP_GGML_ASSERT(t->type == WSP_GGML_TYPE_F32);
+    void * data = (char *) t->data + i0*t->nb[0] + i1*t->nb[1] + i2*t->nb[2] + i3*t->nb[3];
+    return *(float *) data;
+}
+
+static void whisper_set_f32_nd(struct wsp_ggml_tensor * t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, float v) {
+    WSP_GGML_ASSERT(t->type == WSP_GGML_TYPE_F32);
+    void * data = (char *) t->data + i0*t->nb[0] + i1*t->nb[1] + i2*t->nb[2] + i3*t->nb[3];
+    *(float *) data = v;
+}
+
+static int32_t whisper_get_i32_nd(const struct wsp_ggml_tensor * t, int64_t i0, int64_t i1, int64_t i2, int64_t i3) {
+    WSP_GGML_ASSERT(t->type == WSP_GGML_TYPE_I32);
+    void * data = (char *) t->data + i0*t->nb[0] + i1*t->nb[1] + i2*t->nb[2] + i3*t->nb[3];
+    return *(int32_t *) data;
+}
+
+static void whisper_set_i32_nd(struct wsp_ggml_tensor * t, int64_t i0, int64_t i1, int64_t i2, int64_t i3, int32_t v) {
+    WSP_GGML_ASSERT(t->type == WSP_GGML_TYPE_I32);
+    void * data = (char *) t->data + i0*t->nb[0] + i1*t->nb[1] + i2*t->nb[2] + i3*t->nb[3];
+    *(int32_t *) data = v;
 }
 
 // faster matrix multiplications for tensors that do not have dimension 0 divisible by "pad"
@@ -428,6 +489,7 @@ struct whisper_segment {
     int64_t t1;
 
     std::string text;
+    float no_speech_prob;
 
     std::vector<whisper_token_data> tokens;
 
@@ -867,6 +929,7 @@ struct whisper_state {
     whisper_token tid_last;
 
     std::vector<float> energy; // PCM signal energy
+    float no_speech_prob = 0.0f;
 
     // [EXPERIMENTAL] Token-level timestamps with DTW
     whisper_aheads_masks aheads_masks;
@@ -1233,21 +1296,38 @@ static size_t aheads_masks_nbytes(struct whisper_aheads_masks & aheads_masks) {
 static wsp_ggml_backend_t whisper_backend_init_gpu(const whisper_context_params & params) {
     wsp_ggml_log_set(g_state.log_callback, g_state.log_callback_user_data);
 
+    whisper_load_backends();
+
+    wsp_ggml_backend_dev_t dev = nullptr;
+
+    int cnt = 0;
     if (params.use_gpu) {
         for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
-            wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_get(i);
-            if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
-                WHISPER_LOG_INFO("%s: using %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
-                wsp_ggml_backend_t result = wsp_ggml_backend_dev_init(dev, nullptr);
-                if (!result) {
-                    WHISPER_LOG_ERROR("%s: failed to initialize %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
+            wsp_ggml_backend_dev_t dev_cur = wsp_ggml_backend_dev_get(i);
+            if (wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
+                if (cnt == 0 || cnt == params.gpu_device) {
+                    dev = dev_cur;
                 }
-                return result;
+
+                if (++cnt > params.gpu_device) {
+                    break;
+                }
             }
         }
     }
 
-    return nullptr;
+    if (dev == nullptr) {
+        WHISPER_LOG_INFO("%s: no GPU found\n", __func__);
+        return nullptr;
+    }
+
+    WHISPER_LOG_INFO("%s: using %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
+    wsp_ggml_backend_t result = wsp_ggml_backend_dev_init(dev, nullptr);
+    if (!result) {
+        WHISPER_LOG_ERROR("%s: failed to initialize %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
+    }
+
+    return result;
 }
 
 static std::vector<wsp_ggml_backend_t> whisper_backend_init(const whisper_context_params & params) {
@@ -1275,26 +1355,33 @@ static std::vector<wsp_ggml_backend_t> whisper_backend_init(const whisper_contex
 
     WSP_GGML_UNUSED(params);
 
-    result.push_back(wsp_ggml_backend_cpu_init());
+    result.push_back(wsp_ggml_backend_init_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU, nullptr));
 
     return result;
 }
 
 static wsp_ggml_backend_buffer_type_t whisper_default_buffer_type(const whisper_context_params & params) {
+    wsp_ggml_backend_buffer_type_t result = wsp_ggml_backend_cpu_buffer_type();
+
     if (!params.use_gpu) {
-        return wsp_ggml_backend_cpu_buffer_type();
+        return result;
     }
 
-    // if we have a GPU device - use it
+    int cnt = 0;
     for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
         wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_get(i);
         if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
-            WHISPER_LOG_INFO("%s: using device %s (%s)\n", __func__, wsp_ggml_backend_dev_name(dev), wsp_ggml_backend_dev_description(dev));
-            return wsp_ggml_backend_dev_buffer_type(dev);
+            if (cnt == 0 || cnt == params.gpu_device) {
+                result = wsp_ggml_backend_dev_buffer_type(dev);
+            }
+
+            if (++cnt > params.gpu_device) {
+                break;
+            }
         }
     }
 
-    return wsp_ggml_backend_cpu_buffer_type();
+    return result;
 }
 
 // load the model from a ggml file
@@ -4184,22 +4271,28 @@ static int whisper_has_openvino(void) {
 const char * whisper_print_system_info(void) {
     static std::string s;
 
+    whisper_load_backends();
+
     s  = "";
-    s += "AVX = "       + std::to_string(wsp_ggml_cpu_has_avx())       + " | ";
-    s += "AVX2 = "      + std::to_string(wsp_ggml_cpu_has_avx2())      + " | ";
-    s += "AVX512 = "    + std::to_string(wsp_ggml_cpu_has_avx512())    + " | ";
-    s += "FMA = "       + std::to_string(wsp_ggml_cpu_has_fma())       + " | ";
-    s += "NEON = "      + std::to_string(wsp_ggml_cpu_has_neon())      + " | ";
-    s += "ARM_FMA = "   + std::to_string(wsp_ggml_cpu_has_arm_fma())   + " | ";
-    s += "F16C = "      + std::to_string(wsp_ggml_cpu_has_f16c())      + " | ";
-    s += "FP16_VA = "   + std::to_string(wsp_ggml_cpu_has_fp16_va())   + " | ";
-    s += "WASM_SIMD = " + std::to_string(wsp_ggml_cpu_has_wasm_simd()) + " | ";
-    s += "SSE3 = "      + std::to_string(wsp_ggml_cpu_has_sse3())      + " | ";
-    s += "SSSE3 = "     + std::to_string(wsp_ggml_cpu_has_ssse3())     + " | ";
-    s += "VSX = "       + std::to_string(wsp_ggml_cpu_has_vsx())       + " | ";
+    s += "WHISPER : ";
     s += "COREML = "    + std::to_string(whisper_has_coreml())     + " | ";
     s += "OPENVINO = "  + std::to_string(whisper_has_openvino())   + " | ";
 
+    for (size_t i = 0; i < wsp_ggml_backend_reg_count(); i++) {
+        auto * reg = wsp_ggml_backend_reg_get(i);
+        auto * get_features_fn = (wsp_ggml_backend_get_features_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_get_features");
+        if (get_features_fn) {
+            wsp_ggml_backend_feature * features = get_features_fn(reg);
+            s += wsp_ggml_backend_reg_name(reg);
+            s += " : ";
+            for (; features->name; features++) {
+                s += features->name;
+                s += " = ";
+                s += features->value;
+                s += " | ";
+            }
+        }
+    }
     return s.c_str();
 }
 
@@ -4679,7 +4772,7 @@ struct whisper_full_params whisper_full_default_params(enum whisper_sampling_str
         /*.detect_language   =*/ false,
 
         /*.suppress_blank    =*/ true,
-        /*.suppress_non_speech_tokens =*/ false,
+        /*.suppress_nst      =*/ false,
 
         /*.temperature       =*/  0.0f,
         /*.max_initial_ts    =*/  1.0f,
@@ -4829,6 +4922,42 @@ static const std::vector<std::string> non_speech_tokens = {
     "♪♪♪","♩", "♪", "♫", "♬", "♭", "♮", "♯"
 };
 
+static void whisper_compute_logprobs(
+                const std::vector<float> & logits,
+                              const int    n_logits,
+                      std::vector<float> & logprobs) {
+    const float logit_max = *std::max_element(logits.begin(), logits.end());
+    float logsumexp = 0.0f;
+    for (int i = 0; i < n_logits; ++i) {
+        if (logits[i] > -INFINITY) {
+            logsumexp += expf(logits[i] - logit_max);
+        }
+    }
+    logsumexp = logf(logsumexp) + logit_max;
+
+    for (int i = 0; i < n_logits; ++i) {
+        if (logits[i] > -INFINITY) {
+            logprobs[i] = logits[i] - logsumexp;
+        } else {
+            logprobs[i] = -INFINITY;
+        }
+    }
+}
+
+static void whisper_compute_probs(
+    const std::vector<float> & logits,
+                  const int    n_logits,
+    const std::vector<float> & logprobs,
+          std::vector<float> & probs)     {
+    for (int i = 0; i < n_logits; ++i) {
+        if (logits[i] == -INFINITY) {
+            probs[i] = 0.0f;
+        } else {
+            probs[i] = expf(logprobs[i]);
+        }
+    }
+}
+
 // process the logits for the selected decoder
 // - applies logit filters
 // - computes logprobs and probs
@@ -4890,7 +5019,7 @@ static void whisper_process_logits(
 
         // suppress sot and nosp tokens
         logits[vocab.token_sot]  = -INFINITY;
-        logits[vocab.token_nosp] = -INFINITY; // TODO: ignore this token for now
+        logits[vocab.token_nosp] = -INFINITY;
 
         // [TDRZ] when tinydiarize is disabled, suppress solm token
         if (params.tdrz_enable == false) {
@@ -4927,7 +5056,7 @@ static void whisper_process_logits(
 
         // suppress non-speech tokens
         // ref: https://github.com/openai/whisper/blob/7858aa9c08d98f75575035ecd6481f462d66ca27/whisper/tokenizer.py#L224-L253
-        if (params.suppress_non_speech_tokens) {
+        if (params.suppress_nst) {
             for (const std::string & token : non_speech_tokens) {
                 const std::string suppress_tokens[] = {token, " " + token};
                 for (const std::string & suppress_token : suppress_tokens) {
@@ -4989,24 +5118,7 @@ static void whisper_process_logits(
         }
 
         // populate the logprobs array (log_softmax)
-        {
-            const float logit_max = *std::max_element(logits.begin(), logits.end());
-            float logsumexp = 0.0f;
-            for (int i = 0; i < n_logits; ++i) {
-                if (logits[i] > -INFINITY) {
-                    logsumexp += expf(logits[i] - logit_max);
-                }
-            }
-            logsumexp = logf(logsumexp) + logit_max;
-
-            for (int i = 0; i < n_logits; ++i) {
-                if (logits[i] > -INFINITY) {
-                    logprobs[i] = logits[i] - logsumexp;
-                } else {
-                    logprobs[i] = -INFINITY;
-                }
-            }
-        }
+        whisper_compute_logprobs(logits, n_logits, logprobs);
 
         // if sum of probability over timestamps is above any other token, sample timestamp
         // ref: https://github.com/openai/whisper/blob/0b1ba3d46ebf7fe6f953acfd8cad62a4f851b49f/whisper/decoding.py#L431-L437
@@ -5064,15 +5176,7 @@ static void whisper_process_logits(
     }
 
     // compute probs
-    {
-        for (int i = 0; i < n_logits; ++i) {
-            if (logits[i] == -INFINITY) {
-                probs[i] = 0.0f;
-            } else {
-                probs[i] = expf(logprobs[i]);
-            }
-        }
-    }
+    whisper_compute_probs(logits, n_logits, logprobs, probs);
 
 #if 0
     // print first 100 logits - token string : logit
@@ -5651,6 +5755,18 @@ int whisper_full_with_state(
                     return -8;
                 }
 
+                // Calculate no_speech probability after first decode.
+                // This has to be done before any logit filtering. Hence we cannot use the probs from the whisper_process_logits.
+                {
+                    const int n_logits = ctx->vocab.id_to_token.size();
+                    std::vector<float> logprobs(n_logits);
+                    std::vector<float> probs(n_logits);
+
+                    whisper_compute_logprobs(state->logits, n_logits, logprobs);
+                    whisper_compute_probs(state->logits, n_logits, logprobs, probs);
+                    state->no_speech_prob = probs[whisper_token_nosp(ctx)];
+                }
+
                 {
                     const int64_t t_start_sample_us = wsp_ggml_time_us();
 
@@ -6042,8 +6158,9 @@ int whisper_full_with_state(
             if (it != (int) temperatures.size() - 1) {
                 const auto & decoder = state->decoders[best_decoder_id];
 
-                if (decoder.failed || decoder.sequence.avg_logprobs < params.logprob_thold) {
-                    WHISPER_LOG_DEBUG("%s: failed due to avg_logprobs %8.5f < %8.5f\n", __func__, decoder.sequence.avg_logprobs, params.logprob_thold);
+                if (decoder.failed ||
+                    (decoder.sequence.avg_logprobs < params.logprob_thold && state->no_speech_prob < params.no_speech_thold)) {
+                    WHISPER_LOG_DEBUG("%s: failed due to avg_logprobs %8.5f < %8.5f and no_speech_prob %8.5f < %8.5f\n", __func__, decoder.sequence.avg_logprobs, params.logprob_thold, state->no_speech_prob, params.no_speech_thold);
                     success = false;
                     state->n_fail_p++;
                 }
@@ -6064,13 +6181,16 @@ int whisper_full_with_state(
         {
             const auto & best_decoder = state->decoders[best_decoder_id];
 
-            const auto seek_delta = best_decoder.seek_delta;
+            auto seek_delta = best_decoder.seek_delta;
             const auto result_len = best_decoder.sequence.result_len;
 
             const auto & tokens_cur = best_decoder.sequence.tokens;
 
             // [EXPERIMENTAL] Token-level timestamps with DTW
             const auto n_segments_before = state->result_all.size();
+
+            const bool is_no_speech = (state->no_speech_prob > params.no_speech_thold &&
+                best_decoder.sequence.avg_logprobs < params.logprob_thold);
 
             //WHISPER_LOG_DEBUG("prompt_init.size() = %d, prompt.size() = %d, result_len = %d, seek_delta = %d\n", prompt_init.size(), prompt.size(), result_len, seek_delta);
 
@@ -6080,11 +6200,11 @@ int whisper_full_with_state(
                 prompt_past.insert(prompt_past.end(), prompt.begin() + 1, prompt.end() - prompt_init.size());
             }
 
-            for (int i = 0; i < result_len; ++i) {
+            for (int i = 0; i < result_len && !is_no_speech; ++i) {
                 prompt_past.push_back(tokens_cur[i].id);
             }
 
-            if (!tokens_cur.empty() && ctx->model.n_loaded > 0) {
+            if (!tokens_cur.empty() && ctx->model.n_loaded > 0 && !is_no_speech) {
                 int  i0 = 0;
                 auto t0 = seek + 2*(tokens_cur.front().tid - whisper_token_beg(ctx));
 
@@ -6123,7 +6243,7 @@ int whisper_full_with_state(
 
                             //printf("tt0 = %d, tt1 = %d, text = %s, token = %s, token_id = %d, tid = %d\n", tt0, tt1, text.c_str(), ctx->vocab.id_to_token[tokens_cur[i].id].c_str(), tokens_cur[i].id, tokens_cur[i].tid);
 
-                            result_all.push_back({ tt0, tt1, text, {}, speaker_turn_next });
+                            result_all.push_back({ tt0, tt1, text, state->no_speech_prob, {}, speaker_turn_next });
                             for (int j = i0; j <= i; j++) {
                                 result_all.back().tokens.push_back(tokens_cur[j]);
                             }
@@ -6168,7 +6288,7 @@ int whisper_full_with_state(
                         }
                     }
 
-                    result_all.push_back({ tt0, tt1, text, {} , speaker_turn_next });
+                    result_all.push_back({ tt0, tt1, text, state->no_speech_prob, {}, speaker_turn_next });
                     for (int j = i0; j < (int) tokens_cur.size(); j++) {
                         result_all.back().tokens.push_back(tokens_cur[j]);
                     }
@@ -6203,6 +6323,15 @@ int whisper_full_with_state(
                         }
                     }
                 }
+            }
+
+            // ref: https://github.com/ggerganov/whisper.cpp/pull/2629
+            const bool single_timestamp_ending = tokens_cur.size() > 1 &&
+                tokens_cur[tokens_cur.size() - 2].id < whisper_token_beg(ctx) &&
+                tokens_cur[tokens_cur.size() - 1].id > whisper_token_beg(ctx);
+            if (single_timestamp_ending) {
+                WHISPER_LOG_DEBUG("single timestamp ending - skip entire chunk\n");
+                seek_delta = std::min(seek_end - seek, WHISPER_CHUNK_SIZE * 100);
             }
 
             // update audio window
@@ -6426,6 +6555,14 @@ float whisper_full_get_token_p(struct whisper_context * ctx, int i_segment, int 
     return ctx->state->result_all[i_segment].tokens[i_token].p;
 }
 
+float whisper_full_get_segment_no_speech_prob(struct whisper_context * ctx, int i_segment) {
+    return ctx->state->result_all[i_segment].no_speech_prob;
+}
+
+float whisper_full_get_segment_no_speech_prob_from_state(struct whisper_state * state, int i_segment) {
+    return state->result_all[i_segment].no_speech_prob;
+}
+
 // =================================================================================================
 
 //
@@ -6587,6 +6724,8 @@ WHISPER_API int whisper_bench_wsp_ggml_mul_mat(int n_threads) {
 }
 
 WHISPER_API const char * whisper_bench_wsp_ggml_mul_mat_str(int n_threads) {
+    whisper_load_backends();
+
     static std::string s;
     s = "";
     char strbuf[256];
@@ -6606,7 +6745,6 @@ WHISPER_API const char * whisper_bench_wsp_ggml_mul_mat_str(int n_threads) {
     // c: N*N*sizeof(float)
     // when F16 is used, there is an extra work buffer of size N*N*sizeof(float)
     std::vector<uint8_t> buf(3llu*N_max*N_max*sizeof(float) + 3*wsp_ggml_tensor_overhead() + wsp_ggml_graph_overhead());
-    std::vector<uint8_t> work;
 
     // put a bunch of random data in the buffer
     for (size_t i = 0; i < buf.size(); i++) buf[i] = i;
@@ -6663,12 +6801,12 @@ WHISPER_API const char * whisper_bench_wsp_ggml_mul_mat_str(int n_threads) {
             double tsum = 0.0;
 
             // heat-up
-            wsp_ggml_graph_compute_helper(gf, work, n_threads, nullptr, nullptr);
+            wsp_ggml_graph_compute_helper(gf, n_threads, nullptr, nullptr);
 
             for (int i = 0; i < n_max; ++i) {
                 const int64_t t0 = wsp_ggml_time_us();
 
-                wsp_ggml_graph_compute_helper(gf, work, n_threads, nullptr, nullptr);
+                wsp_ggml_graph_compute_helper(gf, n_threads, nullptr, nullptr);
 
                 const int64_t t1 = wsp_ggml_time_us();
 
@@ -7045,18 +7183,18 @@ static wsp_ggml_tensor * dtw_and_backtrace(wsp_ggml_context * ctx, wsp_ggml_tens
     struct wsp_ggml_tensor * cost = wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_F32, N + 1, M + 1);
     struct wsp_ggml_tensor * trace = wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_I32, N + 1, M + 1);
 
-    cost = wsp_ggml_set_f32(cost, INFINITY);
-    trace = wsp_ggml_set_f32(trace, -1);
-    wsp_ggml_set_f32_nd(cost, 0, 0, 0, 0, 0.0);
+    cost = whisper_set_f32(cost, INFINITY);
+    trace = whisper_set_i32(trace, -1);
+    whisper_set_f32_nd(cost, 0, 0, 0, 0, 0.0);
 
     // dtw
     // supposedly can be optmized by computing diagonals in parallel ?
     // Not sure it is worth it since x will be GENERATED_TOKENS*1500 size at most.
     for (int64_t j = 1; j < M + 1; ++j) {
         for (int64_t i = 1; i < N + 1; ++i) {
-            float c0 = wsp_ggml_get_f32_nd(cost, i - 1, j - 1, 0, 0);
-            float c1 = wsp_ggml_get_f32_nd(cost, i - 1, j, 0, 0);
-            float c2 = wsp_ggml_get_f32_nd(cost, i, j - 1, 0, 0);
+            float c0 = whisper_get_f32_nd(cost, i - 1, j - 1, 0, 0);
+            float c1 = whisper_get_f32_nd(cost, i - 1, j, 0, 0);
+            float c2 = whisper_get_f32_nd(cost, i, j - 1, 0, 0);
 
             float c;
             int32_t t;
@@ -7071,9 +7209,9 @@ static wsp_ggml_tensor * dtw_and_backtrace(wsp_ggml_context * ctx, wsp_ggml_tens
                 t = 2;
             }
 
-            c = wsp_ggml_get_f32_nd(x, i - 1, j - 1, 0, 0) + c;
-            wsp_ggml_set_f32_nd(cost, i, j, 0, 0, c);
-            wsp_ggml_set_i32_nd(trace, i, j, 0, 0, t);
+            c = whisper_get_f32_nd(x, i - 1, j - 1, 0, 0) + c;
+            whisper_set_f32_nd(cost, i, j, 0, 0, c);
+            whisper_set_i32_nd(trace, i, j, 0, 0, t);
         }
     }
 
@@ -7082,19 +7220,19 @@ static wsp_ggml_tensor * dtw_and_backtrace(wsp_ggml_context * ctx, wsp_ggml_tens
     struct wsp_ggml_tensor * bt = wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_I32, BT_MAX_ROWS, 2);
     // trace[0, :] = 2;
     for (int64_t i = 0; i < M + 1; ++i)
-        wsp_ggml_set_i32_nd(trace, 0, i, 0, 0, 2);
+        whisper_set_i32_nd(trace, 0, i, 0, 0, 2);
     //trace[:, 0] = 1;
     for (int64_t i = 0; i < N + 1; ++i)
-        wsp_ggml_set_i32_nd(trace, i, 0, 0, 0, 1);
+        whisper_set_i32_nd(trace, i, 0, 0, 0, 1);
     int bt_row_idx = BT_MAX_ROWS - 1;
     int64_t i = N;
     int64_t j = M;
     while (i > 0 || j > 0) {
-        wsp_ggml_set_i32_nd(bt, bt_row_idx, 0, 0, 0, i - 1);
-        wsp_ggml_set_i32_nd(bt, bt_row_idx, 1, 0, 0, j - 1);
+        whisper_set_i32_nd(bt, bt_row_idx, 0, 0, 0, i - 1);
+        whisper_set_i32_nd(bt, bt_row_idx, 1, 0, 0, j - 1);
         --bt_row_idx;
 
-        int32_t t = wsp_ggml_get_i32_nd(trace, i, j, 0, 0);
+        int32_t t = whisper_get_i32_nd(trace, i, j, 0, 0);
         if (t == 0) {
             --i;
             --j;
@@ -7115,8 +7253,8 @@ static wsp_ggml_tensor * dtw_and_backtrace(wsp_ggml_context * ctx, wsp_ggml_tens
     wsp_ggml_tensor * r = wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_I32, 2, result_n_cols);
     for (int64_t i = 0; i < 2; ++i) {
         for (int64_t j = 0; j < result_n_cols; ++j) {
-            int32_t v = wsp_ggml_get_i32_nd(bt, j+bt_row_idx+1, i, 0, 0);
-            wsp_ggml_set_i32_nd(r, i, j, 0, 0, v);
+            int32_t v = whisper_get_i32_nd(bt, j+bt_row_idx+1, i, 0, 0);
+            whisper_set_i32_nd(r, i, j, 0, 0, v);
         }
     }
 
@@ -7151,11 +7289,11 @@ static void median_filter(struct wsp_ggml_tensor * dst , const struct wsp_ggml_t
                         idx = 2*(a->ne[2] - 1) - idx;
                     }
 
-                    filter.push_back(wsp_ggml_get_f32_nd(a, i, j, idx, 0));
+                    filter.push_back(whisper_get_f32_nd(a, i, j, idx, 0));
                 }
                 std::sort(filter.begin(), filter.end());
                 const float v = filter[filter.size()/2];
-                wsp_ggml_set_f32_nd(dst, i, j, k, 0, v);
+                whisper_set_f32_nd(dst, i, j, k, 0, v);
                 filter.clear();
             }
         }
@@ -7277,7 +7415,9 @@ static void whisper_exp_compute_token_level_timestamps_dtw(
     // Compute
     struct wsp_ggml_cgraph * gf = wsp_ggml_new_graph(gctx);
     wsp_ggml_build_forward_expand(gf, w);
-    wsp_ggml_graph_compute_with_ctx(gctx, gf, n_threads);
+
+    wsp_ggml_backend_ptr backend { wsp_ggml_backend_init_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU, nullptr) };
+    wsp_ggml_backend_graph_compute(backend.get(), gf);
 
     wsp_ggml_tensor * alignment = dtw_and_backtrace(gctx, w);
 
@@ -7286,9 +7426,9 @@ static void whisper_exp_compute_token_level_timestamps_dtw(
     auto seg_i = state->result_all.begin() + i_segment;
     auto tok_i = seg_i->tokens.begin();
     for (int i = 0; i < alignment->ne[1]; ++i) {
-        int32_t v = wsp_ggml_get_i32_nd(alignment, 0, i, 0, 0);
+        int32_t v = whisper_get_i32_nd(alignment, 0, i, 0, 0);
         if (v != last_v) {
-            int32_t time_index = wsp_ggml_get_i32_nd(alignment, 1, i, 0, 0);
+            int32_t time_index = whisper_get_i32_nd(alignment, 1, i, 0, 0);
             int64_t timestamp = (time_index * 2) + seek; // Each index on DTW result = 20mS audio
             last_v = v;
 
