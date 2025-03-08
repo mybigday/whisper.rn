@@ -45,7 +45,7 @@ WSP_GGML_BACKEND_API bool wsp_ggml_backend_is_metal(wsp_ggml_backend_t backend);
 
 WSP_GGML_DEPRECATED(
         WSP_GGML_BACKEND_API wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_from_ptr(void * data, size_t size, size_t max_size),
-        "obsoleted by the new device interface - https://github.com/ggerganov/llama.cpp/pull/9713");
+        "obsoleted by the new device interface - https://github.com/ggml-org/llama.cpp/pull/9713");
 
 WSP_GGML_BACKEND_API void wsp_ggml_backend_metal_set_abort_callback(wsp_ggml_backend_t backend, wsp_ggml_abort_callback abort_callback, void * user_data);
 

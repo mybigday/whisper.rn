@@ -7,31 +7,8 @@
 extern "C" {
 #endif
 
-    // Scheduling priorities
-    enum wsp_ggml_sched_priority {
-        WSP_GGML_SCHED_PRIO_NORMAL,
-        WSP_GGML_SCHED_PRIO_MEDIUM,
-        WSP_GGML_SCHED_PRIO_HIGH,
-        WSP_GGML_SCHED_PRIO_REALTIME
-    };
-
-    // Threadpool params
-    // Use wsp_ggml_threadpool_params_default() or wsp_ggml_threadpool_params_init() to populate the defaults
-    struct wsp_ggml_threadpool_params {
-        bool                cpumask[WSP_GGML_MAX_N_THREADS]; // mask of cpu cores (all-zeros means use default affinity settings)
-        int                 n_threads;                   // number of threads
-        enum wsp_ggml_sched_priority prio;                   // thread priority
-        uint32_t            poll;                        // polling level (0 - no polling, 100 - aggressive polling)
-        bool                strict_cpu;                  // strict cpu placement
-        bool                paused;                      // start in paused state
-    };
-
-    struct wsp_ggml_threadpool;     // forward declaration, see ggml.c
-
-    typedef struct wsp_ggml_threadpool * wsp_ggml_threadpool_t;
-
     // the compute plan that needs to be prepared for wsp_ggml_graph_compute()
-    // since https://github.com/ggerganov/ggml/issues/287
+    // since https://github.com/ggml-org/ggml/issues/287
     struct wsp_ggml_cplan {
         size_t    work_size; // size of work buffer, calculated by `wsp_ggml_graph_plan()`
         uint8_t * work_data; // work buffer, to be allocated by caller before calling to `wsp_ggml_graph_compute()`
@@ -75,14 +52,11 @@ extern "C" {
     WSP_GGML_BACKEND_API float   wsp_ggml_get_f32_nd(const struct wsp_ggml_tensor * tensor, int i0, int i1, int i2, int i3);
     WSP_GGML_BACKEND_API void    wsp_ggml_set_f32_nd(const struct wsp_ggml_tensor * tensor, int i0, int i1, int i2, int i3, float value);
 
-    WSP_GGML_BACKEND_API struct wsp_ggml_threadpool_params wsp_ggml_threadpool_params_default(int n_threads);
-    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_params_init   (struct wsp_ggml_threadpool_params * p, int n_threads);
-    WSP_GGML_BACKEND_API bool                          wsp_ggml_threadpool_params_match  (const struct wsp_ggml_threadpool_params * p0, const struct wsp_ggml_threadpool_params * p1);
-    WSP_GGML_BACKEND_API struct wsp_ggml_threadpool *      wsp_ggml_threadpool_new          (struct wsp_ggml_threadpool_params  * params);
-    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_free         (struct wsp_ggml_threadpool * threadpool);
-    WSP_GGML_BACKEND_API int                           wsp_ggml_threadpool_get_n_threads(struct wsp_ggml_threadpool * threadpool);
-    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_pause        (struct wsp_ggml_threadpool * threadpool);
-    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_resume       (struct wsp_ggml_threadpool * threadpool);
+    WSP_GGML_BACKEND_API struct wsp_ggml_threadpool *      wsp_ggml_threadpool_new           (struct wsp_ggml_threadpool_params  * params);
+    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_free          (struct wsp_ggml_threadpool * threadpool);
+    WSP_GGML_BACKEND_API int                           wsp_ggml_threadpool_get_n_threads (struct wsp_ggml_threadpool * threadpool);
+    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_pause         (struct wsp_ggml_threadpool * threadpool);
+    WSP_GGML_BACKEND_API void                          wsp_ggml_threadpool_resume        (struct wsp_ggml_threadpool * threadpool);
 
     // wsp_ggml_graph_plan() has to be called before wsp_ggml_graph_compute()
     // when plan.work_size > 0, caller must allocate memory for plan.work_data
@@ -104,10 +78,10 @@ extern "C" {
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_sse3       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_ssse3      (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx        (void);
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx_vnni   (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx2       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_f16c       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_fma        (void);
-    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx_vnni   (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx512     (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx512_vbmi(void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx512_vnni(void);
@@ -117,35 +91,28 @@ extern "C" {
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_neon       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_arm_fma    (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_fp16_va    (void);
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_dotprod    (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_matmul_int8(void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_sve        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_get_sve_cnt    (void);  // sve vector length in bytes
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_sme        (void);
     // other
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_riscv_v    (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_vsx        (void);
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_vxe        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_wasm_simd  (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_llamafile  (void);
 
     // Internal types and functions exposed for tests and benchmarks
 
-    typedef void (*wsp_ggml_from_float_to_mat_t)
-                                     (const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t nr, int64_t k, int64_t bs);
     typedef void (*wsp_ggml_vec_dot_t)  (int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT x, size_t bx,
                                        const void * WSP_GGML_RESTRICT y, size_t by, int nrc);
-    typedef void (*wsp_ggml_gemv_t)     (int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT x,
-                                       const void * WSP_GGML_RESTRICT y, int nr, int nc);
-    typedef void (*wsp_ggml_gemm_t)     (int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT x,
-                                       const void * WSP_GGML_RESTRICT y, int nr, int nc);
 
     struct wsp_ggml_type_traits_cpu {
         wsp_ggml_from_float_t        from_float;
-        wsp_ggml_from_float_to_mat_t from_float_to_mat;
         wsp_ggml_vec_dot_t           vec_dot;
         enum wsp_ggml_type           vec_dot_type;
         int64_t                  nrows; // number of rows to process simultaneously
-        int64_t                  ncols; // number of columns to process simultaneously
-        wsp_ggml_gemv_t              gemv;
-        wsp_ggml_gemm_t              gemm;
     };
 
     WSP_GGML_BACKEND_API const struct wsp_ggml_type_traits_cpu * wsp_ggml_get_type_traits_cpu(enum wsp_ggml_type type);
@@ -164,13 +131,6 @@ extern "C" {
     WSP_GGML_BACKEND_API void wsp_ggml_backend_cpu_set_abort_callback(wsp_ggml_backend_t backend_cpu, wsp_ggml_abort_callback abort_callback, void * abort_callback_data);
 
     WSP_GGML_BACKEND_API wsp_ggml_backend_reg_t wsp_ggml_backend_cpu_reg(void);
-
-#ifdef WSP_GGML_USE_CPU_HBM
-    WSP_GGML_BACKEND_API wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_hbm_buffer_type(void);
-#endif
-
-    WSP_GGML_BACKEND_API wsp_ggml_backend_buffer_type_t wsp_ggml_backend_cpu_aarch64_buffer_type(void);
-    WSP_GGML_BACKEND_API bool wsp_ggml_backend_cpu_buft_is_aarch64(wsp_ggml_backend_buffer_type_t buft);
 
 #ifdef __cplusplus
 }

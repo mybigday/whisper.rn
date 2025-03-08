@@ -190,10 +190,20 @@ extern "C" {
     typedef void                         (*wsp_ggml_backend_set_n_threads_t)(wsp_ggml_backend_t backend, int n_threads);
     // Get additional buffer types provided by the device (returns a NULL-terminated array)
     typedef wsp_ggml_backend_buffer_type_t * (*wsp_ggml_backend_dev_get_extra_bufts_t)(wsp_ggml_backend_dev_t device);
+    // Set the abort callback for the backend
+    typedef void                         (*wsp_ggml_backend_set_abort_callback_t)(wsp_ggml_backend_t backend, wsp_ggml_abort_callback abort_callback, void * abort_callback_data);
+    // Get a list of feature flags supported by the backend (returns a NULL-terminated array)
+    struct wsp_ggml_backend_feature {
+        const char * name;
+        const char * value;
+    };
+    typedef struct wsp_ggml_backend_feature * (*wsp_ggml_backend_get_features_t)(wsp_ggml_backend_reg_t reg);
 
     //
     // Backend registry
     //
+
+    WSP_GGML_API void wsp_ggml_backend_device_register(wsp_ggml_backend_dev_t device);
 
     // Backend (reg) enumeration
     WSP_GGML_API size_t             wsp_ggml_backend_reg_count(void);
@@ -213,6 +223,14 @@ extern "C" {
     WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_init_by_type(enum wsp_ggml_backend_dev_type type, const char * params);
     // = wsp_ggml_backend_dev_init(wsp_ggml_backend_dev_by_type(GPU) OR wsp_ggml_backend_dev_by_type(CPU), NULL)
     WSP_GGML_API wsp_ggml_backend_t wsp_ggml_backend_init_best(void);
+
+    // Load a backend from a dynamic library and register it
+    WSP_GGML_API wsp_ggml_backend_reg_t wsp_ggml_backend_load(const char * path);
+    // Unload a backend if loaded dynamically and unregister it
+    WSP_GGML_API void               wsp_ggml_backend_unload(wsp_ggml_backend_reg_t reg);
+    // Load all known backends from dynamic libraries
+    WSP_GGML_API void               wsp_ggml_backend_load_all(void);
+    WSP_GGML_API void               wsp_ggml_backend_load_all_from_path(const char * dir_path);
 
     //
     // Backend scheduler

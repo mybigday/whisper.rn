@@ -3,6 +3,8 @@
 // GGML internal header
 
 #include "ggml.h"
+#include "gguf.h"
+
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h> // load `stdlib.h` before other headers to work around MinGW bug: https://sourceforge.net/p/mingw-w64/bugs/192/
@@ -14,7 +16,7 @@
 #include <arm_sve.h>
 #endif // __ARM_FEATURE_SVE
 
-#if defined(__ARM_NEON)
+#if defined(__ARM_NEON) && !defined(__CUDACC__) && !defined(__MUSACC__)
 // if YCM cannot find <arm_neon.h>, make a symbolic link to it, for example:
 //
 //   $ ln -sfn /Library/Developer/CommandLineTools/usr/lib/clang/13.1.6/include/arm_neon.h ./src/
@@ -30,11 +32,13 @@
 extern "C" {
 #endif
 
-#undef MIN
-#undef MAX
+#ifndef MIN
+#    define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#ifndef MAX
+#    define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
 // required for mmap as gguf only guarantees 32-byte alignment
 #define TENSOR_ALIGNMENT 32
@@ -72,8 +76,8 @@ static inline int wsp_ggml_up(int n, int m) {
 //
 
 WSP_GGML_ATTRIBUTE_FORMAT(2, 3)
-void wsp_ggml_log_internal        (enum wsp_ggml_log_level level, const char * format, ...);
-void wsp_ggml_log_callback_default(enum wsp_ggml_log_level level, const char * text, void * user_data);
+WSP_GGML_API void wsp_ggml_log_internal        (enum wsp_ggml_log_level level, const char * format, ...);
+WSP_GGML_API void wsp_ggml_log_callback_default(enum wsp_ggml_log_level level, const char * text, void * user_data);
 
 #define WSP_GGML_LOG(...)       wsp_ggml_log_internal(WSP_GGML_LOG_LEVEL_NONE , __VA_ARGS__)
 #define WSP_GGML_LOG_INFO(...)  wsp_ggml_log_internal(WSP_GGML_LOG_LEVEL_INFO , __VA_ARGS__)
@@ -295,24 +299,27 @@ struct wsp_ggml_cgraph {
     enum wsp_ggml_cgraph_eval_order order;
 };
 
+// returns a slice of cgraph with nodes [i0, i1)
+// the slice does not have leafs or gradients
+// if you need the gradients, get them from the original graph
 struct wsp_ggml_cgraph wsp_ggml_graph_view(struct wsp_ggml_cgraph * cgraph, int i0, int i1);
 
 // Memory allocation
 
-void * wsp_ggml_aligned_malloc(size_t size);
-void wsp_ggml_aligned_free(void * ptr, size_t size);
+WSP_GGML_API void * wsp_ggml_aligned_malloc(size_t size);
+WSP_GGML_API void wsp_ggml_aligned_free(void * ptr, size_t size);
 
 // FP16 to FP32 conversion
 
 #if defined(__ARM_NEON)
-    #ifdef _MSC_VER
+    #if defined(_MSC_VER) || (defined(__CUDACC__) && __CUDACC_VER_MAJOR__ <= 11)
         typedef uint16_t wsp_ggml_fp16_internal_t;
     #else
         typedef __fp16 wsp_ggml_fp16_internal_t;
     #endif
 #endif
 
-#if defined(__ARM_NEON) && !defined(_MSC_VER)
+#if defined(__ARM_NEON) && !defined(_MSC_VER) && !(defined(__CUDACC__) && __CUDACC_VER_MAJOR__ <= 11)
     #define WSP_GGML_COMPUTE_FP16_TO_FP32(x) wsp_ggml_compute_fp16_to_fp32(x)
     #define WSP_GGML_COMPUTE_FP32_TO_FP16(x) wsp_ggml_compute_fp32_to_fp16(x)
 
@@ -549,3 +556,12 @@ static inline wsp_ggml_bf16_t wsp_ggml_compute_fp32_to_bf16(float s) {
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+#include <vector>
+
+// expose GGUF internals for test code
+WSP_GGML_API size_t wsp_gguf_type_size(enum wsp_gguf_type type);
+WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_gguf_init_params params);
+WSP_GGML_API void wsp_gguf_write_to_buf(const struct wsp_gguf_context * ctx, std::vector<int8_t> & buf, bool only_meta);
+#endif // __cplusplus
