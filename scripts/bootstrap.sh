@@ -113,6 +113,21 @@ for file in "${files[@]}"; do
   fi
 done
 
+files_f32_add_wsp_prefix=(
+  "./cpp/ggml-impl.h"
+)
+
+for file in "${files_f32_add_wsp_prefix[@]}"; do
+  # Add prefix to avoid redefinition with other libraries using ggml like llama.rn
+  if [ "$OS" = "Darwin" ]; then
+    sed -i '' 's/fp32_from_bits/wsp_fp32_from_bits/g' $file
+    sed -i '' 's/fp32_to_bits/wsp_fp32_to_bits/g' $file
+  else
+    sed -i 's/fp32_from_bits/wsp_fp32_from_bits/g' $file
+    sed -i 's/fp32_to_bits/wsp_fp32_to_bits/g' $file
+  fi
+done
+
 echo "Replacement completed successfully!"
 
 # Parse whisper.cpp/bindings/javascript/package.json version and set to src/version.json

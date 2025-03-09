@@ -386,7 +386,7 @@ WSP_GGML_API void wsp_ggml_aligned_free(void * ptr, size_t size);
     // FP16 <-> FP32
     // ref: https://github.com/Maratyszcza/FP16
 
-    static inline float fp32_from_bits(uint32_t w) {
+    static inline float wsp_fp32_from_bits(uint32_t w) {
         union {
             uint32_t as_bits;
             float as_value;
@@ -395,7 +395,7 @@ WSP_GGML_API void wsp_ggml_aligned_free(void * ptr, size_t size);
         return fp32.as_value;
     }
 
-    static inline uint32_t fp32_to_bits(float f) {
+    static inline uint32_t wsp_fp32_to_bits(float f) {
         union {
             float as_value;
             uint32_t as_bits;
@@ -413,18 +413,18 @@ WSP_GGML_API void wsp_ggml_aligned_free(void * ptr, size_t size);
     #if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) || defined(__GNUC__) && !defined(__STRICT_ANSI__)) && (!defined(__cplusplus) || __cplusplus >= 201703L)
         const float exp_scale = 0x1.0p-112f;
     #else
-        const float exp_scale = fp32_from_bits(UINT32_C(0x7800000));
+        const float exp_scale = wsp_fp32_from_bits(UINT32_C(0x7800000));
     #endif
-        const float normalized_value = fp32_from_bits((two_w >> 4) + exp_offset) * exp_scale;
+        const float normalized_value = wsp_fp32_from_bits((two_w >> 4) + exp_offset) * exp_scale;
 
         const uint32_t magic_mask = UINT32_C(126) << 23;
         const float magic_bias = 0.5f;
-        const float denormalized_value = fp32_from_bits((two_w >> 17) | magic_mask) - magic_bias;
+        const float denormalized_value = wsp_fp32_from_bits((two_w >> 17) | magic_mask) - magic_bias;
 
         const uint32_t denormalized_cutoff = UINT32_C(1) << 27;
         const uint32_t result = sign |
-            (two_w < denormalized_cutoff ? fp32_to_bits(denormalized_value) : fp32_to_bits(normalized_value));
-        return fp32_from_bits(result);
+            (two_w < denormalized_cutoff ? wsp_fp32_to_bits(denormalized_value) : wsp_fp32_to_bits(normalized_value));
+        return wsp_fp32_from_bits(result);
     }
 
     static inline wsp_ggml_fp16_t wsp_ggml_compute_fp32_to_fp16(float f) {
@@ -432,12 +432,12 @@ WSP_GGML_API void wsp_ggml_aligned_free(void * ptr, size_t size);
         const float scale_to_inf = 0x1.0p+112f;
         const float scale_to_zero = 0x1.0p-110f;
     #else
-        const float scale_to_inf = fp32_from_bits(UINT32_C(0x77800000));
-        const float scale_to_zero = fp32_from_bits(UINT32_C(0x08800000));
+        const float scale_to_inf = wsp_fp32_from_bits(UINT32_C(0x77800000));
+        const float scale_to_zero = wsp_fp32_from_bits(UINT32_C(0x08800000));
     #endif
         float base = (fabsf(f) * scale_to_inf) * scale_to_zero;
 
-        const uint32_t w = fp32_to_bits(f);
+        const uint32_t w = wsp_fp32_to_bits(f);
         const uint32_t shl1_w = w + w;
         const uint32_t sign = w & UINT32_C(0x80000000);
         uint32_t bias = shl1_w & UINT32_C(0xFF000000);
@@ -445,8 +445,8 @@ WSP_GGML_API void wsp_ggml_aligned_free(void * ptr, size_t size);
             bias = UINT32_C(0x71000000);
         }
 
-        base = fp32_from_bits((bias >> 1) + UINT32_C(0x07800000)) + base;
-        const uint32_t bits = fp32_to_bits(base);
+        base = wsp_fp32_from_bits((bias >> 1) + UINT32_C(0x07800000)) + base;
+        const uint32_t bits = wsp_fp32_to_bits(base);
         const uint32_t exp_bits = (bits >> 13) & UINT32_C(0x00007C00);
         const uint32_t mantissa_bits = bits & UINT32_C(0x00000FFF);
         const uint32_t nonsign = exp_bits + mantissa_bits;
