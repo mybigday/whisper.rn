@@ -432,6 +432,7 @@ struct rnwhisper_segments_callback_data {
         self->recordState.job = job;
         int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
         rnwhisper::job_remove(jobId);
+        self->recordState.job = nullptr;
         self->recordState.isTranscribing = false;
         onEnd(code);
     });
@@ -446,7 +447,7 @@ struct rnwhisper_segments_callback_data {
 }
 
 - (void)stopTranscribe:(int)jobId {
-    if (self->recordState.job) self->recordState.job->abort();
+    if (self->recordState.job != nullptr) self->recordState.job->abort();
     if (self->recordState.isRealtime && self->recordState.isCapturing) {
         [self stopAudio];
         if (!self->recordState.isTranscribing) {
