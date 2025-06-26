@@ -37,13 +37,16 @@ extern "C" {
     // ====== Dataset ======
 
     WSP_GGML_API wsp_ggml_opt_dataset_t wsp_ggml_opt_dataset_init(
-            int64_t ne_datapoint, // number of elements per datapoint
-            int64_t ne_label,     // number of elements per label
-            int64_t ndata,        // total number of datapoints/labels
-            int64_t ndata_shard); // number of datapoints/labels per shard (unit at which the dataset is shuffled/copied)
+            enum wsp_ggml_type type_data,    // the type for the internal data tensor
+            enum wsp_ggml_type type_label,   // the type for the internal labels tensor
+            int64_t        ne_datapoint, // number of elements per datapoint
+            int64_t        ne_label,     // number of elements per label
+            int64_t        ndata,        // total number of datapoints/labels
+            int64_t        ndata_shard); // number of datapoints/labels per shard (unit at which the dataset is shuffled/copied)
     WSP_GGML_API void wsp_ggml_opt_dataset_free(wsp_ggml_opt_dataset_t dataset);
 
     // get underlying tensors that store the data
+    WSP_GGML_API int64_t              wsp_ggml_opt_dataset_ndata (wsp_ggml_opt_dataset_t dataset);
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_dataset_data  (wsp_ggml_opt_dataset_t dataset); // shape = [ne_datapoint, ndata]
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_dataset_labels(wsp_ggml_opt_dataset_t dataset); // shape = [nd_label,     ndata]
 
@@ -56,13 +59,19 @@ extern "C" {
             struct wsp_ggml_tensor * data_batch,   // shape = [ne_datapoint, ndata_batch]
             struct wsp_ggml_tensor * labels_batch, // shape = [ne_label,     ndata_batch]
             int64_t              ibatch);
+    WSP_GGML_API void wsp_ggml_opt_dataset_get_batch_host(
+            wsp_ggml_opt_dataset_t   dataset,
+            void               * data_batch,
+            size_t               nb_data_batch,
+            void               * labels_batch,
+            int64_t              ibatch);
 
     // ====== Model / Context ======
 
     enum wsp_ggml_opt_build_type {
-        WSP_GGML_OPT_BUILD_TYPE_FORWARD,
-        WSP_GGML_OPT_BUILD_TYPE_GRAD,
-        WSP_GGML_OPT_BUILD_TYPE_OPT,
+        WSP_GGML_OPT_BUILD_TYPE_FORWARD = 10,
+        WSP_GGML_OPT_BUILD_TYPE_GRAD    = 20,
+        WSP_GGML_OPT_BUILD_TYPE_OPT     = 30,
     };
 
     // parameters that control which optimizer is used and how said optimizer tries to find the minimal loss
@@ -81,20 +90,22 @@ extern "C" {
     // userdata can be used to pass arbitrary data
     typedef struct wsp_ggml_opt_optimizer_params (*wsp_ggml_opt_get_optimizer_params)(void * userdata);
 
-    // returns the default optimizer params (constant)
+    // returns the default optimizer params (constant, hard-coded values)
     // userdata is not used
     WSP_GGML_API struct wsp_ggml_opt_optimizer_params wsp_ggml_opt_get_default_optimizer_params(void * userdata);
+
+    // casts userdata to wsp_ggml_opt_optimizer_params and returns it
+    WSP_GGML_API struct wsp_ggml_opt_optimizer_params wsp_ggml_opt_get_constant_optimizer_params(void * userdata);
 
     // parameters for initializing a new optimization context
     struct wsp_ggml_opt_params {
         wsp_ggml_backend_sched_t backend_sched; // defines which backends are used to construct the compute graphs
 
-        struct wsp_ggml_context * ctx_compute; // created in user code, holds non-static tensors
-
-        // the forward graph is defined by inputs and outputs
-        // those tensors and all tensors inbetween are not intended to be reusable between multiple optimization contexts
-        struct wsp_ggml_tensor * inputs;
-        struct wsp_ggml_tensor * outputs;
+        // by default the forward graph needs to be reconstructed for each eval
+        // if ctx_compute, inputs, and outputs are set the graphs are instead allocated statically
+        struct wsp_ggml_context * ctx_compute;
+        struct wsp_ggml_tensor  * inputs;
+        struct wsp_ggml_tensor  * outputs;
 
         enum wsp_ggml_opt_loss_type  loss_type;
         enum wsp_ggml_opt_build_type build_type;
@@ -107,12 +118,9 @@ extern "C" {
 
     // get parameters for an optimization context with defaults set where possible
     // parameters for which no sensible defaults exist are supplied as arguments to this function
-    WSP_GGML_API wsp_ggml_opt_params wsp_ggml_opt_default_params(
-            wsp_ggml_backend_sched_t      backend_sched,
-            struct wsp_ggml_context     * ctx_compute,
-            struct wsp_ggml_tensor      * inputs,
-            struct wsp_ggml_tensor      * outputs,
-            enum wsp_ggml_opt_loss_type   loss_type);
+    WSP_GGML_API struct wsp_ggml_opt_params wsp_ggml_opt_default_params(
+            wsp_ggml_backend_sched_t    backend_sched,
+            enum wsp_ggml_opt_loss_type loss_type);
 
     WSP_GGML_API wsp_ggml_opt_context_t wsp_ggml_opt_init(struct wsp_ggml_opt_params params);
     WSP_GGML_API void wsp_ggml_opt_free(wsp_ggml_opt_context_t opt_ctx);
@@ -120,7 +128,10 @@ extern "C" {
     // set gradients to zero, initilize loss, and optionally reset the optimizer
     WSP_GGML_API void wsp_ggml_opt_reset(wsp_ggml_opt_context_t opt_ctx, bool optimizer);
 
+    WSP_GGML_API bool wsp_ggml_opt_static_graphs(wsp_ggml_opt_context_t opt_ctx); // whether the graphs are allocated_statically
+
     // get underlying tensors that store data
+    // if not using static graphs these pointers become invalid with the next call to wsp_ggml_opt_alloc
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_inputs(  wsp_ggml_opt_context_t opt_ctx); // forward graph input tensor
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_outputs( wsp_ggml_opt_context_t opt_ctx); // forward graph output tensor
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_labels(  wsp_ggml_opt_context_t opt_ctx); // labels to compare outputs against
@@ -128,11 +139,12 @@ extern "C" {
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_pred(    wsp_ggml_opt_context_t opt_ctx); // predictions made by outputs
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_ncorrect(wsp_ggml_opt_context_t opt_ctx); // number of matching predictions between outputs and labels
 
+    // get the gradient accumulator for a node from the forward graph
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_grad_acc(wsp_ggml_opt_context_t opt_ctx, struct wsp_ggml_tensor * node);
 
     // ====== Optimization Result ======
 
-    WSP_GGML_API wsp_ggml_opt_result_t wsp_ggml_opt_result_init();
+    WSP_GGML_API wsp_ggml_opt_result_t wsp_ggml_opt_result_init(void);
     WSP_GGML_API void wsp_ggml_opt_result_free(wsp_ggml_opt_result_t result);
     WSP_GGML_API void wsp_ggml_opt_result_reset(wsp_ggml_opt_result_t result);
 
@@ -144,11 +156,20 @@ extern "C" {
 
     // ====== Computation ======
 
-    // do forward pass, increment result if not NULL
-    WSP_GGML_API void wsp_ggml_opt_forward(wsp_ggml_opt_context_t opt_ctx, wsp_ggml_opt_result_t result);
+    // if not using static graphs, this function must be called prior to wsp_ggml_opt_alloc
+    WSP_GGML_API void wsp_ggml_opt_prepare_alloc(
+        wsp_ggml_opt_context_t    opt_ctx,
+        struct wsp_ggml_context * ctx_compute,
+        struct wsp_ggml_cgraph  * gf,
+        struct wsp_ggml_tensor  * inputs,
+        struct wsp_ggml_tensor  * outputs);
 
-    // do forward pass, increment result if not NULL, do backward pass
-    WSP_GGML_API void wsp_ggml_opt_forward_backward(wsp_ggml_opt_context_t opt_ctx, wsp_ggml_opt_result_t result);
+    // allocate the next graph for evaluation, either forward or forward + backward
+    // must be called exactly once prior to calling wsp_ggml_opt_eval
+    WSP_GGML_API void wsp_ggml_opt_alloc(wsp_ggml_opt_context_t opt_ctx, bool backward);
+
+    // do forward pass, increment result if not NULL, do backward pass if allocated
+    WSP_GGML_API void wsp_ggml_opt_eval(wsp_ggml_opt_context_t opt_ctx, wsp_ggml_opt_result_t result);
 
     // ############################################################################
     // ## The high-level functions start here. They do not depend on any private ##
@@ -200,9 +221,9 @@ extern "C" {
     // fit model defined by inputs and outputs to dataset
     WSP_GGML_API void wsp_ggml_opt_fit(
             wsp_ggml_backend_sched_t            backend_sched,  // backend scheduler for constructing the compute graphs
-            wsp_ggml_context                  * ctx_compute,    // context with temporarily allocated tensors to calculate the outputs
-            wsp_ggml_tensor                   * inputs,         // input tensor with shape [ne_datapoint, ndata_batch]
-            wsp_ggml_tensor                   * outputs,        // output tensor, must have shape [ne_label, ndata_batch] if labels are used
+            struct wsp_ggml_context           * ctx_compute,    // context with temporarily allocated tensors to calculate the outputs
+            struct wsp_ggml_tensor            * inputs,         // input tensor with shape [ne_datapoint, ndata_batch]
+            struct wsp_ggml_tensor            * outputs,        // output tensor, must have shape [ne_label, ndata_batch] if labels are used
             wsp_ggml_opt_dataset_t              dataset,        // dataset with data and optionally also labels
             enum wsp_ggml_opt_loss_type         loss_type,      // loss to minimize
             wsp_ggml_opt_get_optimizer_params   get_opt_pars,   // callback to get optimizer params, userdata is pointer to epoch (of type int64_t)

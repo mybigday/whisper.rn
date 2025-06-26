@@ -90,10 +90,10 @@ WSP_GGML_API size_t wsp_quantize_q5_0(const float * WSP_GGML_RESTRICT src, void 
 WSP_GGML_API size_t wsp_quantize_q5_1(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 WSP_GGML_API size_t wsp_quantize_q8_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 
-WSP_GGML_API void iq2xs_init_impl(enum wsp_ggml_type type);
-WSP_GGML_API void iq2xs_free_impl(enum wsp_ggml_type type);
-WSP_GGML_API void iq3xs_init_impl(int grid_size);
-WSP_GGML_API void iq3xs_free_impl(int grid_size);
+WSP_GGML_API void wsp_iq2xs_init_impl(enum wsp_ggml_type type);
+WSP_GGML_API void wsp_iq2xs_free_impl(enum wsp_ggml_type type);
+WSP_GGML_API void wsp_iq3xs_init_impl(int grid_size);
+WSP_GGML_API void wsp_iq3xs_free_impl(int grid_size);
 
 #ifdef __cplusplus
 }

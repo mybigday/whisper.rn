@@ -19,16 +19,10 @@
 #define GROUP_MAX_EPS_IQ1_M 1e-7f
 #define GROUP_MAX_EPS_IQ1_S 1e-12f
 
-#if defined(_MSC_VER)
-// disable "possible loss of data" to avoid warnings for hundreds of casts
-// we should just be careful :)
-#pragma warning(disable: 4244 4267)
-#endif
-
 #define UNUSED WSP_GGML_UNUSED
 
 // reference implementation for deterministic creation of model files
-void wsp_quantize_row_q4_0_ref(const float * restrict x, block_q4_0 * restrict y, int64_t k) {
+void wsp_quantize_row_q4_0_ref(const float * WSP_GGML_RESTRICT x, block_q4_0 * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK4_0;
 
     assert(k % qk == 0);
@@ -65,7 +59,7 @@ void wsp_quantize_row_q4_0_ref(const float * restrict x, block_q4_0 * restrict y
     }
 }
 
-void wsp_quantize_row_q4_1_ref(const float * restrict x, block_q4_1 * restrict y, int64_t k) {
+void wsp_quantize_row_q4_1_ref(const float * WSP_GGML_RESTRICT x, block_q4_1 * WSP_GGML_RESTRICT y, int64_t k) {
     const int qk = QK4_1;
 
     assert(k % qk == 0);
@@ -102,7 +96,7 @@ void wsp_quantize_row_q4_1_ref(const float * restrict x, block_q4_1 * restrict y
     }
 }
 
-void wsp_quantize_row_q5_0_ref(const float * restrict x, block_q5_0 * restrict y, int64_t k) {
+void wsp_quantize_row_q5_0_ref(const float * WSP_GGML_RESTRICT x, block_q5_0 * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK5_0;
 
     assert(k % qk == 0);
@@ -146,7 +140,7 @@ void wsp_quantize_row_q5_0_ref(const float * restrict x, block_q5_0 * restrict y
     }
 }
 
-void wsp_quantize_row_q5_1_ref(const float * restrict x, block_q5_1 * restrict y, int64_t k) {
+void wsp_quantize_row_q5_1_ref(const float * WSP_GGML_RESTRICT x, block_q5_1 * WSP_GGML_RESTRICT y, int64_t k) {
     const int qk = QK5_1;
 
     assert(k % qk == 0);
@@ -191,7 +185,7 @@ void wsp_quantize_row_q5_1_ref(const float * restrict x, block_q5_1 * restrict y
 }
 
 // reference implementation for deterministic creation of model files
-void wsp_quantize_row_q8_0_ref(const float * restrict x, block_q8_0 * restrict y, int64_t k) {
+void wsp_quantize_row_q8_0_ref(const float * WSP_GGML_RESTRICT x, block_q8_0 * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK8_0 == 0);
     const int nb = k / QK8_0;
 
@@ -217,7 +211,7 @@ void wsp_quantize_row_q8_0_ref(const float * restrict x, block_q8_0 * restrict y
 }
 
 // reference implementation for deterministic creation of model files
-void wsp_quantize_row_q8_1_ref(const float * restrict x, block_q8_1 * restrict y, int64_t k) {
+void wsp_quantize_row_q8_1_ref(const float * WSP_GGML_RESTRICT x, block_q8_1 * WSP_GGML_RESTRICT y, int64_t k) {
     assert(QK8_1 == 32);
     assert(k % QK8_1 == 0);
     const int nb = k / QK8_1;
@@ -252,7 +246,7 @@ void wsp_quantize_row_q8_1_ref(const float * restrict x, block_q8_1 * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q4_0(const block_q4_0 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q4_0(const block_q4_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK4_0;
 
     assert(k % qk == 0);
@@ -272,7 +266,7 @@ void wsp_dewsp_quantize_row_q4_0(const block_q4_0 * restrict x, float * restrict
     }
 }
 
-void wsp_dewsp_quantize_row_q4_1(const block_q4_1 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q4_1(const block_q4_1 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK4_1;
 
     assert(k % qk == 0);
@@ -293,7 +287,7 @@ void wsp_dewsp_quantize_row_q4_1(const block_q4_1 * restrict x, float * restrict
     }
 }
 
-void wsp_dewsp_quantize_row_q5_0(const block_q5_0 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q5_0(const block_q5_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK5_0;
 
     assert(k % qk == 0);
@@ -319,7 +313,7 @@ void wsp_dewsp_quantize_row_q5_0(const block_q5_0 * restrict x, float * restrict
     }
 }
 
-void wsp_dewsp_quantize_row_q5_1(const block_q5_1 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q5_1(const block_q5_1 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK5_1;
 
     assert(k % qk == 0);
@@ -346,7 +340,7 @@ void wsp_dewsp_quantize_row_q5_1(const block_q5_1 * restrict x, float * restrict
     }
 }
 
-void wsp_dewsp_quantize_row_q8_0(const block_q8_0 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q8_0(const block_q8_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     static const int qk = QK8_0;
 
     assert(k % qk == 0);
@@ -376,8 +370,8 @@ static inline int nearest_int(float fval) {
     return (i & 0x007fffff) - 0x00400000;
 }
 
-static float make_qx_quants(int n, int nmax, const float * restrict x, int8_t * restrict L, int rmse_type,
-        const float * restrict qw) {
+static float make_qx_quants(int n, int nmax, const float * WSP_GGML_RESTRICT x, int8_t * WSP_GGML_RESTRICT L, int rmse_type,
+        const float * WSP_GGML_RESTRICT qw) {
     float max = 0;
     float amax = 0;
     for (int i = 0; i < n; ++i) {
@@ -445,7 +439,7 @@ static float make_qx_quants(int n, int nmax, const float * restrict x, int8_t * 
     return scale;
 }
 
-static float make_q3_quants(int n, int nmax, const float * restrict x, int8_t * restrict L, bool do_rmse) {
+static float make_q3_quants(int n, int nmax, const float * WSP_GGML_RESTRICT x, int8_t * WSP_GGML_RESTRICT L, bool do_rmse) {
     float max = 0;
     float amax = 0;
     for (int i = 0; i < n; ++i) {
@@ -504,7 +498,7 @@ static float make_q3_quants(int n, int nmax, const float * restrict x, int8_t * 
     return 1/iscale;
 }
 
-static float make_qkx1_quants(int n, int nmax, const float * restrict x, uint8_t * restrict L, float * restrict the_min,
+static float make_qkx1_quants(int n, int nmax, const float * WSP_GGML_RESTRICT x, uint8_t * WSP_GGML_RESTRICT L, float * WSP_GGML_RESTRICT the_min,
         int ntry, float alpha) {
     float min = x[0];
     float max = x[0];
@@ -547,8 +541,8 @@ static float make_qkx1_quants(int n, int nmax, const float * restrict x, uint8_t
     return scale;
 }
 
-static float make_qkx2_quants(int n, int nmax, const float * restrict x, const float * restrict weights,
-        uint8_t * restrict L, float * restrict the_min, uint8_t * restrict Laux,
+static float make_qkx2_quants(int n, int nmax, const float * WSP_GGML_RESTRICT x, const float * WSP_GGML_RESTRICT weights,
+        uint8_t * WSP_GGML_RESTRICT L, float * WSP_GGML_RESTRICT the_min, uint8_t * WSP_GGML_RESTRICT Laux,
         float rmin, float rdelta, int nstep, bool use_mad) {
     float min = x[0];
     float max = x[0];
@@ -628,7 +622,7 @@ static float make_qkx2_quants(int n, int nmax, const float * restrict x, const f
     return scale;
 }
 
-static inline void get_scale_min_k4(int j, const uint8_t * restrict q, uint8_t * restrict d, uint8_t * restrict m) {
+static inline void get_scale_min_k4(int j, const uint8_t * WSP_GGML_RESTRICT q, uint8_t * WSP_GGML_RESTRICT d, uint8_t * WSP_GGML_RESTRICT m) {
     if (j < 4) {
         *d = q[j] & 63; *m = q[j + 4] & 63;
     } else {
@@ -639,7 +633,7 @@ static inline void get_scale_min_k4(int j, const uint8_t * restrict q, uint8_t *
 
 //========================- 2-bit (de)-quantization
 
-void wsp_quantize_row_q2_K_ref(const float * restrict x, block_q2_K * restrict y, int64_t k) {
+void wsp_quantize_row_q2_K_ref(const float * WSP_GGML_RESTRICT x, block_q2_K * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -709,7 +703,7 @@ void wsp_quantize_row_q2_K_ref(const float * restrict x, block_q2_K * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q2_K(const block_q2_K * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q2_K(const block_q2_K * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -741,8 +735,8 @@ void wsp_dewsp_quantize_row_q2_K(const block_q2_K * restrict x, float * restrict
     }
 }
 
-static float make_qkx3_quants(int n, int nmax, const float * restrict x, const float * restrict weights,
-        uint8_t * restrict L, float * restrict the_min, uint8_t * restrict Laux,
+static float make_qkx3_quants(int n, int nmax, const float * WSP_GGML_RESTRICT x, const float * WSP_GGML_RESTRICT weights,
+        uint8_t * WSP_GGML_RESTRICT L, float * WSP_GGML_RESTRICT the_min, uint8_t * WSP_GGML_RESTRICT Laux,
         float rmin, float rdelta, int nstep, bool use_mad) {
     float min = x[0];
     float max = x[0];
@@ -824,7 +818,7 @@ static float make_qkx3_quants(int n, int nmax, const float * restrict x, const f
     return scale;
 }
 
-static float make_qp_quants(int n, int nmax, const float * restrict x, uint8_t * restrict L, const float * quant_weights) {
+static float make_qp_quants(int n, int nmax, const float * WSP_GGML_RESTRICT x, uint8_t * WSP_GGML_RESTRICT L, const float * quant_weights) {
     float max = 0;
     for (int i = 0; i < n; ++i) {
         max = MAX(max, x[i]);
@@ -897,7 +891,7 @@ static float make_qp_quants(int n, int nmax, const float * restrict x, uint8_t *
     return sumlx/suml2;
 }
 
-static void wsp_quantize_row_q2_K_impl(const float * restrict x, block_q2_K * restrict y, int k, const float * restrict quant_weights) {
+static void wsp_quantize_row_q2_K_impl(const float * WSP_GGML_RESTRICT x, block_q2_K * WSP_GGML_RESTRICT y, int k, const float * WSP_GGML_RESTRICT quant_weights) {
     WSP_GGML_ASSERT(quant_weights);
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
@@ -917,7 +911,7 @@ static void wsp_quantize_row_q2_K_impl(const float * restrict x, block_q2_K * re
         for (int j = 0; j < QK_K; ++j) sumx2 += x[j]*x[j];
         float sigma2 = sumx2/QK_K;
         for (int j = 0; j < QK_K/16; ++j) {
-            const float * restrict qw = quant_weights + QK_K * i + 16*j;
+            const float * WSP_GGML_RESTRICT qw = quant_weights + QK_K * i + 16*j;
             for (int l = 0; l < 16; ++l) weight[l] = qw[l] * sqrtf(sigma2 + x[16*j + l]*x[16*j + l]);
             for (int l = 0; l < QK_K/16; ++l) sw[j] += weight[l];
             scales[j] = make_qkx3_quants(16, 3, x + 16*j, weight, L + 16*j, &mins[j], Laux, -0.9f, 0.05f, 36, false);
@@ -959,7 +953,7 @@ static void wsp_quantize_row_q2_K_impl(const float * restrict x, block_q2_K * re
     }
 }
 
-size_t wsp_quantize_q2_K(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q2_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_Q2_K, n_per_row);
     if (!quant_weights) {
         wsp_quantize_row_q2_K_ref(src, dst, (int64_t)nrow*n_per_row);
@@ -977,7 +971,7 @@ size_t wsp_quantize_q2_K(const float * restrict src, void * restrict dst, int64_
 
 //========================= 3-bit (de)-quantization
 
-void wsp_quantize_row_q3_K_ref(const float * restrict x, block_q3_K * restrict y, int64_t k) {
+void wsp_quantize_row_q3_K_ref(const float * WSP_GGML_RESTRICT x, block_q3_K * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1053,7 +1047,7 @@ void wsp_quantize_row_q3_K_ref(const float * restrict x, block_q3_K * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q3_K(const block_q3_K * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q3_K(const block_q3_K * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1067,8 +1061,8 @@ void wsp_dewsp_quantize_row_q3_K(const block_q3_K * restrict x, float * restrict
 
         const float d_all = WSP_GGML_FP16_TO_FP32(x[i].d);
 
-        const uint8_t * restrict q = x[i].qs;
-        const uint8_t * restrict hm = x[i].hmask;
+        const uint8_t * WSP_GGML_RESTRICT q = x[i].qs;
+        const uint8_t * WSP_GGML_RESTRICT hm = x[i].hmask;
         uint8_t m = 1;
 
         memcpy(aux, x[i].scales, 12);
@@ -1103,7 +1097,7 @@ void wsp_dewsp_quantize_row_q3_K(const block_q3_K * restrict x, float * restrict
     }
 }
 
-static void wsp_quantize_row_q3_K_impl(const float * restrict x, block_q3_K * restrict y, int64_t n_per_row, const float * restrict quant_weights) {
+static void wsp_quantize_row_q3_K_impl(const float * WSP_GGML_RESTRICT x, block_q3_K * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * WSP_GGML_RESTRICT quant_weights) {
     assert(n_per_row % QK_K == 0);
     const int nb = n_per_row / QK_K;
 
@@ -1187,7 +1181,7 @@ static void wsp_quantize_row_q3_K_impl(const float * restrict x, block_q3_K * re
     }
 }
 
-size_t wsp_quantize_q3_K(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q3_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_Q3_K, n_per_row);
     if (!quant_weights) {
         wsp_quantize_row_q3_K_ref(src, dst, (int64_t)nrow*n_per_row);
@@ -1205,7 +1199,7 @@ size_t wsp_quantize_q3_K(const float * restrict src, void * restrict dst, int64_
 
 // ====================== 4-bit (de)-quantization
 
-void wsp_quantize_row_q4_K_ref(const float * restrict x, block_q4_K * restrict y, int64_t k) {
+void wsp_quantize_row_q4_K_ref(const float * WSP_GGML_RESTRICT x, block_q4_K * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1277,7 +1271,7 @@ void wsp_quantize_row_q4_K_ref(const float * restrict x, block_q4_K * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q4_K(const block_q4_K * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q4_K(const block_q4_K * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
 
@@ -1301,7 +1295,7 @@ void wsp_dewsp_quantize_row_q4_K(const block_q4_K * restrict x, float * restrict
     }
 }
 
-static void wsp_quantize_row_q4_K_impl(const float * restrict x, block_q4_K * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q4_K_impl(const float * WSP_GGML_RESTRICT x, block_q4_K * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     assert(n_per_row % QK_K == 0);
     const int64_t nb = n_per_row / QK_K;
 
@@ -1374,7 +1368,7 @@ static void wsp_quantize_row_q4_K_impl(const float * restrict x, block_q4_K * re
     }
 }
 
-size_t wsp_quantize_q4_K(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q4_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_Q4_K, n_per_row);
     if (!quant_weights) {
         wsp_quantize_row_q4_K_ref(src, dst, (int64_t)nrow*n_per_row);
@@ -1392,7 +1386,7 @@ size_t wsp_quantize_q4_K(const float * restrict src, void * restrict dst, int64_
 
 // ====================== 5-bit (de)-quantization
 
-void wsp_quantize_row_q5_K_ref(const float * restrict x, block_q5_K * restrict y, int64_t k) {
+void wsp_quantize_row_q5_K_ref(const float * WSP_GGML_RESTRICT x, block_q5_K * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -1454,8 +1448,8 @@ void wsp_quantize_row_q5_K_ref(const float * restrict x, block_q5_K * restrict y
             }
         }
 
-        uint8_t * restrict qh = y[i].qh;
-        uint8_t * restrict ql = y[i].qs;
+        uint8_t * WSP_GGML_RESTRICT qh = y[i].qh;
+        uint8_t * WSP_GGML_RESTRICT ql = y[i].qs;
         memset(qh, 0, QK_K/8);
 
         uint8_t m1 = 1, m2 = 2;
@@ -1479,7 +1473,7 @@ void wsp_quantize_row_q5_K_ref(const float * restrict x, block_q5_K * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q5_K(const block_q5_K * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q5_K(const block_q5_K * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -1506,7 +1500,7 @@ void wsp_dewsp_quantize_row_q5_K(const block_q5_K * restrict x, float * restrict
     }
 }
 
-static void wsp_quantize_row_q5_K_impl(const float * restrict x, block_q5_K * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q5_K_impl(const float * WSP_GGML_RESTRICT x, block_q5_K * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     assert(n_per_row % QK_K == 0);
     const int64_t nb = n_per_row / QK_K;
 
@@ -1573,8 +1567,8 @@ static void wsp_quantize_row_q5_K_impl(const float * restrict x, block_q5_K * re
             }
         }
 
-        uint8_t * restrict qh = y[i].qh;
-        uint8_t * restrict ql = y[i].qs;
+        uint8_t * WSP_GGML_RESTRICT qh = y[i].qh;
+        uint8_t * WSP_GGML_RESTRICT ql = y[i].qs;
         memset(qh, 0, QK_K/8);
 
         uint8_t m1 = 1, m2 = 2;
@@ -1599,7 +1593,7 @@ static void wsp_quantize_row_q5_K_impl(const float * restrict x, block_q5_K * re
     }
 }
 
-size_t wsp_quantize_q5_K(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q5_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_Q5_K, n_per_row);
     if (!quant_weights) {
         wsp_quantize_row_q5_K_ref(src, dst, (int64_t)nrow*n_per_row);
@@ -1617,7 +1611,7 @@ size_t wsp_quantize_q5_K(const float * restrict src, void * restrict dst, int64_
 
 // ====================== 6-bit (de)-quantization
 
-void wsp_quantize_row_q6_K_ref(const float * restrict x, block_q6_K * restrict y, int64_t k) {
+void wsp_quantize_row_q6_K_ref(const float * WSP_GGML_RESTRICT x, block_q6_K * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -1667,8 +1661,8 @@ void wsp_quantize_row_q6_K_ref(const float * restrict x, block_q6_K * restrict y
             }
         }
 
-        uint8_t * restrict ql = y[i].ql;
-        uint8_t * restrict qh = y[i].qh;
+        uint8_t * WSP_GGML_RESTRICT ql = y[i].ql;
+        uint8_t * WSP_GGML_RESTRICT qh = y[i].qh;
         for (int j = 0; j < QK_K; j += 128) {
             for (int l = 0; l < 32; ++l) {
                 const uint8_t q1 = L[j + l +  0] & 0xF;
@@ -1687,16 +1681,16 @@ void wsp_quantize_row_q6_K_ref(const float * restrict x, block_q6_K * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q6_K(const block_q6_K * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q6_K(const block_q6_K * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
     for (int i = 0; i < nb; i++) {
         const float d = WSP_GGML_FP16_TO_FP32(x[i].d);
 
-        const uint8_t * restrict ql = x[i].ql;
-        const uint8_t * restrict qh = x[i].qh;
-        const int8_t  * restrict sc = x[i].scales;
+        const uint8_t * WSP_GGML_RESTRICT ql = x[i].ql;
+        const uint8_t * WSP_GGML_RESTRICT qh = x[i].qh;
+        const int8_t  * WSP_GGML_RESTRICT sc = x[i].scales;
 
         for (int n = 0; n < QK_K; n += 128) {
             for (int l = 0; l < 32; ++l) {
@@ -1718,7 +1712,7 @@ void wsp_dewsp_quantize_row_q6_K(const block_q6_K * restrict x, float * restrict
     }
 }
 
-static void wsp_quantize_row_q6_K_impl(const float * restrict x, block_q6_K * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q6_K_impl(const float * WSP_GGML_RESTRICT x, block_q6_K * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     assert(n_per_row % QK_K == 0);
     const int64_t nb = n_per_row / QK_K;
 
@@ -1781,8 +1775,8 @@ static void wsp_quantize_row_q6_K_impl(const float * restrict x, block_q6_K * re
             }
         }
 
-        uint8_t * restrict ql = y[i].ql;
-        uint8_t * restrict qh = y[i].qh;
+        uint8_t * WSP_GGML_RESTRICT ql = y[i].ql;
+        uint8_t * WSP_GGML_RESTRICT qh = y[i].qh;
         for (int j = 0; j < QK_K; j += 128) {
             for (int l = 0; l < 32; ++l) {
                 const uint8_t q1 = L[j + l +  0] & 0xF;
@@ -1802,7 +1796,7 @@ static void wsp_quantize_row_q6_K_impl(const float * restrict x, block_q6_K * re
     }
 }
 
-size_t wsp_quantize_q6_K(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q6_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_Q6_K, n_per_row);
     if (!quant_weights) {
         wsp_quantize_row_q6_K_ref(src, dst, (int64_t)nrow*n_per_row);
@@ -1818,7 +1812,7 @@ size_t wsp_quantize_q6_K(const float * restrict src, void * restrict dst, int64_
     return nrow * row_size;
 }
 
-static void wsp_quantize_row_q4_0_impl(const float * restrict x, block_q4_0 * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q4_0_impl(const float * WSP_GGML_RESTRICT x, block_q4_0 * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     static_assert(QK4_0 == 32, "QK4_0 must be 32");
 
     if (!quant_weights) {
@@ -1846,7 +1840,7 @@ static void wsp_quantize_row_q4_0_impl(const float * restrict x, block_q4_0 * re
     }
 }
 
-size_t wsp_quantize_q4_0(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q4_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     if (!quant_weights) {
         wsp_quantize_row_q4_0_ref(src, dst, (int64_t)nrow*n_per_row);
         return nrow * wsp_ggml_row_size(WSP_GGML_TYPE_Q4_0, n_per_row);
@@ -1861,7 +1855,7 @@ size_t wsp_quantize_q4_0(const float * restrict src, void * restrict dst, int64_
     return nrow * row_size;
 }
 
-static void wsp_quantize_row_q4_1_impl(const float * restrict x, block_q4_1 * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q4_1_impl(const float * WSP_GGML_RESTRICT x, block_q4_1 * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     static_assert(QK4_1 == 32, "QK4_1 must be 32");
 
     if (!quant_weights) {
@@ -1891,7 +1885,7 @@ static void wsp_quantize_row_q4_1_impl(const float * restrict x, block_q4_1 * re
     }
 }
 
-size_t wsp_quantize_q4_1(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q4_1(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     if (!quant_weights) {
         wsp_quantize_row_q4_1_ref(src, dst, (int64_t)nrow*n_per_row);
         return nrow * wsp_ggml_row_size(WSP_GGML_TYPE_Q4_1, n_per_row);
@@ -1906,7 +1900,7 @@ size_t wsp_quantize_q4_1(const float * restrict src, void * restrict dst, int64_
     return nrow * row_size;
 }
 
-static void wsp_quantize_row_q5_0_impl(const float * restrict x, block_q5_0 * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q5_0_impl(const float * WSP_GGML_RESTRICT x, block_q5_0 * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     static_assert(QK5_0 == 32, "QK5_0 must be 32");
 
     if (!quant_weights) {
@@ -1945,7 +1939,7 @@ static void wsp_quantize_row_q5_0_impl(const float * restrict x, block_q5_0 * re
     }
 }
 
-size_t wsp_quantize_q5_0(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q5_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     if (!quant_weights) {
         wsp_quantize_row_q5_0_ref(src, dst, (int64_t)nrow*n_per_row);
         return nrow * wsp_ggml_row_size(WSP_GGML_TYPE_Q5_0, n_per_row);
@@ -1960,7 +1954,7 @@ size_t wsp_quantize_q5_0(const float * restrict src, void * restrict dst, int64_
     return nrow * row_size;
 }
 
-static void wsp_quantize_row_q5_1_impl(const float * restrict x, block_q5_1 * restrict y, int64_t n_per_row, const float * quant_weights) {
+static void wsp_quantize_row_q5_1_impl(const float * WSP_GGML_RESTRICT x, block_q5_1 * WSP_GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights) {
     static_assert(QK5_1 == 32, "QK5_1 must be 32");
 
     if (!quant_weights) {
@@ -1998,7 +1992,7 @@ static void wsp_quantize_row_q5_1_impl(const float * restrict x, block_q5_1 * re
     }
 }
 
-size_t wsp_quantize_q5_1(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q5_1(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     if (!quant_weights) {
         wsp_quantize_row_q5_1_ref(src, dst, (int64_t)nrow*n_per_row);
         return nrow * wsp_ggml_row_size(WSP_GGML_TYPE_Q5_1, n_per_row);
@@ -2013,7 +2007,7 @@ size_t wsp_quantize_q5_1(const float * restrict src, void * restrict dst, int64_
     return nrow * row_size;
 }
 
-size_t wsp_quantize_q8_0(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_q8_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     (void)quant_weights; // not used
     const size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_Q8_0, n_per_row);
     wsp_quantize_row_q8_0_ref(src, dst, (int64_t)nrow*n_per_row);
@@ -2022,7 +2016,7 @@ size_t wsp_quantize_q8_0(const float * restrict src, void * restrict dst, int64_
 
 // ====================== Ternary (de)-quantization (BitNet b1.58 and TriLMs)
 
-void wsp_quantize_row_tq1_0_ref(const float * restrict x, block_tq1_0 * restrict y, int64_t k) {
+void wsp_quantize_row_tq1_0_ref(const float * WSP_GGML_RESTRICT x, block_tq1_0 * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2088,7 +2082,7 @@ void wsp_quantize_row_tq1_0_ref(const float * restrict x, block_tq1_0 * restrict
     }
 }
 
-void wsp_quantize_row_tq2_0_ref(const float * restrict x, block_tq2_0 * restrict y, int64_t k) {
+void wsp_quantize_row_tq2_0_ref(const float * WSP_GGML_RESTRICT x, block_tq2_0 * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2120,21 +2114,21 @@ void wsp_quantize_row_tq2_0_ref(const float * restrict x, block_tq2_0 * restrict
     }
 }
 
-size_t wsp_quantize_tq1_0(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_tq1_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     (void)quant_weights; // not used
     const size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_TQ1_0, n_per_row);
     wsp_quantize_row_tq1_0_ref(src, dst, (int64_t)nrow*n_per_row);
     return nrow * row_size;
 }
 
-size_t wsp_quantize_tq2_0(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_tq2_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     (void)quant_weights; // not used
     const size_t row_size = wsp_ggml_row_size(WSP_GGML_TYPE_TQ2_0, n_per_row);
     wsp_quantize_row_tq2_0_ref(src, dst, (int64_t)nrow*n_per_row);
     return nrow * row_size;
 }
 
-void wsp_dewsp_quantize_row_tq1_0(const block_tq1_0 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_tq1_0(const block_tq1_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2173,7 +2167,7 @@ void wsp_dewsp_quantize_row_tq1_0(const block_tq1_0 * restrict x, float * restri
     }
 }
 
-void wsp_dewsp_quantize_row_tq2_0(const block_tq2_0 * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_tq2_0(const block_tq2_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2194,7 +2188,7 @@ void wsp_dewsp_quantize_row_tq2_0(const block_tq2_0 * restrict x, float * restri
 
 // ====================== "True" 2-bit (de)-quantization
 
-void wsp_dewsp_quantize_row_iq2_xxs(const block_iq2_xxs * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq2_xxs(const block_iq2_xxs * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2222,7 +2216,7 @@ void wsp_dewsp_quantize_row_iq2_xxs(const block_iq2_xxs * restrict x, float * re
 
 // ====================== 2.3125 bpw (de)-quantization
 
-void wsp_dewsp_quantize_row_iq2_xs(const block_iq2_xs * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq2_xs(const block_iq2_xs * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2249,7 +2243,7 @@ void wsp_dewsp_quantize_row_iq2_xs(const block_iq2_xs * restrict x, float * rest
 
 // ====================== 2.5625 bpw (de)-quantization
 
-void wsp_dewsp_quantize_row_iq2_s(const block_iq2_s * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq2_s(const block_iq2_s * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2281,7 +2275,7 @@ void wsp_dewsp_quantize_row_iq2_s(const block_iq2_s * restrict x, float * restri
 
 // ====================== 3.0625 bpw (de)-quantization
 
-void wsp_dewsp_quantize_row_iq3_xxs(const block_iq3_xxs * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq3_xxs(const block_iq3_xxs * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2313,7 +2307,7 @@ void wsp_dewsp_quantize_row_iq3_xxs(const block_iq3_xxs * restrict x, float * re
 
 // ====================== 3.3125 bpw (de)-quantization
 
-void wsp_dewsp_quantize_row_iq3_s(const block_iq3_s * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq3_s(const block_iq3_s * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2356,7 +2350,7 @@ void wsp_dewsp_quantize_row_iq3_s(const block_iq3_s * restrict x, float * restri
 
 // ====================== 1.5625 bpw (de)-quantization
 
-void wsp_dewsp_quantize_row_iq1_s(const block_iq1_s * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq1_s(const block_iq1_s * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2381,7 +2375,7 @@ void wsp_dewsp_quantize_row_iq1_s(const block_iq1_s * restrict x, float * restri
     }
 }
 
-void wsp_dewsp_quantize_row_iq1_m(const block_iq1_m * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq1_m(const block_iq1_m * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2431,9 +2425,7 @@ void wsp_dewsp_quantize_row_iq1_m(const block_iq1_m * restrict x, float * restri
     }
 }
 
-static const int8_t kvalues_iq4nl[16] = {-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113};
-
-void wsp_dewsp_quantize_row_iq4_nl(const block_iq4_nl * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq4_nl(const block_iq4_nl * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK4_NL == 0);
     const int64_t nb = k / QK4_NL;
 
@@ -2451,7 +2443,7 @@ void wsp_dewsp_quantize_row_iq4_nl(const block_iq4_nl * restrict x, float * rest
     }
 }
 
-void wsp_dewsp_quantize_row_iq4_xs(const block_iq4_xs * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_iq4_xs(const block_iq4_xs * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2476,7 +2468,7 @@ void wsp_dewsp_quantize_row_iq4_xs(const block_iq4_xs * restrict x, float * rest
 
 //===================================== Q8_K ==============================================
 
-void wsp_quantize_row_q8_K_ref(const float * restrict x, block_q8_K * restrict y, int64_t k) {
+void wsp_quantize_row_q8_K_ref(const float * WSP_GGML_RESTRICT x, block_q8_K * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2515,7 +2507,7 @@ void wsp_quantize_row_q8_K_ref(const float * restrict x, block_q8_K * restrict y
     }
 }
 
-void wsp_dewsp_quantize_row_q8_K(const block_q8_K * restrict x, float * restrict y, int64_t k) {
+void wsp_dewsp_quantize_row_q8_K(const block_q8_K * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2561,7 +2553,7 @@ static int iq2_compare_func(const void * left, const void * right) {
     return l[0] < r[0] ? -1 : l[0] > r[0] ? 1 : l[1] < r[1] ? -1 : l[1] > r[1] ? 1 : 0;
 }
 
-void iq2xs_init_impl(enum wsp_ggml_type type) {
+void wsp_iq2xs_init_impl(enum wsp_ggml_type type) {
     const int gindex = iq2_data_index(type);
     const int grid_size = iq2_grid_size(type);
     if (iq2_data[gindex].grid) {
@@ -2917,7 +2909,7 @@ void iq2xs_init_impl(enum wsp_ggml_type type) {
     free(dist2);
 }
 
-void iq2xs_free_impl(enum wsp_ggml_type type) {
+void wsp_iq2xs_free_impl(enum wsp_ggml_type type) {
     WSP_GGML_ASSERT(type == WSP_GGML_TYPE_IQ2_XXS || type == WSP_GGML_TYPE_IQ2_XS || type == WSP_GGML_TYPE_IQ1_S || type == WSP_GGML_TYPE_IQ1_M || type == WSP_GGML_TYPE_IQ2_S);
     const int gindex = iq2_data_index(type);
     if (iq2_data[gindex].grid) {
@@ -2927,8 +2919,8 @@ void iq2xs_free_impl(enum wsp_ggml_type type) {
     }
 }
 
-static int iq2_find_best_neighbour(const uint16_t * restrict neighbours, const uint64_t * restrict grid,
-        const float * restrict xval, const float * restrict weight, float scale, int8_t * restrict L) {
+static int iq2_find_best_neighbour(const uint16_t * WSP_GGML_RESTRICT neighbours, const uint64_t * WSP_GGML_RESTRICT grid,
+        const float * WSP_GGML_RESTRICT xval, const float * WSP_GGML_RESTRICT weight, float scale, int8_t * WSP_GGML_RESTRICT L) {
     int num_neighbors = neighbours[0];
     WSP_GGML_ASSERT(num_neighbors > 0);
     float best_d2 = FLT_MAX;
@@ -2951,7 +2943,7 @@ static int iq2_find_best_neighbour(const uint16_t * restrict neighbours, const u
     return grid_index;
 }
 
-static void wsp_quantize_row_iq2_xxs_impl(const float * restrict x, void * restrict vy, int64_t n, const float * restrict quant_weights) {
+static void wsp_quantize_row_iq2_xxs_impl(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t n, const float * WSP_GGML_RESTRICT quant_weights) {
 
     const int gindex = iq2_data_index(WSP_GGML_TYPE_IQ2_XXS);
 
@@ -3124,7 +3116,7 @@ static void wsp_quantize_row_iq2_xxs_impl(const float * restrict x, void * restr
     }
 }
 
-static void wsp_quantize_row_iq2_xs_impl(const float * restrict x, void * restrict vy, int64_t n, const float * restrict quant_weights) {
+static void wsp_quantize_row_iq2_xs_impl(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t n, const float * WSP_GGML_RESTRICT quant_weights) {
 
     const int gindex = iq2_data_index(WSP_GGML_TYPE_IQ2_XS);
 
@@ -3304,7 +3296,7 @@ static void wsp_quantize_row_iq2_xs_impl(const float * restrict x, void * restri
     }
 }
 
-size_t wsp_quantize_iq2_xxs(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq2_xxs(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     int64_t nblock = n_per_row/QK_K;
     char * qrow = (char *)dst;
@@ -3316,7 +3308,7 @@ size_t wsp_quantize_iq2_xxs(const float * restrict src, void * restrict dst, int
     return nrow * nblock * sizeof(block_iq2_xxs);
 }
 
-size_t wsp_quantize_iq2_xs(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq2_xs(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     int64_t nblock = n_per_row/QK_K;
     char * qrow = (char *)dst;
@@ -3355,7 +3347,7 @@ static int iq3_compare_func(const void * left, const void * right) {
     return l[0] < r[0] ? -1 : l[0] > r[0] ? 1 : l[1] < r[1] ? -1 : l[1] > r[1] ? 1 : 0;
 }
 
-void iq3xs_init_impl(int grid_size) {
+void wsp_iq3xs_init_impl(int grid_size) {
     const int gindex = iq3_data_index(grid_size);
     if (iq3_data[gindex].grid) {
         return;
@@ -3511,7 +3503,7 @@ void iq3xs_init_impl(int grid_size) {
     free(dist2);
 }
 
-void iq3xs_free_impl(int grid_size) {
+void wsp_iq3xs_free_impl(int grid_size) {
     WSP_GGML_ASSERT(grid_size == 256 || grid_size == 512);
     const int gindex = iq3_data_index(grid_size);
     if (iq3_data[gindex].grid) {
@@ -3521,8 +3513,8 @@ void iq3xs_free_impl(int grid_size) {
     }
 }
 
-static int iq3_find_best_neighbour(const uint16_t * restrict neighbours, const uint32_t * restrict grid,
-        const float * restrict xval, const float * restrict weight, float scale, int8_t * restrict L) {
+static int iq3_find_best_neighbour(const uint16_t * WSP_GGML_RESTRICT neighbours, const uint32_t * WSP_GGML_RESTRICT grid,
+        const float * WSP_GGML_RESTRICT xval, const float * WSP_GGML_RESTRICT weight, float scale, int8_t * WSP_GGML_RESTRICT L) {
     int num_neighbors = neighbours[0];
     WSP_GGML_ASSERT(num_neighbors > 0);
     float best_d2 = FLT_MAX;
@@ -3545,8 +3537,8 @@ static int iq3_find_best_neighbour(const uint16_t * restrict neighbours, const u
     return grid_index;
 }
 
-static void wsp_quantize_row_iq3_xxs_impl(int grid_size, const float * restrict x, void * restrict vy, int64_t n,
-        const float * restrict quant_weights) {
+static void wsp_quantize_row_iq3_xxs_impl(int grid_size, const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t n,
+        const float * WSP_GGML_RESTRICT quant_weights) {
 
     const int gindex = iq3_data_index(grid_size);
 
@@ -3758,7 +3750,7 @@ static void wsp_quantize_row_iq3_xxs_impl(int grid_size, const float * restrict 
     }
 }
 
-size_t wsp_quantize_iq3_xxs(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq3_xxs(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     int64_t nblock = n_per_row/QK_K;
     char * qrow = (char *)dst;
@@ -3770,13 +3762,13 @@ size_t wsp_quantize_iq3_xxs(const float * restrict src, void * restrict dst, int
     return nrow * nblock * sizeof(block_iq3_xxs);
 }
 
-void wsp_quantize_row_iq3_xxs_ref(const float * restrict x, block_iq3_xxs * restrict y, int64_t k) {
+void wsp_quantize_row_iq3_xxs_ref(const float * WSP_GGML_RESTRICT x, block_iq3_xxs * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     wsp_quantize_row_iq3_xxs_impl(256, x, y, k, NULL);
 }
 
-static void wsp_quantize_row_iq3_s_impl(int block_size, const float * restrict x, void * restrict vy, int n,
-        const float * restrict quant_weights,
+static void wsp_quantize_row_iq3_s_impl(int block_size, const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int n,
+        const float * WSP_GGML_RESTRICT quant_weights,
         float   * scales,
         float   * weight,
         float   * xval,
@@ -3958,7 +3950,7 @@ static void wsp_quantize_row_iq3_s_impl(int block_size, const float * restrict x
 }
 
 #define IQ3S_BLOCK_SIZE 32
-size_t wsp_quantize_iq3_s(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq3_s(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     int64_t nblock = n_per_row/QK_K;
     float scales[QK_K/IQ3S_BLOCK_SIZE];
@@ -3980,7 +3972,7 @@ size_t wsp_quantize_iq3_s(const float * restrict src, void * restrict dst, int64
     return nrow * nblock * sizeof(block_iq3_s);
 }
 
-void wsp_quantize_row_iq3_s_ref(const float * restrict x, block_iq3_s * restrict y, int64_t k) {
+void wsp_quantize_row_iq3_s_ref(const float * WSP_GGML_RESTRICT x, block_iq3_s * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     wsp_quantize_iq3_s(x, y, 1, k, NULL);
 }
@@ -3988,8 +3980,8 @@ void wsp_quantize_row_iq3_s_ref(const float * restrict x, block_iq3_s * restrict
 
 // =================================== 1.5 bpw ===================================================
 
-static int iq1_find_best_neighbour(const uint16_t * restrict neighbours, const uint64_t * restrict grid,
-        const float * restrict xval, const float * restrict weight, float * scale, int8_t * restrict L, int ngrid) {
+static int iq1_find_best_neighbour(const uint16_t * WSP_GGML_RESTRICT neighbours, const uint64_t * WSP_GGML_RESTRICT grid,
+        const float * WSP_GGML_RESTRICT xval, const float * WSP_GGML_RESTRICT weight, float * scale, int8_t * WSP_GGML_RESTRICT L, int ngrid) {
     int num_neighbors = neighbours[0];
     WSP_GGML_ASSERT(num_neighbors > 0);
     float best_score = -FLT_MAX;
@@ -4048,8 +4040,8 @@ static int iq1_find_best_neighbour(const uint16_t * restrict neighbours, const u
     return grid_index;
 }
 
-static int iq1_find_best_neighbour2(const uint16_t * restrict neighbours, const uint64_t * restrict grid,
-        const float * restrict xval, const float * restrict weight, float scale, const float * restrict xg, int8_t * restrict L, int ngrid) {
+static int iq1_find_best_neighbour2(const uint16_t * WSP_GGML_RESTRICT neighbours, const uint64_t * WSP_GGML_RESTRICT grid,
+        const float * WSP_GGML_RESTRICT xval, const float * WSP_GGML_RESTRICT weight, float scale, const float * WSP_GGML_RESTRICT xg, int8_t * WSP_GGML_RESTRICT L, int ngrid) {
     int num_neighbors = neighbours[0];
     WSP_GGML_ASSERT(num_neighbors > 0);
     float best_score = FLT_MAX;
@@ -4113,7 +4105,7 @@ static int iq1_sort_helper(const void * left, const void * right) {
 
 #define IQ1S_BLOCK_SIZE 32
 #define IQ1M_BLOCK_SIZE 16
-static void wsp_quantize_row_iq1_s_impl(const float * restrict x, void * restrict vy, int64_t n, const float * restrict quant_weights,
+static void wsp_quantize_row_iq1_s_impl(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t n, const float * WSP_GGML_RESTRICT quant_weights,
         float    * scales,
         float    * weight,
         float    * sumx,
@@ -4271,7 +4263,7 @@ static void wsp_quantize_row_iq1_s_impl(const float * restrict x, void * restric
     }
 }
 
-size_t wsp_quantize_iq1_s(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq1_s(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     float  scales[QK_K/IQ1S_BLOCK_SIZE];
     float  weight[IQ1S_BLOCK_SIZE];
@@ -4291,7 +4283,7 @@ size_t wsp_quantize_iq1_s(const float * restrict src, void * restrict dst, int64
     return nrow * nblock * sizeof(block_iq1_s);
 }
 
-static void wsp_quantize_row_iq1_m_impl(const float * restrict x, void * restrict vy, int64_t n, const float * restrict quant_weights,
+static void wsp_quantize_row_iq1_m_impl(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t n, const float * WSP_GGML_RESTRICT quant_weights,
         float    * scales,
         float    * weight,
         float    * pairs,
@@ -4539,7 +4531,7 @@ static void wsp_quantize_row_iq1_m_impl(const float * restrict x, void * restric
     }
 }
 
-size_t wsp_quantize_iq1_m(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq1_m(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     float  scales[QK_K/IQ1M_BLOCK_SIZE];
     float  weight[IQ1M_BLOCK_SIZE];
@@ -4570,7 +4562,7 @@ static inline int best_index_int8(int n, const int8_t * val, float x) {
     return x - val[mu-1] < val[mu] - x ? mu-1 : mu;
 }
 
-static void wsp_quantize_row_iq4_nl_impl(const int super_block_size, const int block_size, const float * restrict x,
+static void wsp_quantize_row_iq4_nl_impl(const int super_block_size, const int block_size, const float * WSP_GGML_RESTRICT x,
         wsp_ggml_fp16_t * dh, uint8_t * q4, uint16_t * scales_h, uint8_t * scales_l,
         float * scales, float * weight, uint8_t * L,
         const int8_t * values,
@@ -4681,7 +4673,7 @@ static void wsp_quantize_row_iq4_nl_impl(const int super_block_size, const int b
     }
 }
 
-size_t wsp_quantize_iq4_nl(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq4_nl(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK4_NL == 0);
     int64_t nblock = n_per_row/QK4_NL;
     char * qrow = (char *)dst;
@@ -4703,8 +4695,8 @@ size_t wsp_quantize_iq4_nl(const float * restrict src, void * restrict dst, int6
     return nrow * nblock * sizeof(block_iq4_nl);
 }
 
-//void wsp_quantize_row_iq4_nl_ref(const float * restrict x, void * restrict vy, int64_t k) {
-void wsp_quantize_row_iq4_nl_ref(const float * restrict x, block_iq4_nl * restrict y, int64_t k) {
+//void wsp_quantize_row_iq4_nl_ref(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t k) {
+void wsp_quantize_row_iq4_nl_ref(const float * WSP_GGML_RESTRICT x, block_iq4_nl * WSP_GGML_RESTRICT y, int64_t k) {
     WSP_GGML_ASSERT(k%QK4_NL == 0);
     int64_t nblock = k/QK4_NL;
     uint8_t L[QK4_NL];
@@ -4719,7 +4711,7 @@ void wsp_quantize_row_iq4_nl_ref(const float * restrict x, block_iq4_nl * restri
     }
 }
 
-size_t wsp_quantize_iq4_xs(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq4_xs(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     int64_t nblock = n_per_row/QK_K;
     char * qrow = (char *)dst;
@@ -4739,14 +4731,14 @@ size_t wsp_quantize_iq4_xs(const float * restrict src, void * restrict dst, int6
     return nrow * nblock * sizeof(block_iq4_xs);
 }
 
-void wsp_quantize_row_iq4_xs_ref(const float * restrict x, block_iq4_xs * restrict y, int64_t k) {
+void wsp_quantize_row_iq4_xs_ref(const float * WSP_GGML_RESTRICT x, block_iq4_xs * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     wsp_quantize_iq4_xs(x, y, 1, k, NULL);
 }
 
 // =============================== 2.5625 bpw
 
-static void wsp_quantize_row_iq2_s_impl(const float * restrict x, void * restrict vy, int64_t n, const float * restrict quant_weights) {
+static void wsp_quantize_row_iq2_s_impl(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t n, const float * WSP_GGML_RESTRICT quant_weights) {
 
     const int gindex = iq2_data_index(WSP_GGML_TYPE_IQ2_S);
 
@@ -4914,7 +4906,7 @@ static void wsp_quantize_row_iq2_s_impl(const float * restrict x, void * restric
     }
 }
 
-size_t wsp_quantize_iq2_s(const float * restrict src, void * restrict dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+size_t wsp_quantize_iq2_s(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     WSP_GGML_ASSERT(n_per_row%QK_K == 0);
     int64_t nblock = n_per_row/QK_K;
     char * qrow = (char *)dst;
@@ -4926,7 +4918,7 @@ size_t wsp_quantize_iq2_s(const float * restrict src, void * restrict dst, int64
     return nrow * nblock * sizeof(block_iq2_s);
 }
 
-void wsp_quantize_row_iq2_s_ref(const float * restrict x, block_iq2_s * restrict y, int64_t k) {
+void wsp_quantize_row_iq2_s_ref(const float * WSP_GGML_RESTRICT x, block_iq2_s * WSP_GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     wsp_quantize_iq2_s(x, y, 1, k, NULL);
 }

@@ -299,10 +299,10 @@ bool wsp_gguf_read_emplace_helper(const struct wsp_gguf_reader & gr, std::vector
                 return false;
             }
         } catch (std::length_error &) {
-            fprintf(stderr, "%s: encountered length_error while reading value for key '%s'\n", __func__, key.c_str());
+            WSP_GGML_LOG_ERROR("%s: encountered length_error while reading value for key '%s'\n", __func__, key.c_str());
             return false;
         } catch (std::bad_alloc &) {
-            fprintf(stderr, "%s: encountered bad_alloc error while reading value for key '%s'\n", __func__, key.c_str());
+            WSP_GGML_LOG_ERROR("%s: encountered bad_alloc error while reading value for key '%s'\n", __func__, key.c_str());
             return false;
         }
         kv.emplace_back(key, value);
@@ -328,14 +328,14 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
         ok = ok && gr.read(magic, 4);
 
         if (!ok) {
-            fprintf(stderr, "%s: failed to read magic\n", __func__);
+            WSP_GGML_LOG_ERROR("%s: failed to read magic\n", __func__);
             wsp_gguf_free(ctx);
             return nullptr;
         }
 
         for (uint32_t i = 0; i < magic.size(); i++) {
             if (magic[i] != WSP_GGUF_MAGIC[i]) {
-                fprintf(stderr, "%s: invalid magic characters: '%c%c%c%c', expected 'GGUF'\n", __func__, magic[0], magic[1], magic[2], magic[3]);
+                WSP_GGML_LOG_ERROR("%s: invalid magic characters: '%c%c%c%c', expected 'GGUF'\n", __func__, magic[0], magic[1], magic[2], magic[3]);
                 wsp_gguf_free(ctx);
                 return nullptr;
             }
@@ -347,12 +347,29 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
     int64_t n_tensors = 0;
 
     if (ok && gr.read(ctx->version)) {
-        if (ctx->version == 1) {
-            fprintf(stderr, "%s: GGUFv1 is no longer supported, please use a more up-to-date version\n", __func__);
+        if (ok && ctx->version == 0) {
+            WSP_GGML_LOG_ERROR("%s: bad GGUF version: %" PRIu32 "\n", __func__, ctx->version);
             ok = false;
         }
-        if (ctx->version > WSP_GGUF_VERSION) {
-            fprintf(stderr, "%s: this GGUF file is version %" PRIu32 " but this software only supports up to version %d\n",
+
+        /*
+         * bit layout is different when reading non-native endian models.
+         * assuming that the GGUF version is 3, the non-native endian model
+         * would read it as 0x30000000. we can use the AND operation against
+         * the last 4 hexadecimal digits to check if the model is the same
+         * endianness as the host system.
+        */
+        if (ok && (ctx->version & 0x0000FFFF) == 0x00000000) {
+            WSP_GGML_LOG_ERROR("%s: failed to load model: this GGUF file version %" PRIu32 " is extremely large, is there a mismatch between the host and model endianness?\n", __func__, ctx->version);
+            ok = false;
+        }
+
+        if (ok && ctx->version == 1) {
+            WSP_GGML_LOG_ERROR("%s: GGUFv1 is no longer supported, please use a more up-to-date version\n", __func__);
+            ok = false;
+        }
+        if (ok && ctx->version > WSP_GGUF_VERSION) {
+            WSP_GGML_LOG_ERROR("%s: this GGUF file is version %" PRIu32 " but this software only supports up to version %d\n",
                 __func__, ctx->version, WSP_GGUF_VERSION);
             ok = false;
         }
@@ -363,7 +380,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
     if (ok && gr.read(n_tensors)) {
         static_assert(sizeof(size_t) <= 8 && sizeof(wsp_gguf_tensor_info) >= 2, "int64_t insufficient for indexing");
         if (n_tensors < 0 || n_tensors > int64_t(SIZE_MAX/sizeof(wsp_gguf_tensor_info))) {
-            fprintf(stderr, "%s: number of tensors is %" PRIi64 " but must be in [0, %zu]\n",
+            WSP_GGML_LOG_ERROR("%s: number of tensors is %" PRIi64 " but must be in [0, %zu]\n",
                 __func__, n_tensors, SIZE_MAX/sizeof(wsp_gguf_tensor_info));
             ok = false;
         }
@@ -374,7 +391,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
     if (ok && gr.read(n_kv)) {
         static_assert(sizeof(size_t) <= 8 && sizeof(wsp_gguf_tensor_info) >= 2, "int64_t insufficient for indexing");
         if (n_kv < 0 || n_kv > int64_t(SIZE_MAX/sizeof(wsp_gguf_kv))) {
-            fprintf(stderr, "%s: number of key value pairs is %" PRIi64 " but must be in [0, %zu]\n",
+            WSP_GGML_LOG_ERROR("%s: number of key value pairs is %" PRIi64 " but must be in [0, %zu]\n",
                     __func__, n_kv, SIZE_MAX/sizeof(wsp_gguf_kv));
             ok = false;
         }
@@ -383,7 +400,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
     }
 
     if (!ok) {
-        fprintf(stderr, "%s: failed to read header\n", __func__);
+        WSP_GGML_LOG_ERROR("%s: failed to read header\n", __func__);
         wsp_gguf_free(ctx);
         return nullptr;
     }
@@ -399,15 +416,15 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
             try {
                 ok = ok && gr.read(key);
             } catch (std::length_error &) {
-                fprintf(stderr, "%s: encountered length_error while reading key %" PRIi64 "\n", __func__, i);
+                WSP_GGML_LOG_ERROR("%s: encountered length_error while reading key %" PRIi64 "\n", __func__, i);
                 ok = false;
             } catch (std::bad_alloc &) {
-                fprintf(stderr, "%s: encountered bad_alloc error while reading key %" PRIi64 "\n", __func__, i);
+                WSP_GGML_LOG_ERROR("%s: encountered bad_alloc error while reading key %" PRIi64 "\n", __func__, i);
                 ok = false;
             }
             for (size_t j = 0; ok && j < ctx->kv.size(); ++j) {
                 if (key == ctx->kv[j].key) {
-                    fprintf(stderr, "%s: duplicate key '%s' for tensors %zu and %" PRIi64 " \n", __func__, key.c_str(), j, i);
+                    WSP_GGML_LOG_ERROR("%s: duplicate key '%s' for tensors %zu and %" PRIi64 " \n", __func__, key.c_str(), j, i);
                     ok = false;
                 }
             }
@@ -441,14 +458,14 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
                 case WSP_GGUF_TYPE_ARRAY:
                 default:
                     {
-                        fprintf(stderr, "%s: key '%s' has invalid GGUF type %d\n", __func__, key.c_str(), type);
+                        WSP_GGML_LOG_ERROR("%s: key '%s' has invalid GGUF type %d\n", __func__, key.c_str(), type);
                         ok = false;
                     } break;
             }
         }
 
         if (!ok) {
-            fprintf(stderr, "%s: failed to read key-value pairs\n", __func__);
+            WSP_GGML_LOG_ERROR("%s: failed to read key-value pairs\n", __func__);
             wsp_gguf_free(ctx);
             return nullptr;
         }
@@ -458,7 +475,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
         ctx->alignment = alignment_idx == -1 ? WSP_GGUF_DEFAULT_ALIGNMENT : wsp_gguf_get_val_u32(ctx, alignment_idx);
 
         if (ctx->alignment == 0 || (ctx->alignment & (ctx->alignment - 1)) != 0) {
-            fprintf(stderr, "%s: alignment %zu is not a power of 2\n", __func__, ctx->alignment);
+            WSP_GGML_LOG_ERROR("%s: alignment %zu is not a power of 2\n", __func__, ctx->alignment);
             wsp_gguf_free(ctx);
             return nullptr;
         }
@@ -474,14 +491,14 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
             try {
                 ok = ok && gr.read(name);
             } catch (std::length_error &) {
-                fprintf(stderr, "%s: encountered length_error while reading tensor name %" PRIi64 "\n", __func__, i);
+                WSP_GGML_LOG_ERROR("%s: encountered length_error while reading tensor name %" PRIi64 "\n", __func__, i);
                 ok = false;
             } catch (std::bad_alloc &) {
-                fprintf(stderr, "%s: encountered bad_alloc error while reading tensor name %" PRIi64 "\n", __func__, i);
+                WSP_GGML_LOG_ERROR("%s: encountered bad_alloc error while reading tensor name %" PRIi64 "\n", __func__, i);
                 ok = false;
             }
             if (name.length() >= WSP_GGML_MAX_NAME) {
-                fprintf(stderr, "%s: tensor name %" PRIi64 " is too long: %zu >= %d\n", __func__, i, name.length(), WSP_GGML_MAX_NAME);
+                WSP_GGML_LOG_ERROR("%s: tensor name %" PRIi64 " is too long: %zu >= %d\n", __func__, i, name.length(), WSP_GGML_MAX_NAME);
                 ok = false;
                 break;
             }
@@ -490,7 +507,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
             // make sure there are no duplicate tensor names
             for (int64_t j = 0; ok && j < i; ++j) {
                 if (strcmp(info.t.name, ctx->info[j].t.name) == 0) {
-                    fprintf(stderr, "%s: duplicate tensor name '%s' for tensors %" PRIi64 " and %" PRIi64 "\n", __func__, info.t.name, j, i);
+                    WSP_GGML_LOG_ERROR("%s: duplicate tensor name '%s' for tensors %" PRIi64 " and %" PRIi64 "\n", __func__, info.t.name, j, i);
                     ok = false;
                     break;
                 }
@@ -505,7 +522,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
             uint32_t n_dims = -1;
             ok = ok && gr.read(n_dims);
             if (n_dims > WSP_GGML_MAX_DIMS) {
-                fprintf(stderr, "%s: tensor '%s' has invalid number of dimensions: %" PRIu32 " > %" PRIu32 "\n",
+                WSP_GGML_LOG_ERROR("%s: tensor '%s' has invalid number of dimensions: %" PRIu32 " > %" PRIu32 "\n",
                     __func__, info.t.name, n_dims, WSP_GGML_MAX_DIMS);
                 ok = false;
                 break;
@@ -518,7 +535,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
                 // check that all ne are non-negative
                 if (info.t.ne[j] < 0) {
-                    fprintf(stderr, "%s: tensor '%s' dimension %" PRIu32 " has invalid number of elements: %" PRIi64 " < 0\n",
+                    WSP_GGML_LOG_ERROR("%s: tensor '%s' dimension %" PRIu32 " has invalid number of elements: %" PRIi64 " < 0\n",
                         __func__, info.t.name, j, info.t.ne[j]);
                     ok = false;
                     break;
@@ -530,7 +547,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
                        (INT64_MAX/info.t.ne[2] <= info.t.ne[0]*info.t.ne[1]) ||
                        (INT64_MAX/info.t.ne[3] <= info.t.ne[0]*info.t.ne[1]*info.t.ne[2]))) {
 
-                fprintf(stderr, "%s: total number of elements in tensor '%s' with shape "
+                WSP_GGML_LOG_ERROR("%s: total number of elements in tensor '%s' with shape "
                     "(%" PRIi64 ", %" PRIi64 ", %" PRIi64 ", %" PRIi64 ") is >= %" PRIi64 "\n",
                     __func__, info.t.name, info.t.ne[0], info.t.ne[1], info.t.ne[2], info.t.ne[3], INT64_MAX);
                 ok = false;
@@ -547,7 +564,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
             // check that tensor type is within defined range
             if (info.t.type < 0 || info.t.type >= WSP_GGML_TYPE_COUNT) {
-                fprintf(stderr, "%s: tensor '%s' has invalid ggml type %d (%s)\n",
+                WSP_GGML_LOG_ERROR("%s: tensor '%s' has invalid ggml type %d (%s)\n",
                     __func__, info.t.name, info.t.type, wsp_ggml_type_name(info.t.type));
                 ok = false;
                 break;
@@ -557,7 +574,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
             // check that row size is divisible by block size
             if (blck_size == 0 || info.t.ne[0] % blck_size != 0) {
-                fprintf(stderr, "%s: tensor '%s' of type %d (%s) has %" PRId64 " elements per row, "
+                WSP_GGML_LOG_ERROR("%s: tensor '%s' of type %d (%s) has %" PRId64 " elements per row, "
                     "not a multiple of block size (%" PRId64 ")\n",
                     __func__, info.t.name, (int) info.t.type, wsp_ggml_type_name(info.t.type), info.t.ne[0], blck_size);
                 ok = false;
@@ -582,7 +599,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
     }
 
     if (!ok) {
-        fprintf(stderr, "%s: failed to read tensor info\n", __func__);
+        WSP_GGML_LOG_ERROR("%s: failed to read tensor info\n", __func__);
         wsp_gguf_free(ctx);
         return nullptr;
     }
@@ -590,7 +607,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
     // we require the data section to be aligned, so take into account any padding
     if (fseek(file, WSP_GGML_PAD(ftell(file), ctx->alignment), SEEK_SET) != 0) {
-        fprintf(stderr, "%s: failed to seek to beginning of data section\n", __func__);
+        WSP_GGML_LOG_ERROR("%s: failed to seek to beginning of data section\n", __func__);
         wsp_gguf_free(ctx);
         return nullptr;
     }
@@ -604,9 +621,9 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
         for (size_t i = 0; i < ctx->info.size(); ++i) {
             const wsp_gguf_tensor_info & ti = ctx->info[i];
             if (ti.offset != ctx->size) {
-                fprintf(stderr, "%s: tensor '%s' has offset %" PRIu64 ", expected %zu\n",
+                WSP_GGML_LOG_ERROR("%s: tensor '%s' has offset %" PRIu64 ", expected %zu\n",
                     __func__, ti.t.name, ti.offset, ctx->size);
-                fprintf(stderr, "%s: failed to read tensor data\n", __func__);
+                WSP_GGML_LOG_ERROR("%s: failed to read tensor data\n", __func__);
                 wsp_gguf_free(ctx);
                 return nullptr;
             }
@@ -634,7 +651,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
         *params.ctx = wsp_ggml_init(pdata);
         if (*params.ctx == nullptr) {
-            fprintf(stderr, "%s: failed to initialize ggml context for storing tensors\n", __func__);
+            WSP_GGML_LOG_ERROR("%s: failed to initialize ggml context for storing tensors\n", __func__);
             wsp_gguf_free(ctx);
             return nullptr;
         }
@@ -656,7 +673,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
             ok = ok && gr.read(data->data, ctx->size);
 
             if (!ok) {
-                fprintf(stderr, "%s: failed to read tensor data binary blob\n", __func__);
+                WSP_GGML_LOG_ERROR("%s: failed to read tensor data binary blob\n", __func__);
                 wsp_ggml_free(ctx_data);
                 *params.ctx = nullptr;
                 wsp_gguf_free(ctx);
@@ -689,7 +706,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
         }
 
         if (!ok) {
-            fprintf(stderr, "%s: failed to create tensors\n", __func__);
+            WSP_GGML_LOG_ERROR("%s: failed to create tensors\n", __func__);
             wsp_ggml_free(ctx_data);
             *params.ctx = nullptr;
             wsp_gguf_free(ctx);
@@ -706,7 +723,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file(const char * fname, struct wsp
     FILE * file = wsp_ggml_fopen(fname, "rb");
 
     if (!file) {
-        fprintf(stderr, "%s: failed to open GGUF file '%s'\n", __func__, fname);
+        WSP_GGML_LOG_ERROR("%s: failed to open GGUF file '%s'\n", __func__, fname);
         return nullptr;
     }
 
@@ -932,6 +949,7 @@ static void wsp_gguf_check_reserved_keys(const std::string & key, const T val) {
         if constexpr (std::is_same<T, uint32_t>::value) {
             WSP_GGML_ASSERT(val > 0 && (val & (val - 1)) == 0 && WSP_GGUF_KEY_GENERAL_ALIGNMENT " must be power of 2");
         } else {
+            WSP_GGML_UNUSED(val);
             WSP_GGML_ABORT(WSP_GGUF_KEY_GENERAL_ALIGNMENT " must be type u32");
         }
     }
@@ -1304,7 +1322,7 @@ bool wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fn
     FILE * file = wsp_ggml_fopen(fname, "wb");
 
     if (!file) {
-        fprintf(stderr, "%s: failed to open file '%s' for writing GGUF data\n", __func__, fname);
+        WSP_GGML_LOG_ERROR("%s: failed to open file '%s' for writing GGUF data\n", __func__, fname);
         return false;
     }
 

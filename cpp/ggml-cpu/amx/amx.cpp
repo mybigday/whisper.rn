@@ -5,7 +5,7 @@
 #include "ggml-backend.h"
 #include "ggml-impl.h"
 #include "ggml-cpu.h"
-#include "ggml-cpu-traits.h"
+#include "traits.h"
 
 #if defined(__gnu_linux__)
 #include <sys/syscall.h>
@@ -50,10 +50,11 @@ static void * wsp_ggml_backend_amx_buffer_get_base(wsp_ggml_backend_buffer_t buf
     return (void *) (buffer->context);
 }
 
-static void wsp_ggml_backend_amx_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
+static enum wsp_ggml_status wsp_ggml_backend_amx_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
     tensor->extra = (void *) ggml::cpu::amx::get_tensor_traits(buffer, tensor);
 
     WSP_GGML_UNUSED(buffer);
+    return WSP_GGML_STATUS_SUCCESS;
 }
 
 static void wsp_ggml_backend_amx_buffer_memset_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor,

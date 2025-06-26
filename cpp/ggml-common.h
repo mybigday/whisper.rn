@@ -158,6 +158,12 @@ typedef sycl::half2 wsp_ggml_half2;
 
 #endif // WSP_GGML_COMMON_DECL_CUDA || WSP_GGML_COMMON_DECL_HIP
 
+#ifdef _MSC_VER
+#define WSP_GGML_EXTENSION
+#else // _MSC_VER
+#define WSP_GGML_EXTENSION __extension__
+#endif // _MSC_VER
+
 #define QK4_0 32
 typedef struct {
     wsp_ggml_half d;           // delta
@@ -167,7 +173,7 @@ static_assert(sizeof(block_q4_0) == sizeof(wsp_ggml_half) + QK4_0 / 2, "wrong q4
 
 #define QK4_1 32
 typedef struct {
-    union {
+    WSP_GGML_EXTENSION union {
         struct {
             wsp_ggml_half d; // delta
             wsp_ggml_half m; // min
@@ -188,7 +194,7 @@ static_assert(sizeof(block_q5_0) == sizeof(wsp_ggml_half) + sizeof(uint32_t) + Q
 
 #define QK5_1 32
 typedef struct {
-    union {
+    WSP_GGML_EXTENSION union {
         struct {
             wsp_ggml_half d; // delta
             wsp_ggml_half m; // min
@@ -209,7 +215,7 @@ static_assert(sizeof(block_q8_0) == sizeof(wsp_ggml_half) + QK8_0, "wrong q8_0 b
 
 #define QK8_1 32
 typedef struct {
-    union {
+    WSP_GGML_EXTENSION union {
         struct {
             wsp_ggml_half d; // delta
             wsp_ggml_half s; // d * sum(qs[i])
@@ -250,7 +256,7 @@ static_assert(sizeof(block_tq2_0) == sizeof(wsp_ggml_half) + QK_K / 4, "wrong tq
 typedef struct {
     uint8_t scales[QK_K/16]; // scales and mins, quantized with 4 bits
     uint8_t qs[QK_K/4];      // quants
-    union {
+    WSP_GGML_EXTENSION union {
         struct {
             wsp_ggml_half d;    // super-block scale for quantized scales
             wsp_ggml_half dmin; // super-block scale for quantized mins
@@ -277,7 +283,7 @@ static_assert(sizeof(block_q3_K) == sizeof(wsp_ggml_half) + QK_K / 4 + QK_K / 8 
 // weight is represented as x = a * q + b
 // Effectively 4.5 bits per weight
 typedef struct {
-    union {
+    WSP_GGML_EXTENSION union {
         struct {
             wsp_ggml_half d;    // super-block scale for quantized scales
             wsp_ggml_half dmin; // super-block scale for quantized mins
@@ -294,7 +300,7 @@ static_assert(sizeof(block_q4_K) == 2*sizeof(wsp_ggml_half) + K_SCALE_SIZE + QK_
 // weight is represented as x = a * q + b
 // Effectively 5.5 bits per weight
 typedef struct {
-    union {
+    WSP_GGML_EXTENSION union {
         struct {
             wsp_ggml_half d;    // super-block scale for quantized scales
             wsp_ggml_half dmin; // super-block scale for quantized mins
@@ -1066,6 +1072,10 @@ WSP_GGML_TABLE_BEGIN(uint32_t, iq3s_grid, 512)
     0x0f030509, 0x0f030907, 0x0f03090b, 0x0f050103, 0x0f050109, 0x0f050301, 0x0f05030d, 0x0f050503,
     0x0f050701, 0x0f050b03, 0x0f070105, 0x0f070705, 0x0f07070b, 0x0f070b07, 0x0f090103, 0x0f09010b,
     0x0f090307, 0x0f090501, 0x0f090b01, 0x0f0b0505, 0x0f0b0905, 0x0f0d0105, 0x0f0d0703, 0x0f0f0101,
+WSP_GGML_TABLE_END()
+
+WSP_GGML_TABLE_BEGIN(int8_t, kvalues_iq4nl, 16)
+    -127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113,
 WSP_GGML_TABLE_END()
 
 #define NGRID_IQ1S 2048

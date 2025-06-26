@@ -80,6 +80,7 @@ extern "C" {
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx_vnni   (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx2       (void);
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_bmi2       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_f16c       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_fma        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_avx512     (void);
@@ -131,6 +132,11 @@ extern "C" {
     WSP_GGML_BACKEND_API void wsp_ggml_backend_cpu_set_abort_callback(wsp_ggml_backend_t backend_cpu, wsp_ggml_abort_callback abort_callback, void * abort_callback_data);
 
     WSP_GGML_BACKEND_API wsp_ggml_backend_reg_t wsp_ggml_backend_cpu_reg(void);
+
+    WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp32_to_fp16(const float *, wsp_ggml_fp16_t *, int64_t);
+    WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp16_to_fp32(const wsp_ggml_fp16_t *, float *, int64_t);
+    WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp32_to_bf16(const float *, wsp_ggml_bf16_t *, int64_t);
+    WSP_GGML_BACKEND_API void wsp_ggml_cpu_bf16_to_fp32(const wsp_ggml_bf16_t *, float *, int64_t);
 
 #ifdef __cplusplus
 }
