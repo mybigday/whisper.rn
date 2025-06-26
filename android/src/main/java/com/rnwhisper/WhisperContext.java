@@ -27,6 +27,8 @@ import java.io.PushbackInputStream;
 public class WhisperContext {
   public static final String NAME = "RNWhisperContext";
 
+  private static String loadedLibrary = "";
+
   private static final int SAMPLE_RATE = 16000;
   private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
   private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
@@ -433,64 +435,86 @@ public class WhisperContext {
 
   static {
     Log.d(NAME, "Primary ABI: " + Build.SUPPORTED_ABIS[0]);
-    boolean loadVfpv4 = false;
-    boolean loadV8fp16 = false;
-    if (isArmeabiV7a()) {
-      // armeabi-v7a needs runtime detection support
-      String cpuInfo = cpuInfo();
-      if (cpuInfo != null) {
-        Log.d(NAME, "CPU info: " + cpuInfo);
-        if (cpuInfo.contains("vfpv4")) {
-          Log.d(NAME, "CPU supports vfpv4");
-          loadVfpv4 = true;
-        }
-      }
-    } else if (isArmeabiV8a()) {
-      // ARMv8.2a needs runtime detection support
-      String cpuInfo = cpuInfo();
-      if (cpuInfo != null) {
-        Log.d(NAME, "CPU info: " + cpuInfo);
-        if (cpuInfo.contains("fphp")) {
-          Log.d(NAME, "CPU supports fp16 arithmetic");
-          loadV8fp16 = true;
-        }
-      }
-    }
 
-    if (loadVfpv4) {
-      Log.d(NAME, "Loading libwhisper_vfpv4.so");
-      System.loadLibrary("whisper_vfpv4");
-    } else if (loadV8fp16) {
-      Log.d(NAME, "Loading libwhisper_v8fp16_va.so");
-      System.loadLibrary("whisper_v8fp16_va");
+    String cpuFeatures = WhisperContext.getCpuFeatures();
+    Log.d(NAME, "CPU features: " + cpuFeatures);
+    boolean hasFp16 = cpuFeatures.contains("fp16") || cpuFeatures.contains("fphp");
+    boolean hasDotProd = cpuFeatures.contains("dotprod") || cpuFeatures.contains("asimddp");
+    boolean hasSve = cpuFeatures.contains("sve");
+    boolean hasI8mm = cpuFeatures.contains("i8mm");
+    boolean isAtLeastArmV82 = cpuFeatures.contains("asimd") && cpuFeatures.contains("crc32") && cpuFeatures.contains("aes");
+    boolean isAtLeastArmV84 = cpuFeatures.contains("dcpop") && cpuFeatures.contains("uscat");
+    Log.d(NAME, "- hasFp16: " + hasFp16);
+    Log.d(NAME, "- hasDotProd: " + hasDotProd);
+    Log.d(NAME, "- hasSve: " + hasSve);
+    Log.d(NAME, "- hasI8mm: " + hasI8mm);
+    Log.d(NAME, "- isAtLeastArmV82: " + isAtLeastArmV82);
+    Log.d(NAME, "- isAtLeastArmV84: " + isAtLeastArmV84);
+
+    if (WhisperContext.isArm64V8a()) {
+      if (hasFp16 && hasDotProd && hasI8mm) {
+        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2_dotprod_i8mm.so");
+        System.loadLibrary("rnwhisper_v8fp16_va_2_dotprod_i8mm");
+        loadedLibrary = "rnwhisper_v8fp16_va_2_dotprod_i8mm";
+      } else if (hasFp16 && hasDotProd) {
+        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2_dotprod.so");
+        System.loadLibrary("rnwhisper_v8fp16_va_2_dotprod");
+        loadedLibrary = "rnwhisper_v8fp16_va_2_dotprod";
+      } else if (hasFp16 && hasI8mm) {
+        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2_i8mm.so");
+        System.loadLibrary("rnwhisper_v8fp16_va_2_i8mm");
+        loadedLibrary = "rnwhisper_v8fp16_va_2_i8mm";
+      } else if (hasFp16) {
+        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2.so");
+        System.loadLibrary("rnwhisper_v8fp16_va_2");
+        loadedLibrary = "rnwhisper_v8fp16_va_2";
+      } else {
+        Log.d(NAME, "Loading default librnwhisper_v8fp16_va.so");
+        System.loadLibrary("rnwhisper_v8fp16_va");
+        loadedLibrary = "rnwhisper_v8fp16_va";
+      }
+    } else if (WhisperContext.isArmeabiV7a()) {
+      Log.d(NAME, "Loading librnwhisper_vfpv4.so");
+      System.loadLibrary("rnwhisper_vfpv4");
+      loadedLibrary = "rnwhisper_vfpv4";
+    } else if (WhisperContext.isX86_64()) {
+      Log.d(NAME, "Loading librnwhisper_x86_64.so");
+      System.loadLibrary("rnwhisper_x86_64");
+      loadedLibrary = "rnwhisper_x86_64";
     } else {
-      Log.d(NAME, "Loading libwhisper.so");
-      System.loadLibrary("whisper");
+      Log.d(NAME, "ARM32 is not supported, skipping loading library");
     }
+  }
+
+  private static boolean isArm64V8a() {
+    return Build.SUPPORTED_ABIS[0].equals("arm64-v8a");
   }
 
   private static boolean isArmeabiV7a() {
     return Build.SUPPORTED_ABIS[0].equals("armeabi-v7a");
   }
 
-  private static boolean isArmeabiV8a() {
-    return Build.SUPPORTED_ABIS[0].equals("arm64-v8a");
+  private static boolean isX86_64() {
+    return Build.SUPPORTED_ABIS[0].equals("x86_64");
   }
 
-  private static String cpuInfo() {
+  private static String getCpuFeatures() {
     File file = new File("/proc/cpuinfo");
     StringBuilder stringBuilder = new StringBuilder();
     try {
       BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
       String line;
       while ((line = bufferedReader.readLine()) != null) {
+        if (line.startsWith("Features")) {
           stringBuilder.append(line);
+          break;
+        }
       }
       bufferedReader.close();
       return stringBuilder.toString();
     } catch (IOException e) {
       Log.w(NAME, "Couldn't read /proc/cpuinfo", e);
-      return null;
+      return "";
     }
   }
 
