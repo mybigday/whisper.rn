@@ -31,8 +31,14 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "11.0", :tvos => "11.0" }
   s.source       = { :git => "https://github.com/mybigday/whisper.rn.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,hpp,c,m,mm}"
-  s.resources = "cpp/*.{metallib}"
+  if ENV["RNWHISPER_BUILD_FROM_SOURCE"] == "1"
+    s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,hpp,c,m,mm}"
+    s.resources = "cpp/**/*.{metallib}"
+    base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE"
+  else
+    s.source_files = "ios/**/*.{h,m,mm}"
+    s.vendored_frameworks = "ios/rnwhisper.xcframework"
+  end
 
   s.requires_arc = true
 

@@ -17,6 +17,8 @@ end
 
 ENV['RCT_NEW_ARCH_ENABLED'] = '1'
 
+ENV['RNWHISPER_BUILD_FROM_SOURCE'] = ENV['RNWHISPER_BUILD_FROM_SOURCE'] || '1'
+
 target 'RNWhisperExample' do
   # Tip: You can use RNWHISPER_DISABLE_COREML = '1' to disable CoreML support.
   ENV['RNWHISPER_DISABLE_COREML'] = '0'

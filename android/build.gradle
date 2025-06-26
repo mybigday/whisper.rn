@@ -53,9 +53,18 @@ android {
       }
     }
   }
-  externalNativeBuild {
-    cmake {
-      path = file('src/main/CMakeLists.txt')
+  def rnwhisperBuildFromSource = project.properties["rnwhisperBuildFromSource"]
+  if (rnwhisperBuildFromSource == "true") {
+    externalNativeBuild {
+      cmake {
+        path = file('src/main/CMakeLists.txt')
+      }
+    }
+    // Exclude jniLibs
+    sourceSets {
+      main {
+        jniLibs.srcDirs = []
+      }
     }
   }
   buildTypes {
