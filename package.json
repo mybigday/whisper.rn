@@ -33,7 +33,7 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "build": "bob build",
-    "prepack": "yarn docgen && yarn build",
+    "prepack": "yarn docgen && ./scripts/build-ios.sh && ./scripts/build-android.sh && yarn build",
     "test": "jest",
     "example": "yarn --cwd example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build",
