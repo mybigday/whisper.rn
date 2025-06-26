@@ -439,39 +439,13 @@ public class WhisperContext {
     String cpuFeatures = WhisperContext.getCpuFeatures();
     Log.d(NAME, "CPU features: " + cpuFeatures);
     boolean hasFp16 = cpuFeatures.contains("fp16") || cpuFeatures.contains("fphp");
-    boolean hasDotProd = cpuFeatures.contains("dotprod") || cpuFeatures.contains("asimddp");
-    boolean hasSve = cpuFeatures.contains("sve");
-    boolean hasI8mm = cpuFeatures.contains("i8mm");
-    boolean isAtLeastArmV82 = cpuFeatures.contains("asimd") && cpuFeatures.contains("crc32") && cpuFeatures.contains("aes");
-    boolean isAtLeastArmV84 = cpuFeatures.contains("dcpop") && cpuFeatures.contains("uscat");
     Log.d(NAME, "- hasFp16: " + hasFp16);
-    Log.d(NAME, "- hasDotProd: " + hasDotProd);
-    Log.d(NAME, "- hasSve: " + hasSve);
-    Log.d(NAME, "- hasI8mm: " + hasI8mm);
-    Log.d(NAME, "- isAtLeastArmV82: " + isAtLeastArmV82);
-    Log.d(NAME, "- isAtLeastArmV84: " + isAtLeastArmV84);
 
     if (WhisperContext.isArm64V8a()) {
-      if (hasFp16 && hasDotProd && hasI8mm) {
-        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2_dotprod_i8mm.so");
-        System.loadLibrary("rnwhisper_v8fp16_va_2_dotprod_i8mm");
-        loadedLibrary = "rnwhisper_v8fp16_va_2_dotprod_i8mm";
-      } else if (hasFp16 && hasDotProd) {
-        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2_dotprod.so");
-        System.loadLibrary("rnwhisper_v8fp16_va_2_dotprod");
-        loadedLibrary = "rnwhisper_v8fp16_va_2_dotprod";
-      } else if (hasFp16 && hasI8mm) {
-        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2_i8mm.so");
-        System.loadLibrary("rnwhisper_v8fp16_va_2_i8mm");
-        loadedLibrary = "rnwhisper_v8fp16_va_2_i8mm";
-      } else if (hasFp16) {
+      if (hasFp16) {
         Log.d(NAME, "Loading librnwhisper_v8fp16_va_2.so");
         System.loadLibrary("rnwhisper_v8fp16_va_2");
         loadedLibrary = "rnwhisper_v8fp16_va_2";
-      } else {
-        Log.d(NAME, "Loading default librnwhisper_v8fp16_va.so");
-        System.loadLibrary("rnwhisper_v8fp16_va");
-        loadedLibrary = "rnwhisper_v8fp16_va";
       }
     } else if (WhisperContext.isArmeabiV7a()) {
       Log.d(NAME, "Loading librnwhisper_vfpv4.so");
