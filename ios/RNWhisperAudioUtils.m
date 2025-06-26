@@ -1,5 +1,9 @@
 #import "RNWhisperAudioUtils.h"
+#if RNWHISPER_BUILD_FROM_SOURCE
 #import "whisper.h"
+#else
+#import <rnwhisper/whisper.h>
+#endif
 
 @implementation RNWhisperAudioUtils
 
