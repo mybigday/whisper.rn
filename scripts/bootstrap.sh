@@ -3,6 +3,7 @@
 git submodule init
 git submodule update --recursive
 
+# ggml api
 cp ./whisper.cpp/ggml/include/ggml.h ./cpp/ggml.h
 cp ./whisper.cpp/ggml/include/ggml-alloc.h ./cpp/ggml-alloc.h
 cp ./whisper.cpp/ggml/include/ggml-backend.h ./cpp/ggml-backend.h
@@ -15,17 +16,32 @@ cp ./whisper.cpp/ggml/include/gguf.h ./cpp/gguf.h
 cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal.m ./cpp/ggml-metal.m
 cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal-impl.h ./cpp/ggml-metal-impl.h
 
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c ./cpp/ggml-cpu.c
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp ./cpp/ggml-cpu.cpp
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h ./cpp/ggml-cpu-impl.h
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-aarch64.h ./cpp/ggml-cpu-aarch64.h
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-aarch64.cpp ./cpp/ggml-cpu-aarch64.cpp
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.h ./cpp/ggml-cpu-quants.h
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-quants.c ./cpp/ggml-cpu-quants.c
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-traits.h ./cpp/ggml-cpu-traits.h
-cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-traits.cpp ./cpp/ggml-cpu-traits.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c ./cpp/ggml-cpu/ggml-cpu.c
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp ./cpp/ggml-cpu/ggml-cpu.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h ./cpp/ggml-cpu/ggml-cpu-impl.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/quants.h ./cpp/ggml-cpu/quants.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/quants.c ./cpp/ggml-cpu/quants.c
+cp ./whisper.cpp/ggml/src/ggml-cpu/arch-fallback.h ./cpp/ggml-cpu/arch-fallback.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/repack.cpp ./cpp/ggml-cpu/repack.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/repack.h ./cpp/ggml-cpu/repack.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/traits.h ./cpp/ggml-cpu/traits.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/traits.cpp ./cpp/ggml-cpu/traits.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/common.h ./cpp/ggml-cpu/common.h
 
-cp -r ./whisper.cpp/ggml/src/ggml-cpu/amx ./cpp/
+cp ./whisper.cpp/ggml/src/ggml-cpu/unary-ops.h ./cpp/ggml-cpu/unary-ops.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/unary-ops.cpp ./cpp/ggml-cpu/unary-ops.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/binary-ops.h ./cpp/ggml-cpu/binary-ops.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/binary-ops.cpp ./cpp/ggml-cpu/binary-ops.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/vec.h ./cpp/ggml-cpu/vec.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/vec.cpp ./cpp/ggml-cpu/vec.cpp
+cp ./whisper.cpp/ggml/src/ggml-cpu/simd-mappings.h ./cpp/ggml-cpu/simd-mappings.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/ops.h ./cpp/ggml-cpu/ops.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/ops.cpp ./cpp/ggml-cpu/ops.cpp
+
+cp -r ./whisper.cpp/ggml/src/ggml-cpu/amx ./cpp/ggml-cpu/
+mkdir -p ./cpp/ggml-cpu/arch
+cp -r ./whisper.cpp/ggml/src/ggml-cpu/arch/arm ./cpp/ggml-cpu/arch/
+cp -r ./whisper.cpp/ggml/src/ggml-cpu/arch/x86 ./cpp/ggml-cpu/arch/
 
 cp ./whisper.cpp/ggml/src/ggml.c ./cpp/ggml.c
 cp ./whisper.cpp/ggml/src/ggml-impl.h ./cpp/ggml-impl.h
@@ -41,7 +57,9 @@ cp ./whisper.cpp/ggml/src/ggml-threading.cpp ./cpp/ggml-threading.cpp
 cp ./whisper.cpp/ggml/src/ggml-threading.h ./cpp/ggml-threading.h
 cp ./whisper.cpp/ggml/src/gguf.cpp ./cpp/gguf.cpp
 
+# whisper api
 cp ./whisper.cpp/include/whisper.h ./cpp/whisper.h
+cp ./whisper.cpp/src/whisper-arch.h ./cpp/whisper-arch.h
 cp ./whisper.cpp/src/whisper.cpp ./cpp/whisper.cpp
 
 rm -rf ./cpp/coreml/
@@ -49,8 +67,7 @@ cp -R ./whisper.cpp/src/coreml/ ./cpp/coreml/
 
 # List of files to process
 files=(
-  "./cpp/whisper.h"
-  "./cpp/whisper.cpp"
+  # ggml api
   "./cpp/ggml-common.h"
   "./cpp/ggml.h"
   "./cpp/ggml.c"
@@ -71,23 +88,45 @@ files=(
   "./cpp/ggml-backend.cpp"
   "./cpp/ggml-backend-impl.h"
   "./cpp/ggml-backend-reg.cpp"
-  "./cpp/ggml-cpu-impl.h"
   "./cpp/ggml-cpu.h"
-  "./cpp/ggml-cpu.c"
-  "./cpp/ggml-cpu.cpp"
-  "./cpp/ggml-cpu-aarch64.h"
-  "./cpp/ggml-cpu-aarch64.cpp"
-  "./cpp/ggml-cpu-quants.h"
-  "./cpp/ggml-cpu-quants.c"
-  "./cpp/ggml-cpu-traits.h"
-  "./cpp/ggml-cpu-traits.cpp"
+  "./cpp/ggml-cpu/ggml-cpu-impl.h"
+  "./cpp/ggml-cpu/ggml-cpu.c"
+  "./cpp/ggml-cpu/ggml-cpu.cpp"
+  "./cpp/ggml-cpu/quants.h"
+  "./cpp/ggml-cpu/quants.c"
+  "./cpp/ggml-cpu/traits.h"
+  "./cpp/ggml-cpu/traits.cpp"
+  "./cpp/ggml-cpu/arch-fallback.h"
+  "./cpp/ggml-cpu/repack.cpp"
+  "./cpp/ggml-cpu/repack.h"
+  "./cpp/ggml-cpu/common.h"
   "./cpp/ggml-threading.h"
   "./cpp/ggml-threading.cpp"
-  "./cpp/amx/amx.h"
-  "./cpp/amx/amx.cpp"
-  "./cpp/amx/mmq.h"
-  "./cpp/amx/mmq.cpp"
-  "./cpp/amx/common.h"
+  "./cpp/ggml-cpu/amx/amx.h"
+  "./cpp/ggml-cpu/amx/amx.cpp"
+  "./cpp/ggml-cpu/amx/mmq.h"
+  "./cpp/ggml-cpu/amx/mmq.cpp"
+  "./cpp/ggml-cpu/amx/common.h"
+  "./cpp/ggml-cpu/unary-ops.h"
+  "./cpp/ggml-cpu/unary-ops.cpp"
+  "./cpp/ggml-cpu/binary-ops.h"
+  "./cpp/ggml-cpu/binary-ops.cpp"
+  "./cpp/ggml-cpu/vec.h"
+  "./cpp/ggml-cpu/vec.cpp"
+  "./cpp/ggml-cpu/simd-mappings.h"
+  "./cpp/ggml-cpu/ops.h"
+  "./cpp/ggml-cpu/ops.cpp"
+  "./cpp/ggml-cpu/arch/arm/cpu-feats.cpp"
+  "./cpp/ggml-cpu/arch/arm/quants.c"
+  "./cpp/ggml-cpu/arch/arm/repack.cpp"
+  "./cpp/ggml-cpu/arch/x86/cpu-feats.cpp"
+  "./cpp/ggml-cpu/arch/x86/quants.c"
+  "./cpp/ggml-cpu/arch/x86/repack.cpp"
+
+  # whisper api
+  "./cpp/whisper-arch.h"
+  "./cpp/whisper.h"
+  "./cpp/whisper.cpp"
 )
 
 # Loop through each file and run the sed commands
@@ -113,18 +152,24 @@ for file in "${files[@]}"; do
   fi
 done
 
-files_f32_add_wsp_prefix=(
-  "./cpp/ggml-impl.h"
+files_iq_add_wsp_prefix=(
+  "./cpp/ggml-quants.h"
+  "./cpp/ggml-quants.c"
+  "./cpp/ggml.c"
 )
 
-for file in "${files_f32_add_wsp_prefix[@]}"; do
-  # Add prefix to avoid redefinition with other libraries using ggml like llama.rn
+for file in "${files_iq_add_wsp_prefix[@]}"; do
+  # Add prefix to avoid redefinition with other libraries using ggml like whisper.rn
   if [ "$OS" = "Darwin" ]; then
-    sed -i '' 's/fp32_from_bits/wsp_fp32_from_bits/g' $file
-    sed -i '' 's/fp32_to_bits/wsp_fp32_to_bits/g' $file
+    sed -i '' 's/iq2xs_init_impl/wsp_iq2xs_init_impl/g' $file
+    sed -i '' 's/iq2xs_free_impl/wsp_iq2xs_free_impl/g' $file
+    sed -i '' 's/iq3xs_init_impl/wsp_iq3xs_init_impl/g' $file
+    sed -i '' 's/iq3xs_free_impl/wsp_iq3xs_free_impl/g' $file
   else
-    sed -i 's/fp32_from_bits/wsp_fp32_from_bits/g' $file
-    sed -i 's/fp32_to_bits/wsp_fp32_to_bits/g' $file
+    sed -i 's/iq2xs_init_impl/wsp_iq2xs_init_impl/g' $file
+    sed -i 's/iq2xs_free_impl/wsp_iq2xs_free_impl/g' $file
+    sed -i 's/iq3xs_init_impl/wsp_iq3xs_init_impl/g' $file
+    sed -i 's/iq3xs_free_impl/wsp_iq3xs_free_impl/g' $file
   fi
 done
 
@@ -142,21 +187,27 @@ patch -p0 -d ./cpp < ./scripts/patches/ggml-metal.m.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml-quants.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
-
+rm -rf ./cpp/*.orig
 
 if [ "$OS" = "Darwin" ]; then
   # Build metallib (~2.6MB)
   cd whisper.cpp/ggml/src/ggml-metal
+
+  # Create a symbolic link to ggml-common.h in the current directory
+  ln -sf ../ggml-common.h .
+
   xcrun --sdk iphoneos metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
   xcrun --sdk iphoneos metallib ggml-metal.air   -o ggml-whisper.metallib
   rm ggml-metal.air
   mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper.metallib
 
-  cd -
+  xcrun --sdk iphonesimulator metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
+  xcrun --sdk iphonesimulator metallib ggml-metal.air   -o ggml-whisper.metallib
+  rm ggml-metal.air
+  mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper-sim.metallib
 
-  # Generate .xcode.env.local in iOS example
-  cd example/ios
-  echo export NODE_BINARY=$(command -v node) > .xcode.env.local
+  # Remove the symbolic link
+  rm ggml-common.h
 
   cd -
 fi

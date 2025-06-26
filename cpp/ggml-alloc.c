@@ -89,7 +89,7 @@ struct wsp_ggml_tallocr wsp_ggml_tallocr_new(wsp_ggml_backend_buffer_t buffer) {
     return talloc;
 }
 
-void wsp_ggml_tallocr_alloc(struct wsp_ggml_tallocr * talloc, struct wsp_ggml_tensor * tensor) {
+enum wsp_ggml_status wsp_ggml_tallocr_alloc(struct wsp_ggml_tallocr * talloc, struct wsp_ggml_tensor * tensor) {
     size_t size = wsp_ggml_backend_buffer_get_alloc_size(talloc->buffer, tensor);
     size = WSP_GGML_PAD(size, talloc->alignment);
 
@@ -104,7 +104,7 @@ void wsp_ggml_tallocr_alloc(struct wsp_ggml_tallocr * talloc, struct wsp_ggml_te
 
     assert(((uintptr_t)addr % talloc->alignment) == 0);
 
-    wsp_ggml_backend_tensor_alloc(talloc->buffer, tensor, addr);
+    return wsp_ggml_backend_tensor_alloc(talloc->buffer, tensor, addr);
 }
 
 // dynamic tensor allocator
@@ -816,7 +816,10 @@ static void wsp_ggml_gallocr_init_tensor(wsp_ggml_gallocr_t galloc, struct wsp_g
 static bool wsp_ggml_gallocr_node_needs_realloc(wsp_ggml_gallocr_t galloc, struct wsp_ggml_tensor * node, struct tensor_alloc * talloc) {
     size_t node_size = 0;
     if (!node->data && !node->view_src) {
-        WSP_GGML_ASSERT(talloc->buffer_id >= 0); // prevent segfault when misusing the API
+        // If we previously had data but don't now then reallocate
+        if (talloc->buffer_id < 0) {
+            return false;
+        }
         node_size = wsp_ggml_backend_buft_get_alloc_size(galloc->bufts[talloc->buffer_id], node);
     }
     return talloc->size_max >= node_size;
@@ -933,41 +936,50 @@ size_t wsp_ggml_gallocr_get_buffer_size(wsp_ggml_gallocr_t galloc, int buffer_id
 
 // utils
 
+static void free_buffers(wsp_ggml_backend_buffer_t ** buffers, const size_t * n_buffers) {
+    for (size_t i = 0; i < *n_buffers; i++) {
+        wsp_ggml_backend_buffer_free((*buffers)[i]);
+    }
+    free(*buffers);
+}
+
 static bool alloc_tensor_range(struct wsp_ggml_context * ctx,
         struct wsp_ggml_tensor * first, struct wsp_ggml_tensor * last,
         wsp_ggml_backend_buffer_type_t buft, size_t size,
         wsp_ggml_backend_buffer_t ** buffers, size_t * n_buffers) {
+
     wsp_ggml_backend_buffer_t buffer = wsp_ggml_backend_buft_alloc_buffer(buft, size);
     if (buffer == NULL) {
-#ifndef NDEBUG
-        WSP_GGML_LOG_DEBUG("%s: failed to allocate %s buffer of size %zu\n", __func__, wsp_ggml_backend_buft_name(buft), size);
-#endif
-        for (size_t i = 0; i < *n_buffers; i++) {
-            wsp_ggml_backend_buffer_free((*buffers)[i]);
-        }
-        free(*buffers);
+        WSP_GGML_LOG_ERROR("%s: failed to allocate %s buffer of size %zu\n", __func__, wsp_ggml_backend_buft_name(buft), size);
+        free_buffers(buffers, n_buffers);
         return false;
-    }
-
-    struct wsp_ggml_tallocr tallocr = wsp_ggml_tallocr_new(buffer);
-
-    for (struct wsp_ggml_tensor * t = first; t != last; t = wsp_ggml_get_next_tensor(ctx, t)) {
-        if (t->data == NULL) {
-            if (t->view_src == NULL) {
-                wsp_ggml_tallocr_alloc(&tallocr, t);
-            } else if (t->buffer == NULL) {
-                wsp_ggml_backend_view_init(t);
-            }
-        } else {
-            if (t->view_src != NULL && t->buffer == NULL) {
-                // view of a pre-allocated tensor
-                wsp_ggml_backend_view_init(t);
-            }
-        }
     }
 
     *buffers = realloc(*buffers, sizeof(wsp_ggml_backend_buffer_t) * (*n_buffers + 1));
     (*buffers)[(*n_buffers)++] = buffer;
+
+    struct wsp_ggml_tallocr tallocr = wsp_ggml_tallocr_new(buffer);
+
+    for (struct wsp_ggml_tensor * t = first; t != last; t = wsp_ggml_get_next_tensor(ctx, t)) {
+        enum wsp_ggml_status status = WSP_GGML_STATUS_SUCCESS;
+        if (t->data == NULL) {
+            if (t->view_src == NULL) {
+                status = wsp_ggml_tallocr_alloc(&tallocr, t);
+            } else if (t->buffer == NULL) {
+                status = wsp_ggml_backend_view_init(t);
+            }
+        } else {
+            if (t->view_src != NULL && t->buffer == NULL) {
+                // view of a pre-allocated tensor
+                status = wsp_ggml_backend_view_init(t);
+            }
+        }
+        if (status != WSP_GGML_STATUS_SUCCESS) {
+            WSP_GGML_LOG_ERROR("%s: failed to initialize tensor %s\n", __func__, t->name);
+            free_buffers(buffers, n_buffers);
+            return false;
+        }
+    }
 
     return true;
 }

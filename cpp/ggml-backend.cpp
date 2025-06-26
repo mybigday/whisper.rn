@@ -21,6 +21,7 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #ifdef __APPLE__
 #include <sys/types.h>
@@ -55,7 +56,7 @@ size_t wsp_ggml_backend_buft_get_max_size(wsp_ggml_backend_buffer_type_t buft) {
     return SIZE_MAX;
 }
 
-size_t wsp_ggml_backend_buft_get_alloc_size(wsp_ggml_backend_buffer_type_t buft, struct wsp_ggml_tensor * tensor) {
+size_t wsp_ggml_backend_buft_get_alloc_size(wsp_ggml_backend_buffer_type_t buft, const struct wsp_ggml_tensor * tensor) {
     // get_alloc_size is optional, defaults to wsp_ggml_nbytes
     if (buft->iface.get_alloc_size) {
         size_t size = buft->iface.get_alloc_size(buft, tensor);
@@ -126,11 +127,12 @@ void * wsp_ggml_backend_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
     return base;
 }
 
-void wsp_ggml_backend_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
+enum wsp_ggml_status wsp_ggml_backend_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
     // init_tensor is optional
     if (buffer->iface.init_tensor) {
-        buffer->iface.init_tensor(buffer, tensor);
+        return buffer->iface.init_tensor(buffer, tensor);
     }
+    return WSP_GGML_STATUS_SUCCESS;
 }
 
 void wsp_ggml_backend_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
@@ -150,7 +152,7 @@ size_t wsp_ggml_backend_buffer_get_max_size(wsp_ggml_backend_buffer_t buffer) {
     return wsp_ggml_backend_buft_get_max_size(wsp_ggml_backend_buffer_get_type(buffer));
 }
 
-size_t wsp_ggml_backend_buffer_get_alloc_size(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
+size_t wsp_ggml_backend_buffer_get_alloc_size(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * tensor) {
     return wsp_ggml_backend_buft_get_alloc_size(wsp_ggml_backend_buffer_get_type(buffer), tensor);
 }
 
@@ -672,6 +674,8 @@ struct wsp_ggml_backend_sched {
     char * context_buffer;
     size_t context_buffer_size;
 
+    bool op_offload;
+
     int debug;
 };
 
@@ -764,7 +768,7 @@ static int wsp_ggml_backend_sched_backend_id_from_cur(wsp_ggml_backend_sched_t s
         if (tensor->op != WSP_GGML_OP_ROPE && src->buffer != NULL && src->buffer->usage == WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS) {
             int src_backend_id = wsp_ggml_backend_sched_backend_from_buffer(sched, src, tensor);
             // check if a backend with higher prio wants to offload the op
-            if (src_backend_id == sched->n_backends - 1 && wsp_ggml_backend_buffer_is_host(src->buffer)) {
+            if (sched->op_offload && src_backend_id == sched->n_backends - 1 && wsp_ggml_backend_buffer_is_host(src->buffer)) {
                 for (int b = 0; b < src_backend_id; b++) {
                     if (wsp_ggml_backend_supports_op(sched->backends[b], tensor) && wsp_ggml_backend_offload_op(sched->backends[b], tensor)) {
                         SET_CAUSE(tensor, "1.off");
@@ -1107,7 +1111,7 @@ static void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, s
 
             const int node_backend_id = tensor_backend_id(node);
 
-            assert(node_backend_id != -1); // all nodes should be assigned by now
+            assert(node_backend_id != -1); // all nodes should be assigned by now, this can happen if there is no CPU fallback
 
             // check if we should start a new split based on the sources of the current node
             bool need_new_split = false;
@@ -1336,7 +1340,10 @@ static bool wsp_ggml_backend_sched_alloc_splits(wsp_ggml_backend_sched_t sched) 
     // allocate graph
     if (backend_ids_changed || !wsp_ggml_gallocr_alloc_graph(sched->galloc, &sched->graph)) {
         // the re-allocation may cause the split inputs to be moved to a different address
-        wsp_ggml_backend_sched_synchronize(sched);
+        // synchronize without wsp_ggml_backend_sched_synchronize to avoid changing cur_copy
+        for (int i = 0; i < sched->n_backends; i++) {
+            wsp_ggml_backend_synchronize(sched->backends[i]);
+        }
 #ifndef NDEBUG
         WSP_GGML_LOG_DEBUG("%s: failed to allocate graph, reserving (backend_ids_changed = %d)\n", __func__, backend_ids_changed);
 #endif
@@ -1450,7 +1457,8 @@ wsp_ggml_backend_sched_t wsp_ggml_backend_sched_new(
         wsp_ggml_backend_buffer_type_t * bufts,
         int n_backends,
         size_t graph_size,
-        bool parallel) {
+        bool parallel,
+        bool op_offload) {
     WSP_GGML_ASSERT(n_backends > 0);
     WSP_GGML_ASSERT(n_backends <= WSP_GGML_SCHED_MAX_BACKENDS);
     WSP_GGML_ASSERT(wsp_ggml_backend_dev_type(wsp_ggml_backend_get_device(backends[n_backends - 1])) == WSP_GGML_BACKEND_DEVICE_TYPE_CPU);
@@ -1495,6 +1503,7 @@ wsp_ggml_backend_sched_t wsp_ggml_backend_sched_new(
     }
 
     sched->galloc = wsp_ggml_gallocr_new_n(sched->bufts, n_backends);
+    sched->op_offload = op_offload;
 
     wsp_ggml_backend_sched_reset(sched);
 
@@ -1558,7 +1567,6 @@ bool wsp_ggml_backend_sched_alloc_graph(wsp_ggml_backend_sched_t sched, struct w
 
     wsp_ggml_backend_sched_split_graph(sched, graph);
 
-
     if (!wsp_ggml_backend_sched_alloc_splits(sched)) {
         return false;
     }
@@ -1591,6 +1599,12 @@ enum wsp_ggml_status wsp_ggml_backend_sched_graph_compute_async(wsp_ggml_backend
 void wsp_ggml_backend_sched_synchronize(wsp_ggml_backend_sched_t sched) {
     for (int i = 0; i < sched->n_backends; i++) {
         wsp_ggml_backend_synchronize(sched->backends[i]);
+    }
+    if (!sched->is_alloc) {
+        // if the graph is not already allocated, always use copy 0 after a synchronization
+        // this ensures that during generation the same copy is used every time,
+        // which avoids changes in the graph that could cause CUDA or other graphs to be disabled
+        sched->cur_copy = 0;
     }
 }
 
@@ -1641,7 +1655,7 @@ wsp_ggml_backend_t wsp_ggml_backend_sched_get_tensor_backend(wsp_ggml_backend_sc
 
 // utils
 
-void wsp_ggml_backend_view_init(struct wsp_ggml_tensor * tensor) {
+enum wsp_ggml_status wsp_ggml_backend_view_init(struct wsp_ggml_tensor * tensor) {
     WSP_GGML_ASSERT(tensor->buffer == NULL);
     WSP_GGML_ASSERT(tensor->view_src != NULL);
     WSP_GGML_ASSERT(tensor->view_src->buffer != NULL);
@@ -1649,10 +1663,10 @@ void wsp_ggml_backend_view_init(struct wsp_ggml_tensor * tensor) {
 
     tensor->buffer = tensor->view_src->buffer;
     tensor->data = (char *)tensor->view_src->data + tensor->view_offs;
-    wsp_ggml_backend_buffer_init_tensor(tensor->buffer, tensor);
+    return wsp_ggml_backend_buffer_init_tensor(tensor->buffer, tensor);
 }
 
-void wsp_ggml_backend_tensor_alloc(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, void * addr) {
+enum wsp_ggml_status wsp_ggml_backend_tensor_alloc(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, void * addr) {
     WSP_GGML_ASSERT(tensor->buffer == NULL);
     WSP_GGML_ASSERT(tensor->data == NULL);
     WSP_GGML_ASSERT(tensor->view_src == NULL);
@@ -1662,7 +1676,7 @@ void wsp_ggml_backend_tensor_alloc(wsp_ggml_backend_buffer_t buffer, struct wsp_
 
     tensor->buffer = buffer;
     tensor->data = addr;
-    wsp_ggml_backend_buffer_init_tensor(buffer, tensor);
+    return wsp_ggml_backend_buffer_init_tensor(buffer, tensor);
 }
 
 static struct wsp_ggml_tensor * graph_copy_dup_tensor(struct wsp_ggml_hash_set hash_set, struct wsp_ggml_tensor ** node_copies,
@@ -1708,7 +1722,8 @@ static void graph_copy_init_tensor(struct wsp_ggml_hash_set * hash_set, struct w
     struct wsp_ggml_tensor * dst = node_copies[id];
     if (dst->view_src != NULL) {
         graph_copy_init_tensor(hash_set, node_copies, node_init, src->view_src);
-        wsp_ggml_backend_view_init(dst);
+        enum wsp_ggml_status status = wsp_ggml_backend_view_init(dst);
+        WSP_GGML_ASSERT(status == WSP_GGML_STATUS_SUCCESS);
     }
     else {
         wsp_ggml_backend_tensor_copy(src, dst);
@@ -1823,7 +1838,6 @@ bool wsp_ggml_backend_compare_graph_backend(wsp_ggml_backend_t backend1, wsp_ggm
     assert(g1->n_nodes == g2->n_nodes);
 
     for (int i = 0; i < g1->n_nodes; i++) {
-        //printf("eval %d/%d\n", i, g1->n_nodes);
         struct wsp_ggml_tensor * t1 = g1->nodes[i];
         struct wsp_ggml_tensor * t2 = g2->nodes[i];
 

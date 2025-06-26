@@ -44,7 +44,7 @@ extern "C" {
         // base address of the buffer
         void *       (*get_base)     (wsp_ggml_backend_buffer_t buffer);
         // (optional) initialize a tensor in the buffer (eg. add tensor extras)
-        void         (*init_tensor)  (wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor);
+        enum wsp_ggml_status (*init_tensor)(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor);
         // tensor data access
         void         (*memset_tensor)(wsp_ggml_backend_buffer_t buffer,       struct wsp_ggml_tensor * tensor,     uint8_t value, size_t offset, size_t size);
         void         (*set_tensor)   (wsp_ggml_backend_buffer_t buffer,       struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);

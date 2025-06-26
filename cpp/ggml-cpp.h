@@ -24,7 +24,7 @@ typedef std::unique_ptr<wsp_gguf_context, wsp_gguf_context_deleter> wsp_gguf_con
 
 struct wsp_ggml_gallocr_deleter { void operator()(wsp_ggml_gallocr_t galloc) { wsp_ggml_gallocr_free(galloc); } };
 
-typedef std::unique_ptr<wsp_ggml_gallocr_t, wsp_ggml_gallocr_deleter> wsp_ggml_gallocr_ptr;
+typedef std::unique_ptr<wsp_ggml_gallocr, wsp_ggml_gallocr_deleter> wsp_ggml_gallocr_ptr;
 
 // ggml-backend
 

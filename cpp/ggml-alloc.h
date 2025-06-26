@@ -19,7 +19,7 @@ struct wsp_ggml_tallocr {
 };
 
 WSP_GGML_API struct wsp_ggml_tallocr wsp_ggml_tallocr_new(wsp_ggml_backend_buffer_t buffer);
-WSP_GGML_API void                wsp_ggml_tallocr_alloc(struct wsp_ggml_tallocr * talloc, struct wsp_ggml_tensor * tensor);
+WSP_GGML_API enum wsp_ggml_status    wsp_ggml_tallocr_alloc(struct wsp_ggml_tallocr * talloc, struct wsp_ggml_tensor * tensor);
 
 // Graph allocator
 /*
