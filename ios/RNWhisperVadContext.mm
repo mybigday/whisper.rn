@@ -1,5 +1,6 @@
 #import "RNWhisperVadContext.h"
 #import "RNWhisperAudioUtils.h"
+#import <Metal/Metal.h>
 
 @implementation RNWhisperVadContext
 
@@ -8,8 +9,7 @@
 
     context->contextId = contextId;
     context->dQueue = dispatch_queue_create("rnwhisper.vad.serial_queue", DISPATCH_QUEUE_SERIAL);
-    context->isMetalEnabled = false;
-    context->reasonNoMetal = @"";
+    NSString *reasonNoMetal = @"";
 
     // Set up VAD context parameters
     struct whisper_vad_context_params ctx_params = whisper_vad_default_context_params();
@@ -17,6 +17,30 @@
     if (nThreads != nil) {
         ctx_params.n_threads = [nThreads intValue];
     }
+
+#ifdef WSP_GGML_USE_METAL
+    if (ctx_params.use_gpu) {
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+
+        // Check ggml-metal availability
+        BOOL supportsGgmlMetal = [device supportsFamily:MTLGPUFamilyApple7];
+        if (@available(iOS 16.0, tvOS 16.0, *)) {
+            supportsGgmlMetal = supportsGgmlMetal && [device supportsFamily:MTLGPUFamilyMetal3];
+        }
+        if (!supportsGgmlMetal) {
+          ctx_params.use_gpu = false;
+            reasonNoMetal = @"Metal is not supported in this device";
+        }
+
+#if TARGET_OS_SIMULATOR
+        // Use the backend, but no layers because not supported fully on simulator
+        ctx_params.use_gpu = false;
+        reasonNoMetal = @"Metal is not supported in simulator";
+#endif
+
+        device = nil;
+    }
+#endif // WSP_GGML_USE_METAL
 
     // Initialize VAD context
     context->vctx = whisper_vad_init_from_file_with_params([modelPath UTF8String], ctx_params);
@@ -28,9 +52,7 @@
 
     // Check GPU status
     context->isMetalEnabled = ctx_params.use_gpu;
-    if (!ctx_params.use_gpu && !noMetal) {
-        context->reasonNoMetal = @"VAD context initialization failed to use GPU";
-    }
+    context->reasonNoMetal = reasonNoMetal;
 
     return context;
 }

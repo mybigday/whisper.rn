@@ -90,7 +90,7 @@ export default function VadExample() {
               const startTime = Date.now()
               const ctx = await initWhisperVad({
                 filePath: require('../assets/ggml-silero-v5.1.2.bin'),
-                useGpu: false,
+                useGpu: true,
                 nThreads: 4,
               })
               const endTime = Date.now()
