@@ -103,6 +103,75 @@ subscribe(evt => {
 })
 ```
 
+## Voice Activity Detection (VAD)
+
+Voice Activity Detection allows you to detect speech segments in audio data using the Silero VAD model.
+
+#### Initialize VAD Context
+
+```typescript
+import { initWhisperVad } from 'whisper.rn'
+
+const vadContext = await initWhisperVad({
+  filePath: require('./assets/ggml-silero-v5.1.2.bin'), // VAD model file
+  useGpu: true, // Use GPU acceleration (iOS only)
+  nThreads: 4, // Number of threads for processing
+})
+```
+
+#### Detect Speech Segments
+
+##### From Audio Files
+
+```typescript
+// Detect speech in audio file (supports same formats as transcribe)
+const segments = await vadContext.detectSpeech(require('./assets/audio.wav'), {
+  threshold: 0.5, // Speech probability threshold (0.0-1.0)
+  minSpeechDurationMs: 250, // Minimum speech duration in ms
+  minSilenceDurationMs: 100, // Minimum silence duration in ms
+  maxSpeechDurationS: 30, // Maximum speech duration in seconds
+  speechPadMs: 30, // Padding around speech segments in ms
+  samplesOverlap: 0.1, // Overlap between analysis windows
+})
+
+// Also supports:
+// - File paths: vadContext.detectSpeech('path/to/audio.wav', options)
+// - HTTP URLs: vadContext.detectSpeech('https://example.com/audio.wav', options)
+// - Base64 WAV: vadContext.detectSpeech('data:audio/wav;base64,...', options)
+// - Assets: vadContext.detectSpeech(require('./assets/audio.wav'), options)
+```
+
+##### From Raw Audio Data
+
+```typescript
+// Detect speech in base64 encoded float32 PCM data
+const segments = await vadContext.detectSpeechData(base64AudioData, {
+  threshold: 0.5,
+  minSpeechDurationMs: 250,
+  minSilenceDurationMs: 100,
+  maxSpeechDurationS: 30,
+  speechPadMs: 30,
+  samplesOverlap: 0.1,
+})
+```
+
+#### Process Results
+
+```typescript
+segments.forEach((segment, index) => {
+  console.log(`Segment ${index + 1}: ${segment.t0.toFixed(2)}s - ${segment.t1.toFixed(2)}s`)
+  console.log(`Duration: ${(segment.t1 - segment.t0).toFixed(2)}s`)
+})
+```
+
+#### Release VAD Context
+
+```typescript
+await vadContext.release()
+// Or release all VAD contexts
+await releaseAllWhisperVad()
+```
+
 In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
 
 Option 1 - Use options in transcribeRealtime:

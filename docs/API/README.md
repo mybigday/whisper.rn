@@ -13,6 +13,7 @@ whisper.rn
 ### Classes
 
 - [WhisperContext](classes/WhisperContext.md)
+- [WhisperVadContext](classes/WhisperVadContext.md)
 
 ### Type Aliases
 
@@ -29,6 +30,9 @@ whisper.rn
 - [TranscribeRealtimeNativePayload](README.md#transcriberealtimenativepayload)
 - [TranscribeRealtimeOptions](README.md#transcriberealtimeoptions)
 - [TranscribeResult](README.md#transcriberesult)
+- [VadContextOptions](README.md#vadcontextoptions)
+- [VadOptions](README.md#vadoptions)
+- [VadSegment](README.md#vadsegment)
 
 ### Variables
 
@@ -40,7 +44,9 @@ whisper.rn
 ### Functions
 
 - [initWhisper](README.md#initwhisper)
+- [initWhisperVad](README.md#initwhispervad)
 - [releaseAllWhisper](README.md#releaseallwhisper)
+- [releaseAllWhisperVad](README.md#releaseallwhispervad)
 
 ## Type Aliases
 
@@ -59,7 +65,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:76](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L76)
+[index.ts:80](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L80)
 
 ___
 
@@ -80,7 +86,7 @@ ___
 
 #### Defined in
 
-[index.ts:177](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L177)
+[index.ts:181](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L181)
 
 ___
 
@@ -103,7 +109,7 @@ ___
 
 #### Defined in
 
-[index.ts:476](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L476)
+[index.ts:480](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L480)
 
 ___
 
@@ -113,7 +119,7 @@ ___
 
 #### Defined in
 
-[index.ts:59](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L59)
+[index.ts:63](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L63)
 
 ___
 
@@ -131,7 +137,7 @@ ___
 
 #### Defined in
 
-[index.ts:52](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L52)
+[index.ts:56](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L56)
 
 ___
 
@@ -150,7 +156,7 @@ ___
 
 #### Defined in
 
-[index.ts:45](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L45)
+[index.ts:49](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L49)
 
 ___
 
@@ -180,7 +186,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -198,7 +204,7 @@ ___
 
 #### Defined in
 
-[index.ts:70](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L70)
+[index.ts:74](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L74)
 
 ___
 
@@ -223,7 +229,7 @@ ___
 
 #### Defined in
 
-[index.ts:138](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L138)
+[index.ts:142](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L142)
 
 ___
 
@@ -241,7 +247,7 @@ ___
 
 #### Defined in
 
-[index.ts:171](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L171)
+[index.ts:175](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L175)
 
 ___
 
@@ -265,7 +271,7 @@ ___
 
 #### Defined in
 
-[index.ts:158](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L158)
+[index.ts:162](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L162)
 
 ___
 
@@ -275,7 +281,7 @@ ___
 
 #### Defined in
 
-[index.ts:84](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L84)
+[index.ts:88](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L88)
 
 ___
 
@@ -293,7 +299,64 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L37)
+
+___
+
+### VadContextOptions
+
+Ƭ **VadContextOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `filePath` | `string` \| `number` | - |
+| `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
+| `nThreads?` | `number` | Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) |
+| `useGpu?` | `boolean` | Use GPU if available. Currently iOS only |
+
+#### Defined in
+
+[index.ts:594](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L594)
+
+___
+
+### VadOptions
+
+Ƭ **VadOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `maxSpeechDurationS?` | `number` | Max duration of a speech segment before forcing a new segment in seconds (Default: 30) |
+| `minSilenceDurationMs?` | `number` | Min silence duration to consider speech as ended in ms (Default: 100) |
+| `minSpeechDurationMs?` | `number` | Min duration for a valid speech segment in ms (Default: 250) |
+| `samplesOverlap?` | `number` | Overlap in seconds when copying audio samples from speech segment (Default: 0.1) |
+| `speechPadMs?` | `number` | Padding added before and after speech segments in ms (Default: 30) |
+| `threshold?` | `number` | Probability threshold to consider as speech (Default: 0.5) |
+
+#### Defined in
+
+[NativeRNWhisper.ts:68](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L68)
+
+___
+
+### VadSegment
+
+Ƭ **VadSegment**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `t0` | `number` |
+| `t1` | `number` |
+
+#### Defined in
+
+[NativeRNWhisper.ts:96](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L96)
 
 ## Variables
 
@@ -318,7 +381,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/a11299e/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -330,7 +393,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:582](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L582)
+[index.ts:586](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L586)
 
 ___
 
@@ -342,7 +405,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:579](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L579)
+[index.ts:583](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L583)
 
 ___
 
@@ -354,7 +417,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:574](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L574)
+[index.ts:578](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L578)
 
 ## Functions
 
@@ -374,7 +437,31 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:504](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L504)
+[index.ts:508](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L508)
+
+___
+
+### initWhisperVad
+
+▸ **initWhisperVad**(`options`): `Promise`<[`WhisperVadContext`](classes/WhisperVadContext.md)\>
+
+Initialize a VAD context for voice activity detection
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `options` | [`VadContextOptions`](README.md#vadcontextoptions) | VAD context options |
+
+#### Returns
+
+`Promise`<[`WhisperVadContext`](classes/WhisperVadContext.md)\>
+
+Promise resolving to WhisperVadContext instance
+
+#### Defined in
+
+[index.ts:676](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L676)
 
 ___
 
@@ -388,4 +475,22 @@ ___
 
 #### Defined in
 
-[index.ts:569](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L569)
+[index.ts:573](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L573)
+
+___
+
+### releaseAllWhisperVad
+
+▸ **releaseAllWhisperVad**(): `Promise`<`void`\>
+
+Release all VAD contexts and free their memory
+
+#### Returns
+
+`Promise`<`void`\>
+
+Promise resolving when all contexts are released
+
+#### Defined in
+
+[index.ts:713](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L713)
