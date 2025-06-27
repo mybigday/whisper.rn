@@ -36,36 +36,30 @@
         NSLog(@"[RNWhisper] ggml-metal is not enabled in this build, ignoring use_gpu option");
         cparams.use_gpu = false;
     }
+    reasonNoMetal = @"Metal is not enabled in this build";
 #endif
 
 #ifdef WSP_GGML_USE_METAL
     if (cparams.use_gpu) {
-#if TARGET_OS_SIMULATOR
-        NSLog(@"[RNWhisper] ggml-metal is not available in simulator, ignoring use_gpu option: %@", reasonNoMetal);
-        cparams.use_gpu = false;
-#else // TARGET_OS_SIMULATOR
-        // Check ggml-metal availability
-        NSError * error = nil;
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-        id<MTLLibrary> library = [device
-            newLibraryWithSource:@"#include <metal_stdlib>\n"
-                                    "using namespace metal;"
-                                    "kernel void test() { simd_sum(0); }"
-            options:nil
-            error:&error
-        ];
-        if (error) {
-            reasonNoMetal = [error localizedDescription];
-        } else {
-            id<MTLFunction> kernel = [library newFunctionWithName:@"test"];
-            id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:kernel error:&error];
-            if (pipeline == nil) {
-                reasonNoMetal = [error localizedDescription];
-                NSLog(@"[RNWhisper] ggml-metal is not available, ignoring use_gpu option: %@", reasonNoMetal);
-                cparams.use_gpu = false;
-            }
+
+        // Check ggml-metal availability
+        BOOL supportsGgmlMetal = [device supportsFamily:MTLGPUFamilyApple7];
+        if (@available(iOS 16.0, tvOS 16.0, *)) {
+            supportsGgmlMetal = supportsGgmlMetal && [device supportsFamily:MTLGPUFamilyMetal3];
         }
-#endif // TARGET_OS_SIMULATOR
+        if (!supportsGgmlMetal) {
+            cparams.use_gpu = false;
+            reasonNoMetal = @"Metal is not supported in this device";
+        }
+
+#if TARGET_OS_SIMULATOR
+        // Use the backend, but no layers because not supported fully on simulator
+        cparams.use_gpu = false;
+        reasonNoMetal = @"Metal is not supported in simulator";
+#endif
+
+        device = nil;
     }
 #endif // WSP_GGML_USE_METAL
 
