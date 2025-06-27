@@ -10,7 +10,7 @@ import Sound from 'react-native-sound'
 import { initWhisperVad, libVersion } from '../../src' // whisper.rn
 import type { WhisperVadContext, VadSegment } from '../../src'
 import { Button } from './Button'
-import { createDir, fileDir, modelHost, toTimestamp } from './util'
+import { createDir, fileDir, vadModelHost, toTimestamp } from './util'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -109,7 +109,7 @@ export default function VadExample() {
                 log('Released previous VAD context')
               }
               await createDir(log)
-              const modelFilePath = `${fileDir}/ggml-base.bin`
+              const modelFilePath = `${fileDir}/ggml-silero-v5.1.2.bin`
               if (await RNFS.exists(modelFilePath)) {
                 log('Model already exists:')
                 log(filterPath(modelFilePath))
@@ -117,7 +117,7 @@ export default function VadExample() {
                 log('Start Download Model for VAD to:')
                 log(filterPath(modelFilePath))
                 await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-base.bin`,
+                  fromUrl: `${vadModelHost}/ggml-silero-v5.1.2.bin`,
                   toFile: modelFilePath,
                   progressInterval: 1000,
                   begin: () => {},

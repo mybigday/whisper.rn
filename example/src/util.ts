@@ -6,6 +6,8 @@ console.log('[App] fileDir', fileDir)
 
 export const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
 
+export const vadModelHost = 'https://huggingface.co/ggml-org/whisper-vad/resolve/main'
+
 export const createDir = async (log: any) => {
   if (!(await RNFS.exists(fileDir))) {
     log?.('Create dir', fileDir)
