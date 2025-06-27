@@ -36,7 +36,7 @@
 
 #### Defined in
 
-[index.ts:204](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L204)
+[index.ts:208](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L208)
 
 ## Properties
 
@@ -46,7 +46,7 @@
 
 #### Defined in
 
-[index.ts:200](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L200)
+[index.ts:204](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L204)
 
 ___
 
@@ -56,7 +56,7 @@ ___
 
 #### Defined in
 
-[index.ts:198](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L198)
+[index.ts:202](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L202)
 
 ___
 
@@ -66,7 +66,7 @@ ___
 
 #### Defined in
 
-[index.ts:202](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L202)
+[index.ts:206](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L206)
 
 ## Methods
 
@@ -86,7 +86,7 @@ ___
 
 #### Defined in
 
-[index.ts:465](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L465)
+[index.ts:469](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L469)
 
 ___
 
@@ -100,7 +100,7 @@ ___
 
 #### Defined in
 
-[index.ts:471](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L471)
+[index.ts:475](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L475)
 
 ___
 
@@ -129,7 +129,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:292](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L292)
+[index.ts:296](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L296)
 
 ___
 
@@ -157,7 +157,7 @@ Transcribe audio data (base64 encoded float32 PCM data)
 
 #### Defined in
 
-[index.ts:323](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L323)
+[index.ts:327](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L327)
 
 ___
 
@@ -179,4 +179,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:331](https://github.com/mybigday/whisper.rn/blob/9a3a410/src/index.ts#L331)
+[index.ts:335](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L335)

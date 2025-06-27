@@ -65,6 +65,39 @@ export type NativeWhisperContext = {
   reasonNoGPU: string
 }
 
+export type VadOptions = {
+  /** Probability threshold to consider as speech (Default: 0.5) */
+  threshold?: number,
+  /** Min duration for a valid speech segment in ms (Default: 250) */
+  minSpeechDurationMs?: number,
+  /** Min silence duration to consider speech as ended in ms (Default: 100) */
+  minSilenceDurationMs?: number,
+  /** Max duration of a speech segment before forcing a new segment in seconds (Default: 30) */
+  maxSpeechDurationS?: number,
+  /** Padding added before and after speech segments in ms (Default: 30) */
+  speechPadMs?: number,
+  /** Overlap in seconds when copying audio samples from speech segment (Default: 0.1) */
+  samplesOverlap?: number,
+}
+
+type NativeVadContextOptions = {
+  filePath: string,
+  isBundleAsset: boolean,
+  useGpu?: boolean,
+  nThreads?: number,
+}
+
+export type NativeWhisperVadContext = {
+  contextId: number
+  gpu: boolean
+  reasonNoGPU: string
+}
+
+export type VadSegment = {
+  t0: number
+  t1: number
+}
+
 export interface Spec extends TurboModule {
   getConstants(): {
     useCoreML: boolean
@@ -93,6 +126,21 @@ export interface Spec extends TurboModule {
   abortTranscribe(contextId: number, jobId: number): Promise<void>;
 
   bench(contextId: number, maxThreads: number): Promise<string>;
+
+  // VAD methods
+  initVadContext(options: NativeVadContextOptions): Promise<NativeWhisperVadContext>;
+  releaseVadContext(contextId: number): Promise<void>;
+  releaseAllVadContexts(): Promise<void>;
+  vadDetectSpeech(
+    contextId: number,
+    audioData: string, // base64 encoded float32 PCM data
+    options: VadOptions,
+  ): Promise<VadSegment[]>;
+  vadDetectSpeechFile(
+    contextId: number,
+    filePathOrBase64: string,
+    options: VadOptions,
+  ): Promise<VadSegment[]>;
 
   // iOS specific
   getAudioSessionCurrentCategory: () => Promise<{

@@ -1,5 +1,6 @@
 #import "RNWhisper.h"
 #import "RNWhisperContext.h"
+#import "RNWhisperVadContext.h"
 #import "RNWhisperDownloader.h"
 #import "RNWhisperAudioUtils.h"
 #import "RNWhisperAudioSessionUtils.h"
@@ -13,6 +14,7 @@
 @implementation RNWhisper
 
 NSMutableDictionary *contexts;
+NSMutableDictionary *vadContexts;
 
 RCT_EXPORT_MODULE()
 
@@ -366,6 +368,15 @@ RCT_REMAP_METHOD(releaseAllContexts,
         [context invalidate];
     }
 
+    if (vadContexts != nil) {
+        for (NSNumber *contextId in vadContexts) {
+            RNWhisperVadContext *vadContext = vadContexts[contextId];
+            [vadContext invalidate];
+        }
+        [vadContexts removeAllObjects];
+        vadContexts = nil;
+    }
+
     rnwhisper::job_abort_all(); // graceful abort
 
     [contexts removeAllObjects];
@@ -433,6 +444,142 @@ RCT_REMAP_METHOD(setAudioSessionActive,
     if (error != nil) {
         reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set active. Error: %@", error], nil);
         return;
+    }
+    resolve(nil);
+}
+
+RCT_REMAP_METHOD(initVadContext,
+                 withVadOptions:(NSDictionary *)vadOptions
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    if (vadContexts == nil) {
+        vadContexts = [[NSMutableDictionary alloc] init];
+    }
+
+    NSString *modelPath = [vadOptions objectForKey:@"filePath"];
+    BOOL isBundleAsset = [[vadOptions objectForKey:@"isBundleAsset"] boolValue];
+    BOOL useGpu = [[vadOptions objectForKey:@"useGpu"] boolValue];
+    NSNumber *nThreads = [vadOptions objectForKey:@"nThreads"];
+
+    NSString *path = modelPath;
+    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+        path = [RNWhisperDownloader downloadFile:path toFile:nil];
+    }
+    if (isBundleAsset) {
+        path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
+    }
+
+    int contextId = arc4random_uniform(1000000);
+
+    RNWhisperVadContext *vadContext = [RNWhisperVadContext
+        initWithModelPath:path
+        contextId:contextId
+        noMetal:!useGpu
+        nThreads:nThreads
+    ];
+    if ([vadContext getVadContext] == NULL) {
+        reject(@"whisper_vad_error", @"Failed to load the VAD model", nil);
+        return;
+    }
+
+    [vadContexts setObject:vadContext forKey:[NSNumber numberWithInt:contextId]];
+
+    resolve(@{
+        @"contextId": @(contextId),
+        @"gpu": @([vadContext isMetalEnabled]),
+        @"reasonNoGPU": [vadContext reasonNoMetal],
+    });
+}
+
+RCT_REMAP_METHOD(vadDetectSpeech,
+                 withContextId:(int)contextId
+                 withAudioData:(NSString *)audioDataBase64
+                 withOptions:(NSDictionary *)options
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperVadContext *vadContext = vadContexts[[NSNumber numberWithInt:contextId]];
+
+    if (vadContext == nil) {
+        reject(@"whisper_vad_error", @"VAD context not found", nil);
+        return;
+    }
+
+    // Decode base64 audio data
+    NSData *audioData = [[NSData alloc] initWithBase64EncodedString:audioDataBase64 options:0];
+    if (audioData == nil) {
+        reject(@"whisper_vad_error", @"Invalid audio data", nil);
+        return;
+    }
+
+    NSArray *segments = [vadContext detectSpeech:audioData options:options];
+    resolve(segments);
+}
+
+RCT_REMAP_METHOD(vadDetectSpeechFile,
+                 withVadContextId:(int)contextId
+                 withFilePath:(NSString *)filePath
+                 withOptions:(NSDictionary *)options
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperVadContext *vadContext = vadContexts[[NSNumber numberWithInt:contextId]];
+
+    if (vadContext == nil) {
+        reject(@"whisper_vad_error", @"VAD context not found", nil);
+        return;
+    }
+
+    // Handle different input types like transcribeFile does
+    float *data = nil;
+    int count = 0;
+    if ([filePath hasPrefix:@"http://"] || [filePath hasPrefix:@"https://"]) {
+        NSString *path = [RNWhisperDownloader downloadFile:filePath toFile:nil];
+        data = [RNWhisperAudioUtils decodeWaveFile:path count:&count];
+    } else if ([filePath hasPrefix:@"data:audio/wav;base64,"]) {
+        NSData *waveData = [[NSData alloc] initWithBase64EncodedString:[filePath substringFromIndex:22] options:0];
+        data = [RNWhisperAudioUtils decodeWaveData:waveData count:&count cutHeader:YES];
+    } else {
+        data = [RNWhisperAudioUtils decodeWaveFile:filePath count:&count];
+    }
+
+    if (data == nil) {
+        reject(@"whisper_vad_error", @"Failed to load or decode audio file", nil);
+        return;
+    }
+
+    // Convert float32 data to NSData for VAD context
+    NSData *audioData = [NSData dataWithBytes:data length:count * sizeof(float)];
+
+    NSArray *segments = [vadContext detectSpeech:audioData options:options];
+    resolve(segments);
+}
+
+RCT_REMAP_METHOD(releaseVadContext,
+                 withVadContextId:(int)contextId
+                 withResolver:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RNWhisperVadContext *vadContext = vadContexts[[NSNumber numberWithInt:contextId]];
+    if (vadContext == nil) {
+        reject(@"whisper_vad_error", @"VAD context not found", nil);
+        return;
+    }
+    [vadContext invalidate];
+    [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    resolve(nil);
+}
+
+RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    if (vadContexts != nil) {
+        for (NSNumber *contextId in vadContexts) {
+            RNWhisperVadContext *vadContext = vadContexts[contextId];
+            [vadContext invalidate];
+        }
+        [vadContexts removeAllObjects];
     }
     resolve(nil);
 }

@@ -61,6 +61,25 @@ if (!NativeModules.RNWhisper) {
     releaseContext: jest.fn(() => Promise.resolve()),
     releaseAllContexts: jest.fn(() => Promise.resolve()),
 
+    // VAD methods
+    initVadContext: jest.fn(() => Promise.resolve({
+      contextId: 2,
+      gpu: false,
+      reasonNoGPU: 'Mock VAD context'
+    })),
+    vadDetectSpeech: jest.fn().mockResolvedValue([
+      { t0: 0.5, t1: 2.3 },
+      { t0: 3.1, t1: 5.8 },
+      { t0: 7.2, t1: 9.4 }
+    ]),
+    vadDetectSpeechFile: jest.fn().mockResolvedValue([
+      { t0: 0.5, t1: 2.3 },
+      { t0: 3.1, t1: 5.8 },
+      { t0: 7.2, t1: 9.4 }
+    ]),
+    releaseVadContext: jest.fn(() => Promise.resolve()),
+    releaseAllVadContexts: jest.fn(() => Promise.resolve()),
+
     // iOS AudioSession utils
     getAudioSessionCurrentCategory: jest.fn(() => Promise.resolve({
       category: 'AVAudioSessionCategoryPlayAndRecord',

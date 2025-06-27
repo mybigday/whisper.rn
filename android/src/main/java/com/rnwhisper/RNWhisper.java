@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.Arguments;
 
 import java.util.HashMap;
@@ -47,6 +48,7 @@ public class RNWhisper implements LifecycleEventListener {
   private HashMap<AsyncTask, String> tasks = new HashMap<>();
 
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
+  private HashMap<Integer, WhisperVadContext> vadContexts = new HashMap<>();
 
   private int getResourceIdentifier(String filePath) {
     int identifier = reactContext.getResources().getIdentifier(
@@ -344,6 +346,211 @@ public class RNWhisper implements LifecycleEventListener {
     tasks.put(task, "releaseAllContexts");
   }
 
+  public void initVadContext(final ReadableMap options, final Promise promise) {
+    AsyncTask task = new AsyncTask<Void, Void, Integer>() {
+      private Exception exception;
+
+      @Override
+      protected Integer doInBackground(Void... voids) {
+        try {
+          String modelPath = options.getString("filePath");
+          boolean isBundleAsset = options.getBoolean("isBundleAsset");
+
+          String modelFilePath = modelPath;
+          if (!isBundleAsset && (modelPath.startsWith("http://") || modelPath.startsWith("https://"))) {
+            modelFilePath = downloader.downloadFile(modelPath);
+          }
+
+          long vadContext;
+          int resId = getResourceIdentifier(modelFilePath);
+          if (resId > 0) {
+            vadContext = WhisperContext.initVadContextWithInputStream(
+              new PushbackInputStream(reactContext.getResources().openRawResource(resId))
+            );
+          } else if (isBundleAsset) {
+            vadContext = WhisperContext.initVadContextWithAsset(reactContext.getAssets(), modelFilePath);
+          } else {
+            vadContext = WhisperContext.initVadContext(modelFilePath);
+          }
+          if (vadContext == 0) {
+            throw new Exception("Failed to initialize VAD context");
+          }
+          int id = Math.abs(new Random().nextInt());
+          WhisperVadContext whisperVadContext = new WhisperVadContext(id, reactContext, vadContext);
+          vadContexts.put(id, whisperVadContext);
+          return id;
+        } catch (Exception e) {
+          exception = e;
+          return null;
+        }
+      }
+
+      @Override
+      protected void onPostExecute(Integer id) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        WritableMap result = Arguments.createMap();
+        result.putInt("contextId", id);
+        result.putBoolean("gpu", false);
+        result.putString("reasonNoGPU", "Currently not supported");
+        promise.resolve(result);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "initVadContext");
+  }
+
+  public void vadDetectSpeech(double id, String audioDataBase64, ReadableMap options, Promise promise) {
+    final WhisperVadContext vadContext = vadContexts.get((int) id);
+    if (vadContext == null) {
+      promise.reject("VAD context not found");
+      return;
+    }
+
+    AsyncTask task = new AsyncTask<Void, Void, WritableArray>() {
+      private Exception exception;
+
+      @Override
+      protected WritableArray doInBackground(Void... voids) {
+        try {
+          return vadContext.detectSpeech(audioDataBase64, options);
+        } catch (Exception e) {
+          exception = e;
+          return null;
+        }
+      }
+
+      @Override
+      protected void onPostExecute(WritableArray segments) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(segments);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "vadDetectSpeech-" + id);
+  }
+
+  public void vadDetectSpeechFile(double id, String filePathOrBase64, ReadableMap options, Promise promise) {
+    final WhisperVadContext vadContext = vadContexts.get((int) id);
+    if (vadContext == null) {
+      promise.reject("VAD context not found");
+      return;
+    }
+
+    AsyncTask task = new AsyncTask<Void, Void, WritableArray>() {
+      private Exception exception;
+
+      @Override
+      protected WritableArray doInBackground(Void... voids) {
+        try {
+          // Handle file processing like transcribeFile does
+          String filePath = filePathOrBase64;
+          if (filePathOrBase64.startsWith("http://") || filePathOrBase64.startsWith("https://")) {
+            filePath = downloader.downloadFile(filePathOrBase64);
+          }
+
+          float[] audioData;
+          int resId = getResourceIdentifier(filePath);
+          if (resId > 0) {
+            audioData = AudioUtils.decodeWaveFile(reactContext.getResources().openRawResource(resId));
+          } else if (filePathOrBase64.startsWith("data:audio/wav;base64,")) {
+            audioData = AudioUtils.decodeWaveData(filePathOrBase64);
+          } else {
+            audioData = AudioUtils.decodeWaveFile(new java.io.FileInputStream(new java.io.File(filePath)));
+          }
+
+          if (audioData == null) {
+            throw new Exception("Failed to load audio file: " + filePathOrBase64);
+          }
+
+          return vadContext.detectSpeechWithAudioData(audioData, options);
+        } catch (Exception e) {
+          exception = e;
+          return null;
+        }
+      }
+
+      @Override
+      protected void onPostExecute(WritableArray segments) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(segments);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "vadDetectSpeechFile-" + id);
+  }
+
+  public void releaseVadContext(double id, Promise promise) {
+    final int contextId = (int) id;
+    AsyncTask task = new AsyncTask<Void, Void, Void>() {
+      private Exception exception;
+
+      @Override
+      protected Void doInBackground(Void... voids) {
+        try {
+          WhisperVadContext vadContext = vadContexts.get(contextId);
+          if (vadContext == null) {
+            throw new Exception("VAD context " + id + " not found");
+          }
+          vadContext.release();
+          vadContexts.remove(contextId);
+        } catch (Exception e) {
+          exception = e;
+        }
+        return null;
+      }
+
+      @Override
+      protected void onPostExecute(Void result) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(null);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "releaseVadContext-" + id);
+  }
+
+  public void releaseAllVadContexts(Promise promise) {
+    AsyncTask task = new AsyncTask<Void, Void, Void>() {
+      private Exception exception;
+
+      @Override
+      protected Void doInBackground(Void... voids) {
+        try {
+          for (WhisperVadContext vadContext : vadContexts.values()) {
+            vadContext.release();
+          }
+          vadContexts.clear();
+        } catch (Exception e) {
+          exception = e;
+        }
+        return null;
+      }
+
+      @Override
+      protected void onPostExecute(Void result) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(null);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "releaseAllVadContexts");
+  }
+
   @Override
   public void onHostResume() {
   }
@@ -367,8 +574,12 @@ public class RNWhisper implements LifecycleEventListener {
     for (WhisperContext context : contexts.values()) {
       context.release();
     }
+    for (WhisperVadContext vadContext : vadContexts.values()) {
+      vadContext.release();
+    }
     WhisperContext.abortAllTranscribe(); // graceful abort
     contexts.clear();
+    vadContexts.clear();
     downloader.clearCache();
   }
 }

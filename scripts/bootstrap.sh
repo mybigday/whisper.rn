@@ -218,15 +218,19 @@ cd whisper.cpp/models
 # If CI env is `true`, use dummy model
 if [ "$CI" = "true" ]; then
   cp for-tests-ggml-base.bin ggml-base.bin
+  cp for-tests-silero-v5.1.2-ggml.bin ggml-silero-v5.1.2.bin
   echo "CI: Copied for-tests-ggml-base.bin to ggml-base.bin"
 else
   ./download-ggml-model.sh base
+  ./download-vad-model.sh silero-v5.1.2
 fi
 
 # Copy to assets
 cp ../samples/jfk.wav ../../example/assets
 cp ggml-base.bin ../../example/assets
 echo "Copied ggml-base.bin to example/assets"
+cp ggml-silero-v5.1.2.bin ../../example/assets
+echo "Copied ggml-silero-v5.1.2.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-base-encoder.mlmodelc exist
 if [ ! -d ./ggml-base-encoder.mlmodelc ]; then
