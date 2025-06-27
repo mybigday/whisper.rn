@@ -573,7 +573,7 @@ Java_com_rnwhisper_WhisperContext_bench(
 
 // VAD Context JNI implementations
 JNIEXPORT jlong JNICALL
-Java_com_rnwhisper_WhisperVadContext_initVadContext(
+Java_com_rnwhisper_WhisperContext_initVadContext(
     JNIEnv *env,
     jobject thiz,
     jstring model_path_str
@@ -589,7 +589,7 @@ Java_com_rnwhisper_WhisperVadContext_initVadContext(
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_rnwhisper_WhisperVadContext_initVadContextWithAsset(
+Java_com_rnwhisper_WhisperContext_initVadContextWithAsset(
     JNIEnv *env,
     jobject thiz,
     jobject asset_manager,
@@ -606,7 +606,7 @@ Java_com_rnwhisper_WhisperVadContext_initVadContextWithAsset(
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_rnwhisper_WhisperVadContext_initVadContextWithInputStream(
+Java_com_rnwhisper_WhisperContext_initVadContextWithInputStream(
     JNIEnv *env,
     jobject thiz,
     jobject input_stream
@@ -620,7 +620,7 @@ Java_com_rnwhisper_WhisperVadContext_initVadContextWithInputStream(
 }
 
 JNIEXPORT void JNICALL
-Java_com_rnwhisper_WhisperVadContext_freeVadContext(
+Java_com_rnwhisper_WhisperContext_freeVadContext(
     JNIEnv *env,
     jobject thiz,
     jlong vad_context_ptr
@@ -632,7 +632,7 @@ Java_com_rnwhisper_WhisperVadContext_freeVadContext(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_rnwhisper_WhisperVadContext_vadDetectSpeech(
+Java_com_rnwhisper_WhisperContext_vadDetectSpeech(
     JNIEnv *env,
     jobject thiz,
     jlong vad_context_ptr,
@@ -650,7 +650,7 @@ Java_com_rnwhisper_WhisperVadContext_vadDetectSpeech(
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_rnwhisper_WhisperVadContext_vadGetSegmentsFromProbs(
+Java_com_rnwhisper_WhisperContext_vadGetSegmentsFromProbs(
     JNIEnv *env,
     jobject thiz,
     jlong vad_context_ptr,
@@ -677,7 +677,7 @@ Java_com_rnwhisper_WhisperVadContext_vadGetSegmentsFromProbs(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_rnwhisper_WhisperVadContext_vadGetNSegments(
+Java_com_rnwhisper_WhisperContext_vadGetNSegments(
     JNIEnv *env,
     jobject thiz,
     jlong segments_ptr
@@ -689,7 +689,7 @@ Java_com_rnwhisper_WhisperVadContext_vadGetNSegments(
 }
 
 JNIEXPORT jfloat JNICALL
-Java_com_rnwhisper_WhisperVadContext_vadGetSegmentT0(
+Java_com_rnwhisper_WhisperContext_vadGetSegmentT0(
     JNIEnv *env,
     jobject thiz,
     jlong segments_ptr,
@@ -702,7 +702,7 @@ Java_com_rnwhisper_WhisperVadContext_vadGetSegmentT0(
 }
 
 JNIEXPORT jfloat JNICALL
-Java_com_rnwhisper_WhisperVadContext_vadGetSegmentT1(
+Java_com_rnwhisper_WhisperContext_vadGetSegmentT1(
     JNIEnv *env,
     jobject thiz,
     jlong segments_ptr,
@@ -715,7 +715,7 @@ Java_com_rnwhisper_WhisperVadContext_vadGetSegmentT1(
 }
 
 JNIEXPORT void JNICALL
-Java_com_rnwhisper_WhisperVadContext_vadFreeSegments(
+Java_com_rnwhisper_WhisperContext_vadFreeSegments(
     JNIEnv *env,
     jobject thiz,
     jlong segments_ptr
