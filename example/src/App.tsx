@@ -49,7 +49,7 @@ function HomeScreen({ navigation }: { navigation: any }) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate('Vad')}
+        onPress={() => navigation.navigate('VAD')}
       >
         <Text style={styles.buttonText}>Example: VAD</Text>
       </TouchableOpacity>
@@ -73,7 +73,7 @@ function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Transcribe" component={Transcribe} />
           <Stack.Screen name="TranscribeData" component={TranscribeData} />
-          <Stack.Screen name="Vad" component={Vad} />
+          <Stack.Screen name="VAD" component={Vad} />
           <Stack.Screen name="Bench" component={Bench} />
         </Stack.Navigator>
       </NavigationContainer>
