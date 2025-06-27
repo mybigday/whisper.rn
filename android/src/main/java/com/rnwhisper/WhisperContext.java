@@ -460,19 +460,19 @@ public class WhisperContext {
     }
   }
 
-  private static boolean isArm64V8a() {
+  public static boolean isArm64V8a() {
     return Build.SUPPORTED_ABIS[0].equals("arm64-v8a");
   }
 
-  private static boolean isArmeabiV7a() {
+  public static boolean isArmeabiV7a() {
     return Build.SUPPORTED_ABIS[0].equals("armeabi-v7a");
   }
 
-  private static boolean isX86_64() {
+  public static boolean isX86_64() {
     return Build.SUPPORTED_ABIS[0].equals("x86_64");
   }
 
-  private static String getCpuFeatures() {
+  public static String getCpuFeatures() {
     File file = new File("/proc/cpuinfo");
     StringBuilder stringBuilder = new StringBuilder();
     try {
@@ -490,6 +490,10 @@ public class WhisperContext {
       Log.w(NAME, "Couldn't read /proc/cpuinfo", e);
       return "";
     }
+  }
+
+  public static String getLoadedLibrary() {
+    return loadedLibrary;
   }
 
   // JNI methods
@@ -529,4 +533,30 @@ public class WhisperContext {
     int n_samples
   );
   protected static native String bench(long context, int n_threads);
+
+  // VAD JNI methods
+  protected static native long initVadContext(String modelPath);
+  protected static native long initVadContextWithAsset(AssetManager assetManager, String modelPath);
+  protected static native long initVadContextWithInputStream(PushbackInputStream inputStream);
+  protected static native void freeVadContext(long vadContextPtr);
+  protected static native boolean vadDetectSpeech(long vadContextPtr, float[] audioData, int nSamples);
+  protected static native long vadGetSegmentsFromProbs(long vadContextPtr, float threshold,
+                                                       int minSpeechDurationMs, int minSilenceDurationMs,
+                                                       float maxSpeechDurationS, int speechPadMs,
+                                                       float samplesOverlap);
+  protected static native int vadGetNSegments(long segmentsPtr);
+  protected static native float vadGetSegmentT0(long segmentsPtr, int index);
+  protected static native float vadGetSegmentT1(long segmentsPtr, int index);
+  protected static native void vadFreeSegments(long segmentsPtr);
+
+  // Audio file loading utility for VAD
+  public static float[] loadAudioFileAsFloat32(String filePath) {
+    try {
+      java.io.FileInputStream fis = new java.io.FileInputStream(new java.io.File(filePath));
+      return AudioUtils.decodeWaveFile(fis);
+    } catch (Exception e) {
+      Log.e(NAME, "Failed to load audio file: " + filePath, e);
+      return null;
+    }
+  }
 }

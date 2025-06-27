@@ -148,6 +148,47 @@ static struct whisper_context *whisper_init_from_asset(
     return whisper_init_with_params(&loader, cparams);
 }
 
+// VAD context initialization functions
+static struct whisper_vad_context *whisper_vad_init_from_input_stream(
+    JNIEnv *env,
+    jobject input_stream, // PushbackInputStream
+    struct whisper_vad_context_params vad_params
+) {
+    input_stream_context *context = new input_stream_context;
+    context->env = env;
+    context->input_stream = env->NewGlobalRef(input_stream);
+
+    whisper_model_loader loader = {
+        .context = context,
+        .read = &input_stream_read,
+        .eof = &input_stream_is_eof,
+        .close = &input_stream_close
+    };
+    return whisper_vad_init_with_params(&loader, vad_params);
+}
+
+static struct whisper_vad_context *whisper_vad_init_from_asset(
+    JNIEnv *env,
+    jobject assetManager,
+    const char *asset_path,
+    struct whisper_vad_context_params vad_params
+) {
+    LOGI("Loading VAD model from asset '%s'\n", asset_path);
+    AAssetManager *asset_manager = AAssetManager_fromJava(env, assetManager);
+    AAsset *asset = AAssetManager_open(asset_manager, asset_path, AASSET_MODE_STREAMING);
+    if (!asset) {
+        LOGW("Failed to open VAD asset '%s'\n", asset_path);
+        return NULL;
+    }
+    whisper_model_loader loader = {
+        .context = asset,
+        .read = &asset_read,
+        .eof = &asset_is_eof,
+        .close = &asset_close
+    };
+    return whisper_vad_init_with_params(&loader, vad_params);
+}
+
 extern "C" {
 
 JNIEXPORT jlong JNICALL
@@ -528,6 +569,161 @@ Java_com_rnwhisper_WhisperContext_bench(
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     std::string result = rnwhisper::bench(context, n_threads);
     return env->NewStringUTF(result.c_str());
+}
+
+// VAD Context JNI implementations
+JNIEXPORT jlong JNICALL
+Java_com_rnwhisper_WhisperVadContext_initVadContext(
+    JNIEnv *env,
+    jobject thiz,
+    jstring model_path_str
+) {
+    UNUSED(thiz);
+    struct whisper_vad_context_params vad_params = whisper_vad_default_context_params();
+
+    struct whisper_vad_context *vad_context = nullptr;
+    const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
+    vad_context = whisper_vad_init_from_file_with_params(model_path_chars, vad_params);
+    env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    return reinterpret_cast<jlong>(vad_context);
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_rnwhisper_WhisperVadContext_initVadContextWithAsset(
+    JNIEnv *env,
+    jobject thiz,
+    jobject asset_manager,
+    jstring model_path_str
+) {
+    UNUSED(thiz);
+    struct whisper_vad_context_params vad_params = whisper_vad_default_context_params();
+
+    struct whisper_vad_context *vad_context = nullptr;
+    const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
+    vad_context = whisper_vad_init_from_asset(env, asset_manager, model_path_chars, vad_params);
+    env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    return reinterpret_cast<jlong>(vad_context);
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_rnwhisper_WhisperVadContext_initVadContextWithInputStream(
+    JNIEnv *env,
+    jobject thiz,
+    jobject input_stream
+) {
+    UNUSED(thiz);
+    struct whisper_vad_context_params vad_params = whisper_vad_default_context_params();
+
+    struct whisper_vad_context *vad_context = nullptr;
+    vad_context = whisper_vad_init_from_input_stream(env, input_stream, vad_params);
+    return reinterpret_cast<jlong>(vad_context);
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperVadContext_freeVadContext(
+    JNIEnv *env,
+    jobject thiz,
+    jlong vad_context_ptr
+) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_vad_context *vad_context = reinterpret_cast<struct whisper_vad_context *>(vad_context_ptr);
+    whisper_vad_free(vad_context);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_rnwhisper_WhisperVadContext_vadDetectSpeech(
+    JNIEnv *env,
+    jobject thiz,
+    jlong vad_context_ptr,
+    jfloatArray audio_data,
+    jint n_samples
+) {
+    UNUSED(thiz);
+    struct whisper_vad_context *vad_context = reinterpret_cast<struct whisper_vad_context *>(vad_context_ptr);
+
+    jfloat *audio_data_arr = env->GetFloatArrayElements(audio_data, nullptr);
+    bool result = whisper_vad_detect_speech(vad_context, audio_data_arr, n_samples);
+    env->ReleaseFloatArrayElements(audio_data, audio_data_arr, JNI_ABORT);
+
+    return result;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_rnwhisper_WhisperVadContext_vadGetSegmentsFromProbs(
+    JNIEnv *env,
+    jobject thiz,
+    jlong vad_context_ptr,
+    jfloat threshold,
+    jint min_speech_duration_ms,
+    jint min_silence_duration_ms,
+    jfloat max_speech_duration_s,
+    jint speech_pad_ms,
+    jfloat samples_overlap
+) {
+    UNUSED(thiz);
+    struct whisper_vad_context *vad_context = reinterpret_cast<struct whisper_vad_context *>(vad_context_ptr);
+
+    struct whisper_vad_params vad_params = whisper_vad_default_params();
+    vad_params.threshold = threshold;
+    vad_params.min_speech_duration_ms = min_speech_duration_ms;
+    vad_params.min_silence_duration_ms = min_silence_duration_ms;
+    vad_params.max_speech_duration_s = max_speech_duration_s;
+    vad_params.speech_pad_ms = speech_pad_ms;
+    vad_params.samples_overlap = samples_overlap;
+
+    struct whisper_vad_segments *segments = whisper_vad_segments_from_probs(vad_context, vad_params);
+    return reinterpret_cast<jlong>(segments);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_rnwhisper_WhisperVadContext_vadGetNSegments(
+    JNIEnv *env,
+    jobject thiz,
+    jlong segments_ptr
+) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_vad_segments *segments = reinterpret_cast<struct whisper_vad_segments *>(segments_ptr);
+    return whisper_vad_segments_n_segments(segments);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_rnwhisper_WhisperVadContext_vadGetSegmentT0(
+    JNIEnv *env,
+    jobject thiz,
+    jlong segments_ptr,
+    jint index
+) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_vad_segments *segments = reinterpret_cast<struct whisper_vad_segments *>(segments_ptr);
+    return whisper_vad_segments_get_segment_t0(segments, index);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_rnwhisper_WhisperVadContext_vadGetSegmentT1(
+    JNIEnv *env,
+    jobject thiz,
+    jlong segments_ptr,
+    jint index
+) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_vad_segments *segments = reinterpret_cast<struct whisper_vad_segments *>(segments_ptr);
+    return whisper_vad_segments_get_segment_t1(segments, index);
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperVadContext_vadFreeSegments(
+    JNIEnv *env,
+    jobject thiz,
+    jlong segments_ptr
+) {
+    UNUSED(env);
+    UNUSED(thiz);
+    struct whisper_vad_segments *segments = reinterpret_cast<struct whisper_vad_segments *>(segments_ptr);
+    whisper_vad_free_segments(segments);
 }
 
 } // extern "C"

@@ -5,11 +5,13 @@ import {
   DeviceEventEmitterStatic,
   Image,
 } from 'react-native'
-import RNWhisper, { NativeWhisperContext } from './NativeRNWhisper'
+import RNWhisper, { NativeWhisperContext, NativeWhisperVadContext } from './NativeRNWhisper'
 import type {
   TranscribeOptions,
   TranscribeResult,
   CoreMLAsset,
+  VadOptions,
+  VadSegment,
 } from './NativeRNWhisper'
 import AudioSessionIos from './AudioSessionIos'
 import type {
@@ -34,6 +36,8 @@ export type {
   AudioSessionCategoryIos,
   AudioSessionCategoryOptionIos,
   AudioSessionModeIos,
+  VadOptions,
+  VadSegment,
 }
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
@@ -582,3 +586,130 @@ export const isUseCoreML: boolean = !!useCoreML
 export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
 
 export { AudioSessionIos }
+
+//
+// VAD (Voice Activity Detection) Context
+//
+
+export type VadContextOptions = {
+  filePath: string | number
+  /** Is the file path a bundle asset for pure string filePath */
+  isBundleAsset?: boolean
+  /** Use GPU if available. Currently iOS only */
+  useGpu?: boolean
+  /** Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) */
+  nThreads?: number
+}
+
+export class WhisperVadContext {
+  id: number
+
+  gpu: boolean = false
+
+  reasonNoGPU: string = ''
+
+  constructor({
+    contextId,
+    gpu,
+    reasonNoGPU,
+  }: NativeWhisperVadContext) {
+    this.id = contextId
+    this.gpu = gpu
+    this.reasonNoGPU = reasonNoGPU
+  }
+
+  /**
+   * Detect speech segments in audio file (path or base64 encoded wav file)
+   * base64: need add `data:audio/wav;base64,` prefix
+   */
+  async detectSpeech(
+    filePathOrBase64: string | number,
+    options: VadOptions = {}
+  ): Promise<VadSegment[]> {
+    let path = ''
+    if (typeof filePathOrBase64 === 'number') {
+      try {
+        const source = Image.resolveAssetSource(filePathOrBase64)
+        if (source) path = source.uri
+      } catch (e) {
+        throw new Error(`Invalid asset: ${filePathOrBase64}`)
+      }
+    } else {
+      if (filePathOrBase64.startsWith('http'))
+        throw new Error(
+          'VAD remote file is not supported, please download it first',
+        )
+      path = filePathOrBase64
+    }
+    if (path.startsWith('file://')) path = path.slice(7)
+
+    // Check if this is base64 encoded audio data
+    if (path.startsWith('data:audio/')) {
+      // This is base64 encoded audio data, use the raw data method
+      return RNWhisper.vadDetectSpeech(this.id, path, options)
+    } else {
+      // This is a file path, use the file method
+      return RNWhisper.vadDetectSpeechFile(this.id, path, options)
+    }
+  }
+
+  /**
+   * Detect speech segments in raw audio data (base64 encoded float32 PCM data)
+   */
+  async detectSpeechData(
+    audioData: string,
+    options: VadOptions = {}
+  ): Promise<VadSegment[]> {
+    return RNWhisper.vadDetectSpeech(this.id, audioData, options)
+  }
+
+  async release(): Promise<void> {
+    return RNWhisper.releaseVadContext(this.id)
+  }
+}
+
+/**
+ * Initialize a VAD context for voice activity detection
+ * @param options VAD context options
+ * @returns Promise resolving to WhisperVadContext instance
+ */
+export async function initWhisperVad({
+  filePath,
+  isBundleAsset,
+  useGpu = true,
+  nThreads,
+}: VadContextOptions): Promise<WhisperVadContext> {
+  let path = ''
+  if (typeof filePath === 'number') {
+    try {
+      const source = Image.resolveAssetSource(filePath)
+      if (source) {
+        path = source.uri
+      }
+    } catch (e) {
+      throw new Error(`Invalid asset: ${filePath}`)
+    }
+  } else {
+    if (!isBundleAsset && filePath.startsWith('http'))
+      throw new Error(
+        'VAD remote file is not supported, please download it first',
+      )
+    path = filePath
+  }
+  if (path.startsWith('file://')) path = path.slice(7)
+  const { contextId, gpu, reasonNoGPU } = await RNWhisper.initVadContext({
+    filePath: path,
+    isBundleAsset: !!isBundleAsset,
+    useGpu,
+    nThreads,
+  })
+  return new WhisperVadContext({ contextId, gpu, reasonNoGPU })
+}
+
+/**
+ * Release all VAD contexts and free their memory
+ * @returns Promise resolving when all contexts are released
+ */
+export async function releaseAllWhisperVad(): Promise<void> {
+  return RNWhisper.releaseAllVadContexts()
+}

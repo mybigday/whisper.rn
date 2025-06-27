@@ -77,6 +77,32 @@ public class RNWhisperModule extends NativeRNWhisperSpec {
     rnwhisper.releaseAllContexts(promise);
   }
 
+  // VAD methods
+  @ReactMethod
+  public void initVadContext(final ReadableMap options, final Promise promise) {
+    rnwhisper.initVadContext(options, promise);
+  }
+
+  @ReactMethod
+  public void vadDetectSpeech(double id, String audioDataBase64, ReadableMap options, Promise promise) {
+    rnwhisper.vadDetectSpeech(id, audioDataBase64, options, promise);
+  }
+
+  @ReactMethod
+  public void vadDetectSpeechFile(double id, String filePath, ReadableMap options, Promise promise) {
+    rnwhisper.vadDetectSpeechFile(id, filePath, options, promise);
+  }
+
+  @ReactMethod
+  public void releaseVadContext(double id, Promise promise) {
+    rnwhisper.releaseVadContext(id, promise);
+  }
+
+  @ReactMethod
+  public void releaseAllVadContexts(Promise promise) {
+    rnwhisper.releaseAllVadContexts(promise);
+  }
+
   /*
    * iOS Specific methods, left here for make the turbo module happy:
    */
