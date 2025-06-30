@@ -1,10 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
-} from 'react-native'
+import { StyleSheet, ScrollView, View, Text } from 'react-native'
 import RNFS from 'react-native-fs'
 import Sound from 'react-native-sound'
 import LiveAudioStream from '@fugood/react-native-audio-pcm-stream'
@@ -57,7 +52,10 @@ const filterPath = (path: string) =>
 export default function VadExample() {
   const vadContextRef = useRef<WhisperVadContext | null>(null)
   const vadContext = vadContextRef.current
-  const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`, 'VAD Example - Voice Activity Detection'])
+  const [logs, setLogs] = useState([
+    `whisper.cpp version: ${libVersion}`,
+    'VAD Example - Voice Activity Detection',
+  ])
   const [vadResult, setVadResult] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const recordedDataRef = useRef<Uint8Array | null>(null)
@@ -66,10 +64,13 @@ export default function VadExample() {
     setLogs((prev) => [...prev, messages.join(' ')])
   }, [])
 
-  useEffect(() => () => {
-    vadContextRef.current?.release()
-    vadContextRef.current = null
-  }, [])
+  useEffect(
+    () => () => {
+      vadContextRef.current?.release()
+      vadContextRef.current = null
+    },
+    [],
+  )
 
   const progress = useCallback(
     ({
@@ -161,7 +162,9 @@ export default function VadExample() {
               })
               const endTime = Date.now()
               log('Loaded VAD model, ID:', ctx.id)
-              log(`Loaded VAD model in ${endTime - startTime}ms in ${mode} mode`)
+              log(
+                `Loaded VAD model in ${endTime - startTime}ms in ${mode} mode`,
+              )
               vadContextRef.current = ctx
             }}
           />
@@ -202,7 +205,9 @@ export default function VadExample() {
               })
               const endTime = Date.now()
               log('Loaded VAD model, ID:', ctx.id)
-              log(`Loaded VAD model in ${endTime - startTime}ms in ${mode} mode`)
+              log(
+                `Loaded VAD model in ${endTime - startTime}ms in ${mode} mode`,
+              )
               vadContextRef.current = ctx
             }}
           />
@@ -217,22 +222,28 @@ export default function VadExample() {
             title="Detect Speech (Recorded Data)"
             onPress={async () => {
               if (!vadContext) return log('No VAD context')
-              if (!recordedDataRef.current) return log('No recorded data available')
+              if (!recordedDataRef.current)
+                return log('No recorded data available')
 
               log('Start VAD detection on recorded data...')
               const startTime = Date.now()
 
               // Convert recorded data to base64
-              const base64Data = Buffer.from(recordedDataRef.current).toString('base64')
+              const base64Data = Buffer.from(recordedDataRef.current).toString(
+                'base64',
+              )
 
-              const segments: VadSegment[] = await vadContext.detectSpeechData(base64Data, {
-                threshold: 0.5,
-                minSpeechDurationMs: 250,
-                minSilenceDurationMs: 100,
-                maxSpeechDurationS: 30,
-                speechPadMs: 30,
-                samplesOverlap: 0.1,
-              })
+              const segments: VadSegment[] = await vadContext.detectSpeechData(
+                base64Data,
+                {
+                  threshold: 0.5,
+                  minSpeechDurationMs: 250,
+                  minSilenceDurationMs: 100,
+                  maxSpeechDurationS: 30,
+                  speechPadMs: 30,
+                  samplesOverlap: 0.1,
+                },
+              )
 
               const endTime = Date.now()
 
@@ -240,18 +251,27 @@ export default function VadExample() {
                 setVadResult('No speech segments detected in recorded data')
                 log('No speech segments found in recorded data')
               } else {
-                const resultText = `Recorded Data - Detected ${segments.length} speech segments:
+                const resultText = `Recorded Data - Detected ${
+                  segments.length
+                } speech segments:
 Detection time: ${endTime - startTime}ms in ${mode} mode
 
 Speech Segments:
 ${segments
-                    .map((segment, index) =>
-                      `${index + 1}. [${toTimestamp(Math.round(segment.t0 * 100))} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(segment.t1 - segment.t0).toFixed(2)}ms`
-                    )
-                    .join('\n')}`
+  .map(
+    (segment, index) =>
+      `${index + 1}. [${toTimestamp(
+        Math.round(segment.t0 * 100),
+      )} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(
+        segment.t1 - segment.t0
+      ).toFixed(2)}ms`,
+  )
+  .join('\n')}`
 
                 setVadResult(resultText)
-                log(`Detected ${segments.length} speech segments in recorded data`)
+                log(
+                  `Detected ${segments.length} speech segments in recorded data`,
+                )
               }
             }}
             disabled={!vadContext || !recordedDataRef.current}
@@ -268,14 +288,17 @@ ${segments
 
               // Use actual sample audio file for VAD detection
               // Now supports same formats as transcribe: files, URLs, base64 WAV, assets
-              const segments: VadSegment[] = await vadContext.detectSpeech(sampleFile, {
-                threshold: 0.5,
-                minSpeechDurationMs: 250,
-                minSilenceDurationMs: 100,
-                maxSpeechDurationS: 30,
-                speechPadMs: 30,
-                samplesOverlap: 0.1,
-              })
+              const segments: VadSegment[] = await vadContext.detectSpeech(
+                sampleFile,
+                {
+                  threshold: 0.5,
+                  minSpeechDurationMs: 250,
+                  minSilenceDurationMs: 100,
+                  maxSpeechDurationS: 30,
+                  speechPadMs: 30,
+                  samplesOverlap: 0.1,
+                },
+              )
 
               const endTime = Date.now()
 
@@ -288,10 +311,15 @@ Detection time: ${endTime - startTime}ms in ${mode} mode
 
 Speech Segments:
 ${segments
-                    .map((segment, index) =>
-                      `${index + 1}. [${toTimestamp(Math.round(segment.t0 * 100))} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(segment.t1 - segment.t0).toFixed(2)}ms`
-                    )
-                    .join('\n')}`
+  .map(
+    (segment, index) =>
+      `${index + 1}. [${toTimestamp(
+        Math.round(segment.t0 * 100),
+      )} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(
+        segment.t1 - segment.t0
+      ).toFixed(2)}ms`,
+  )
+  .join('\n')}`
 
                 setVadResult(resultText)
                 log(`Detected ${segments.length} speech segments`)
@@ -306,14 +334,17 @@ ${segments
               log('Start VAD detection with sensitive settings...')
               const startTime = Date.now()
 
-              const segments: VadSegment[] = await vadContext.detectSpeech(sampleFile, {
-                threshold: 0.3, // More sensitive
-                minSpeechDurationMs: 100, // Shorter minimum duration
-                minSilenceDurationMs: 50, // Shorter silence requirement
-                maxSpeechDurationS: 15, // Shorter max segments
-                speechPadMs: 50, // More padding
-                samplesOverlap: 0.2, // More overlap
-              })
+              const segments: VadSegment[] = await vadContext.detectSpeech(
+                sampleFile,
+                {
+                  threshold: 0.3, // More sensitive
+                  minSpeechDurationMs: 100, // Shorter minimum duration
+                  minSilenceDurationMs: 50, // Shorter silence requirement
+                  maxSpeechDurationS: 15, // Shorter max segments
+                  speechPadMs: 50, // More padding
+                  samplesOverlap: 0.2, // More overlap
+                },
+              )
 
               const endTime = Date.now()
 
@@ -321,15 +352,22 @@ ${segments
                 setVadResult('No speech segments detected (sensitive mode)')
                 log('No speech segments found (sensitive)')
               } else {
-                const resultText = `Sensitive Detection - Found ${segments.length} speech segments:
+                const resultText = `Sensitive Detection - Found ${
+                  segments.length
+                } speech segments:
 Detection time: ${endTime - startTime}ms in ${mode} mode
 
 Speech Segments:
 ${segments
-                    .map((segment, index) =>
-                      `${index + 1}. [${toTimestamp(Math.round(segment.t0 * 100))} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(segment.t1 - segment.t0).toFixed(2)}ms`
-                    )
-                    .join('\n')}`
+  .map(
+    (segment, index) =>
+      `${index + 1}. [${toTimestamp(
+        Math.round(segment.t0 * 100),
+      )} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(
+        segment.t1 - segment.t0
+      ).toFixed(2)}ms`,
+  )
+  .join('\n')}`
 
                 setVadResult(resultText)
                 log(`Detected ${segments.length} speech segments (sensitive)`)
@@ -363,7 +401,10 @@ ${segments
           title="Clear Logs"
           style={styles.buttonClear}
           onPress={() => {
-            setLogs([`whisper.cpp version: ${libVersion}`, 'VAD Example - Voice Activity Detection'])
+            setLogs([
+              `whisper.cpp version: ${libVersion}`,
+              'VAD Example - Voice Activity Detection',
+            ])
             setVadResult('')
           }}
         />
