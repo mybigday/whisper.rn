@@ -507,13 +507,16 @@ RCT_REMAP_METHOD(vadDetectSpeech,
     }
 
     // Decode base64 audio data
-    NSData *audioData = [[NSData alloc] initWithBase64EncodedString:audioDataBase64 options:0];
-    if (audioData == nil) {
+    NSData *pcmData = [[NSData alloc] initWithBase64EncodedString:audioDataBase64 options:0];
+    if (pcmData == nil) {
         reject(@"whisper_vad_error", @"Invalid audio data", nil);
         return;
     }
 
-    NSArray *segments = [vadContext detectSpeech:audioData options:options];
+    int count = 0;
+    float *data = [RNWhisperAudioUtils decodeWaveData:pcmData count:&count cutHeader:NO];
+
+    NSArray *segments = [vadContext detectSpeech:data samplesCount:count options:options];
     resolve(segments);
 }
 
@@ -549,10 +552,7 @@ RCT_REMAP_METHOD(vadDetectSpeechFile,
         return;
     }
 
-    // Convert float32 data to NSData for VAD context
-    NSData *audioData = [NSData dataWithBytes:data length:count * sizeof(float)];
-
-    NSArray *segments = [vadContext detectSpeech:audioData options:options];
+    NSArray *segments = [vadContext detectSpeech:data samplesCount:count options:options];
     resolve(segments);
 }
 

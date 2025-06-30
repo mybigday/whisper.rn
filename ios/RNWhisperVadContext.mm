@@ -73,18 +73,14 @@
     return dQueue;
 }
 
-- (NSArray *)detectSpeech:(NSData *)audioData options:(NSDictionary *)options {
+- (NSArray *)detectSpeech:(float *)samples samplesCount:(int)samplesCount options:(NSDictionary *)options {
     if (vctx == NULL) {
         NSLog(@"VAD context is null");
         return @[];
     }
 
-    // Convert NSData to float array
-    const float *samples = (const float *)[audioData bytes];
-    int n_samples = (int)[audioData length] / sizeof(float);
-
     // Run VAD detection
-    bool speechDetected = whisper_vad_detect_speech(vctx, samples, n_samples);
+    bool speechDetected = whisper_vad_detect_speech(vctx, samples, samplesCount);
     if (!speechDetected) {
         return @[];
     }

@@ -23,7 +23,7 @@
 - (NSString *)reasonNoMetal;
 - (struct whisper_vad_context *)getVadContext;
 - (dispatch_queue_t)getDispatchQueue;
-- (NSArray *)detectSpeech:(NSData *)audioData options:(NSDictionary *)options;
+- (NSArray *)detectSpeech:(float *)samples samplesCount:(int)samplesCount options:(NSDictionary *)options;
 - (void)invalidate;
 
 @end

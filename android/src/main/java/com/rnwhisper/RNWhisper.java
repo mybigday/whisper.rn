@@ -415,7 +415,8 @@ public class RNWhisper implements LifecycleEventListener {
       @Override
       protected WritableArray doInBackground(Void... voids) {
         try {
-          return vadContext.detectSpeech(audioDataBase64, options);
+          float[] audioData = AudioUtils.decodePcmData(audioDataBase64);
+          return vadContext.detectSpeechWithAudioData(audioData, audioData.length, options);
         } catch (Exception e) {
           exception = e;
           return null;
@@ -468,7 +469,7 @@ public class RNWhisper implements LifecycleEventListener {
             throw new Exception("Failed to load audio file: " + filePathOrBase64);
           }
 
-          return vadContext.detectSpeechWithAudioData(audioData, options);
+          return vadContext.detectSpeechWithAudioData(audioData, audioData.length, options);
         } catch (Exception e) {
           exception = e;
           return null;

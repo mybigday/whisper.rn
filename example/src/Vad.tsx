@@ -7,10 +7,13 @@ import {
 } from 'react-native'
 import RNFS from 'react-native-fs'
 import Sound from 'react-native-sound'
+import LiveAudioStream from '@fugood/react-native-audio-pcm-stream'
+import { Buffer } from 'buffer'
 import { initWhisperVad, libVersion } from '../../src' // whisper.rn
 import type { WhisperVadContext, VadSegment } from '../../src'
 import { Button } from './Button'
 import { createDir, fileDir, vadModelHost, toTimestamp } from './utils/common'
+import { WavFileWriter } from './utils/WavFileWriter'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -37,6 +40,16 @@ const styles = StyleSheet.create({
 })
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
+const recordFile = `${fileDir}/vad-record.wav`
+
+const audioOptions = {
+  sampleRate: 16000,
+  channels: 1,
+  bitsPerSample: 16,
+  audioSource: 6,
+  wavFile: recordFile,
+  bufferSize: 16 * 1024,
+}
 
 const filterPath = (path: string) =>
   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
@@ -46,6 +59,8 @@ export default function VadExample() {
   const vadContext = vadContextRef.current
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`, 'VAD Example - Voice Activity Detection'])
   const [vadResult, setVadResult] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const recordedDataRef = useRef<Uint8Array | null>(null)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -69,6 +84,57 @@ export default function VadExample() {
     },
     [log],
   )
+
+  const startRecording = async () => {
+    try {
+      await createDir(log)
+      recordedDataRef.current = null
+
+      LiveAudioStream.init(audioOptions)
+      LiveAudioStream.on('data', (data: string) => {
+        const newData = new Uint8Array(Buffer.from(data, 'base64'))
+        if (!recordedDataRef.current) {
+          recordedDataRef.current = newData
+        } else {
+          const combined = new Uint8Array(
+            recordedDataRef.current.length + newData.length,
+          )
+          combined.set(recordedDataRef.current)
+          combined.set(newData, recordedDataRef.current.length)
+          recordedDataRef.current = combined
+        }
+      })
+
+      LiveAudioStream.start()
+      setIsRecording(true)
+      log('Started recording for VAD analysis...')
+    } catch (error) {
+      log('Error starting recording:', error)
+    }
+  }
+
+  const stopRecording = async () => {
+    try {
+      await LiveAudioStream.stop()
+      setIsRecording(false)
+      log('Stopped recording')
+
+      if (!recordedDataRef.current) {
+        log('No recorded data')
+        return
+      }
+
+      // Save the recorded data as WAV file for playback
+      const wavFileWriter = new WavFileWriter(recordFile, audioOptions)
+      await wavFileWriter.initialize()
+      await wavFileWriter.appendAudioData(Buffer.from(recordedDataRef.current!))
+      await wavFileWriter.finalize()
+
+      log(`Recorded ${recordedDataRef.current.length} bytes of audio data`)
+    } catch (error) {
+      log('Error stopping recording:', error)
+    }
+  }
 
   return (
     <ScrollView
@@ -139,6 +205,56 @@ export default function VadExample() {
               log(`Loaded VAD model in ${endTime - startTime}ms in ${mode} mode`)
               vadContextRef.current = ctx
             }}
+          />
+        </View>
+        <View style={styles.buttons}>
+          <Button
+            title={isRecording ? 'Stop Recording' : 'Start Recording'}
+            onPress={isRecording ? stopRecording : startRecording}
+            disabled={!vadContext}
+          />
+          <Button
+            title="Detect Speech (Recorded Data)"
+            onPress={async () => {
+              if (!vadContext) return log('No VAD context')
+              if (!recordedDataRef.current) return log('No recorded data available')
+
+              log('Start VAD detection on recorded data...')
+              const startTime = Date.now()
+
+              // Convert recorded data to base64
+              const base64Data = Buffer.from(recordedDataRef.current).toString('base64')
+
+              const segments: VadSegment[] = await vadContext.detectSpeechData(base64Data, {
+                threshold: 0.5,
+                minSpeechDurationMs: 250,
+                minSilenceDurationMs: 100,
+                maxSpeechDurationS: 30,
+                speechPadMs: 30,
+                samplesOverlap: 0.1,
+              })
+
+              const endTime = Date.now()
+
+              if (segments.length === 0) {
+                setVadResult('No speech segments detected in recorded data')
+                log('No speech segments found in recorded data')
+              } else {
+                const resultText = `Recorded Data - Detected ${segments.length} speech segments:
+Detection time: ${endTime - startTime}ms in ${mode} mode
+
+Speech Segments:
+${segments
+                    .map((segment, index) =>
+                      `${index + 1}. [${toTimestamp(Math.round(segment.t0 * 100))} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(segment.t1 - segment.t0).toFixed(2)}ms`
+                    )
+                    .join('\n')}`
+
+                setVadResult(resultText)
+                log(`Detected ${segments.length} speech segments in recorded data`)
+              }
+            }}
+            disabled={!vadContext || !recordedDataRef.current}
           />
         </View>
         <View style={styles.buttons}>
@@ -272,6 +388,31 @@ ${segments
               player.play((success) => {
                 if (success) {
                   log('Sample audio playback finished')
+                } else {
+                  log('playback failed due to audio decoding errors')
+                }
+                player.release()
+              })
+            })
+          }}
+        />
+        <Button
+          title="Play Recorded Audio"
+          style={styles.buttonClear}
+          onPress={async () => {
+            if (!(await RNFS.exists(recordFile))) {
+              log('Recorded file does not exist')
+              return
+            }
+            const player = new Sound(recordFile, '', (e) => {
+              if (e) {
+                log('error', e)
+                return
+              }
+              log('Playing recorded audio...')
+              player.play((success) => {
+                if (success) {
+                  log('Recorded audio playback finished')
                 } else {
                   log('playback failed due to audio decoding errors')
                 }
