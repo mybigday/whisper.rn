@@ -8,7 +8,8 @@ import { initWhisper, libVersion } from '../../src'
 import type { WhisperContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir } from './util'
+import { WavFileWriter } from './utils/WavFileWriter'
+import { createDir, fileDir } from './utils/common'
 
 const styles = StyleSheet.create({
   scrollview: { flexGrow: 1, justifyContent: 'center' },
@@ -50,7 +51,7 @@ export default function TranscribeData() {
   const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
   const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
-  const recordedDataRef = useRef<Buffer | null>(null)
+  const recordedDataRef = useRef<Uint8Array | null>(null)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -71,13 +72,16 @@ export default function TranscribeData() {
 
       LiveAudioStream.init(audioOptions)
       LiveAudioStream.on('data', (data: string) => {
+        const newData = new Uint8Array(Buffer.from(data, 'base64'))
         if (!recordedDataRef.current) {
-          recordedDataRef.current = Buffer.from(data, 'base64')
+          recordedDataRef.current = newData
         } else {
-          recordedDataRef.current = Buffer.concat([
-            recordedDataRef.current,
-            Buffer.from(data, 'base64'),
-          ])
+          const combined = new Uint8Array(
+            recordedDataRef.current.length + newData.length,
+          )
+          combined.set(recordedDataRef.current)
+          combined.set(newData, recordedDataRef.current.length)
+          recordedDataRef.current = combined
         }
       })
 
@@ -99,8 +103,15 @@ export default function TranscribeData() {
       if (!recordedDataRef.current) return log('No recorded data')
       if (!whisperContext) return log('No context')
 
+      const wavFileWriter = new WavFileWriter(recordFile, audioOptions)
+      await wavFileWriter.initialize()
+      await wavFileWriter.appendAudioData(Buffer.from(recordedDataRef.current!))
+      await wavFileWriter.finalize()
+
       // Read the wav file as base64
-      const base64Data = recordedDataRef.current!.toString('base64')
+      const base64Data = Buffer.from(recordedDataRef.current!).toString(
+        'base64',
+      )
       log('Start transcribing...')
 
       const startTime = Date.now()

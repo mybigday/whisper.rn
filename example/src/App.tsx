@@ -11,6 +11,7 @@ import Transcribe from './Transcribe'
 import TranscribeData from './TranscribeData'
 import Vad from './Vad'
 import Bench from './Bench'
+import RealtimeTranscriberDemo from './RealtimeTranscriberDemo'
 
 enableScreens()
 
@@ -49,6 +50,12 @@ function HomeScreen({ navigation }: { navigation: any }) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
+        onPress={() => navigation.navigate('RealtimeTranscriberDemo')}
+      >
+        <Text style={styles.buttonText}>Example: Realtime Transcriber (Pure JS)</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
         onPress={() => navigation.navigate('VAD')}
       >
         <Text style={styles.buttonText}>Example: VAD</Text>
@@ -73,6 +80,7 @@ function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Transcribe" component={Transcribe} />
           <Stack.Screen name="TranscribeData" component={TranscribeData} />
+          <Stack.Screen name="RealtimeTranscriberDemo" component={RealtimeTranscriberDemo} />
           <Stack.Screen name="VAD" component={Vad} />
           <Stack.Screen name="Bench" component={Bench} />
         </Stack.Navigator>

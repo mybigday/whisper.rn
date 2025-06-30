@@ -10,7 +10,7 @@ import Sound from 'react-native-sound'
 import { initWhisperVad, libVersion } from '../../src' // whisper.rn
 import type { WhisperVadContext, VadSegment } from '../../src'
 import { Button } from './Button'
-import { createDir, fileDir, vadModelHost, toTimestamp } from './util'
+import { createDir, fileDir, vadModelHost, toTimestamp } from './utils/common'
 
 const sampleFile = require('../assets/jfk.wav')
 
