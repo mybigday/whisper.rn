@@ -1,6 +1,10 @@
 /* eslint-disable class-methods-use-this */
 import type { Buffer } from 'buffer'
-import type { WhisperContext, WhisperVadContext, VadOptions } from '../../../src'
+import type {
+  WhisperContext,
+  WhisperVadContext,
+  VadOptions,
+} from '../../../src'
 import { SliceManager } from './SliceManager'
 import { WavFileWriter } from '../utils/WavFileWriter'
 import type {
@@ -10,7 +14,7 @@ import type {
   RealtimeTranscriberCallbacks,
   StatsEvent,
   RealtimeTranscriberDependencies,
-  AudioStreamData
+  AudioStreamData,
 } from './types'
 import { VAD_PRESETS } from './types'
 
@@ -22,8 +26,6 @@ interface InternalRealtimeOptions {
   vadPreset?: keyof typeof VAD_PRESETS
   transcribeOptions: any
   audioOutputPath?: string
-  concurrentTranscriptions: number
-  vadMode: 'continuous' | 'push-to-talk' | 'smart'
 }
 
 export class RealtimeTranscriber {
@@ -43,11 +45,10 @@ export class RealtimeTranscriber {
 
   private isTranscribing = false
 
-  private concurrentTranscriptions = 0
-
   private vadEnabled = false
 
-  private transcriptionQueue: Array<{ sliceIndex: number; audioData: Buffer }> = []
+  private transcriptionQueue: Array<{ sliceIndex: number; audioData: Buffer }> =
+    []
 
   private accumulatedData: Uint8Array = new Uint8Array(0)
 
@@ -62,7 +63,7 @@ export class RealtimeTranscriber {
   constructor(
     dependencies: RealtimeTranscriberDependencies,
     options: RealtimeOptions = {},
-    callbacks: RealtimeTranscriberCallbacks = {}
+    callbacks: RealtimeTranscriberCallbacks = {},
   ) {
     this.whisperContext = dependencies.contexts.whisperContext
     this.vadContext = dependencies.contexts.vadContext
@@ -78,13 +79,14 @@ export class RealtimeTranscriber {
       vadPreset: options.vadPreset,
       transcribeOptions: options.transcribeOptions || {},
       audioOutputPath: options.audioOutputPath,
-      concurrentTranscriptions: options.concurrentTranscriptions || 1,
-      vadMode: options.vadMode || 'smart',
     }
 
     // Apply VAD preset if specified
     if (this.options.vadPreset && VAD_PRESETS[this.options.vadPreset]) {
-      this.options.vadOptions = { ...VAD_PRESETS[this.options.vadPreset], ...this.options.vadOptions }
+      this.options.vadOptions = {
+        ...VAD_PRESETS[this.options.vadPreset],
+        ...this.options.vadOptions,
+      }
     }
 
     // Enable VAD if context is provided and not explicitly disabled
@@ -93,7 +95,7 @@ export class RealtimeTranscriber {
     // Initialize managers
     this.sliceManager = new SliceManager(
       this.options.audioSliceSec,
-      this.options.maxSlicesInMemory
+      this.options.maxSlicesInMemory,
     )
 
     // Set up audio stream callbacks
@@ -161,7 +163,7 @@ export class RealtimeTranscriber {
       }
 
       // Process any remaining queued transcriptions
-      await this.processRemainingQueue()
+      await this.processTranscriptionQueue()
 
       // Finalize WAV file
       if (this.wavFileWriter) {
@@ -194,7 +196,7 @@ export class RealtimeTranscriber {
     try {
       // Write to WAV file if enabled (convert to Uint8Array for WavFileWriter)
       if (this.wavFileWriter) {
-        this.wavFileWriter.appendAudioData(streamData.data).catch(error => {
+        this.wavFileWriter.appendAudioData(streamData.data).catch((error) => {
           console.warn('Failed to write audio to WAV file:', error)
         })
       }
@@ -202,7 +204,8 @@ export class RealtimeTranscriber {
       // Always accumulate data for slice management
       this.accumulateAudioData(streamData.data)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Audio processing error'
+      const errorMessage =
+        error instanceof Error ? error.message : 'Audio processing error'
       this.handleError(errorMessage)
     }
   }
@@ -211,7 +214,9 @@ export class RealtimeTranscriber {
    * Accumulate audio data for slice management
    */
   private accumulateAudioData(newData: Buffer): void {
-    const combined = new Uint8Array(this.accumulatedData.length + newData.length)
+    const combined = new Uint8Array(
+      this.accumulatedData.length + newData.length,
+    )
     combined.set(this.accumulatedData)
     combined.set(new Uint8Array(newData), this.accumulatedData.length)
     this.accumulatedData = combined
@@ -235,7 +240,9 @@ export class RealtimeTranscriber {
     const result = this.sliceManager.addAudioData(this.accumulatedData)
 
     if (result.slice) {
-      this.log(`Slice ${result.slice.index} ready (${result.slice.data.length} bytes)`)
+      this.log(
+        `Slice ${result.slice.index} ready (${result.slice.data.length} bytes)`,
+      )
 
       // Process VAD for the slice if enabled
       if (!this.isTranscribing && this.vadEnabled) {
@@ -264,10 +271,14 @@ export class RealtimeTranscriber {
   private async processSliceVAD(slice: any): Promise<void> {
     try {
       // Get audio data from the slice for VAD processing
-      const audioData = this.sliceManager.getAudioDataForTranscription(slice.index)
+      const audioData = this.sliceManager.getAudioDataForTranscription(
+        slice.index,
+      )
 
       if (!audioData) {
-        this.log(`No audio data available for VAD processing of slice ${slice.index}`)
+        this.log(
+          `No audio data available for VAD processing of slice ${slice.index}`,
+        )
         return
       }
 
@@ -281,25 +292,39 @@ export class RealtimeTranscriber {
       this.callbacks.onVAD?.(vadEvent)
 
       // Check if speech was detected and if we should transcribe
-      const isSpeech = vadEvent.type === 'speech_start' || vadEvent.type === 'speech_continue'
+      const isSpeech =
+        vadEvent.type === 'speech_start' || vadEvent.type === 'speech_continue'
 
       if (isSpeech) {
+        const minDuration = this.options.audioMinSec
         // Check if this is a new speech detection (different from last detected time)
-        if (vadEvent.timestamp !== this.lastSpeechDetectedTime) {
-          this.lastSpeechDetectedTime = vadEvent.timestamp
+        if (
+          vadEvent.lastSpeechDetectedTime !== this.lastSpeechDetectedTime ||
+          (vadEvent.lastSpeechDetectedTime - this.lastSpeechDetectedTime) /
+            100 >
+            minDuration
+        ) {
+          this.lastSpeechDetectedTime = vadEvent.lastSpeechDetectedTime
 
           // Check minimum duration requirement
           const speechDuration = slice.data.length / 16000 / 2 // Convert bytes to seconds (16kHz, 16-bit)
-          const minDuration = this.options.audioMinSec
 
           if (speechDuration >= minDuration) {
-            this.log(`Speech detected in slice ${slice.index}, queueing for transcription`)
+            this.log(
+              `Speech detected in slice ${slice.index}, queueing for transcription`,
+            )
             await this.queueSliceForTranscription(slice)
           } else {
-            this.log(`Speech too short in slice ${slice.index} (${speechDuration.toFixed(2)}s < ${minDuration}s), skipping`)
+            this.log(
+              `Speech too short in slice ${
+                slice.index
+              } (${speechDuration.toFixed(2)}s < ${minDuration}s), skipping`,
+            )
           }
         } else {
-          this.log(`Skipping transcription for slice ${slice.index} - same detection time as last`)
+          this.log(
+            `Skipping transcription for slice ${slice.index} - same detection time as last`,
+          )
         }
       } else {
         this.log(`No speech detected in slice ${slice.index}`)
@@ -308,7 +333,9 @@ export class RealtimeTranscriber {
       // Emit stats update for VAD change
       this.emitStatsUpdate('vad_change')
     } catch (error: any) {
-      this.handleError(`VAD processing error for slice ${slice.index}: ${error}`)
+      this.handleError(
+        `VAD processing error for slice ${slice.index}: ${error}`,
+      )
     }
   }
 
@@ -318,7 +345,9 @@ export class RealtimeTranscriber {
   private async queueSliceForTranscription(slice: any): Promise<void> {
     try {
       // Get audio data from the slice
-      const audioData = this.sliceManager.getAudioDataForTranscription(slice.index)
+      const audioData = this.sliceManager.getAudioDataForTranscription(
+        slice.index,
+      )
 
       if (!audioData) {
         this.log(`No audio data available for slice ${slice.index}`)
@@ -331,15 +360,14 @@ export class RealtimeTranscriber {
         audioData,
       })
 
-      this.log(`Queued slice ${slice.index} for transcription (${slice.data.length} samples)`)
+      this.log(
+        `Queued slice ${slice.index} for transcription (${slice.data.length} samples)`,
+      )
 
       // Emit stats update for queue change
       this.emitStatsUpdate('queue_change')
 
-      // Process queue if we have capacity
-      if (this.concurrentTranscriptions < this.options.concurrentTranscriptions) {
-        await this.processTranscriptionQueue()
-      }
+      await this.processTranscriptionQueue()
     } catch (error: any) {
       this.handleError(`Failed to queue slice for transcription: ${error}`)
     }
@@ -348,11 +376,15 @@ export class RealtimeTranscriber {
   /**
    * Detect speech using VAD context
    */
-  private async detectSpeech(audioData: Buffer, sliceIndex: number): Promise<VADEvent> {
+  private async detectSpeech(
+    audioData: Buffer,
+    sliceIndex: number,
+  ): Promise<VADEvent> {
     if (!this.vadContext) {
       // Return default speech event if no VAD context
       return {
         type: 'speech_start',
+        lastSpeechDetectedTime: 0,
         timestamp: Date.now(),
         confidence: 1.0,
         duration: 0,
@@ -364,25 +396,32 @@ export class RealtimeTranscriber {
       const audioBase64 = audioData.toString('base64')
 
       // Use VAD context to detect speech segments
-      const vadSegments = await this.vadContext.detectSpeechData(audioBase64, this.options.vadOptions)
+      const vadSegments = await this.vadContext.detectSpeechData(
+        audioBase64,
+        this.options.vadOptions,
+      )
 
       // Calculate confidence based on speech segments
       let confidence = 0.0
+      let lastSpeechDetectedTime = 0
       if (vadSegments && vadSegments.length > 0) {
         // If there are speech segments, calculate average confidence
-        const totalTime = vadSegments.reduce((sum, segment) => sum + (segment.t1 - segment.t0), 0)
+        const totalTime = vadSegments.reduce(
+          (sum, segment) => sum + (segment.t1 - segment.t0),
+          0,
+        )
         const audioDuration = audioData.length / 16000 / 2 // Convert bytes to seconds
-        confidence = totalTime > 0 ? Math.min(totalTime / audioDuration, 1.0) : 0.0
+        confidence =
+          totalTime > 0 ? Math.min(totalTime / audioDuration, 1.0) : 0.0
+        lastSpeechDetectedTime = vadSegments[vadSegments.length - 1]?.t1 || -1
       }
 
       const threshold = this.options.vadOptions.threshold || 0.5
       const isSpeech = confidence > threshold
 
-      console.log(vadSegments)
-      console.log('isSpeech', isSpeech)
-
       return {
         type: isSpeech ? 'speech_start' : 'silence',
+        lastSpeechDetectedTime,
         timestamp: Date.now(),
         confidence,
         duration: audioData.length / 16000 / 2, // Convert bytes to seconds
@@ -395,6 +434,7 @@ export class RealtimeTranscriber {
       // Return default silence event on error
       return {
         type: 'silence',
+        lastSpeechDetectedTime: 0,
         timestamp: Date.now(),
         confidence: 0.0,
         duration: 0,
@@ -407,13 +447,11 @@ export class RealtimeTranscriber {
    * Process the transcription queue
    */
   private async processTranscriptionQueue(): Promise<void> {
-    while (
-      this.transcriptionQueue.length > 0 &&
-      this.concurrentTranscriptions < this.options.concurrentTranscriptions
-    ) {
+    while (this.transcriptionQueue.length > 0) {
       const item = this.transcriptionQueue.shift()
       if (item) {
-        this.processTranscription(item).catch(error => {
+        // eslint-disable-next-line no-await-in-loop
+        await this.processTranscription(item).catch((error) => {
           this.handleError(`Transcription error: ${error}`)
         })
       }
@@ -423,12 +461,14 @@ export class RealtimeTranscriber {
   /**
    * Process a single transcription
    */
-  private async processTranscription(item: { sliceIndex: number; audioData: Buffer }): Promise<void> {
+  private async processTranscription(item: {
+    sliceIndex: number
+    audioData: Buffer
+  }): Promise<void> {
     if (!this.isActive) {
       return
     }
 
-    this.concurrentTranscriptions += 1
     this.isTranscribing = true
 
     // Emit stats update for status change
@@ -437,10 +477,13 @@ export class RealtimeTranscriber {
     const startTime = Date.now()
 
     try {
-      const { promise } = this.whisperContext.transcribeData(item.audioData.toString('base64'), {
-        ...this.options.transcribeOptions,
-        onProgress: undefined, // Disable progress for realtime
-      })
+      const { promise } = this.whisperContext.transcribeData(
+        item.audioData.toString('base64'),
+        {
+          ...this.options.transcribeOptions,
+          onProgress: undefined, // Disable progress for realtime
+        },
+      )
 
       const result = await promise
       const endTime = Date.now()
@@ -462,67 +505,23 @@ export class RealtimeTranscriber {
       // Emit stats update for memory/slice changes
       this.emitStatsUpdate('memory_change')
 
-      this.log(`Transcribed speech segment ${item.sliceIndex}: "${result.result}"`)
+      this.log(
+        `Transcribed speech segment ${item.sliceIndex}: "${result.result}"`,
+      )
     } catch (error) {
-      this.handleError(`Transcription failed for speech segment ${item.sliceIndex}: ${error}`)
+      this.handleError(
+        `Transcription failed for speech segment ${item.sliceIndex}: ${error}`,
+      )
     } finally {
-      this.concurrentTranscriptions -= 1
-
       // Check if we should continue processing queue
       if (this.transcriptionQueue.length > 0) {
         await this.processTranscriptionQueue()
-      } else if (this.concurrentTranscriptions === 0) {
+      } else {
         this.isTranscribing = false
-        // Emit stats update for status change
-        this.emitStatsUpdate('status_change')
       }
 
       // Emit stats update for queue change
       this.emitStatsUpdate('queue_change')
-    }
-  }
-
-  /**
-   * Process any remaining items in the queue when stopping
-   */
-  private async processRemainingQueue(): Promise<void> {
-    // Wait for current transcriptions to finish using recursive promise
-    const waitForConcurrentToFinish = async (maxWaitTime = 10000): Promise<void> => {
-      const startTime = Date.now()
-
-      const checkAndWait = async (): Promise<void> => {
-        if (this.concurrentTranscriptions === 0 || (Date.now() - startTime) >= maxWaitTime) {
-          return
-        }
-        await new Promise(resolve => setTimeout(resolve, 100))
-        return checkAndWait()
-      }
-
-      return checkAndWait()
-    }
-
-    await waitForConcurrentToFinish()
-
-    // Process remaining queue items in batches
-    const remainingItems = [...this.transcriptionQueue]
-    this.transcriptionQueue = []
-
-    if (remainingItems.length > 0) {
-      const batchSize = Math.min(remainingItems.length, this.options.concurrentTranscriptions)
-
-      const processBatch = async (startIndex: number): Promise<void> => {
-        if (startIndex >= remainingItems.length) {
-          return
-        }
-
-        const batch = remainingItems.slice(startIndex, startIndex + batchSize)
-        await Promise.all(batch.map(item => this.processTranscription(item)))
-
-        // Process next batch
-        return processBatch(startIndex + batchSize)
-      }
-
-      await processBatch(0)
     }
   }
 
@@ -564,16 +563,17 @@ export class RealtimeTranscriber {
       isTranscribing: this.isTranscribing,
       vadEnabled: this.vadEnabled,
       queueLength: this.transcriptionQueue.length,
-      concurrentTranscriptions: this.concurrentTranscriptions,
       audioStats: {
         isRecording: this.audioStream.isRecording(),
         accumulatedSamples: this.accumulatedData.length,
       },
-      vadStats: this.vadEnabled ? {
-        enabled: true,
-        contextAvailable: !!this.vadContext,
-        lastSpeechDetectedTime: this.lastSpeechDetectedTime,
-      } : null,
+      vadStats: this.vadEnabled
+        ? {
+            enabled: true,
+            contextAvailable: !!this.vadContext,
+            lastSpeechDetectedTime: this.lastSpeechDetectedTime,
+          }
+        : null,
       sliceStats: this.sliceManager.getCurrentSliceInfo(),
     }
   }
@@ -584,19 +584,18 @@ export class RealtimeTranscriber {
   reset(): void {
     this.sliceManager.reset()
     this.transcriptionQueue = []
-    this.concurrentTranscriptions = 0
     this.isTranscribing = false
     this.accumulatedData = new Uint8Array(0)
 
     // Reset simplified VAD state
-    this.lastSpeechDetectedTime = 0
+    this.lastSpeechDetectedTime = -1
 
     // Reset stats snapshot for clean start
     this.lastStatsSnapshot = null
 
     // Cancel WAV file writing if in progress
     if (this.wavFileWriter) {
-      this.wavFileWriter.cancel().catch(error => {
+      this.wavFileWriter.cancel().catch((error) => {
         console.warn('Failed to cancel WAV file writing:', error)
       })
       this.wavFileWriter = null
@@ -623,7 +622,13 @@ export class RealtimeTranscriber {
     const currentStats = this.getStatistics()
 
     // Check if stats have changed significantly
-    if (!this.lastStatsSnapshot || RealtimeTranscriber.shouldEmitStatsUpdate(currentStats, this.lastStatsSnapshot)) {
+    if (
+      !this.lastStatsSnapshot ||
+      RealtimeTranscriber.shouldEmitStatsUpdate(
+        currentStats,
+        this.lastStatsSnapshot,
+      )
+    ) {
       const statsEvent: StatsEvent = {
         timestamp: Date.now(),
         type: eventType,
@@ -640,7 +645,10 @@ export class RealtimeTranscriber {
    */
   private static shouldEmitStatsUpdate(current: any, previous: any): boolean {
     // Always emit on status changes
-    if (current.isActive !== previous.isActive || current.isTranscribing !== previous.isTranscribing) {
+    if (
+      current.isActive !== previous.isActive ||
+      current.isTranscribing !== previous.isTranscribing
+    ) {
       return true
     }
 
@@ -654,7 +662,10 @@ export class RealtimeTranscriber {
     const previousMemory = previous.sliceStats?.memoryUsage?.estimatedMB || 0
     const memoryDiff = Math.abs(currentMemory - previousMemory)
 
-    if (memoryDiff > 5 || (previousMemory > 0 && memoryDiff / previousMemory > 0.1)) {
+    if (
+      memoryDiff > 5 ||
+      (previousMemory > 0 && memoryDiff / previousMemory > 0.1)
+    ) {
       return true
     }
 

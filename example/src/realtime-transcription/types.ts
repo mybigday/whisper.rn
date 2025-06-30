@@ -117,6 +117,7 @@ export const VAD_PRESETS = {
 export interface VADEvent {
   type: 'speech_start' | 'speech_end' | 'speech_continue' | 'silence'
   timestamp: number
+  lastSpeechDetectedTime: number
   confidence: number
   duration: number
   sliceIndex: number
@@ -165,13 +166,6 @@ export interface RealtimeOptions {
   // File settings
   audioOutputPath?: string
 
-  // Performance settings
-  concurrentTranscriptions?: number // default: 1
-
-  // Advanced VAD behavior
-  vadMode?: 'continuous' | 'push-to-talk' | 'smart' // default: 'smart'
-  vadAdaptiveThreshold?: boolean // Automatically adjust threshold based on environment
-
   // Audio stream configuration
   audioStreamConfig?: AudioStreamConfig
 }
@@ -200,7 +194,6 @@ export interface StatsEvent {
     isTranscribing: boolean
     vadEnabled: boolean
     queueLength: number
-    concurrentTranscriptions: number
     audioStats: any
     vadStats: any
     sliceStats: any

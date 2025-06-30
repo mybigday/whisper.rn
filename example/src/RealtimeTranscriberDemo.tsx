@@ -192,8 +192,6 @@ export default function RealtimeTranscriberDemo() {
             maxLen: 1,
           },
           audioOutputPath: `${fileDir}/realtime-recording.wav`,
-          concurrentTranscriptions: 1,
-          vadMode: 'smart',
           audioStreamConfig: {
             sampleRate: 16000,
             channels: 1,

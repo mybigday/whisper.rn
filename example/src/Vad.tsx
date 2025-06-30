@@ -261,10 +261,10 @@ ${segments
   .map(
     (segment, index) =>
       `${index + 1}. [${toTimestamp(
-        Math.round(segment.t0 * 100),
-      )} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(
-        segment.t1 - segment.t0
-      ).toFixed(2)}ms`,
+        Math.round(segment.t0),
+      )} --> ${toTimestamp(Math.round(segment.t1))}] Duration: ${(
+        (segment.t1 - segment.t0) / 100
+      ).toFixed(2)}s`,
   )
   .join('\n')}`
 
@@ -314,10 +314,10 @@ ${segments
   .map(
     (segment, index) =>
       `${index + 1}. [${toTimestamp(
-        Math.round(segment.t0 * 100),
-      )} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(
-        segment.t1 - segment.t0
-      ).toFixed(2)}ms`,
+        Math.round(segment.t0),
+      )} --> ${toTimestamp(Math.round(segment.t1))}] Duration: ${(
+        (segment.t1 - segment.t0) / 100
+      ).toFixed(2)}s`,
   )
   .join('\n')}`
 
@@ -362,10 +362,10 @@ ${segments
   .map(
     (segment, index) =>
       `${index + 1}. [${toTimestamp(
-        Math.round(segment.t0 * 100),
-      )} --> ${toTimestamp(Math.round(segment.t1 * 100))}] Duration: ${(
-        segment.t1 - segment.t0
-      ).toFixed(2)}ms`,
+        Math.round(segment.t0),
+      )} --> ${toTimestamp(Math.round(segment.t1))}] Duration: ${(
+        (segment.t1 - segment.t0) / 100
+      ).toFixed(2)}s`,
   )
   .join('\n')}`
 
