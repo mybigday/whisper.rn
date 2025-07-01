@@ -249,27 +249,50 @@ export default function RealtimeTranscriberDemo() {
   }
 
   const handleTranscribeEvent = (event: TranscribeEvent) => {
-    const { data, processTime, sliceIndex, memoryUsage } = event
+    const { data, sliceIndex } = event
 
     if (data?.result) {
-      const resultText =
-        `[Slice ${sliceIndex}] ${data.result}\n` +
-        `Process Time: ${processTime}ms\n` +
-        `Memory: ${memoryUsage?.slicesInMemory || 0} slices, ${
-          memoryUsage?.estimatedMB || 0
-        }MB\n\n` +
-        `Segments:\n${data.segments
-          .map(
-            (segment) =>
-              `  [${toTimestamp(segment.t0)} --> ${toTimestamp(segment.t1)}] ${
-                segment.text
-              }`,
-          )
-          .join('\n')}`
+      // Get all transcription results from the transcriber
+      const allResults =
+        realtimeTranscriberRef.current?.getTranscriptionResults() || []
 
-      setTranscribeResult(resultText)
+      if (allResults.length > 0) {
+        const separator = `\n\n${'='.repeat(50)}\n\n`
+        const formattedResults = allResults
+          .map(({ slice, transcribeEvent }) => {
+            const { data: resultData, processTime: procTime } = transcribeEvent
+            if (!resultData) return null
+
+            return (
+              `[Slice ${slice.index}] ${resultData.result}\n` +
+              `Process Time: ${procTime}ms | Duration: ${(
+                (slice.endTime - slice.startTime) /
+                1000
+              ).toFixed(1)}s\n` +
+              `Memory: ${
+                transcribeEvent.memoryUsage?.slicesInMemory || 0
+              } slices, ${transcribeEvent.memoryUsage?.estimatedMB || 0}MB\n` +
+              `Segments:\n${resultData.segments
+                .map(
+                  (segment) =>
+                    `  [${toTimestamp(segment.t0)} --> ${toTimestamp(
+                      segment.t1,
+                    )}] ${segment.text}`,
+                )
+                .join('\n')}`
+            )
+          })
+          .filter((result): result is string => result !== null)
+          .join(separator)
+
+        setTranscribeResult(formattedResults)
+      }
+
       log(
-        `Transcribed slice ${sliceIndex}: "${data.result.substring(0, 50)}..."`,
+        `Transcribed slice ${sliceIndex}: "${data.result.substring(
+          0,
+          50,
+        )}..." (Total results: ${allResults.length})`,
       )
     }
   }

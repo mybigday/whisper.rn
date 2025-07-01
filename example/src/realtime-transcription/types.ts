@@ -180,6 +180,8 @@ export interface AudioSlice {
   isReleased: boolean
 }
 
+export interface AudioSliceNoData extends Omit<AudioSlice, 'data'> {}
+
 export interface MemoryUsage {
   slicesInMemory: number
   totalSamples: number

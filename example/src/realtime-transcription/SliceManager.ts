@@ -148,6 +148,13 @@ export class SliceManager {
   }
 
   /**
+   * Get a slice by index
+   */
+  getSliceByIndex(sliceIndex: number): AudioSlice | null {
+    return this.slices.find((s) => s.index === sliceIndex) || null
+  }
+
+  /**
    * Clean up old slices to manage memory
    */
   private cleanupOldSlices(): void {
@@ -221,49 +228,5 @@ export class SliceManager {
       totalSlices: this.slices.length,
       memoryUsage: this.getMemoryUsage(),
     }
-  }
-
-  /**
-   * Get the most recent slice with audio data
-   */
-  getMostRecentSlice(): AudioSlice | null {
-    // Find the slice with the highest index that has audio data
-    const slicesWithData = this.slices
-      .filter((slice) => !slice.isReleased && slice.sampleCount > 0)
-      .sort((a, b) => b.index - a.index) // Sort by index descending
-
-    if (slicesWithData.length === 0) {
-      return null
-    }
-
-    const mostRecentSlice = slicesWithData[0]
-    return mostRecentSlice || null
-  }
-
-  /**
-   * Check if there are unprocessed slices ready for transcription
-   */
-  hasUnprocessedSlices(): boolean {
-    return this.slices.some(
-      (slice) =>
-        !slice.isProcessed &&
-        !slice.isReleased &&
-        slice.sampleCount > 0 &&
-        slice.index >= this.transcribeSliceIndex,
-    )
-  }
-
-  /**
-   * Get all slice statistics for debugging
-   */
-  getSliceStatistics() {
-    return this.slices.map((slice) => ({
-      index: slice.index,
-      sampleCount: slice.sampleCount,
-      durationSec: (slice.sampleCount / 2) / this.sampleRate, // Convert bytes to samples then to seconds
-      isProcessed: slice.isProcessed,
-      isReleased: slice.isReleased,
-      processingTime: slice.endTime - slice.startTime,
-    }))
   }
 }

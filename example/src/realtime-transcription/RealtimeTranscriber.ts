@@ -15,6 +15,7 @@ import type {
   StatsEvent,
   RealtimeTranscriberDependencies,
   AudioStreamData,
+  AudioSliceNoData,
 } from './types'
 import { VAD_PRESETS } from './types'
 
@@ -59,6 +60,12 @@ export class RealtimeTranscriber {
 
   // Track last stats to emit only when changed
   private lastStatsSnapshot: any = null
+
+  // Store transcription results by slice index
+  private transcriptionResults: Map<
+    number,
+    { slice: AudioSliceNoData; transcribeEvent: TranscribeEvent }
+  > = new Map()
 
   constructor(
     dependencies: RealtimeTranscriberDependencies,
@@ -502,6 +509,23 @@ export class RealtimeTranscriber {
       // Emit transcribe event
       this.callbacks.onTranscribe?.(transcribeEvent)
 
+      // Save transcription results
+      const slice = this.sliceManager.getSliceByIndex(item.sliceIndex)
+      if (slice) {
+        this.transcriptionResults.set(item.sliceIndex, {
+          slice: {
+            // Don't keep data in the slice
+            index: slice.index,
+            sampleCount: slice.sampleCount,
+            startTime: slice.startTime,
+            endTime: slice.endTime,
+            isProcessed: slice.isProcessed,
+            isReleased: slice.isReleased,
+          },
+          transcribeEvent,
+        })
+      }
+
       // Emit stats update for memory/slice changes
       this.emitStatsUpdate('memory_change')
 
@@ -579,6 +603,16 @@ export class RealtimeTranscriber {
   }
 
   /**
+   * Get all transcription results
+   */
+  getTranscriptionResults(): Array<{
+    slice: AudioSliceNoData
+    transcribeEvent: TranscribeEvent
+  }> {
+    return Array.from(this.transcriptionResults.values())
+  }
+
+  /**
    * Reset all components
    */
   reset(): void {
@@ -600,6 +634,9 @@ export class RealtimeTranscriber {
       })
       this.wavFileWriter = null
     }
+
+    // Clear transcription results
+    this.transcriptionResults.clear()
   }
 
   /**
