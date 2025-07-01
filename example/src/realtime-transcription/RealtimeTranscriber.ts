@@ -450,10 +450,16 @@ export class RealtimeTranscriber {
     }
   }
 
+  private isProcessingTranscriptionQueue = false
+
   /**
    * Process the transcription queue
    */
   private async processTranscriptionQueue(): Promise<void> {
+    if (this.isProcessingTranscriptionQueue) return
+
+    this.isProcessingTranscriptionQueue = true
+
     while (this.transcriptionQueue.length > 0) {
       const item = this.transcriptionQueue.shift()
       if (item) {
@@ -463,6 +469,8 @@ export class RealtimeTranscriber {
         })
       }
     }
+
+    this.isProcessingTranscriptionQueue = false
   }
 
   /**
@@ -610,6 +618,50 @@ export class RealtimeTranscriber {
     transcribeEvent: TranscribeEvent
   }> {
     return Array.from(this.transcriptionResults.values())
+  }
+
+  /**
+   * Force move to the next slice, finalizing the current one regardless of capacity
+   */
+  async nextSlice(): Promise<void> {
+    if (!this.isActive) {
+      this.log('Cannot force next slice - transcriber is not active')
+      return
+    }
+
+    // Check if there are pending transcriptions or currently transcribing
+    if (this.isTranscribing || this.transcriptionQueue.length > 0) {
+      this.log('Waiting for pending transcriptions to complete before forcing next slice...')
+
+      // Wait for current transcription queue to be processed
+      await this.processTranscriptionQueue()
+    }
+
+    const result = this.sliceManager.forceNextSlice()
+
+    if (result.slice) {
+      this.log(
+        `Forced slice ${result.slice.index} ready (${result.slice.data.length} bytes)`,
+      )
+
+      // Process VAD for the slice if enabled
+      if (!this.isTranscribing && this.vadEnabled) {
+        this.processSliceVAD(result.slice).catch((error: any) => {
+          this.handleError(`VAD processing error: ${error}`)
+        })
+      } else if (!this.isTranscribing) {
+        // If VAD is disabled, transcribe slices as they become ready
+        this.queueSliceForTranscription(result.slice).catch((error: any) => {
+          this.handleError(`Failed to queue slice for transcription: ${error}`)
+        })
+      } else {
+        this.log(`Skipping slice ${result.slice.index} - already transcribing`)
+      }
+
+      this.emitStatsUpdate('memory_change')
+    } else {
+      this.log('Forced next slice but no slice data to process')
+    }
   }
 
   /**

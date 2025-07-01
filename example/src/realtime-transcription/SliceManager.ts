@@ -229,4 +229,25 @@ export class SliceManager {
       memoryUsage: this.getMemoryUsage(),
     }
   }
+
+  /**
+   * Force move to the next slice, finalizing the current one regardless of capacity
+   */
+  forceNextSlice(): { slice?: AudioSlice } {
+    const currentSlice = this.slices.find((s) => s.index === this.currentSliceIndex)
+
+    if (currentSlice && currentSlice.sampleCount > 0) {
+      // Finalize current slice
+      this.finalizeCurrentSlice()
+
+      // Move to next slice
+      this.currentSliceIndex += 1
+
+      return { slice: currentSlice }
+    }
+
+    // If no current slice or it's empty, just move to next index
+    this.currentSliceIndex += 1
+    return {}
+  }
 }

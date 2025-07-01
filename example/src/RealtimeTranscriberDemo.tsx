@@ -413,6 +413,22 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
+  const forceNextSlice = async () => {
+    if (!realtimeTranscriberRef.current) {
+      Alert.alert('Error', 'Realtime transcriber not initialized')
+      return
+    }
+
+    try {
+      log('Forcing next slice...')
+      await realtimeTranscriberRef.current.nextSlice()
+      log('Successfully forced next slice')
+    } catch (error) {
+      log('Error forcing next slice:', error)
+      Alert.alert('Error', `Failed to force next slice: ${error}`)
+    }
+  }
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -449,6 +465,12 @@ export default function RealtimeTranscriberDemo() {
             }
             style={isTranscribing ? styles.buttonActive : undefined}
             disabled={!whisperContextRef.current}
+          />
+          <Button
+            title="Force Next Slice"
+            onPress={forceNextSlice}
+            style={styles.buttonClear}
+            disabled={!isTranscribing || !realtimeTranscriberRef.current}
           />
           <Button
             title="Reset All"
