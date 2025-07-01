@@ -182,9 +182,9 @@ export default function RealtimeTranscriberDemo() {
 
       if (!realtimeTranscriberRef.current) {
         const options: RealtimeOptions = {
-          audioSliceSec: 25,
-          audioMinSec: 1,
-          maxSlicesInMemory: 3,
+          audioSliceSec: 30,
+          audioMinSec: 0.5,
+          maxSlicesInMemory: 1,
           vadPreset: currentVadPreset,
           vadOptions: VAD_PRESETS[currentVadPreset],
           transcribeOptions: {
@@ -361,7 +361,7 @@ export default function RealtimeTranscriberDemo() {
     log('Reset all components')
   }
 
-  const playRecordedFile = async () => {
+  const checkRecordedFile = async () => {
     const recordFilePath = `${fileDir}/realtime-recording.wav`
 
     try {
@@ -550,7 +550,7 @@ export default function RealtimeTranscriberDemo() {
           <Button
             title="Check Recorded File"
             style={styles.buttonClear}
-            onPress={playRecordedFile}
+            onPress={checkRecordedFile}
           />
         </View>
       </View>
