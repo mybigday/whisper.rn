@@ -25,10 +25,22 @@ interface InternalRealtimeOptions {
   maxSlicesInMemory: number
   vadOptions: VadOptions
   vadPreset?: keyof typeof VAD_PRESETS
+  autoSliceOnSpeechEnd: boolean
+  autoSliceThreshold: number
   transcribeOptions: any
   audioOutputPath?: string
 }
 
+/**
+ * RealtimeTranscriber provides real-time audio transcription with VAD support.
+ *
+ * Features:
+ * - Automatic slice management based on duration
+ * - VAD-based speech detection and auto-slicing
+ * - Configurable auto-slice mechanism that triggers on speech_end/silence events
+ * - Memory management for audio slices
+ * - Queue-based transcription processing
+ */
 export class RealtimeTranscriber {
   private whisperContext: WhisperContext
 
@@ -87,6 +99,8 @@ export class RealtimeTranscriber {
       maxSlicesInMemory: options.maxSlicesInMemory || 3,
       vadOptions: options.vadOptions || VAD_PRESETS.DEFAULT,
       vadPreset: options.vadPreset,
+      autoSliceOnSpeechEnd: options.autoSliceOnSpeechEnd || false,
+      autoSliceThreshold: options.autoSliceThreshold || 0.85,
       transcribeOptions: options.transcribeOptions || {},
       audioOutputPath: options.audioOutputPath,
     }
@@ -276,6 +290,65 @@ export class RealtimeTranscriber {
   }
 
   /**
+   * Check if auto-slice should be triggered based on VAD event and timing
+   */
+  private async checkAutoSlice(vadEvent: VADEvent, _slice: any): Promise<void> {
+    if (!this.options.autoSliceOnSpeechEnd || !this.vadEnabled) {
+      return
+    }
+
+    // Only trigger on speech_end or silence events
+    const shouldTriggerAutoSlice =
+      vadEvent.type === 'speech_end' || vadEvent.type === 'silence'
+
+    if (!shouldTriggerAutoSlice) {
+      return
+    }
+
+    // Get current slice info from SliceManager
+    const currentSliceInfo = this.sliceManager.getCurrentSliceInfo()
+    const currentSlice = this.sliceManager.getSliceByIndex(
+      currentSliceInfo.currentSliceIndex,
+    )
+
+    if (!currentSlice) {
+      return
+    }
+
+    // Calculate current slice duration
+    const currentDuration = (Date.now() - currentSlice.startTime) / 1000 // Convert to seconds
+    const targetDuration = this.options.audioSliceSec
+    const minDuration = this.options.audioMinSec
+    const autoSliceThreshold = targetDuration * this.options.autoSliceThreshold
+
+    // Check if conditions are met for auto-slice
+    const meetsMinDuration = currentDuration >= minDuration
+    const meetsThreshold = currentDuration >= autoSliceThreshold
+
+    if (meetsMinDuration && meetsThreshold) {
+      this.log(
+        `Auto-slicing on ${vadEvent.type} at ${currentDuration.toFixed(1)}s ` +
+          `(min: ${minDuration}s, threshold: ${autoSliceThreshold.toFixed(
+            1,
+          )}s, target: ${targetDuration}s)`,
+      )
+
+      // Force next slice
+      await this.nextSlice()
+    } else {
+      this.log(
+        `Auto-slice conditions not met on ${vadEvent.type}: ` +
+          `duration=${currentDuration.toFixed(
+            1,
+          )}s, min=${minDuration}s, threshold=${autoSliceThreshold.toFixed(
+            1,
+          )}s ` +
+          `(minOk=${meetsMinDuration}, thresholdOk=${meetsThreshold})`,
+      )
+    }
+  }
+
+  /**
    * Process VAD for a completed slice
    */
   private async processSliceVAD(slice: any): Promise<void> {
@@ -300,6 +373,9 @@ export class RealtimeTranscriber {
 
       // Emit VAD event
       this.callbacks.onVAD?.(vadEvent)
+
+      // Check if auto-slice should be triggered
+      await this.checkAutoSlice(vadEvent, slice)
 
       // Check if speech was detected and if we should transcribe
       const isSpeech =
@@ -634,6 +710,24 @@ export class RealtimeTranscriber {
   }
 
   /**
+   * Update auto-slice options dynamically
+   */
+  updateAutoSliceOptions(options: {
+    autoSliceOnSpeechEnd?: boolean
+    autoSliceThreshold?: number
+  }): void {
+    if (options.autoSliceOnSpeechEnd !== undefined) {
+      this.options.autoSliceOnSpeechEnd = options.autoSliceOnSpeechEnd
+    }
+    if (options.autoSliceThreshold !== undefined) {
+      this.options.autoSliceThreshold = options.autoSliceThreshold
+    }
+    this.log(
+      `Auto-slice options updated: enabled=${this.options.autoSliceOnSpeechEnd}, threshold=${this.options.autoSliceThreshold}`,
+    )
+  }
+
+  /**
    * Get current statistics
    */
   getStatistics() {
@@ -654,6 +748,12 @@ export class RealtimeTranscriber {
           }
         : null,
       sliceStats: this.sliceManager.getCurrentSliceInfo(),
+      autoSliceConfig: {
+        enabled: this.options.autoSliceOnSpeechEnd,
+        threshold: this.options.autoSliceThreshold,
+        targetDuration: this.options.audioSliceSec,
+        minDuration: this.options.audioMinSec,
+      },
     }
   }
 

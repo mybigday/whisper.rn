@@ -136,6 +136,10 @@ export default function RealtimeTranscriberDemo() {
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
   const [vadEvents, setVadEvents] = useState<VADEvent[]>([])
 
+  // Auto-slice configuration
+  const [autoSliceOnSpeechEnd, setAutoSliceOnSpeechEnd] = useState(false)
+  const autoSliceThreshold = 0.85 // Fixed 85% threshold
+
   // File simulation specific state
   const [useFileSimulation, setUseFileSimulation] = useState(false)
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
@@ -297,6 +301,8 @@ export default function RealtimeTranscriberDemo() {
           maxSlicesInMemory: 1,
           vadPreset: currentVadPreset,
           vadOptions: VAD_PRESETS[currentVadPreset],
+          autoSliceOnSpeechEnd,
+          autoSliceThreshold,
           transcribeOptions: {
             language: 'en',
             maxLen: 1,
@@ -726,6 +732,47 @@ export default function RealtimeTranscriberDemo() {
           />
         </View>
 
+        {/* Auto-Slice Configuration */}
+        <View style={styles.configContainer}>
+          <Text style={styles.configTitle}>Auto-Slice Configuration</Text>
+          <Text style={styles.configLabel}>
+            Automatically slice when speech ends and duration ≥{' '}
+            {(autoSliceThreshold * 100).toFixed(0)}% of target
+          </Text>
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>Auto-Slice on Speech End:</Text>
+            <Switch
+              value={autoSliceOnSpeechEnd}
+              onValueChange={(value) => {
+                setAutoSliceOnSpeechEnd(value)
+                log(
+                  `Auto-slice on speech end: ${value ? 'ENABLED' : 'DISABLED'}`,
+                )
+
+                // Update transcriber if active
+                if (realtimeTranscriberRef.current) {
+                  realtimeTranscriberRef.current.updateAutoSliceOptions({
+                    autoSliceOnSpeechEnd: value,
+                  })
+                }
+              }}
+              disabled={isTranscribing}
+            />
+          </View>
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>Threshold:</Text>
+            <Text style={styles.configValue}>
+              {(autoSliceThreshold * 100).toFixed(0)}%
+            </Text>
+          </View>
+          {autoSliceOnSpeechEnd && (
+            <Text style={styles.configLabel}>
+              Will auto-slice when speech ends and slice duration ≥{' '}
+              {(30 * autoSliceThreshold).toFixed(1)}s
+            </Text>
+          )}
+        </View>
+
         {/* Realtime Controls */}
         <View style={styles.buttons}>
           <Button
@@ -827,6 +874,17 @@ export default function RealtimeTranscriberDemo() {
               transcribing | Audio Source:{' '}
               {useFileSimulation ? 'File (JFK)' : 'Live'}
               {useFileSimulation && ` @ ${playbackSpeed}x`}
+            </Text>
+            <Text style={styles.statusText}>
+              Auto-Slice:{' '}
+              {realtimeStats.autoSliceConfig?.enabled ? 'ENABLED' : 'DISABLED'}
+              {realtimeStats.autoSliceConfig?.enabled &&
+                ` (≥${(realtimeStats.autoSliceConfig.threshold * 100).toFixed(
+                  0,
+                )}% = ${(
+                  realtimeStats.autoSliceConfig.targetDuration *
+                  realtimeStats.autoSliceConfig.threshold
+                ).toFixed(1)}s)`}
             </Text>
           </View>
         )}

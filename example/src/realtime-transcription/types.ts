@@ -1,4 +1,8 @@
-import type { TranscribeFileOptions, TranscribeResult, VadOptions } from '../../../src'
+import type {
+  TranscribeFileOptions,
+  TranscribeResult,
+  VadOptions,
+} from '../../../src'
 
 // === Audio Stream Interfaces ===
 
@@ -32,7 +36,6 @@ export interface AudioStreamInterface {
 
 // Pre-defined VAD configurations for different use cases
 export const VAD_PRESETS = {
-
   // Default - balanced performance
   DEFAULT: {
     threshold: 0.5,
@@ -153,12 +156,16 @@ export interface TranscribeEvent {
 export interface RealtimeOptions {
   // Audio settings
   audioSliceSec?: number // default: 25
-  audioMinSec?: number   // default: 1
+  audioMinSec?: number // default: 1
   maxSlicesInMemory?: number // default: 3
 
   // VAD settings - now using extended options
   vadOptions?: VadOptions
   vadPreset?: keyof typeof VAD_PRESETS // Quick preset selection
+
+  // Auto-slice settings
+  autoSliceOnSpeechEnd?: boolean // default: false - automatically slice when speech ends and duration thresholds are met
+  autoSliceThreshold?: number // default: 0.85 - percentage of audioSliceSec to trigger auto-slice
 
   // Transcription settings
   transcribeOptions?: TranscribeFileOptions
@@ -190,7 +197,12 @@ export interface MemoryUsage {
 
 export interface StatsEvent {
   timestamp: number
-  type: 'slice_processed' | 'vad_change' | 'queue_change' | 'memory_change' | 'status_change'
+  type:
+    | 'slice_processed'
+    | 'vad_change'
+    | 'queue_change'
+    | 'memory_change'
+    | 'status_change'
   data: {
     isActive: boolean
     isTranscribing: boolean
