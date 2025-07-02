@@ -9,6 +9,7 @@ import {
   Platform,
   PermissionsAndroid,
   Alert,
+  Switch,
 } from 'react-native'
 import RNFS from 'react-native-fs'
 import { initWhisper, initWhisperVad, libVersion } from '../../src'
@@ -18,12 +19,14 @@ import contextOpts from './context-opts'
 import { createDir, fileDir, toTimestamp } from './utils/common'
 import { RealtimeTranscriber } from './realtime-transcription/RealtimeTranscriber'
 import { LiveAudioStreamAdapter } from './realtime-transcription/LiveAudioStreamAdapter'
+import { SimulateFileAudioStreamAdapter } from './realtime-transcription/SimulateFileAudioStreamAdapter'
 import type {
   TranscribeEvent,
   VADEvent,
   RealtimeOptions,
   StatsEvent,
   RealtimeTranscriberDependencies,
+  AudioStreamInterface,
 } from './realtime-transcription/types'
 import { VAD_PRESETS } from './realtime-transcription/types'
 
@@ -51,6 +54,7 @@ const styles = StyleSheet.create({
   button: { margin: 4, backgroundColor: '#333', borderRadius: 4, padding: 8 },
   buttonClear: { backgroundColor: '#888' },
   buttonActive: { backgroundColor: '#4CAF50' },
+  buttonDanger: { backgroundColor: '#f44336' },
   buttonText: { fontSize: 14, color: 'white', textAlign: 'center' },
   logContainer: {
     backgroundColor: 'lightgray',
@@ -71,10 +75,33 @@ const styles = StyleSheet.create({
   configRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginVertical: 4,
   },
   configLabel: { fontSize: 14, color: '#666' },
   configValue: { fontSize: 14, fontWeight: '500' },
+  playbackContainer: {
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    width: '95%',
+    borderRadius: 8,
+    marginVertical: 4,
+  },
+  playbackCompleted: {
+    backgroundColor: '#d4edda',
+  },
+  playbackTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 8 },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 2,
+    marginVertical: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007bff',
+    borderRadius: 2,
+  },
   statusContainer: {
     backgroundColor: '#e8f5e8',
     padding: 8,
@@ -89,10 +116,15 @@ const styles = StyleSheet.create({
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
+// JFK audio file URL from whisper.cpp repository
+const JFK_AUDIO_URL =
+  'https://github.com/ggml-org/whisper.cpp/raw/refs/heads/master/samples/jfk.wav'
+
 export default function RealtimeTranscriberDemo() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
   const vadContextRef = useRef<WhisperVadContext | null>(null)
   const realtimeTranscriberRef = useRef<RealtimeTranscriber | null>(null)
+  const audioStreamRef = useRef<AudioStreamInterface | null>(null)
 
   const [logs, setLogs] = useState([
     `Realtime Transcriber Demo - whisper.cpp v${libVersion}`,
@@ -103,6 +135,14 @@ export default function RealtimeTranscriberDemo() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
   const [vadEvents, setVadEvents] = useState<VADEvent[]>([])
+
+  // File simulation specific state
+  const [useFileSimulation, setUseFileSimulation] = useState(false)
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
+  const [simulationStats, setSimulationStats] = useState<any>(null)
+  const [audioFilePath, setAudioFilePath] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [
@@ -117,9 +157,79 @@ export default function RealtimeTranscriberDemo() {
       whisperContextRef.current?.release()
       vadContextRef.current?.release()
       realtimeTranscriberRef.current?.release()
+      audioStreamRef.current?.release()
     },
     [],
   )
+
+  // Update simulation stats periodically when using file simulation
+  useEffect(() => {
+    if (!useFileSimulation || !audioStreamRef.current) {
+      return undefined
+    }
+
+    const interval = setInterval(() => {
+      if (audioStreamRef.current && 'getStatistics' in audioStreamRef.current) {
+        const stats = (audioStreamRef.current as any).getStatistics()
+        setSimulationStats(stats)
+      }
+    }, 500) // Update every 500ms
+
+    return () => clearInterval(interval)
+  }, [useFileSimulation, isTranscribing])
+
+  const downloadAudioFile = async () => {
+    if (audioFilePath) {
+      // File already downloaded
+      return audioFilePath
+    }
+
+    setIsDownloading(true)
+    setDownloadProgress(0)
+
+    try {
+      const downloadPath = `${fileDir}/jfk-sample.wav`
+
+      // Check if file already exists
+      const exists = await RNFS.exists(downloadPath)
+      if (exists) {
+        log('Audio file already exists, using cached version')
+        setAudioFilePath(downloadPath)
+        setIsDownloading(false)
+        return downloadPath
+      }
+
+      log('Downloading JFK audio sample from whisper.cpp repository...')
+
+      const downloadResult = await RNFS.downloadFile({
+        fromUrl: JFK_AUDIO_URL,
+        toFile: downloadPath,
+        progress: (res) => {
+          const progress = (res.bytesWritten / res.contentLength) * 100
+          setDownloadProgress(progress)
+          log(`Download progress: ${progress.toFixed(1)}%`)
+        },
+      }).promise
+
+      if (downloadResult.statusCode === 200) {
+        log('Audio file downloaded successfully')
+        setAudioFilePath(downloadPath)
+        setIsDownloading(false)
+        setDownloadProgress(100)
+        return downloadPath
+      } else {
+        throw new Error(
+          `Download failed with status: ${downloadResult.statusCode}`,
+        )
+      }
+    } catch (error) {
+      log('Error downloading audio file:', error)
+      setIsDownloading(false)
+      setDownloadProgress(0)
+      Alert.alert('Download Error', `Failed to download audio file: ${error}`)
+      throw error
+    }
+  }
 
   const initializeContexts = async () => {
     try {
@@ -201,9 +311,46 @@ export default function RealtimeTranscriberDemo() {
           },
         }
 
-        // Create audio stream adapter
-        const audioStream = new LiveAudioStreamAdapter()
+        // Create appropriate audio stream adapter
+        let audioStream: AudioStreamInterface
+
+        if (useFileSimulation) {
+          log('Creating file simulation adapter...')
+
+          // Download audio file if needed
+          try {
+            const filePath = await downloadAudioFile()
+
+            audioStream = new SimulateFileAudioStreamAdapter({
+              filePath,
+              playbackSpeed,
+              chunkDurationMs: 100,
+              loop: false,
+              onEndOfFile: () => {
+                log('File simulation reached end - no new buffer available')
+                log('Automatically stopping realtime transcription...')
+
+                // Automatically stop realtime transcription when file ends
+                setTimeout(() => {
+                  stopRealtimeTranscription()
+                }, 1000) // Small delay to allow final processing
+              },
+            })
+          } catch (error) {
+            log('Failed to download audio file for simulation')
+            Alert.alert(
+              'Error',
+              'Could not download audio file for simulation. Please check your internet connection and try again.',
+            )
+            return
+          }
+        } else {
+          log('Creating live audio adapter...')
+          audioStream = new LiveAudioStreamAdapter()
+        }
+
         await audioStream.initialize(options.audioStreamConfig!)
+        audioStreamRef.current = audioStream
 
         // Create dependencies
         const dependencies: RealtimeTranscriberDependencies = {
@@ -225,9 +372,18 @@ export default function RealtimeTranscriberDemo() {
 
         realtimeTranscriberRef.current = transcriber
       }
+
+      if (useFileSimulation && audioStreamRef.current) {
+        ;(audioStreamRef.current as any).resetBuffer()
+      }
+
       // Start transcription
       await realtimeTranscriberRef.current.start()
-      log('Realtime transcription started')
+      log(
+        `Realtime transcription started (${
+          useFileSimulation ? 'File Simulation - JFK Speech' : 'Live Audio'
+        })`,
+      )
     } catch (error) {
       log('Error starting realtime transcription:', error)
       Alert.alert('Error', `Failed to start: ${error}`)
@@ -242,6 +398,7 @@ export default function RealtimeTranscriberDemo() {
     try {
       await realtimeTranscriberRef.current.stop()
       setRealtimeStats(null)
+      setSimulationStats(null)
       log('Realtime transcription stopped')
     } catch (error) {
       log('Error stopping realtime transcription:', error)
@@ -351,6 +508,39 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
+  const changePlaybackSpeed = () => {
+    const speeds = [0.5, 1.0, 1.5, 2.0]
+    const currentIndex = speeds.indexOf(playbackSpeed)
+    const nextIndex = (currentIndex + 1) % speeds.length
+    const nextSpeed = speeds[nextIndex] || 1.0
+
+    setPlaybackSpeed(nextSpeed)
+    log(`Playback speed changed to: ${nextSpeed}x`)
+
+    // Update adapter if active and using file simulation
+    if (
+      audioStreamRef.current &&
+      'setPlaybackSpeed' in audioStreamRef.current
+    ) {
+      ;(audioStreamRef.current as any).setPlaybackSpeed(nextSpeed)
+    }
+  }
+
+  const seekToPosition = (percentage: number) => {
+    if (
+      !useFileSimulation ||
+      !audioStreamRef.current ||
+      !('seekToTime' in audioStreamRef.current) ||
+      !simulationStats
+    ) {
+      return
+    }
+
+    const targetTime = simulationStats.totalDuration * (percentage / 100)
+    ;(audioStreamRef.current as any).seekToTime(targetTime)
+    log(`Seeked to ${targetTime.toFixed(1)}s (${percentage}%)`)
+  }
+
   const resetAll = () => {
     if (realtimeTranscriberRef.current) {
       realtimeTranscriberRef.current.reset()
@@ -358,6 +548,7 @@ export default function RealtimeTranscriberDemo() {
     setTranscribeResult(null)
     setVadEvents([])
     setRealtimeStats(null)
+    setSimulationStats(null)
     log('Reset all components')
   }
 
@@ -440,6 +631,87 @@ export default function RealtimeTranscriberDemo() {
           <Button title="Initialize Contexts" onPress={initializeContexts} />
         </View>
 
+        {/* Audio Source Configuration */}
+        <View style={styles.configContainer}>
+          <Text style={styles.configTitle}>Audio Source</Text>
+          {useFileSimulation && (
+            <Text style={styles.configLabel}>
+              Using JFK speech sample from whisper.cpp repository
+            </Text>
+          )}
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>Use File Simulation:</Text>
+            <Switch
+              value={useFileSimulation}
+              onValueChange={(value) => {
+                setUseFileSimulation(value)
+                log(`Audio source: ${value ? 'File Simulation' : 'Live Audio'}`)
+              }}
+              disabled={isTranscribing}
+            />
+          </View>
+          {useFileSimulation && (
+            <>
+              <View style={styles.configRow}>
+                <Text style={styles.configLabel}>Audio File:</Text>
+                <Text style={styles.configValue}>
+                  {audioFilePath ? 'Downloaded' : 'Not downloaded'}
+                </Text>
+              </View>
+              {isDownloading && (
+                <View style={styles.configRow}>
+                  <Text style={styles.configLabel}>Download Progress:</Text>
+                  <Text style={styles.configValue}>
+                    {downloadProgress.toFixed(1)}%
+                  </Text>
+                </View>
+              )}
+              <View style={styles.buttons}>
+                <Button
+                  title={audioFilePath ? 'Re-download Audio' : 'Download Audio'}
+                  onPress={() => {
+                    setAudioFilePath(null) // Force re-download
+                    downloadAudioFile()
+                  }}
+                  style={styles.buttonClear}
+                  disabled={isDownloading || isTranscribing}
+                />
+                {audioFilePath && (
+                  <Button
+                    title="Clear Cache"
+                    onPress={async () => {
+                      try {
+                        if (audioFilePath) {
+                          const exists = await RNFS.exists(audioFilePath)
+                          if (exists) {
+                            await RNFS.unlink(audioFilePath)
+                            log('Audio file cache cleared')
+                          }
+                        }
+                        setAudioFilePath(null)
+                      } catch (error) {
+                        log('Error clearing cache:', error)
+                      }
+                    }}
+                    style={styles.buttonClear}
+                    disabled={isDownloading || isTranscribing}
+                  />
+                )}
+              </View>
+              <View style={styles.configRow}>
+                <Text style={styles.configLabel}>Playback Speed:</Text>
+                <Text style={styles.configValue}>{playbackSpeed}x</Text>
+              </View>
+              <Button
+                title="Change Speed"
+                onPress={changePlaybackSpeed}
+                style={styles.buttonClear}
+                disabled={isTranscribing}
+              />
+            </>
+          )}
+        </View>
+
         {/* VAD Configuration */}
         <View style={styles.configContainer}>
           <Text style={styles.configTitle}>VAD Configuration</Text>
@@ -463,8 +735,12 @@ export default function RealtimeTranscriberDemo() {
                 ? stopRealtimeTranscription
                 : startRealtimeTranscription
             }
-            style={isTranscribing ? styles.buttonActive : undefined}
-            disabled={!whisperContextRef.current}
+            style={isTranscribing ? styles.buttonDanger : styles.buttonActive}
+            disabled={
+              !whisperContextRef.current ||
+              (useFileSimulation && !audioFilePath) ||
+              isDownloading
+            }
           />
           <Button
             title="Force Next Slice"
@@ -478,6 +754,58 @@ export default function RealtimeTranscriberDemo() {
             style={styles.buttonClear}
           />
         </View>
+
+        {/* File Simulation Playback Controls */}
+        {useFileSimulation && simulationStats && (
+          <View
+            style={[
+              styles.playbackContainer,
+              simulationStats.hasReachedEnd && styles.playbackCompleted,
+            ]}
+          >
+            <Text style={styles.playbackTitle}>File Playback Progress</Text>
+            <Text style={styles.configValue}>
+              {simulationStats.currentTime.toFixed(1)}s /{' '}
+              {simulationStats.totalDuration.toFixed(1)}s (
+              {(simulationStats.progress * 100).toFixed(1)}%)
+              {simulationStats.hasReachedEnd && ' - COMPLETED'}
+            </Text>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${simulationStats.progress * 100}%` },
+                ]}
+              />
+            </View>
+            <View style={styles.buttons}>
+              <Button
+                title="0%"
+                onPress={() => seekToPosition(0)}
+                style={styles.buttonClear}
+                disabled={!isTranscribing || simulationStats.hasReachedEnd}
+              />
+              <Button
+                title="25%"
+                onPress={() => seekToPosition(25)}
+                style={styles.buttonClear}
+                disabled={!isTranscribing || simulationStats.hasReachedEnd}
+              />
+              <Button
+                title="50%"
+                onPress={() => seekToPosition(50)}
+                style={styles.buttonClear}
+                disabled={!isTranscribing || simulationStats.hasReachedEnd}
+              />
+              <Button
+                title="75%"
+                onPress={() => seekToPosition(75)}
+                style={styles.buttonClear}
+                disabled={!isTranscribing || simulationStats.hasReachedEnd}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Status Display */}
         {realtimeStats && (
@@ -495,10 +823,10 @@ export default function RealtimeTranscriberDemo() {
             </Text>
             <Text style={styles.statusText}>
               Slices: {realtimeStats.sliceStats?.currentSliceIndex || 0}{' '}
-              current,
-              {realtimeStats.sliceStats?.transcribeSliceIndex || 0} transcribing
-              | VAD Threshold:{' '}
-              {realtimeStats.vadStats?.currentThreshold?.toFixed(2) || 'N/A'}
+              current, {realtimeStats.sliceStats?.transcribeSliceIndex || 0}{' '}
+              transcribing | Audio Source:{' '}
+              {useFileSimulation ? 'File (JFK)' : 'Live'}
+              {useFileSimulation && ` @ ${playbackSpeed}x`}
             </Text>
           </View>
         )}
