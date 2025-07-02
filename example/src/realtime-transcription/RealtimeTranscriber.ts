@@ -58,6 +58,9 @@ export class RealtimeTranscriber {
   // Simplified VAD state management
   private lastSpeechDetectedTime = 0
 
+  // Track VAD state for proper event transitions
+  private lastVadState: 'speech' | 'silence' = 'silence'
+
   // Track last stats to emit only when changed
   private lastStatsSnapshot: any = null
 
@@ -302,6 +305,8 @@ export class RealtimeTranscriber {
       const isSpeech =
         vadEvent.type === 'speech_start' || vadEvent.type === 'speech_continue'
 
+      const isSpeechEnd = vadEvent.type === 'speech_end'
+
       if (isSpeech) {
         const minDuration = this.options.audioMinSec
         // Check if this is a new speech detection (different from last detected time)
@@ -331,6 +336,25 @@ export class RealtimeTranscriber {
         } else {
           this.log(
             `Skipping transcription for slice ${slice.index} - same detection time as last`,
+          )
+        }
+      } else if (isSpeechEnd) {
+        this.log(`Speech ended in slice ${slice.index}`)
+        // For speech_end events, we might want to queue the slice for transcription
+        // to capture the final part of the speech segment
+        const speechDuration = slice.data.length / 16000 / 2 // Convert bytes to seconds
+        const minDuration = this.options.audioMinSec
+
+        if (speechDuration >= minDuration) {
+          this.log(
+            `Speech end detected in slice ${slice.index}, queueing final segment for transcription`,
+          )
+          await this.queueSliceForTranscription(slice)
+        } else {
+          this.log(
+            `Speech end segment too short in slice ${
+              slice.index
+            } (${speechDuration.toFixed(2)}s < ${minDuration}s), skipping`,
           )
         }
       } else {
@@ -388,13 +412,23 @@ export class RealtimeTranscriber {
     sliceIndex: number,
   ): Promise<VADEvent> {
     if (!this.vadContext) {
-      // Return default speech event if no VAD context
+      // When no VAD context is available, assume speech is always detected
+      // but still follow the state machine pattern
+      const currentTimestamp = Date.now()
+
+      // Assume speech is always detected when no VAD context
+      const vadEventType: VADEvent['type'] =
+        this.lastVadState === 'silence' ? 'speech_start' : 'speech_continue'
+
+      // Update VAD state
+      this.lastVadState = 'speech'
+
       return {
-        type: 'speech_start',
+        type: vadEventType,
         lastSpeechDetectedTime: 0,
-        timestamp: Date.now(),
+        timestamp: currentTimestamp,
         confidence: 1.0,
-        duration: 0,
+        duration: audioData.length / 16000 / 2, // Convert bytes to seconds
         sliceIndex,
       }
     }
@@ -425,11 +459,24 @@ export class RealtimeTranscriber {
 
       const threshold = this.options.vadOptions.threshold || 0.5
       const isSpeech = confidence > threshold
+      const currentTimestamp = Date.now()
+
+      // Determine VAD event type based on current and previous state
+      let vadEventType: VADEvent['type']
+      if (isSpeech) {
+        vadEventType =
+          this.lastVadState === 'silence' ? 'speech_start' : 'speech_continue'
+      } else {
+        vadEventType = this.lastVadState === 'speech' ? 'speech_end' : 'silence'
+      }
+
+      // Update VAD state for next detection
+      this.lastVadState = isSpeech ? 'speech' : 'silence'
 
       return {
-        type: isSpeech ? 'speech_start' : 'silence',
+        type: vadEventType,
         lastSpeechDetectedTime,
-        timestamp: Date.now(),
+        timestamp: currentTimestamp,
         confidence,
         duration: audioData.length / 16000 / 2, // Convert bytes to seconds
         sliceIndex,
@@ -631,7 +678,9 @@ export class RealtimeTranscriber {
 
     // Check if there are pending transcriptions or currently transcribing
     if (this.isTranscribing || this.transcriptionQueue.length > 0) {
-      this.log('Waiting for pending transcriptions to complete before forcing next slice...')
+      this.log(
+        'Waiting for pending transcriptions to complete before forcing next slice...',
+      )
 
       // Wait for current transcription queue to be processed
       await this.processTranscriptionQueue()
@@ -675,6 +724,7 @@ export class RealtimeTranscriber {
 
     // Reset simplified VAD state
     this.lastSpeechDetectedTime = -1
+    this.lastVadState = 'silence'
 
     // Reset stats snapshot for clean start
     this.lastStatsSnapshot = null
