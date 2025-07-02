@@ -17,18 +17,18 @@ import type { WhisperContext, WhisperVadContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
 import { createDir, fileDir, toTimestamp } from './utils/common'
-import { RealtimeTranscriber } from './realtime-transcription/RealtimeTranscriber'
-import { LiveAudioStreamAdapter } from './realtime-transcription/LiveAudioStreamAdapter'
-import { SimulateFileAudioStreamAdapter } from './realtime-transcription/SimulateFileAudioStreamAdapter'
-import type {
-  TranscribeEvent,
-  VADEvent,
-  RealtimeOptions,
-  StatsEvent,
-  RealtimeTranscriberDependencies,
-  AudioStreamInterface,
-} from './realtime-transcription/types'
-import { VAD_PRESETS } from './realtime-transcription/types'
+import {
+  RealtimeTranscriber,
+  LiveAudioStreamAdapter,
+  SimulateFileAudioStreamAdapter,
+  VAD_PRESETS,
+  type TranscribeEvent,
+  type VADEvent,
+  type RealtimeOptions,
+  type StatsEvent,
+  type RealtimeTranscriberDependencies,
+  type AudioStreamInterface,
+} from './realtime-transcription'
 
 if (Platform.OS === 'android') {
   // Request record audio permission
