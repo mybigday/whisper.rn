@@ -4,6 +4,7 @@
 #import "RNWhisperDownloader.h"
 #import "RNWhisperAudioUtils.h"
 #import "RNWhisperAudioSessionUtils.h"
+#import "RNWhisperJSI.h"
 #include <stdlib.h>
 #include <string>
 
@@ -582,6 +583,26 @@ RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
         [vadContexts removeAllObjects];
     }
     resolve(nil);
+}
+
+RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RCTBridge *bridge = [RCTBridge currentBridge];
+    if (bridge == nil) {
+        reject(@"whisper_jsi_error", @"Bridge not available", nil);
+        return;
+    }
+
+    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge;
+    if (cxxBridge.runtime) {
+        // Cast void* to facebook::jsi::Runtime* before dereferencing
+        facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
+        [RNWhisperJSI installJSIBindings:*runtime bridge:bridge];
+        resolve(@{@"success": @YES});
+    } else {
+        reject(@"whisper_jsi_error", @"Runtime not available", nil);
+    }
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

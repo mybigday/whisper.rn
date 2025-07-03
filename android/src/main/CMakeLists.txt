@@ -5,6 +5,13 @@ project(whisper.rn)
 set(CMAKE_CXX_STANDARD 17)
 set(RNWHISPER_LIB_DIR ${CMAKE_SOURCE_DIR}/../../../cpp)
 
+# Configure STL to be compatible with ReactAndroid JSI libraries
+set(CMAKE_ANDROID_STL_TYPE c++_shared)
+
+# Find ReactAndroid package for JSI
+find_package(ReactAndroid REQUIRED CONFIG)
+find_package(fbjni REQUIRED CONFIG)
+
 include_directories(
     ${RNWHISPER_LIB_DIR}
     ${RNWHISPER_LIB_DIR}/ggml-cpu
@@ -35,6 +42,7 @@ set(
     ${RNWHISPER_LIB_DIR}/rn-audioutils.cpp
     ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp
+    ${CMAKE_SOURCE_DIR}/RNWhisperJSI.cpp
 )
 
 find_library(LOG_LIB log)
@@ -54,7 +62,15 @@ function(build_library target_name arch cpu_flags)
         ${SOURCE_FILES_ARCH}
     )
 
-    target_link_libraries(${target_name} ${LOG_LIB} android)
+    # Link JSI libraries
+    target_link_libraries(${target_name}
+        ${LOG_LIB}
+        android
+        fbjni::fbjni
+        ReactAndroid::jsi
+        ReactAndroid::turbomodulejsijni
+        ReactAndroid::react_nativemodule_core
+    )
 
     if (${arch} STREQUAL "generic")
         target_compile_options(${target_name} PRIVATE -DWSP_GGML_CPU_GENERIC)

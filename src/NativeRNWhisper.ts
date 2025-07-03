@@ -60,6 +60,7 @@ type NativeContextOptions = {
 }
 
 export type NativeWhisperContext = {
+  contextPtr: number
   contextId: number
   gpu: boolean
   reasonNoGPU: string
@@ -103,6 +104,7 @@ export interface Spec extends TurboModule {
     useCoreML: boolean
     coreMLAllowFallback: boolean
   };
+  installJSIBindings(): Promise<{ success: boolean }>;
   initContext(options: NativeContextOptions): Promise<NativeWhisperContext>;
   releaseContext(contextId: number): Promise<void>;
   releaseAllContexts(): Promise<void>;

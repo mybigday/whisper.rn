@@ -50,11 +50,38 @@ android {
     externalNativeBuild {
       cmake {
         abiFilters (*reactNativeArchitectures())
+        // Configure STL to be compatible with ReactAndroid JSI libraries
+        arguments "-DANDROID_STL=c++_shared"
       }
     }
+    ndk {
+      // Ensure shared STL is used for JSI compatibility
+      abiFilters (*reactNativeArchitectures())
+    }
   }
+
+  packagingOptions {
+    doNotStrip resolveBuildType() == "debug" ? "**/**/*.so" : ""
+    excludes = [
+      "META-INF",
+      "META-INF/**",
+      "**/libc++_shared.so",
+      "**/libfbjni.so",
+      "**/libjsi.so",
+      "**/libfolly_json.so",
+      "**/libfolly_runtime.so",
+      "**/libglog.so",
+      "**/libreactnative.so",
+      "**/libreactnativejni.so",
+      "**/libturbomodulejsijni.so",
+    ]
+  }
+
   def rnwhisperBuildFromSource = project.properties["rnwhisperBuildFromSource"]
   if (rnwhisperBuildFromSource == "true") {
+    buildFeatures {
+      prefab = true
+    }
     externalNativeBuild {
       cmake {
         path = file('src/main/CMakeLists.txt')
@@ -112,4 +139,11 @@ if (isNewArchitectureEnabled()) {
     libraryName = "RNWhisper"
     codegenJavaPackageName = "com.rnwhisper"
   }
+}
+
+def resolveBuildType() {
+    Gradle gradle = getGradle()
+    String tskReqStr = gradle.getStartParameter().getTaskRequests()["args"].toString()
+
+    return tskReqStr.contains("Release") ? "release" : "debug"
 }

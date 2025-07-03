@@ -199,6 +199,8 @@ const updateAudioSession = async (setting: AudioSessionSettingIos) => {
 }
 
 export class WhisperContext {
+  ptr: number
+
   id: number
 
   gpu: boolean = false
@@ -206,10 +208,12 @@ export class WhisperContext {
   reasonNoGPU: string = ''
 
   constructor({
+    contextPtr,
     contextId,
     gpu,
     reasonNoGPU,
   }: NativeWhisperContext) {
+    this.ptr = contextPtr
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
@@ -557,7 +561,7 @@ export async function initWhisper({
     path = filePath
   }
   if (path.startsWith('file://')) path = path.slice(7)
-  const { contextId, gpu, reasonNoGPU } = await RNWhisper.initContext({
+  const { contextPtr, contextId, gpu, reasonNoGPU } = await RNWhisper.initContext({
     filePath: path,
     isBundleAsset: !!isBundleAsset,
     useFlashAttn,
@@ -567,7 +571,7 @@ export async function initWhisper({
     downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
     coreMLAssets,
   })
-  return new WhisperContext({ contextId, gpu, reasonNoGPU })
+  return new WhisperContext({ contextPtr, contextId, gpu, reasonNoGPU })
 }
 
 export async function releaseAllWhisper(): Promise<void> {
@@ -712,4 +716,12 @@ export async function initWhisperVad({
  */
 export async function releaseAllWhisperVad(): Promise<void> {
   return RNWhisper.releaseAllVadContexts()
+}
+
+/**
+ * Install JSI bindings for direct native function access
+ * Call this once before using any JSI functions like global.whisperTestContext
+ */
+export async function installJSIBindings(): Promise<{ success: boolean }> {
+  return RNWhisper.installJSIBindings()
 }

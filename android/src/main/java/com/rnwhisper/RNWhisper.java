@@ -15,6 +15,9 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
+import com.facebook.react.turbomodule.core.interfaces.CallInvokerHolder;
+import com.facebook.react.bridge.Arguments;
 
 import java.util.HashMap;
 import java.util.Random;
@@ -22,6 +25,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+
+import com.facebook.react.common.LifecycleState;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
+import com.facebook.react.bridge.ReactContext;
 
 public class RNWhisper implements LifecycleEventListener {
   public static final String NAME = "RNWhisper";
@@ -50,6 +58,43 @@ public class RNWhisper implements LifecycleEventListener {
   private HashMap<Integer, WhisperContext> contexts = new HashMap<>();
   private HashMap<Integer, WhisperVadContext> vadContexts = new HashMap<>();
 
+  // JSI helper method to check if context exists
+  public boolean hasContext(int contextId) {
+    return contexts.containsKey(contextId);
+  }
+
+  public void installJSIBindings(Promise promise) {
+
+    AsyncTask task = new AsyncTask<Void, Void, Void>() {
+      private Exception exception;
+
+      @Override
+      protected Void doInBackground(Void... voids) {
+        try {
+          CallInvokerHolderImpl callInvokerHolder = JSCallInvokerResolver.getJSCallInvokerHolder(reactContext);
+          long runtimePtr = JSCallInvokerResolver.getJavaScriptContextHolder(reactContext);
+
+          WhisperContext.installJSIBindings(runtimePtr, callInvokerHolder);
+          android.util.Log.i("RNWhisperModule", "JSI bindings installed successfully");
+        } catch (Exception e) {
+          exception = e;
+        }
+        return null;
+      }
+
+      @Override
+      protected void onPostExecute(Void result) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(null);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "installJSIBindings");
+  }
+
   private int getResourceIdentifier(String filePath) {
     int identifier = reactContext.getResources().getIdentifier(
       filePath,
@@ -67,11 +112,11 @@ public class RNWhisper implements LifecycleEventListener {
   }
 
   public void initContext(final ReadableMap options, final Promise promise) {
-    AsyncTask task = new AsyncTask<Void, Void, Integer>() {
+    AsyncTask task = new AsyncTask<Void, Void, WhisperContext>() {
       private Exception exception;
 
       @Override
-      protected Integer doInBackground(Void... voids) {
+      protected WhisperContext doInBackground(Void... voids) {
         try {
           String modelPath = options.getString("filePath");
           boolean isBundleAsset = options.getBoolean("isBundleAsset");
@@ -81,24 +126,25 @@ public class RNWhisper implements LifecycleEventListener {
             modelFilePath = downloader.downloadFile(modelPath);
           }
 
+          int id = Math.abs(new Random().nextInt());
           long context;
           int resId = getResourceIdentifier(modelFilePath);
           if (resId > 0) {
             context = WhisperContext.initContextWithInputStream(
+              id,
               new PushbackInputStream(reactContext.getResources().openRawResource(resId))
             );
           } else if (isBundleAsset) {
-            context = WhisperContext.initContextWithAsset(reactContext.getAssets(), modelFilePath);
+            context = WhisperContext.initContextWithAsset(id, reactContext.getAssets(), modelFilePath);
           } else {
-            context = WhisperContext.initContext(modelFilePath);
+            context = WhisperContext.initContext(id, modelFilePath);
           }
           if (context == 0) {
             throw new Exception("Failed to initialize context");
           }
-          int id = Math.abs(new Random().nextInt());
           WhisperContext whisperContext = new WhisperContext(id, reactContext, context);
           contexts.put(id, whisperContext);
-          return id;
+          return whisperContext;
         } catch (Exception e) {
           exception = e;
           return null;
@@ -106,13 +152,14 @@ public class RNWhisper implements LifecycleEventListener {
       }
 
       @Override
-      protected void onPostExecute(Integer id) {
+      protected void onPostExecute(WhisperContext context) {
         if (exception != null) {
           promise.reject(exception);
           return;
         }
         WritableMap result = Arguments.createMap();
-        result.putInt("contextId", id);
+        result.putInt("contextId", context.getId());
+        result.putDouble("contextPtr", (double) context.getContextPtr());
         result.putBoolean("gpu", false);
         result.putString("reasonNoGPU", "Currently not supported");
         promise.resolve(result);
