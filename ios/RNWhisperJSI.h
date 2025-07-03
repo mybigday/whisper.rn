@@ -15,6 +15,6 @@
 
 @interface RNWhisperJSI : NSObject
 
-+ (void)installJSIBindings:(facebook::jsi::Runtime &)runtime bridge:(RCTBridge *)bridge;
++ (void)installJSIBindings:(facebook::jsi::Runtime &)runtime bridge:(RCTBridge *)bridge callInvoker:(std::shared_ptr<facebook::react::CallInvoker>)callInvoker;
 
 @end

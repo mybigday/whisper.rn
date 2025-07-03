@@ -360,6 +360,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
 - (void)invalidate {
     [super invalidate];
 
+    [RNWhisperDownloader clearCache];
+
     if (contexts == nil) {
         return;
     }
@@ -382,8 +384,6 @@ RCT_REMAP_METHOD(releaseAllContexts,
 
     [contexts removeAllObjects];
     contexts = nil;
-
-    [RNWhisperDownloader clearCache];
 }
 
 // MARK: - AudioSessionUtils
@@ -595,11 +595,20 @@ RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
     }
 
     RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge;
+    auto callInvoker = bridge.jsCallInvoker;
     if (cxxBridge.runtime) {
-        // Cast void* to facebook::jsi::Runtime* before dereferencing
         facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
-        [RNWhisperJSI installJSIBindings:*runtime bridge:bridge];
-        resolve(@{@"success": @YES});
+
+        if (callInvoker) {
+          callInvoker->invokeAsync([runtime, bridge, callInvoker]() {
+            [RNWhisperJSI installJSIBindings:*runtime bridge:bridge callInvoker:callInvoker];
+          });
+        } else {
+          reject(@"whisper_jsi_error", @"CallInvoker not available", nil);
+          return;
+        }
+
+        resolve(@{});
     } else {
         reject(@"whisper_jsi_error", @"Runtime not available", nil);
     }

@@ -17,24 +17,11 @@ static BOOL jsiBindingsInstalled = NO;
 
 @implementation RNWhisperJSI
 
-+ (void)initialize {
-    if (self == [RNWhisperJSI class]) {
-        contextQueue = dispatch_queue_create("com.rnwhisper.jsi.context", DISPATCH_QUEUE_CONCURRENT);
-    }
-}
-
-// Helper method to safely get context
-+ (RNWhisperContext *)safelyGetContext:(int)contextId {
-    __block RNWhisperContext *context = nil;
-    dispatch_sync(contextQueue, ^{
-        if (contexts != nil) {
-            context = contexts[[NSNumber numberWithInt:contextId]];
-        }
-    });
-    return context;
-}
-
-+ (void)installJSIBindings:(facebook::jsi::Runtime &)runtime bridge:(RCTBridge *)bridge {
++ (void)installJSIBindings:(
+  facebook::jsi::Runtime &)runtime
+  bridge:(RCTBridge *)bridge
+  callInvoker:(std::shared_ptr<facebook::react::CallInvoker>)callInvoker
+{
     @try {
         // Test function to verify JSI access to whisper contexts
         auto whisperTestContext = Function::createFromHostFunction(
@@ -57,7 +44,7 @@ static BOOL jsiBindingsInstalled = NO;
 
                     @autoreleasepool {
                         // Thread-safe context lookup
-                        RNWhisperContext *context = [RNWhisperJSI safelyGetContext:contextId];
+                        RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
                         if (context == nil) {
                             NSLog(@"RNWhisperJSI: Context not found for id=%d", contextId);
                             return Value::undefined();

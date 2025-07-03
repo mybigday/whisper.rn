@@ -733,6 +733,7 @@ Java_com_rnwhisper_WhisperContext_vadFreeSegments(
     whisper_vad_free_segments(segments);
 }
 
+// JSI Installation function using fbjni
 JNIEXPORT void JNICALL
 Java_com_rnwhisper_WhisperContext_installJSIBindings(
     JNIEnv *env,
