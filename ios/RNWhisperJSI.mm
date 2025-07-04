@@ -4,6 +4,11 @@
 #import "RNWhisperAudioUtils.h"
 #import <jsi/jsi.h>
 #import <memory>
+#if RNWHISPER_BUILD_FROM_SOURCE
+#import "rn-whisper.h"
+#else
+#import <rnwhisper/rn-whisper.h>
+#endif
 
 using namespace facebook::jsi;
 
@@ -23,74 +28,7 @@ static BOOL jsiBindingsInstalled = NO;
   callInvoker:(std::shared_ptr<facebook::react::CallInvoker>)callInvoker
 {
     @try {
-        // Test function to verify JSI access to whisper contexts
-        auto whisperTestContext = Function::createFromHostFunction(
-            runtime,
-            PropNameID::forAscii(runtime, "whisperTestContext"),
-            2, // number of arguments
-            [](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
-                @try {
-                    if (count != 2) {
-                        throw JSError(runtime, "whisperTestContext expects 2 arguments (contextId, arrayBuffer)");
-                    }
 
-                    if (!arguments[0].isNumber()) {
-                        throw JSError(runtime, "whisperTestContext expects contextId to be a number");
-                    }
-
-                    if (!arguments[1].isObject() || !arguments[1].getObject(runtime).isArrayBuffer(runtime)) {
-                        throw JSError(runtime, "whisperTestContext expects second argument to be an ArrayBuffer");
-                    }
-
-                    int contextId = (int)arguments[0].getNumber();
-
-                    // Get ArrayBuffer data
-                    auto arrayBuffer = arguments[1].getObject(runtime).getArrayBuffer(runtime);
-                    size_t arrayBufferSize = arrayBuffer.size(runtime);
-                    uint8_t* arrayBufferData = arrayBuffer.data(runtime);
-
-                    NSLog(@"RNWhisperJSI: whisperTestContext called with contextId=%d, arrayBuffer size=%zu", contextId, arrayBufferSize);
-
-                    @autoreleasepool {
-                        // Thread-safe context lookup
-                        RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-                        if (context == nil) {
-                            NSLog(@"RNWhisperJSI: Context not found for id=%d", contextId);
-                            return Value::undefined();
-                        }
-
-                        // Validate that context object is still valid
-                        if (![context isKindOfClass:[RNWhisperContext class]]) {
-                            NSLog(@"RNWhisperJSI: Invalid context object for id=%d", contextId);
-                            return Value::undefined();
-                        }
-
-                        // Test that we can access the whisper context
-                        struct whisper_context *whisperCtx = nil;
-                        @try {
-                            whisperCtx = [context getContext];
-                        } @catch (NSException *exception) {
-                            NSLog(@"RNWhisperJSI: Exception getting context: %@", exception);
-                            return Value::undefined();
-                        }
-
-                        if (whisperCtx == NULL) {
-                            NSLog(@"RNWhisperJSI: Whisper context pointer is null for id=%d", contextId);
-                            return Value::undefined();
-                        }
-
-                        NSLog(@"RNWhisperJSI: Context validated successfully for id=%d, processed ArrayBuffer with %zu bytes", contextId, arrayBufferSize);
-                        return Value(true);
-                    }
-                } @catch (NSException *exception) {
-                    NSLog(@"RNWhisperJSI: NSException in whisperTestContext: %@", exception);
-                    throw JSError(runtime, std::string("whisperTestContext error: ") + std::string([exception.description UTF8String]));
-                } @catch (...) {
-                    NSLog(@"RNWhisperJSI: Unknown exception in whisperTestContext");
-                    throw JSError(runtime, "whisperTestContext encountered unknown error");
-                }
-            }
-        );
 
         // whisperTranscribeData function
         auto whisperTranscribeData = Function::createFromHostFunction(
@@ -145,8 +83,12 @@ static BOOL jsiBindingsInstalled = NO;
                             audioData[i] = (float)pcmData[i] / 32768.0f;
                         }
 
-                        // Convert JSI options to NSDictionary
+                                                // Convert JSI options to NSDictionary
                         NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
+                        std::shared_ptr<Function> onProgressCallback = nullptr;
+                        std::shared_ptr<Function> onNewSegmentsCallback = nullptr;
+                        int jobId = rand(); // Default fallback jobId
+
                         auto propNames = optionsObj.getPropertyNames(runtime);
                         for (size_t i = 0; i < propNames.size(runtime); i++) {
                             auto propName = propNames.getValueAtIndex(runtime, i).getString(runtime);
@@ -156,9 +98,19 @@ static BOOL jsiBindingsInstalled = NO;
                             if (propValue.isBool()) {
                                 options[key] = @(propValue.getBool());
                             } else if (propValue.isNumber()) {
-                                options[key] = @(propValue.getNumber());
+                                if ([key isEqualToString:@"jobId"]) {
+                                    jobId = (int)propValue.getNumber();
+                                } else {
+                                    options[key] = @(propValue.getNumber());
+                                }
                             } else if (propValue.isString()) {
                                 options[key] = [NSString stringWithUTF8String:propValue.getString(runtime).utf8(runtime).c_str()];
+                            } else if (propValue.isObject() && propValue.getObject(runtime).isFunction(runtime)) {
+                                if ([key isEqualToString:@"onProgress"]) {
+                                    onProgressCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
+                                } else if ([key isEqualToString:@"onNewSegments"]) {
+                                    onNewSegmentsCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
+                                }
                             }
                         }
 
@@ -169,7 +121,7 @@ static BOOL jsiBindingsInstalled = NO;
                             runtime,
                             PropNameID::forAscii(runtime, ""),
                             2, // resolve, reject
-                            [context, audioData, audioDataCount, options, callInvoker](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
+                            [context, audioData, audioDataCount, options, onProgressCallback, onNewSegmentsCallback, jobId, callInvoker](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
                                 if (count != 2) {
                                     free(audioData);
                                     throw JSError(runtime, "Promise executor expects 2 arguments (resolve, reject)");
@@ -182,17 +134,66 @@ static BOOL jsiBindingsInstalled = NO;
                                 // Run transcription on background thread
                                 dispatch_async([context getDispatchQueue], ^{
                                     @try {
-                                        int jobId = rand();
-
                                         [context transcribeData:jobId
                                                       audioData:audioData
                                                  audioDataCount:audioDataCount
                                                         options:options
                                                      onProgress:^(int progress) {
-                                                         // Progress callback could be implemented here
+                                                         if (onProgressCallback) {
+                                                             callInvoker->invokeAsync([onProgressCallback, progress, &runtime]() {
+                                                                 @try {
+                                                                     onProgressCallback->call(runtime, Value(progress));
+                                                                 } @catch (NSException *exception) {
+                                                                     NSLog(@"RNWhisperJSI: Error calling onProgress callback: %@", exception);
+                                                                 } @catch (...) {
+                                                                     NSLog(@"RNWhisperJSI: Unknown error calling onProgress callback");
+                                                                 }
+                                                             });
+                                                         }
                                                      }
                                                   onNewSegments:^(NSDictionary *segments) {
-                                                      // New segments callback could be implemented here
+                                                      if (onNewSegmentsCallback) {
+                                                          callInvoker->invokeAsync([onNewSegmentsCallback, segments, &runtime]() {
+                                                              @try {
+                                                                  // Convert segments to JSI object
+                                                                  auto segmentsObj = Object(runtime);
+                                                                  if (segments[@"nNew"]) {
+                                                                      segmentsObj.setProperty(runtime, "nNew", Value([segments[@"nNew"] intValue]));
+                                                                  }
+                                                                  if (segments[@"totalNNew"]) {
+                                                                      segmentsObj.setProperty(runtime, "totalNNew", Value([segments[@"totalNNew"] intValue]));
+                                                                  }
+                                                                  if (segments[@"result"]) {
+                                                                      segmentsObj.setProperty(runtime, "result", String::createFromUtf8(runtime, [segments[@"result"] UTF8String]));
+                                                                  }
+                                                                  if (segments[@"segments"]) {
+                                                                      NSArray *segmentsArray = segments[@"segments"];
+                                                                      auto jsiSegmentsArray = Array(runtime, segmentsArray.count);
+                                                                      for (NSUInteger i = 0; i < segmentsArray.count; i++) {
+                                                                          NSDictionary *segment = segmentsArray[i];
+                                                                          auto segmentObj = Object(runtime);
+                                                                          if (segment[@"text"]) {
+                                                                              segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, [segment[@"text"] UTF8String]));
+                                                                          }
+                                                                          if (segment[@"t0"]) {
+                                                                              segmentObj.setProperty(runtime, "t0", Value([segment[@"t0"] doubleValue]));
+                                                                          }
+                                                                          if (segment[@"t1"]) {
+                                                                              segmentObj.setProperty(runtime, "t1", Value([segment[@"t1"] doubleValue]));
+                                                                          }
+                                                                          jsiSegmentsArray.setValueAtIndex(runtime, i, segmentObj);
+                                                                      }
+                                                                      segmentsObj.setProperty(runtime, "segments", jsiSegmentsArray);
+                                                                  }
+
+                                                                  onNewSegmentsCallback->call(runtime, segmentsObj);
+                                                              } @catch (NSException *exception) {
+                                                                  NSLog(@"RNWhisperJSI: Error calling onNewSegments callback: %@", exception);
+                                                              } @catch (...) {
+                                                                  NSLog(@"RNWhisperJSI: Unknown error calling onNewSegments callback");
+                                                              }
+                                                          });
+                                                      }
                                                   }
                                                           onEnd:^(int code) {
                                                               callInvoker->invokeAsync([resolvePtr, rejectPtr, code, context, audioData, &runtime]() {
@@ -438,7 +439,6 @@ static BOOL jsiBindingsInstalled = NO;
         );
 
         // Install all JSI functions on the global object
-        runtime.global().setProperty(runtime, "whisperTestContext", std::move(whisperTestContext));
         runtime.global().setProperty(runtime, "whisperTranscribeData", std::move(whisperTranscribeData));
         runtime.global().setProperty(runtime, "whisperVadDetectSpeech", std::move(whisperVadDetectSpeech));
 

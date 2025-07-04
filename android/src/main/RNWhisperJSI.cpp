@@ -6,8 +6,10 @@
 #include <unordered_map>
 #include <algorithm>
 #include <vector>
+#include <atomic>
 #include <android/log.h>
 #include "whisper.h"
+#include "rn-whisper.h"
 
 using namespace facebook::jsi;
 
@@ -145,69 +147,7 @@ void installJSIBindings(
     jobject javaModule
 ) {
     try {
-        // Test function to verify JSI bindings are working
-        auto whisperTestContext = Function::createFromHostFunction(
-            runtime,
-            PropNameID::forAscii(runtime, "whisperTestContext"),
-            2, // number of arguments
-            [](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
-                try {
-                    if (count != 2) {
-                        throw JSError(runtime, "whisperTestContext expects 2 arguments (contextId, arrayBuffer)");
-                    }
 
-                    if (!arguments[0].isNumber()) {
-                        throw JSError(runtime, "whisperTestContext expects contextId to be a number");
-                    }
-
-                    if (!arguments[1].isObject() || !arguments[1].getObject(runtime).isArrayBuffer(runtime)) {
-                        throw JSError(runtime, "whisperTestContext expects second argument to be an ArrayBuffer");
-                    }
-
-                    int contextId = (int)arguments[0].getNumber();
-
-                    // Get ArrayBuffer data
-                    auto arrayBuffer = arguments[1].getObject(runtime).getArrayBuffer(runtime);
-                    size_t arrayBufferSize = arrayBuffer.size(runtime);
-                    uint8_t* arrayBufferData = arrayBuffer.data(runtime);
-
-                    __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
-                        "whisperTestContext called with contextId=%d, arrayBuffer size=%zu", contextId, arrayBufferSize);
-
-                    // Thread-safe context lookup
-                    long contextPtr = getContextPtr(contextId);
-
-                    if (contextPtr == 0) {
-                        __android_log_print(ANDROID_LOG_DEBUG, "RNWhisperJSI",
-                            "Context not found for id=%d", contextId);
-                        return Value::undefined();
-                    }
-
-                    // Validate context pointer before casting
-                    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(contextPtr);
-                    if (context == nullptr) {
-                        __android_log_print(ANDROID_LOG_WARN, "RNWhisperJSI",
-                            "Context pointer is null for id=%d", contextId);
-                        return Value::undefined();
-                    }
-
-                    __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
-                        "Context validated successfully for id=%d, processed ArrayBuffer with %zu bytes", contextId, arrayBufferSize);
-                    return Value(true);
-                } catch (const JSError& e) {
-                    // Re-throw JSError
-                    throw;
-                } catch (const std::exception& e) {
-                    __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
-                        "Exception in whisperTestContext: %s", e.what());
-                    throw JSError(runtime, std::string("whisperTestContext error: ") + e.what());
-                } catch (...) {
-                    __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
-                        "Unknown exception in whisperTestContext");
-                    throw JSError(runtime, "whisperTestContext encountered unknown error");
-                }
-            }
-        );
 
         // whisperTranscribeData function
         auto whisperTranscribeData = Function::createFromHostFunction(
@@ -270,6 +210,30 @@ void installJSIBindings(
                     // Create whisper_full_params from JSI options
                     whisper_full_params params = createFullParamsFromJSI(runtime, optionsObj);
 
+                    // Check for onProgress, onNewSegments callback functions, and jobId
+                    std::shared_ptr<Function> onProgressCallback = nullptr;
+                    std::shared_ptr<Function> onNewSegmentsCallback = nullptr;
+                    int jobId = rand(); // Default fallback jobId
+
+                    try {
+                        auto propNames = optionsObj.getPropertyNames(runtime);
+                        for (size_t i = 0; i < propNames.size(runtime); i++) {
+                            auto propNameValue = propNames.getValueAtIndex(runtime, i);
+                            std::string propName = propNameValue.getString(runtime).utf8(runtime);
+                            Value propValue = optionsObj.getProperty(runtime, propNameValue.getString(runtime));
+
+                            if (propName == "onProgress" && propValue.isObject() && propValue.getObject(runtime).isFunction(runtime)) {
+                                onProgressCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
+                            } else if (propName == "onNewSegments" && propValue.isObject() && propValue.getObject(runtime).isFunction(runtime)) {
+                                onNewSegmentsCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
+                            } else if (propName == "jobId" && propValue.isNumber()) {
+                                jobId = (int)propValue.getNumber();
+                            }
+                        }
+                    } catch (...) {
+                        // Ignore callback detection errors
+                    }
+
                     // Create a promise for async transcription
                     auto promiseConstructor = runtime.global().getPropertyAsFunction(runtime, "Promise");
 
@@ -277,7 +241,7 @@ void installJSIBindings(
                         runtime,
                         PropNameID::forAscii(runtime, ""),
                         2, // resolve, reject
-                        [context, audioData, audioDataCount, params, callInvoker](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
+                                                [context, audioData, audioDataCount, params, onProgressCallback, onNewSegmentsCallback, jobId, callInvoker](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
                             if (count != 2) {
                                 throw JSError(runtime, "Promise executor expects 2 arguments (resolve, reject)");
                             }
@@ -288,55 +252,172 @@ void installJSIBindings(
 
                             // Run transcription on background thread
                             if (callInvoker) {
-                                callInvoker->invokeAsync([context, audioData, audioDataCount, params, resolvePtr, rejectPtr, &runtime]() {
+                                // Capture a safe reference to runtime for later use in JS thread
+                                auto safeRuntime = std::shared_ptr<Runtime>(&runtime, [](Runtime*){/* no-op deleter */});
+                                callInvoker->invokeAsync([context, audioData, audioDataCount, params, onProgressCallback, onNewSegmentsCallback, resolvePtr, rejectPtr, callInvoker, jobId, safeRuntime]() {
                                     try {
                                         // Reset timings before transcription
                                         whisper_reset_timings(context);
 
-                                        // Run transcription
-                                        int code = whisper_full(context, params, audioData.data(), audioDataCount);
+                                        // Setup callbacks for progress and new segments
+                                        whisper_full_params mutable_params = params;
 
-                                        // Call resolve/reject on JS thread
-                                        if (code == 0) {
-                                            // Get results
-                                            int n_segments = whisper_full_n_segments(context);
+                                                                                // Progress callback data - use shared_ptr for thread safety
+                                        struct progress_callback_data {
+                                            std::shared_ptr<facebook::react::CallInvoker> callInvoker;
+                                            std::shared_ptr<Function> callback;
+                                        };
 
-                                            auto resultObj = Object(runtime);
-                                            resultObj.setProperty(runtime, "code", Value(code));
+                                        auto progress_data = std::make_shared<progress_callback_data>();
+                                        progress_data->callInvoker = callInvoker;
+                                        progress_data->callback = onProgressCallback;
 
-                                            std::string fullText = "";
-                                            auto segmentsArray = Array(runtime, n_segments);
+                                        if (onProgressCallback) {
+                                            mutable_params.progress_callback = [](struct whisper_context* /*ctx*/, struct whisper_state* /*state*/, int progress, void* user_data) {
+                                                auto* data_ptr = static_cast<std::shared_ptr<progress_callback_data>*>(user_data);
+                                                if (data_ptr && *data_ptr) {
+                                                    auto data = *data_ptr;
+                                                    if (data->callInvoker && data->callback) {
+                                                        data->callInvoker->invokeAsync([progress, callback = data->callback]() {
+                                                            try {
+                                                                // Note: Runtime will be accessed safely within the JS thread context
+                                                                // The CallInvoker ensures we're on the JS thread when this executes
+                                                                __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
+                                                                    "Progress: %d%%", progress);
+                                                            } catch (...) {
+                                                                __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
+                                                                    "Error in progress callback");
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            };
+                                            mutable_params.progress_callback_user_data = &progress_data;
+                                        }
 
-                                            for (int i = 0; i < n_segments; i++) {
-                                                const char* text = whisper_full_get_segment_text(context, i);
-                                                std::string segmentText(text);
-                                                fullText += segmentText;
+                                                                                // New segments callback data - use shared_ptr for thread safety
+                                        struct new_segments_callback_data {
+                                            std::shared_ptr<facebook::react::CallInvoker> callInvoker;
+                                            std::shared_ptr<Function> callback;
+                                            std::atomic<int> total_n_new;
+                                        };
 
-                                                auto segmentObj = Object(runtime);
-                                                segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, segmentText));
-                                                segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(context, i)));
-                                                segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(context, i)));
+                                        auto segments_data = std::make_shared<new_segments_callback_data>();
+                                        segments_data->callInvoker = callInvoker;
+                                        segments_data->callback = onNewSegmentsCallback;
+                                        segments_data->total_n_new = 0;
 
-                                                segmentsArray.setValueAtIndex(runtime, i, segmentObj);
+                                        if (onNewSegmentsCallback) {
+                                            mutable_params.new_segment_callback = [](struct whisper_context* ctx, struct whisper_state* /*state*/, int n_new, void* user_data) {
+                                                auto* data_ptr = static_cast<std::shared_ptr<new_segments_callback_data>*>(user_data);
+                                                if (data_ptr && *data_ptr) {
+                                                    auto data = *data_ptr;
+                                                    if (data->callInvoker && data->callback && ctx) {
+                                                        int current_total = data->total_n_new.fetch_add(n_new) + n_new;
+
+                                                        data->callInvoker->invokeAsync([n_new, current_total, callback = data->callback]() {
+                                                            try {
+                                                                // For now, just log the new segments
+                                                                // TODO: Properly construct JSI objects when runtime is available
+                                                                __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
+                                                                    "New segments: %d (total: %d)", n_new, current_total);
+                                                            } catch (...) {
+                                                                __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
+                                                                    "Error in new segments callback");
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            };
+                                            mutable_params.new_segment_callback_user_data = &segments_data;
+                                        }
+
+                                                                                                                        // Create job for transcription with abort support
+                                        rnwhisper::job* job = rnwhisper::job_new(jobId, mutable_params);
+                                        int code = -1; // Default error code
+
+                                        if (job == nullptr) {
+                                            __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
+                                                "Failed to create job for transcription");
+                                            code = -2; // Job creation failed
+                                        } else {
+                                            // Run transcription with job support
+                                            code = whisper_full(context, job->params, audioData.data(), audioDataCount);
+
+                                            // Check if job was aborted
+                                            if (job->is_aborted()) {
+                                                code = -999; // Aborted code
                                             }
 
-                                            resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, fullText));
-                                            resultObj.setProperty(runtime, "segments", segmentsArray);
-
-                                            resolvePtr->call(runtime, resultObj);
-                                        } else {
-                                            auto errorObj = Object(runtime);
-                                            errorObj.setProperty(runtime, "code", Value(code));
-                                            errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Transcription failed"));
-                                            rejectPtr->call(runtime, errorObj);
+                                            // Clean up job
+                                            rnwhisper::job_remove(jobId);
                                         }
+
+                                        // Call resolve/reject on JS thread - use callInvoker to ensure we're on JS thread
+                                        callInvoker->invokeAsync([resolvePtr, rejectPtr, code, context, safeRuntime]() {
+                                            try {
+                                                // Use the safely captured runtime reference
+                                                auto& runtime = *safeRuntime;
+
+                                                if (code == 0) {
+                                                    // Get results
+                                                    int n_segments = whisper_full_n_segments(context);
+
+                                                    auto resultObj = Object(runtime);
+                                                    resultObj.setProperty(runtime, "code", Value(code));
+
+                                                    std::string fullText = "";
+                                                    auto segmentsArray = Array(runtime, n_segments);
+
+                                                    for (int i = 0; i < n_segments; i++) {
+                                                        const char* text = whisper_full_get_segment_text(context, i);
+                                                        std::string segmentText(text);
+                                                        fullText += segmentText;
+
+                                                        auto segmentObj = Object(runtime);
+                                                        segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, segmentText));
+                                                        segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(context, i)));
+                                                        segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(context, i)));
+
+                                                        segmentsArray.setValueAtIndex(runtime, i, segmentObj);
+                                                    }
+
+                                                    resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, fullText));
+                                                    resultObj.setProperty(runtime, "segments", segmentsArray);
+
+                                                    resolvePtr->call(runtime, resultObj);
+                                                } else {
+                                                    auto errorObj = Object(runtime);
+                                                    errorObj.setProperty(runtime, "code", Value(code));
+                                                    std::string errorMsg = (code == -2) ? "Failed to create transcription job" :
+                                                                          (code == -999) ? "Transcription was aborted" :
+                                                                          "Transcription failed";
+                                                    errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, errorMsg));
+                                                    rejectPtr->call(runtime, errorObj);
+                                                }
+                                            } catch (const JSError& e) {
+                                                throw;
+                                            } catch (const std::exception& e) {
+                                                auto& runtime = *safeRuntime;
+                                                auto errorObj = Object(runtime);
+                                                errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, e.what()));
+                                                rejectPtr->call(runtime, errorObj);
+                                            } catch (...) {
+                                                auto& runtime = *safeRuntime;
+                                                auto errorObj = Object(runtime);
+                                                errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Unknown error"));
+                                                rejectPtr->call(runtime, errorObj);
+                                            }
+                                        });
                                     } catch (const JSError& e) {
                                         throw;
                                     } catch (const std::exception& e) {
+                                        auto& runtime = *safeRuntime;
                                         auto errorObj = Object(runtime);
                                         errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, e.what()));
                                         rejectPtr->call(runtime, errorObj);
                                     } catch (...) {
+                                        auto& runtime = *safeRuntime;
                                         auto errorObj = Object(runtime);
                                         errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Unknown error"));
                                         rejectPtr->call(runtime, errorObj);
@@ -346,7 +427,26 @@ void installJSIBindings(
                                 // Fallback: run synchronously
                                 try {
                                     whisper_reset_timings(context);
-                                    int code = whisper_full(context, params, audioData.data(), audioDataCount);
+
+                                                                        // Create job for transcription with abort support
+                                    rnwhisper::job* job = rnwhisper::job_new(jobId, params);
+                                    if (job == nullptr) {
+                                        auto errorObj = Object(runtime);
+                                        errorObj.setProperty(runtime, "code", Value(-1));
+                                        errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Failed to create transcription job"));
+                                        rejectPtr->call(runtime, errorObj);
+                                        return Value::undefined();
+                                    }
+
+                                    int code = whisper_full(context, job->params, audioData.data(), audioDataCount);
+
+                                    // Check if job was aborted
+                                    if (job->is_aborted()) {
+                                        code = -999; // Aborted code
+                                    }
+
+                                    // Clean up job
+                                    rnwhisper::job_remove(jobId);
 
                                     if (code == 0) {
                                         int n_segments = whisper_full_n_segments(context);
@@ -575,8 +675,7 @@ void installJSIBindings(
             }
         );
 
-        // Install the function on the global object
-        runtime.global().setProperty(runtime, "whisperTestContext", std::move(whisperTestContext));
+        // Install the JSI functions on the global object
         runtime.global().setProperty(runtime, "whisperTranscribeData", std::move(whisperTranscribeData));
         runtime.global().setProperty(runtime, "whisperVadDetectSpeech", std::move(whisperVadDetectSpeech));
 

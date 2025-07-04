@@ -6,30 +6,10 @@ import {
   initWhisperVad,
   releaseAllWhisper,
   installJSIBindings,
+  WhisperContext,
+  WhisperVadContext,
 } from '../../src'
 import { WavFileReader } from './utils/WavFileReader'
-
-
-// Declare the global JSI functions
-declare global {
-  // eslint-disable-next-line no-var
-  var whisperTestContext: (
-    contextId: number,
-    arrayBuffer: ArrayBuffer,
-  ) => boolean
-  // eslint-disable-next-line no-var
-  var whisperTranscribeData: (
-    contextId: number,
-    options: any,
-    arrayBuffer: ArrayBuffer,
-  ) => Promise<any>
-  // eslint-disable-next-line no-var
-  var whisperVadDetectSpeech: (
-    contextId: number,
-    options: any,
-    arrayBuffer: ArrayBuffer,
-  ) => Promise<any>
-}
 
 // JFK audio file URL from whisper.cpp repository
 const JFK_AUDIO_URL =
@@ -92,14 +72,13 @@ const styles = StyleSheet.create({
 
 const JSITest: React.FC = () => {
   const [testResults, setTestResults] = useState<string[]>([])
-  const [contextId, setContextId] = useState<number | null>(null)
-  const [vadContextId, setVadContextId] = useState<number | null>(null)
+  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(null)
+  const [vadContext, setVadContext] = useState<WhisperVadContext | null>(null)
   const [contextsInitialized, setContextsInitialized] = useState(false)
 
   const jsiAvailable =
-    typeof global.whisperTestContext === 'function' &&
-    typeof global.whisperTranscribeData === 'function' &&
-    typeof global.whisperVadDetectSpeech === 'function'
+    typeof (global as any).whisperTranscribeData === 'function' &&
+    typeof (global as any).whisperVadDetectSpeech === 'function'
 
   const addTestResult = (result: string) => {
     setTestResults((prev) => [...prev, result])
@@ -127,7 +106,7 @@ const JSITest: React.FC = () => {
       return
     }
 
-    if (!contextsInitialized || !contextId) {
+    if (!contextsInitialized || !whisperContext) {
       addTestResult(
         '❌ Contexts not initialized. Please initialize contexts first.',
       )
@@ -135,85 +114,77 @@ const JSITest: React.FC = () => {
     }
 
     try {
-      // Test 1: whisperTestContext
-      addTestResult('🧪 Testing whisperTestContext...')
+      addTestResult('🧪 Converting audio data to ArrayBuffer...')
 
+      // Convert audio data to 16-bit PCM ArrayBuffer
       const arrayBuffer = new ArrayBuffer(audioData!.length)
       const dataView = new DataView(arrayBuffer)
       for (let i = 0; i < audioData!.length; i += 1) {
         dataView.setUint8(i, audioData![i]!)
       }
 
-      const testResult: any = global.whisperTestContext(contextId, arrayBuffer)
-      addTestResult(`✅ whisperTestContext result: ${testResult}`)
+      addTestResult(`✅ ArrayBuffer created: ${arrayBuffer.byteLength} bytes`)
 
-      // Test 2: whisperVadDetectSpeech (only if VAD context is available)
-      if (vadContextId) {
-        addTestResult('🧪 Testing whisperVadDetectSpeech...')
+      // Test 1: VAD detection with ArrayBuffer (if VAD context is available)
+      if (vadContext) {
+        addTestResult('🧪 Testing VAD detectSpeechData with ArrayBuffer...')
 
-        const vadOptions = {
-          threshold: 0.6,
-          minSpeechDuration: 100,
-          minSilenceDuration: 100,
+        try {
+          const vadResult = await vadContext.detectSpeechData(arrayBuffer)
+          addTestResult(
+            `✅ VAD detection success: Found ${vadResult.length} speech segments`,
+          )
+          vadResult.forEach((segment, index) => {
+            addTestResult(
+              `  Segment ${index + 1}: ${segment.t0}ms - ${segment.t1}ms`,
+            )
+          })
+        } catch (error) {
+          addTestResult(`❌ VAD detection error: ${error}`)
         }
-
-        global
-          .whisperVadDetectSpeech(vadContextId, vadOptions, arrayBuffer)
-          .then((result) => {
-            addTestResult(
-              `✅ whisperVadDetectSpeech success: ${JSON.stringify(
-                result,
-                null,
-                2,
-              )}`,
-            )
-          })
-          .catch((error) => {
-            addTestResult(
-              `❌ whisperVadDetectSpeech error: ${JSON.stringify(
-                error,
-                null,
-                2,
-              )}`,
-            )
-          })
-
-        addTestResult('🔄 whisperVadDetectSpeech call initiated (async)')
       } else {
         addTestResult(
-          '⚠️ Skipping whisperVadDetectSpeech (VAD context not available)',
+          '⚠️ Skipping VAD test (VAD context not available)',
         )
       }
 
-      // Test 3: whisperTranscribeData (Promise-based)
-      addTestResult('🧪 Testing whisperTranscribeData...')
+            // Test 2: Transcription with ArrayBuffer and callbacks
+      addTestResult('🧪 Testing transcribeData with ArrayBuffer and callbacks...')
 
-      const transcribeOptions = {
-        language: 'en',
-        maxThreads: 2,
-        translate: false,
-        tokenTimestamps: false,
-        tdrzEnable: false,
+      try {
+        let progressCount = 0
+        let segmentsCount = 0
+
+        const { promise: transcribePromise } = whisperContext.transcribeData(arrayBuffer, {
+          language: 'en',
+          maxThreads: 2,
+          translate: false,
+          tokenTimestamps: false,
+          tdrzEnable: false,
+          onProgress: (progress: number) => {
+            progressCount += 1
+            addTestResult(`📊 Progress callback #${progressCount}: ${progress}%`)
+          },
+          onNewSegments: (result: any) => {
+            segmentsCount += 1
+            addTestResult(`🆕 New segments callback #${segmentsCount}:`)
+            addTestResult(`  New segments: ${result.nNew}`)
+            addTestResult(`  Total segments: ${result.totalNNew}`)
+            addTestResult(`  Text: "${result.result}"`)
+          },
+        })
+
+        const transcribeResult = await transcribePromise
+        addTestResult('✅ Transcription completed!')
+        addTestResult(`📝 Final result: "${transcribeResult.result}"`)
+        addTestResult(`📊 Total progress callbacks: ${progressCount}`)
+        addTestResult(`🆕 Total segment callbacks: ${segmentsCount}`)
+        addTestResult(`🔢 Final segments count: ${transcribeResult.segments?.length || 0}`)
+
+      } catch (error) {
+        addTestResult(`❌ Transcription error: ${error}`)
       }
 
-      global
-        .whisperTranscribeData(contextId, transcribeOptions, arrayBuffer)
-        .then((result: any) => {
-          addTestResult(
-            `✅ whisperTranscribeData success: ${JSON.stringify(
-              result,
-              null,
-              2,
-            )}`,
-          )
-        })
-        .catch((error: any) => {
-          addTestResult(
-            `❌ whisperTranscribeData error: ${JSON.stringify(error, null, 2)}`,
-          )
-        })
-
-      addTestResult('🔄 whisperTranscribeData call initiated (async)')
     } catch (error) {
       addTestResult(`❌ Test error: ${error}`)
     }
@@ -235,22 +206,22 @@ const JSITest: React.FC = () => {
 
       // Initialize Whisper context
       addTestResult('🧠 Initializing Whisper context...')
-      const whisperContext = await initWhisper({
+      const newWhisperContext = await initWhisper({
         filePath: require('../assets/ggml-base.bin'),
       })
-      setContextId(whisperContext.id)
+      setWhisperContext(newWhisperContext)
       addTestResult(
-        `✅ Whisper context initialized with ID: ${whisperContext.id}`,
+        `✅ Whisper context initialized with ID: ${newWhisperContext.id}`,
       )
 
       // Initialize VAD context (if available)
       try {
         addTestResult('🎤 Initializing VAD context...')
-        const vadContext = await initWhisperVad({
+        const newVadContext = await initWhisperVad({
           filePath: require('../assets/ggml-silero-v5.1.2.bin'),
         })
-        setVadContextId(vadContext.id)
-        addTestResult(`✅ VAD context initialized with ID: ${vadContext.id}`)
+        setVadContext(newVadContext)
+        addTestResult(`✅ VAD context initialized with ID: ${newVadContext.id}`)
       } catch (vadError) {
         addTestResult(`⚠️ VAD context initialization failed: ${vadError}`)
         addTestResult('🧪 VAD tests will be skipped')
@@ -268,8 +239,8 @@ const JSITest: React.FC = () => {
     try {
       addTestResult('🗑️ Releasing all contexts...')
       await releaseAllWhisper()
-      setContextId(null)
-      setVadContextId(null)
+      setWhisperContext(null)
+      setVadContext(null)
       setContextsInitialized(false)
       addTestResult('✅ All contexts released')
     } catch (error) {
@@ -290,14 +261,14 @@ const JSITest: React.FC = () => {
             contextsInitialized ? '✅ Initialized' : '❌ Not Initialized'
           }`}
         </Text>
-        {contextId && (
+        {whisperContext && (
           <Text style={styles.statusSubText}>
-            {`Whisper Context ID: ${contextId}`}
+            {`Whisper Context ID: ${whisperContext.id}`}
           </Text>
         )}
-        {vadContextId && (
+        {vadContext && (
           <Text style={styles.statusSubText}>
-            {`VAD Context ID: ${vadContextId}`}
+            {`VAD Context ID: ${vadContext.id}`}
           </Text>
         )}
       </View>

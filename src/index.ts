@@ -326,13 +326,65 @@ export class WhisperContext {
   }
 
   /**
-   * Transcribe audio data (base64 encoded float32 PCM data)
+   * Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
-  transcribeData(data: string, options: TranscribeFileOptions = {}): {
+  transcribeData(data: string | ArrayBuffer, options: TranscribeFileOptions = {}): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
+    if (data instanceof ArrayBuffer) {
+      // Use JSI function for ArrayBuffer
+      return this.transcribeDataArrayBuffer(data, options)
+    }
     return this.transcribeWithNativeMethod('transcribeData', data, options)
+  }
+
+      /**
+   * Transcribe audio data from ArrayBuffer (16-bit PCM, mono, 16kHz)
+   */
+  private transcribeDataArrayBuffer(data: ArrayBuffer, options: TranscribeFileOptions = {}): {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  } {
+    const { onProgress, onNewSegments, ...rest } = options
+
+    // Generate a unique jobId for this transcription
+    const jobId = Math.floor(Math.random() * 10000)
+
+    const jsiOptions = {
+      ...rest,
+      onProgress: onProgress || undefined,
+      onNewSegments: onNewSegments || undefined,
+      jobId, // Pass jobId to native implementation
+    }
+
+    let isAborted = false
+    const promise = (global as any).whisperTranscribeData(this.id, jsiOptions, data)
+      .then((result: any) => {
+        if (isAborted) {
+          return { ...result, isAborted: true }
+        }
+        return result
+      })
+      .catch((error: any) => {
+        if (isAborted) {
+          return { isAborted: true, error: 'Transcription aborted' }
+        }
+        throw error
+      })
+
+    return {
+      stop: async () => {
+        isAborted = true
+        try {
+          // Use the existing native abort method
+          await RNWhisper.abortTranscribe(this.id, jobId)
+        } catch (error) {
+          // Ignore errors if context is already released or job doesn't exist
+        }
+      },
+      promise
+    }
   }
 
   /** Transcribe the microphone audio stream, the microphone user permission is required */
@@ -658,12 +710,17 @@ export class WhisperVadContext {
   }
 
   /**
-   * Detect speech segments in raw audio data (base64 encoded float32 PCM data)
+   * Detect speech segments in raw audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
   async detectSpeechData(
-    audioData: string,
+    audioData: string | ArrayBuffer,
     options: VadOptions = {}
   ): Promise<VadSegment[]> {
+    if (audioData instanceof ArrayBuffer) {
+      // Use JSI function for ArrayBuffer
+      const result = await (global as any).whisperVadDetectSpeech(this.id, options, audioData)
+      return result.segments || []
+    }
     return RNWhisper.vadDetectSpeech(this.id, audioData, options)
   }
 
