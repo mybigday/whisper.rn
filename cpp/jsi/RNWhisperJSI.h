@@ -10,10 +10,20 @@
 
 #if defined(__ANDROID__)
 #include <android/log.h>
-#endif
-
 #include "whisper.h"
 #include "rn-whisper.h"
+#endif
+
+#if defined(__APPLE__)
+#if !RNWHISPER_BUILD_FROM_SOURCE
+#include "whisper.h"
+#include "rn-whisper.h"
+#else
+#include <rnwhisper/whisper.h>
+#include <rnwhisper/rn-whisper.h>
+#endif
+#endif
+
 
 namespace rnwhisper_jsi {
 
