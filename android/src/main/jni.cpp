@@ -210,7 +210,7 @@ Java_com_rnwhisper_WhisperContext_initContext(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     context = whisper_init_from_file_with_params(model_path_chars, cparams);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
-    rnwhisper::addContext(context_id, reinterpret_cast<jlong>(context));
+    rnwhisper_jsi::addContext(context_id, reinterpret_cast<jlong>(context));
     return reinterpret_cast<jlong>(context);
 }
 
@@ -553,7 +553,7 @@ Java_com_rnwhisper_WhisperContext_freeContext(
     UNUSED(thiz);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     whisper_free(context);
-    rnwhisper::removeContext(context_id);
+    rnwhisper_jsi::removeContext(context_id);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -593,7 +593,7 @@ Java_com_rnwhisper_WhisperContext_initVadContext(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     vad_context = whisper_vad_init_from_file_with_params(model_path_chars, vad_params);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
-    rnwhisper::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
+    rnwhisper_jsi::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -612,7 +612,7 @@ Java_com_rnwhisper_WhisperContext_initVadContextWithAsset(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     vad_context = whisper_vad_init_from_asset(env, asset_manager, model_path_chars, vad_params);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
-    rnwhisper::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
+    rnwhisper_jsi::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -628,7 +628,7 @@ Java_com_rnwhisper_WhisperContext_initVadContextWithInputStream(
 
     struct whisper_vad_context *vad_context = nullptr;
     vad_context = whisper_vad_init_from_input_stream(env, input_stream, vad_params);
-    rnwhisper::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
+    rnwhisper_jsi::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -643,7 +643,7 @@ Java_com_rnwhisper_WhisperContext_freeVadContext(
     UNUSED(thiz);
     struct whisper_vad_context *vad_context = reinterpret_cast<struct whisper_vad_context *>(vad_context_ptr);
     whisper_vad_free(vad_context);
-    rnwhisper::removeVadContext(context_id);
+    rnwhisper_jsi::removeVadContext(context_id);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -783,7 +783,7 @@ Java_com_rnwhisper_WhisperContext_installJSIBindings(
 
     callInvoker->invokeAsync([runtime, callInvoker]() {
         try {
-            rnwhisper::installJSIBindings(*runtime, callInvoker);
+            rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
             LOGI("JSI bindings installed successfully on JS thread");
         } catch (const facebook::jsi::JSError& e) {
             LOGW("JSError installing JSI bindings: %s", e.getMessage().c_str());

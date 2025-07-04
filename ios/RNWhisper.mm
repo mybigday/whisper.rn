@@ -91,6 +91,8 @@ RCT_REMAP_METHOD(initContext,
     }
 
     [contexts setObject:context forKey:[NSNumber numberWithInt:contextId]];
+    // Also add to unified context management - store raw context pointer like Android
+    rnwhisper_jsi::addContext(contextId, reinterpret_cast<long>([context getContext]));
 
     resolve(@{
         @"contextId": @(contextId),
@@ -346,6 +348,8 @@ RCT_REMAP_METHOD(releaseContext,
     }
     [context invalidate];
     [contexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    // Also remove from unified context management
+    rnwhisper_jsi::removeContext(contextId);
     resolve(nil);
 }
 
@@ -369,12 +373,16 @@ RCT_REMAP_METHOD(releaseAllContexts,
     for (NSNumber *contextId in contexts) {
         RNWhisperContext *context = contexts[contextId];
         [context invalidate];
+        // Also remove from unified context management
+        rnwhisper_jsi::removeContext([contextId intValue]);
     }
 
     if (vadContexts != nil) {
         for (NSNumber *contextId in vadContexts) {
             RNWhisperVadContext *vadContext = vadContexts[contextId];
             [vadContext invalidate];
+            // Also remove from unified context management
+            rnwhisper_jsi::removeVadContext([contextId intValue]);
         }
         [vadContexts removeAllObjects];
         vadContexts = nil;
@@ -485,6 +493,8 @@ RCT_REMAP_METHOD(initVadContext,
     }
 
     [vadContexts setObject:vadContext forKey:[NSNumber numberWithInt:contextId]];
+    // Also add to unified context management - store raw VAD context pointer like Android
+    rnwhisper_jsi::addVadContext(contextId, reinterpret_cast<long>([vadContext getVadContext]));
 
     resolve(@{
         @"contextId": @(contextId),
@@ -569,6 +579,8 @@ RCT_REMAP_METHOD(releaseVadContext,
     }
     [vadContext invalidate];
     [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    // Also remove from unified context management
+    rnwhisper_jsi::removeVadContext(contextId);
     resolve(nil);
 }
 
@@ -600,8 +612,8 @@ RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
         facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
 
         if (callInvoker) {
-          callInvoker->invokeAsync([runtime, bridge, callInvoker]() {
-            [RNWhisperJSI installJSIBindings:*runtime callInvoker:callInvoker];
+          callInvoker->invokeAsync([runtime, callInvoker]() {
+            rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
           });
         } else {
           reject(@"whisper_jsi_error", @"CallInvoker not available", nil);

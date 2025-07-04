@@ -15,6 +15,7 @@ find_package(fbjni REQUIRED CONFIG)
 include_directories(
     ${RNWHISPER_LIB_DIR}
     ${RNWHISPER_LIB_DIR}/ggml-cpu
+    ${RNWHISPER_LIB_DIR}/jsi
 )
 
 set(
@@ -41,8 +42,8 @@ set(
     ${RNWHISPER_LIB_DIR}/whisper.cpp
     ${RNWHISPER_LIB_DIR}/rn-audioutils.cpp
     ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
+    ${RNWHISPER_LIB_DIR}/jsi/RNWhisperJSI.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp
-    ${CMAKE_SOURCE_DIR}/RNWhisperJSI.cpp
 )
 
 find_library(LOG_LIB log)

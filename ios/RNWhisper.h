@@ -8,7 +8,9 @@
 #endif
 #endif
 
+#import <Foundation/Foundation.h>
 #import <React/RCTBridgeModule.h>
+#import <React/RCTBridge+Private.h>
 #import <React/RCTEventEmitter.h>
 
 @interface RNWhisper : RCTEventEmitter <RCTBridgeModule>
