@@ -15,7 +15,7 @@
 #endif
 
 #if defined(__APPLE__)
-#if !RNWHISPER_BUILD_FROM_SOURCE
+#if RNWHISPER_BUILD_FROM_SOURCE
 #include "whisper.h"
 #include "rn-whisper.h"
 #else
@@ -23,7 +23,6 @@
 #include <rnwhisper/rn-whisper.h>
 #endif
 #endif
-
 
 namespace rnwhisper_jsi {
 
@@ -41,19 +40,5 @@ void installJSIBindings(
 
 // Cleanup function to dispose of ThreadPool
 void cleanupJSIBindings();
-
-// Helper functions
-whisper_full_params createFullParamsFromJSI(
-    facebook::jsi::Runtime& runtime,
-    const facebook::jsi::Object& optionsObj
-);
-
-long getContextPtr(int contextId);
-long getVadContextPtr(int contextId);
-
-// Platform-specific logging
-void logInfo(const char* format, ...);
-void logError(const char* format, ...);
-void logDebug(const char* format, ...);
 
 } // namespace rnwhisper_jsi

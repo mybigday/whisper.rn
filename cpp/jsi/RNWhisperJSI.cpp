@@ -17,6 +17,52 @@ using namespace facebook::jsi;
 
 namespace rnwhisper_jsi {
 
+// Platform-specific logging
+static void logInfo(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+
+#if defined(__ANDROID__)
+  __android_log_vprint(ANDROID_LOG_INFO, "RNWhisperJSI", format, args);
+#else
+  char buffer[1024];
+  vsnprintf(buffer, sizeof(buffer), format, args);
+  printf("RNWhisperJSI: %s\n", buffer);
+#endif
+
+  va_end(args);
+}
+
+static void logError(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+
+#if defined(__ANDROID__)
+  __android_log_vprint(ANDROID_LOG_ERROR, "RNWhisperJSI", format, args);
+#else
+  char buffer[1024];
+  vsnprintf(buffer, sizeof(buffer), format, args);
+  printf("RNWhisperJSI ERROR: %s\n", buffer);
+#endif
+
+  va_end(args);
+}
+
+static void logDebug(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+
+#if defined(__ANDROID__)
+  __android_log_vprint(ANDROID_LOG_DEBUG, "RNWhisperJSI", format, args);
+#else
+  char buffer[1024];
+  vsnprintf(buffer, sizeof(buffer), format, args);
+  printf("RNWhisperJSI DEBUG: %s\n", buffer);
+#endif
+
+  va_end(args);
+}
+
 static std::unique_ptr<ThreadPool> whisperThreadPool = nullptr;
 static std::mutex threadPoolMutex;
 
@@ -77,52 +123,6 @@ long getVadContextPtr(int contextId) {
     std::lock_guard<std::mutex> lock(vadContextMapMutex);
     auto it = vadContextMap.find(contextId);
     return (it != vadContextMap.end()) ? it->second : 0;
-}
-
-// Platform-specific logging
-void logInfo(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-
-#if defined(__ANDROID__)
-    __android_log_vprint(ANDROID_LOG_INFO, "RNWhisperJSI", format, args);
-#else
-    char buffer[1024];
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    printf("RNWhisperJSI: %s\n", buffer);
-#endif
-
-    va_end(args);
-}
-
-void logError(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-
-#if defined(__ANDROID__)
-    __android_log_vprint(ANDROID_LOG_ERROR, "RNWhisperJSI", format, args);
-#else
-    char buffer[1024];
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    printf("RNWhisperJSI ERROR: %s\n", buffer);
-#endif
-
-    va_end(args);
-}
-
-void logDebug(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-
-#if defined(__ANDROID__)
-    __android_log_vprint(ANDROID_LOG_DEBUG, "RNWhisperJSI", format, args);
-#else
-    char buffer[1024];
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    printf("RNWhisperJSI DEBUG: %s\n", buffer);
-#endif
-
-    va_end(args);
 }
 
 // Helper function to convert JSI object to whisper_full_params
