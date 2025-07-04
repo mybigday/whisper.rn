@@ -795,4 +795,12 @@ Java_com_rnwhisper_WhisperContext_installJSIBindings(
     });
 }
 
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_cleanupJSIBindings(
+    JNIEnv *env,
+    jclass clazz
+) {
+    rnwhisper_jsi::cleanupJSIBindings();
+}
+
 } // extern "C"

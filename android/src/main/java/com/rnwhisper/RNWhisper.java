@@ -373,7 +373,7 @@ public class RNWhisper implements LifecycleEventListener {
       @Override
       protected Void doInBackground(Void... voids) {
         try {
-          onHostDestroy();
+          cleanup();
         } catch (Exception e) {
           exception = e;
         }
@@ -608,8 +608,7 @@ public class RNWhisper implements LifecycleEventListener {
   public void onHostPause() {
   }
 
-  @Override
-  public void onHostDestroy() {
+  private void cleanup() {
     for (WhisperContext context : contexts.values()) {
       context.stopCurrentTranscribe();
     }
@@ -629,6 +628,12 @@ public class RNWhisper implements LifecycleEventListener {
     WhisperContext.abortAllTranscribe(); // graceful abort
     contexts.clear();
     vadContexts.clear();
+  }
+
+  @Override
+  public void onHostDestroy() {
+    cleanup();
     downloader.clearCache();
+    WhisperContext.cleanupJSIBindings();
   }
 }

@@ -570,4 +570,5 @@ public class WhisperContext {
 
   // JSI Installation
   protected static native void installJSIBindings(long runtimePtr, Object callInvokerHolder);
+  protected static native void cleanupJSIBindings();
 }

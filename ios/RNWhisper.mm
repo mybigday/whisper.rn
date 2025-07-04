@@ -361,20 +361,18 @@ RCT_REMAP_METHOD(releaseAllContexts,
     resolve(nil);
 }
 
-- (void)invalidate {
-    [super invalidate];
-
-    [RNWhisperDownloader clearCache];
+- (void)cleanup {
+    rnwhisper::job_abort_all(); // graceful abort
 
     if (contexts == nil) {
-        return;
-    }
-
-    for (NSNumber *contextId in contexts) {
-        RNWhisperContext *context = contexts[contextId];
-        [context invalidate];
-        // Also remove from unified context management
-        rnwhisper_jsi::removeContext([contextId intValue]);
+        for (NSNumber *contextId in contexts) {
+            RNWhisperContext *context = contexts[contextId];
+            [context invalidate];
+            // Also remove from unified context management
+            rnwhisper_jsi::removeContext([contextId intValue]);
+        }
+        [contexts removeAllObjects];
+        contexts = nil;
     }
 
     if (vadContexts != nil) {
@@ -387,11 +385,13 @@ RCT_REMAP_METHOD(releaseAllContexts,
         [vadContexts removeAllObjects];
         vadContexts = nil;
     }
+}
 
-    rnwhisper::job_abort_all(); // graceful abort
-
-    [contexts removeAllObjects];
-    contexts = nil;
+- (void)invalidate {
+    [super invalidate];
+    [RNWhisperDownloader clearCache];
+    [self cleanup];
+    rnwhisper_jsi::cleanupJSIBindings();
 }
 
 // MARK: - AudioSessionUtils
