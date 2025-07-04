@@ -776,34 +776,23 @@ Java_com_rnwhisper_WhisperContext_installJSIBindings(
         }
     }
 
-    if (callInvoker) {
-        // Install JSI bindings on the JS thread using CallInvoker
-        callInvoker->invokeAsync([runtime, callInvoker]() {
-            try {
-                rnwhisper::installJSIBindings(*runtime, callInvoker, nullptr, nullptr);
-                LOGI("JSI bindings installed successfully on JS thread");
-            } catch (const facebook::jsi::JSError& e) {
-                LOGW("JSError installing JSI bindings: %s", e.getMessage().c_str());
-            } catch (const std::exception& e) {
-                LOGW("Exception installing JSI bindings: %s", e.what());
-            } catch (...) {
-                LOGW("Unknown error installing JSI bindings");
-            }
-        });
-    } else {
-        // Fallback: Install directly (less safe but better than failure)
-        LOGW("CallInvoker not available, installing JSI bindings directly");
-        try {
-            rnwhisper::installJSIBindings(*runtime, nullptr, env, nullptr);
-            LOGI("JSI bindings installed successfully (direct)");
-        } catch (const facebook::jsi::JSError& e) {
-            LOGW("JSError installing JSI bindings directly: %s", e.getMessage().c_str());
-        } catch (const std::exception& e) {
-            LOGW("Exception installing JSI bindings directly: %s", e.what());
-        } catch (...) {
-            LOGW("Unknown error installing JSI bindings directly");
-        }
+    if (callInvoker == nullptr) {
+        LOGW("CallInvoker is null, cannot install JSI bindings");
+        return;
     }
+
+    callInvoker->invokeAsync([runtime, callInvoker]() {
+        try {
+            rnwhisper::installJSIBindings(*runtime, callInvoker);
+            LOGI("JSI bindings installed successfully on JS thread");
+        } catch (const facebook::jsi::JSError& e) {
+            LOGW("JSError installing JSI bindings: %s", e.getMessage().c_str());
+        } catch (const std::exception& e) {
+            LOGW("Exception installing JSI bindings: %s", e.what());
+        } catch (...) {
+            LOGW("Unknown error installing JSI bindings");
+        }
+    });
 }
 
 } // extern "C"

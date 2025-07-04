@@ -11,8 +11,6 @@ namespace rnwhisper {
     void removeVadContext(int contextId);
     void installJSIBindings(
         facebook::jsi::Runtime& runtime,
-        std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-        JNIEnv* env,
-        jobject javaModule
+        std::shared_ptr<facebook::react::CallInvoker> callInvoker
     );
 }

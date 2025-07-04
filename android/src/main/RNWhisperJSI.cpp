@@ -142,9 +142,7 @@ static whisper_full_params createFullParamsFromJSI(Runtime& runtime, const Objec
 
 void installJSIBindings(
     facebook::jsi::Runtime& runtime,
-    std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-    JNIEnv* env,
-    jobject javaModule
+    std::shared_ptr<facebook::react::CallInvoker> callInvoker
 ) {
     try {
 
@@ -250,242 +248,177 @@ void installJSIBindings(
                             auto resolvePtr = std::make_shared<Function>(arguments[0].getObject(runtime).getFunction(runtime));
                             auto rejectPtr = std::make_shared<Function>(arguments[1].getObject(runtime).getFunction(runtime));
 
-                            // Run transcription on background thread
-                            if (callInvoker) {
-                                // Capture a safe reference to runtime for later use in JS thread
-                                auto safeRuntime = std::shared_ptr<Runtime>(&runtime, [](Runtime*){/* no-op deleter */});
-                                callInvoker->invokeAsync([context, audioData, audioDataCount, params, onProgressCallback, onNewSegmentsCallback, resolvePtr, rejectPtr, callInvoker, jobId, safeRuntime]() {
-                                    try {
-                                        // Reset timings before transcription
-                                        whisper_reset_timings(context);
-
-                                        // Setup callbacks for progress and new segments
-                                        whisper_full_params mutable_params = params;
-
-                                                                                // Progress callback data - use shared_ptr for thread safety
-                                        struct progress_callback_data {
-                                            std::shared_ptr<facebook::react::CallInvoker> callInvoker;
-                                            std::shared_ptr<Function> callback;
-                                        };
-
-                                        auto progress_data = std::make_shared<progress_callback_data>();
-                                        progress_data->callInvoker = callInvoker;
-                                        progress_data->callback = onProgressCallback;
-
-                                        if (onProgressCallback) {
-                                            mutable_params.progress_callback = [](struct whisper_context* /*ctx*/, struct whisper_state* /*state*/, int progress, void* user_data) {
-                                                auto* data_ptr = static_cast<std::shared_ptr<progress_callback_data>*>(user_data);
-                                                if (data_ptr && *data_ptr) {
-                                                    auto data = *data_ptr;
-                                                    if (data->callInvoker && data->callback) {
-                                                        data->callInvoker->invokeAsync([progress, callback = data->callback]() {
-                                                            try {
-                                                                // Note: Runtime will be accessed safely within the JS thread context
-                                                                // The CallInvoker ensures we're on the JS thread when this executes
-                                                                __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
-                                                                    "Progress: %d%%", progress);
-                                                            } catch (...) {
-                                                                __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
-                                                                    "Error in progress callback");
-                                                            }
-                                                        });
-                                                    }
-                                                }
-                                            };
-                                            mutable_params.progress_callback_user_data = &progress_data;
-                                        }
-
-                                                                                // New segments callback data - use shared_ptr for thread safety
-                                        struct new_segments_callback_data {
-                                            std::shared_ptr<facebook::react::CallInvoker> callInvoker;
-                                            std::shared_ptr<Function> callback;
-                                            std::atomic<int> total_n_new;
-                                        };
-
-                                        auto segments_data = std::make_shared<new_segments_callback_data>();
-                                        segments_data->callInvoker = callInvoker;
-                                        segments_data->callback = onNewSegmentsCallback;
-                                        segments_data->total_n_new = 0;
-
-                                        if (onNewSegmentsCallback) {
-                                            mutable_params.new_segment_callback = [](struct whisper_context* ctx, struct whisper_state* /*state*/, int n_new, void* user_data) {
-                                                auto* data_ptr = static_cast<std::shared_ptr<new_segments_callback_data>*>(user_data);
-                                                if (data_ptr && *data_ptr) {
-                                                    auto data = *data_ptr;
-                                                    if (data->callInvoker && data->callback && ctx) {
-                                                        int current_total = data->total_n_new.fetch_add(n_new) + n_new;
-
-                                                        data->callInvoker->invokeAsync([n_new, current_total, callback = data->callback]() {
-                                                            try {
-                                                                // For now, just log the new segments
-                                                                // TODO: Properly construct JSI objects when runtime is available
-                                                                __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
-                                                                    "New segments: %d (total: %d)", n_new, current_total);
-                                                            } catch (...) {
-                                                                __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
-                                                                    "Error in new segments callback");
-                                                            }
-                                                        });
-                                                    }
-                                                }
-                                            };
-                                            mutable_params.new_segment_callback_user_data = &segments_data;
-                                        }
-
-                                                                                                                        // Create job for transcription with abort support
-                                        rnwhisper::job* job = rnwhisper::job_new(jobId, mutable_params);
-                                        int code = -1; // Default error code
-
-                                        if (job == nullptr) {
-                                            __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
-                                                "Failed to create job for transcription");
-                                            code = -2; // Job creation failed
-                                        } else {
-                                            // Run transcription with job support
-                                            code = whisper_full(context, job->params, audioData.data(), audioDataCount);
-
-                                            // Check if job was aborted
-                                            if (job->is_aborted()) {
-                                                code = -999; // Aborted code
-                                            }
-
-                                            // Clean up job
-                                            rnwhisper::job_remove(jobId);
-                                        }
-
-                                        // Call resolve/reject on JS thread - use callInvoker to ensure we're on JS thread
-                                        callInvoker->invokeAsync([resolvePtr, rejectPtr, code, context, safeRuntime]() {
-                                            try {
-                                                // Use the safely captured runtime reference
-                                                auto& runtime = *safeRuntime;
-
-                                                if (code == 0) {
-                                                    // Get results
-                                                    int n_segments = whisper_full_n_segments(context);
-
-                                                    auto resultObj = Object(runtime);
-                                                    resultObj.setProperty(runtime, "code", Value(code));
-
-                                                    std::string fullText = "";
-                                                    auto segmentsArray = Array(runtime, n_segments);
-
-                                                    for (int i = 0; i < n_segments; i++) {
-                                                        const char* text = whisper_full_get_segment_text(context, i);
-                                                        std::string segmentText(text);
-                                                        fullText += segmentText;
-
-                                                        auto segmentObj = Object(runtime);
-                                                        segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, segmentText));
-                                                        segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(context, i)));
-                                                        segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(context, i)));
-
-                                                        segmentsArray.setValueAtIndex(runtime, i, segmentObj);
-                                                    }
-
-                                                    resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, fullText));
-                                                    resultObj.setProperty(runtime, "segments", segmentsArray);
-
-                                                    resolvePtr->call(runtime, resultObj);
-                                                } else {
-                                                    auto errorObj = Object(runtime);
-                                                    errorObj.setProperty(runtime, "code", Value(code));
-                                                    std::string errorMsg = (code == -2) ? "Failed to create transcription job" :
-                                                                          (code == -999) ? "Transcription was aborted" :
-                                                                          "Transcription failed";
-                                                    errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, errorMsg));
-                                                    rejectPtr->call(runtime, errorObj);
-                                                }
-                                            } catch (const JSError& e) {
-                                                throw;
-                                            } catch (const std::exception& e) {
-                                                auto& runtime = *safeRuntime;
-                                                auto errorObj = Object(runtime);
-                                                errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, e.what()));
-                                                rejectPtr->call(runtime, errorObj);
-                                            } catch (...) {
-                                                auto& runtime = *safeRuntime;
-                                                auto errorObj = Object(runtime);
-                                                errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Unknown error"));
-                                                rejectPtr->call(runtime, errorObj);
-                                            }
-                                        });
-                                    } catch (const JSError& e) {
-                                        throw;
-                                    } catch (const std::exception& e) {
-                                        auto& runtime = *safeRuntime;
-                                        auto errorObj = Object(runtime);
-                                        errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, e.what()));
-                                        rejectPtr->call(runtime, errorObj);
-                                    } catch (...) {
-                                        auto& runtime = *safeRuntime;
-                                        auto errorObj = Object(runtime);
-                                        errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Unknown error"));
-                                        rejectPtr->call(runtime, errorObj);
-                                    }
-                                });
-                            } else {
-                                // Fallback: run synchronously
+                            // Capture a safe reference to runtime for later use in JS thread
+                            auto safeRuntime = std::shared_ptr<Runtime>(&runtime, [](Runtime*){/* no-op deleter */});
+                            callInvoker->invokeAsync([context, audioData, audioDataCount, params, onProgressCallback, onNewSegmentsCallback, resolvePtr, rejectPtr, callInvoker, jobId, safeRuntime]() {
                                 try {
+                                    // Reset timings before transcription
                                     whisper_reset_timings(context);
 
-                                                                        // Create job for transcription with abort support
-                                    rnwhisper::job* job = rnwhisper::job_new(jobId, params);
+                                    // Setup callbacks for progress and new segments
+                                    whisper_full_params mutable_params = params;
+
+                                                                            // Progress callback data - use shared_ptr for thread safety
+                                    struct progress_callback_data {
+                                        std::shared_ptr<facebook::react::CallInvoker> callInvoker;
+                                        std::shared_ptr<Function> callback;
+                                    };
+
+                                    auto progress_data = std::make_shared<progress_callback_data>();
+                                    progress_data->callInvoker = callInvoker;
+                                    progress_data->callback = onProgressCallback;
+
+                                    if (onProgressCallback) {
+                                        mutable_params.progress_callback = [](struct whisper_context* /*ctx*/, struct whisper_state* /*state*/, int progress, void* user_data) {
+                                            auto* data_ptr = static_cast<std::shared_ptr<progress_callback_data>*>(user_data);
+                                            if (data_ptr && *data_ptr) {
+                                                auto data = *data_ptr;
+                                                if (data->callInvoker && data->callback) {
+                                                    data->callInvoker->invokeAsync([progress, callback = data->callback]() {
+                                                        try {
+                                                            // Note: Runtime will be accessed safely within the JS thread context
+                                                            // The CallInvoker ensures we're on the JS thread when this executes
+                                                            __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
+                                                                "Progress: %d%%", progress);
+                                                        } catch (...) {
+                                                            __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
+                                                                "Error in progress callback");
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        };
+                                        mutable_params.progress_callback_user_data = &progress_data;
+                                    }
+
+                                                                            // New segments callback data - use shared_ptr for thread safety
+                                    struct new_segments_callback_data {
+                                        std::shared_ptr<facebook::react::CallInvoker> callInvoker;
+                                        std::shared_ptr<Function> callback;
+                                        std::atomic<int> total_n_new;
+                                    };
+
+                                    auto segments_data = std::make_shared<new_segments_callback_data>();
+                                    segments_data->callInvoker = callInvoker;
+                                    segments_data->callback = onNewSegmentsCallback;
+                                    segments_data->total_n_new = 0;
+
+                                    if (onNewSegmentsCallback) {
+                                        mutable_params.new_segment_callback = [](struct whisper_context* ctx, struct whisper_state* /*state*/, int n_new, void* user_data) {
+                                            auto* data_ptr = static_cast<std::shared_ptr<new_segments_callback_data>*>(user_data);
+                                            if (data_ptr && *data_ptr) {
+                                                auto data = *data_ptr;
+                                                if (data->callInvoker && data->callback && ctx) {
+                                                    int current_total = data->total_n_new.fetch_add(n_new) + n_new;
+
+                                                    data->callInvoker->invokeAsync([n_new, current_total, callback = data->callback]() {
+                                                        try {
+                                                            // For now, just log the new segments
+                                                            // TODO: Properly construct JSI objects when runtime is available
+                                                            __android_log_print(ANDROID_LOG_INFO, "RNWhisperJSI",
+                                                                "New segments: %d (total: %d)", n_new, current_total);
+                                                        } catch (...) {
+                                                            __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
+                                                                "Error in new segments callback");
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        };
+                                        mutable_params.new_segment_callback_user_data = &segments_data;
+                                    }
+
+                                                                                                                    // Create job for transcription with abort support
+                                    rnwhisper::job* job = rnwhisper::job_new(jobId, mutable_params);
+                                    int code = -1; // Default error code
+
                                     if (job == nullptr) {
-                                        auto errorObj = Object(runtime);
-                                        errorObj.setProperty(runtime, "code", Value(-1));
-                                        errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Failed to create transcription job"));
-                                        rejectPtr->call(runtime, errorObj);
-                                        return Value::undefined();
-                                    }
+                                        __android_log_print(ANDROID_LOG_ERROR, "RNWhisperJSI",
+                                            "Failed to create job for transcription");
+                                        code = -2; // Job creation failed
+                                    } else {
+                                        // Run transcription with job support
+                                        code = whisper_full(context, job->params, audioData.data(), audioDataCount);
 
-                                    int code = whisper_full(context, job->params, audioData.data(), audioDataCount);
-
-                                    // Check if job was aborted
-                                    if (job->is_aborted()) {
-                                        code = -999; // Aborted code
-                                    }
-
-                                    // Clean up job
-                                    rnwhisper::job_remove(jobId);
-
-                                    if (code == 0) {
-                                        int n_segments = whisper_full_n_segments(context);
-
-                                        auto resultObj = Object(runtime);
-                                        resultObj.setProperty(runtime, "code", Value(code));
-
-                                        std::string fullText = "";
-                                        auto segmentsArray = Array(runtime, n_segments);
-
-                                        for (int i = 0; i < n_segments; i++) {
-                                            const char* text = whisper_full_get_segment_text(context, i);
-                                            std::string segmentText(text);
-                                            fullText += segmentText;
-
-                                            auto segmentObj = Object(runtime);
-                                            segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, segmentText));
-                                            segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(context, i)));
-                                            segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(context, i)));
-
-                                            segmentsArray.setValueAtIndex(runtime, i, segmentObj);
+                                        // Check if job was aborted
+                                        if (job->is_aborted()) {
+                                            code = -999; // Aborted code
                                         }
 
-                                        resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, fullText));
-                                        resultObj.setProperty(runtime, "segments", segmentsArray);
-
-                                        resolvePtr->call(runtime, resultObj);
-                                    } else {
-                                        auto errorObj = Object(runtime);
-                                        errorObj.setProperty(runtime, "code", Value(code));
-                                        errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Transcription failed"));
-                                        rejectPtr->call(runtime, errorObj);
+                                        // Clean up job
+                                        rnwhisper::job_remove(jobId);
                                     }
+
+                                    // Call resolve/reject on JS thread - use callInvoker to ensure we're on JS thread
+                                    callInvoker->invokeAsync([resolvePtr, rejectPtr, code, context, safeRuntime]() {
+                                        try {
+                                            // Use the safely captured runtime reference
+                                            auto& runtime = *safeRuntime;
+
+                                            if (code == 0) {
+                                                // Get results
+                                                int n_segments = whisper_full_n_segments(context);
+
+                                                auto resultObj = Object(runtime);
+                                                resultObj.setProperty(runtime, "code", Value(code));
+
+                                                std::string fullText = "";
+                                                auto segmentsArray = Array(runtime, n_segments);
+
+                                                for (int i = 0; i < n_segments; i++) {
+                                                    const char* text = whisper_full_get_segment_text(context, i);
+                                                    std::string segmentText(text);
+                                                    fullText += segmentText;
+
+                                                    auto segmentObj = Object(runtime);
+                                                    segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, segmentText));
+                                                    segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(context, i)));
+                                                    segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(context, i)));
+
+                                                    segmentsArray.setValueAtIndex(runtime, i, segmentObj);
+                                                }
+
+                                                resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, fullText));
+                                                resultObj.setProperty(runtime, "segments", segmentsArray);
+
+                                                resolvePtr->call(runtime, resultObj);
+                                            } else {
+                                                auto errorObj = Object(runtime);
+                                                errorObj.setProperty(runtime, "code", Value(code));
+                                                std::string errorMsg = (code == -2) ? "Failed to create transcription job" :
+                                                                      (code == -999) ? "Transcription was aborted" :
+                                                                      "Transcription failed";
+                                                errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, errorMsg));
+                                                rejectPtr->call(runtime, errorObj);
+                                            }
+                                        } catch (const JSError& e) {
+                                            throw;
+                                        } catch (const std::exception& e) {
+                                            auto& runtime = *safeRuntime;
+                                            auto errorObj = Object(runtime);
+                                            errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, e.what()));
+                                            rejectPtr->call(runtime, errorObj);
+                                        } catch (...) {
+                                            auto& runtime = *safeRuntime;
+                                            auto errorObj = Object(runtime);
+                                            errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Unknown error"));
+                                            rejectPtr->call(runtime, errorObj);
+                                        }
+                                    });
+                                } catch (const JSError& e) {
+                                    throw;
                                 } catch (const std::exception& e) {
+                                    auto& runtime = *safeRuntime;
                                     auto errorObj = Object(runtime);
                                     errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, e.what()));
                                     rejectPtr->call(runtime, errorObj);
+                                } catch (...) {
+                                    auto& runtime = *safeRuntime;
+                                    auto errorObj = Object(runtime);
+                                    errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, "Unknown error"));
+                                    rejectPtr->call(runtime, errorObj);
                                 }
-                            }
+                            });
 
                             return Value::undefined();
                         }
