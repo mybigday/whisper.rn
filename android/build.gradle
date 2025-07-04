@@ -87,10 +87,17 @@ android {
         path = file('src/main/CMakeLists.txt')
       }
     }
-    // Exclude jniLibs
+    // Exclude jniLibs when building from source
     sourceSets {
       main {
         jniLibs.srcDirs = []
+      }
+    }
+  } else {
+    // Use pre-built libraries from jniLibs when not building from source
+    sourceSets {
+      main {
+        jniLibs.srcDirs = ['src/main/jniLibs']
       }
     }
   }
