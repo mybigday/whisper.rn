@@ -134,7 +134,7 @@ const JSITest: React.FC = () => {
         )
         vadResult.forEach((segment, index) => {
           addTestResult(
-            `  Segment ${index + 1}: ${segment.t0}ms - ${segment.t1}ms`,
+            `  Segment ${index + 1}: ${segment.t0 / 100}s - ${segment.t1 / 100}s`,
           )
         })
       } catch (error) {
