@@ -106,7 +106,7 @@ const JSITest: React.FC = () => {
       return
     }
 
-    if (!contextsInitialized || !whisperContext) {
+    if (!contextsInitialized || !whisperContext || !vadContext) {
       addTestResult(
         '❌ Contexts not initialized. Please initialize contexts first.',
       )
@@ -117,44 +117,38 @@ const JSITest: React.FC = () => {
       addTestResult('🧪 Converting audio data to ArrayBuffer...')
 
       // Convert audio data to 16-bit PCM ArrayBuffer
-      const arrayBuffer = new ArrayBuffer(audioData!.length)
-      const dataView = new DataView(arrayBuffer)
-      for (let i = 0; i < audioData!.length; i += 1) {
-        dataView.setUint8(i, audioData![i]!)
-      }
+      const arrayBuffer = audioData?.buffer || new ArrayBuffer(0)
 
       addTestResult(`✅ ArrayBuffer created: ${arrayBuffer.byteLength} bytes`)
 
       // Test 1: VAD detection with ArrayBuffer (if VAD context is available)
-      if (vadContext) {
-        addTestResult('🧪 Testing VAD detectSpeechData with ArrayBuffer...')
+      addTestResult('🧪 Testing VAD detectSpeechData with ArrayBuffer...')
 
-        try {
-          const vadResult = await vadContext.detectSpeechData(arrayBuffer)
-          addTestResult(
-            `✅ VAD detection success: Found ${vadResult.length} speech segments`,
-          )
-          vadResult.forEach((segment, index) => {
-            addTestResult(
-              `  Segment ${index + 1}: ${segment.t0}ms - ${segment.t1}ms`,
-            )
-          })
-        } catch (error) {
-          addTestResult(`❌ VAD detection error: ${error}`)
-        }
-      } else {
+      try {
+        const t0 = Date.now()
+        const vadResult = await vadContext.detectSpeechData(arrayBuffer)
+        const t1 = Date.now()
+        addTestResult(`🕒 Time taken: ${t1 - t0}ms`)
         addTestResult(
-          '⚠️ Skipping VAD test (VAD context not available)',
+          `✅ VAD detection success: Found ${vadResult.length} speech segments`,
         )
+        vadResult.forEach((segment, index) => {
+          addTestResult(
+            `  Segment ${index + 1}: ${segment.t0}ms - ${segment.t1}ms`,
+          )
+        })
+      } catch (error) {
+        addTestResult(`❌ VAD detection error: ${error}`)
       }
 
-            // Test 2: Transcription with ArrayBuffer and callbacks
+      // Test 2: Transcription with ArrayBuffer and callbacks
       addTestResult('🧪 Testing transcribeData with ArrayBuffer and callbacks...')
 
       try {
         let progressCount = 0
         let segmentsCount = 0
 
+        const t0 = Date.now()
         const { promise: transcribePromise } = whisperContext.transcribeData(arrayBuffer, {
           language: 'en',
           maxThreads: 2,
@@ -173,8 +167,9 @@ const JSITest: React.FC = () => {
             addTestResult(`  Text: "${result.result}"`)
           },
         })
-
         const transcribeResult = await transcribePromise
+        const t1 = Date.now()
+        addTestResult(`🕒 Time taken: ${t1 - t0}ms`)
         addTestResult('✅ Transcription completed!')
         addTestResult(`📝 Final result: "${transcribeResult.result}"`)
         addTestResult(`📊 Total progress callbacks: ${progressCount}`)

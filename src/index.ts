@@ -328,11 +328,11 @@ export class WhisperContext {
   /**
    * Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
-  transcribeData(data: string | ArrayBuffer, options: TranscribeFileOptions = {}): {
+  transcribeData(data: string | ArrayBuffer | SharedArrayBuffer, options: TranscribeFileOptions = {}): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
-    if (data instanceof ArrayBuffer) {
+    if (data instanceof ArrayBuffer || data instanceof SharedArrayBuffer) {
       // Use JSI function for ArrayBuffer
       return this.transcribeDataArrayBuffer(data, options)
     }
@@ -342,7 +342,7 @@ export class WhisperContext {
       /**
    * Transcribe audio data from ArrayBuffer (16-bit PCM, mono, 16kHz)
    */
-  private transcribeDataArrayBuffer(data: ArrayBuffer, options: TranscribeFileOptions = {}): {
+  private transcribeDataArrayBuffer(data: ArrayBuffer | SharedArrayBuffer, options: TranscribeFileOptions = {}): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
@@ -713,10 +713,10 @@ export class WhisperVadContext {
    * Detect speech segments in raw audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
   async detectSpeechData(
-    audioData: string | ArrayBuffer,
+    audioData: string | ArrayBuffer | SharedArrayBuffer,
     options: VadOptions = {}
   ): Promise<VadSegment[]> {
-    if (audioData instanceof ArrayBuffer) {
+    if (audioData instanceof ArrayBuffer || audioData instanceof SharedArrayBuffer) {
       // Use JSI function for ArrayBuffer
       const result = await (global as any).whisperVadDetectSpeech(this.id, options, audioData)
       return result.segments || []
