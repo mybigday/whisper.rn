@@ -408,21 +408,22 @@ public class RNWhisper implements LifecycleEventListener {
             modelFilePath = downloader.downloadFile(modelPath);
           }
 
+          int id = Math.abs(new Random().nextInt());
           long vadContext;
           int resId = getResourceIdentifier(modelFilePath);
           if (resId > 0) {
             vadContext = WhisperContext.initVadContextWithInputStream(
+              id,
               new PushbackInputStream(reactContext.getResources().openRawResource(resId))
             );
           } else if (isBundleAsset) {
-            vadContext = WhisperContext.initVadContextWithAsset(reactContext.getAssets(), modelFilePath);
+            vadContext = WhisperContext.initVadContextWithAsset(id, reactContext.getAssets(), modelFilePath);
           } else {
-            vadContext = WhisperContext.initVadContext(modelFilePath);
+            vadContext = WhisperContext.initVadContext(id, modelFilePath);
           }
           if (vadContext == 0) {
             throw new Exception("Failed to initialize VAD context");
           }
-          int id = Math.abs(new Random().nextInt());
           WhisperVadContext whisperVadContext = new WhisperVadContext(id, reactContext, vadContext);
           vadContexts.put(id, whisperVadContext);
           return id;

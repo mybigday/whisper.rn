@@ -543,10 +543,10 @@ public class WhisperContext {
   protected static native String bench(long context, int n_threads);
 
   // VAD JNI methods
-  protected static native long initVadContext(String modelPath);
-  protected static native long initVadContextWithAsset(AssetManager assetManager, String modelPath);
-  protected static native long initVadContextWithInputStream(PushbackInputStream inputStream);
-  protected static native void freeVadContext(long vadContextPtr);
+  protected static native long initVadContext(int contextId, String modelPath);
+  protected static native long initVadContextWithAsset(int contextId, AssetManager assetManager, String modelPath);
+  protected static native long initVadContextWithInputStream(int contextId, PushbackInputStream inputStream);
+  protected static native void freeVadContext(int contextId, long vadContextPtr);
   protected static native boolean vadDetectSpeech(long vadContextPtr, float[] audioData, int nSamples);
   protected static native long vadGetSegmentsFromProbs(long vadContextPtr, float threshold,
                                                        int minSpeechDurationMs, int minSilenceDurationMs,

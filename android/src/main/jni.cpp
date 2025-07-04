@@ -583,6 +583,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initVadContext(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jstring model_path_str
 ) {
     UNUSED(thiz);
@@ -592,6 +593,7 @@ Java_com_rnwhisper_WhisperContext_initVadContext(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     vad_context = whisper_vad_init_from_file_with_params(model_path_chars, vad_params);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -599,6 +601,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initVadContextWithAsset(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject asset_manager,
     jstring model_path_str
 ) {
@@ -609,6 +612,7 @@ Java_com_rnwhisper_WhisperContext_initVadContextWithAsset(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     vad_context = whisper_vad_init_from_asset(env, asset_manager, model_path_chars, vad_params);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -616,6 +620,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initVadContextWithInputStream(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject input_stream
 ) {
     UNUSED(thiz);
@@ -623,6 +628,7 @@ Java_com_rnwhisper_WhisperContext_initVadContextWithInputStream(
 
     struct whisper_vad_context *vad_context = nullptr;
     vad_context = whisper_vad_init_from_input_stream(env, input_stream, vad_params);
+    rnwhisper::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -630,12 +636,14 @@ JNIEXPORT void JNICALL
 Java_com_rnwhisper_WhisperContext_freeVadContext(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jlong vad_context_ptr
 ) {
     UNUSED(env);
     UNUSED(thiz);
     struct whisper_vad_context *vad_context = reinterpret_cast<struct whisper_vad_context *>(vad_context_ptr);
     whisper_vad_free(vad_context);
+    rnwhisper::removeVadContext(context_id);
 }
 
 JNIEXPORT jboolean JNICALL

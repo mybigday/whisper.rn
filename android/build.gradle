@@ -77,28 +77,18 @@ android {
     ]
   }
 
-  def rnwhisperBuildFromSource = project.properties["rnwhisperBuildFromSource"]
-  if (rnwhisperBuildFromSource == "true") {
-    buildFeatures {
-      prefab = true
+  buildFeatures {
+    prefab = true
+  }
+  externalNativeBuild {
+    cmake {
+      path = file('src/main/CMakeLists.txt')
     }
-    externalNativeBuild {
-      cmake {
-        path = file('src/main/CMakeLists.txt')
-      }
-    }
-    // Exclude jniLibs when building from source
-    sourceSets {
-      main {
-        jniLibs.srcDirs = []
-      }
-    }
-  } else {
-    // Use pre-built libraries from jniLibs when not building from source
-    sourceSets {
-      main {
-        jniLibs.srcDirs = ['src/main/jniLibs']
-      }
+  }
+  // Exclude jniLibs when building from source
+  sourceSets {
+    main {
+      jniLibs.srcDirs = []
     }
   }
   buildTypes {
