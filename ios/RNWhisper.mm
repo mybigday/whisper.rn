@@ -601,7 +601,7 @@ RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
 
         if (callInvoker) {
           callInvoker->invokeAsync([runtime, bridge, callInvoker]() {
-            [RNWhisperJSI installJSIBindings:*runtime bridge:bridge callInvoker:callInvoker];
+            [RNWhisperJSI installJSIBindings:*runtime callInvoker:callInvoker];
           });
         } else {
           reject(@"whisper_jsi_error", @"CallInvoker not available", nil);

@@ -24,7 +24,6 @@ static BOOL jsiBindingsInstalled = NO;
 
 + (void)installJSIBindings:(
   facebook::jsi::Runtime &)runtime
-  bridge:(RCTBridge *)bridge
   callInvoker:(std::shared_ptr<facebook::react::CallInvoker>)callInvoker
 {
     @try {
