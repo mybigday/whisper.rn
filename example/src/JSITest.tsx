@@ -151,7 +151,7 @@ const JSITest: React.FC = () => {
         const t0 = Date.now()
         const { promise: transcribePromise } = whisperContext.transcribeData(arrayBuffer, {
           language: 'en',
-          maxThreads: 2,
+          maxThreads: 4,
           translate: false,
           tokenTimestamps: false,
           tdrzEnable: false,
@@ -165,6 +165,9 @@ const JSITest: React.FC = () => {
             addTestResult(`  New segments: ${result.nNew}`)
             addTestResult(`  Total segments: ${result.totalNNew}`)
             addTestResult(`  Text: "${result.result}"`)
+            result.segments.forEach((segment: any) => {
+              addTestResult(`    Segment ${segment.text} ${segment.t0} ${segment.t1}`)
+            })
           },
         })
         const transcribeResult = await transcribePromise

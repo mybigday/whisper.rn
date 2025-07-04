@@ -341,21 +341,26 @@ void installJSIBindings(
                                     struct progress_callback_data {
                                         std::shared_ptr<facebook::react::CallInvoker> callInvoker;
                                         std::shared_ptr<Function> callback;
+                                        std::shared_ptr<Runtime> safeRuntime;
                                     };
 
                                     auto progress_data = std::make_shared<progress_callback_data>();
                                     progress_data->callInvoker = callInvoker;
                                     progress_data->callback = onProgressCallback;
+                                    progress_data->safeRuntime = safeRuntime;
 
                                     if (onProgressCallback) {
                                         mutable_params.progress_callback = [](struct whisper_context* /*ctx*/, struct whisper_state* /*state*/, int progress, void* user_data) {
                                             auto* data_ptr = static_cast<std::shared_ptr<progress_callback_data>*>(user_data);
                                             if (data_ptr && *data_ptr) {
                                                 auto data = *data_ptr;
-                                                if (data->callInvoker && data->callback) {
-                                                    data->callInvoker->invokeAsync([progress, callback = data->callback]() {
+                                                if (data->callInvoker && data->callback && data->safeRuntime) {
+                                                    data->callInvoker->invokeAsync([progress, callback = data->callback, safeRuntime = data->safeRuntime]() {
                                                         try {
                                                             logInfo("Progress: %d%%", progress);
+                                                            auto& runtime = *safeRuntime;
+                                                            Value progressValue = Value(progress);
+                                                            callback->call(runtime, progressValue);
                                                         } catch (...) {
                                                             logError("Error in progress callback");
                                                         }
@@ -370,12 +375,14 @@ void installJSIBindings(
                                     struct new_segments_callback_data {
                                         std::shared_ptr<facebook::react::CallInvoker> callInvoker;
                                         std::shared_ptr<Function> callback;
+                                        std::shared_ptr<Runtime> safeRuntime;
                                         std::atomic<int> total_n_new;
                                     };
 
                                     auto segments_data = std::make_shared<new_segments_callback_data>();
                                     segments_data->callInvoker = callInvoker;
                                     segments_data->callback = onNewSegmentsCallback;
+                                    segments_data->safeRuntime = safeRuntime;
                                     segments_data->total_n_new = 0;
 
                                     if (onNewSegmentsCallback) {
@@ -383,11 +390,32 @@ void installJSIBindings(
                                             auto* data_ptr = static_cast<std::shared_ptr<new_segments_callback_data>*>(user_data);
                                             if (data_ptr && *data_ptr) {
                                                 auto data = *data_ptr;
-                                                if (data->callInvoker && data->callback && ctx) {
+                                                if (data->callInvoker && data->callback && data->safeRuntime && ctx) {
                                                     int current_total = data->total_n_new.fetch_add(n_new) + n_new;
-                                                    data->callInvoker->invokeAsync([n_new, current_total, callback = data->callback]() {
+                                                    data->callInvoker->invokeAsync([ctx, n_new, current_total, callback = data->callback, safeRuntime = data->safeRuntime]() {
                                                         try {
                                                             logInfo("New segments: %d (total: %d)", n_new, current_total);
+
+                                                            auto& runtime = *safeRuntime;
+                                                            auto resultObj = Object(runtime);
+                                                            resultObj.setProperty(runtime, "nNew", Value(n_new));
+                                                            resultObj.setProperty(runtime, "totalNNew", Value(current_total));
+                                                            auto n_segments = whisper_full_n_segments(ctx);
+                                                            auto segmentsArray = Array(runtime, n_segments);
+                                                            std::string fullText = "";
+                                                            for (int i = 0; i < n_segments; i++) {
+                                                                const char* text = whisper_full_get_segment_text(ctx, i);
+                                                                std::string segmentText(text);
+                                                                fullText = fullText + segmentText;
+                                                                auto segmentObj = Object(runtime);
+                                                                segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, segmentText));
+                                                                segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(ctx, i)));
+                                                                segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(ctx, i)));
+                                                                segmentsArray.setValueAtIndex(runtime, i, segmentObj);
+                                                            }
+                                                            resultObj.setProperty(runtime, "segments", segmentsArray);
+                                                            resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, fullText));
+                                                            callback->call(runtime, resultObj);
                                                         } catch (...) {
                                                             logError("Error in new segments callback");
                                                         }
