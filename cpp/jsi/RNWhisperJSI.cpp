@@ -194,6 +194,30 @@ whisper_full_params createFullParamsFromJSI(Runtime& runtime, const Object& opti
     return params;
 }
 
+// Helper function to convert ArrayBuffer to float32 audio data
+struct AudioData {
+    std::vector<float> data;
+    int count;
+};
+
+AudioData convertArrayBufferToAudioData(Runtime& runtime, size_t arrayBufferSize, uint8_t* arrayBufferData) {
+    // Convert ArrayBuffer to float32 array (assuming 16-bit PCM input)
+    if (arrayBufferSize % 2 != 0) {
+        throw JSError(runtime, "ArrayBuffer size must be even for 16-bit PCM data");
+    }
+
+    int audioDataCount = (int)(arrayBufferSize / 2); // 16-bit samples
+    std::vector<float> audioData(audioDataCount);
+
+    // Convert 16-bit PCM to float32
+    int16_t* pcmData = (int16_t*)arrayBufferData;
+    for (int i = 0; i < audioDataCount; i++) {
+        audioData[i] = (float)pcmData[i] / 32768.0f;
+    }
+
+    return {std::move(audioData), audioDataCount};
+}
+
 void installJSIBindings(
     facebook::jsi::Runtime& runtime,
     std::shared_ptr<facebook::react::CallInvoker> callInvoker
@@ -240,19 +264,10 @@ void installJSIBindings(
                         throw JSError(runtime, "Invalid context pointer for id: " + std::to_string(contextId));
                     }
 
-                    // Convert ArrayBuffer to float32 array (assuming 16-bit PCM input)
-                    if (arrayBufferSize % 2 != 0) {
-                        throw JSError(runtime, "ArrayBuffer size must be even for 16-bit PCM data");
-                    }
-
-                    int audioDataCount = (int)(arrayBufferSize / 2); // 16-bit samples
-                    std::vector<float> audioData(audioDataCount);
-
-                    // Convert 16-bit PCM to float32
-                    int16_t* pcmData = (int16_t*)arrayBufferData;
-                    for (int i = 0; i < audioDataCount; i++) {
-                        audioData[i] = (float)pcmData[i] / 32768.0f;
-                    }
+                    // Convert ArrayBuffer to audio data
+                    AudioData audioResult = convertArrayBufferToAudioData(runtime, arrayBufferSize, arrayBufferData);
+                    auto& audioData = audioResult.data;
+                    int audioDataCount = audioResult.count;
 
                     // Create whisper_full_params from JSI options
                     whisper_full_params params = createFullParamsFromJSI(runtime, optionsObj);
@@ -553,18 +568,10 @@ void installJSIBindings(
                         throw JSError(runtime, "Invalid VAD context pointer for id: " + std::to_string(contextId));
                     }
 
-                    // Convert ArrayBuffer to float32 array
-                    if (arrayBufferSize % 2 != 0) {
-                        throw JSError(runtime, "ArrayBuffer size must be even for 16-bit PCM data");
-                    }
-
-                    int audioDataCount = (int)(arrayBufferSize / 2);
-                    std::vector<float> audioData(audioDataCount);
-
-                    int16_t* pcmData = (int16_t*)arrayBufferData;
-                    for (int i = 0; i < audioDataCount; i++) {
-                        audioData[i] = (float)pcmData[i] / 32768.0f;
-                    }
+                    // Convert ArrayBuffer to audio data
+                    AudioData audioResult = convertArrayBufferToAudioData(runtime, arrayBufferSize, arrayBufferData);
+                    auto& audioData = audioResult.data;
+                    int audioDataCount = audioResult.count;
 
                     auto promiseConstructor = runtime.global().getPropertyAsFunction(runtime, "Promise");
 
