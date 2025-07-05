@@ -373,11 +373,7 @@ public class RNWhisper implements LifecycleEventListener {
       @Override
       protected Void doInBackground(Void... voids) {
         try {
-<<<<<<< HEAD
-          cleanup();
-=======
           releaseAllContexts();
->>>>>>> main
         } catch (Exception e) {
           exception = e;
         }
