@@ -64,14 +64,24 @@ function(build_library target_name arch cpu_flags)
     )
 
     # Link JSI libraries
-    target_link_libraries(${target_name}
-        ${LOG_LIB}
-        android
-        fbjni::fbjni
-        ReactAndroid::jsi
-        ReactAndroid::turbomodulejsijni
-        ReactAndroid::react_nativemodule_core
-    )
+    if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 76)
+        target_link_libraries(${target_name}
+            ${LOG_LIB}
+            android
+            fbjni::fbjni
+            ReactAndroid::jsi
+            ReactAndroid::reactnative
+        )
+    else ()
+        target_link_libraries(${target_name}
+            ${LOG_LIB}
+            android
+            fbjni::fbjni
+            ReactAndroid::jsi
+            ReactAndroid::turbomodulejsijni
+            ReactAndroid::react_nativemodule_core
+        )
+    endif ()
 
     if (${arch} STREQUAL "generic")
         target_compile_options(${target_name} PRIVATE -DWSP_GGML_CPU_GENERIC)
