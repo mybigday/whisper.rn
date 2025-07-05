@@ -353,9 +353,13 @@ Value createPromiseTask(
     // Convert ArrayBuffer to audio data
     AudioData audioResult = convertArrayBufferToAudioData(runtime, arrayBufferSize, arrayBufferData);
 
-    // Extract data from optionsObj before lambda capture
-    whisper_full_params params = createFullParamsFromJSI(runtime, optionsObj);
-    CallbackInfo callbackInfo = extractCallbacks(runtime, optionsObj);
+    whisper_full_params params = {};
+    CallbackInfo callbackInfo = {};
+    if (functionName == "whisperTranscribeData") {
+        params = createFullParamsFromJSI(runtime, optionsObj);
+        // Extract data from optionsObj before lambda capture
+        callbackInfo = extractCallbacks(runtime, optionsObj);
+    }
 
     // Create promise
     auto promiseConstructor = runtime.global().getPropertyAsFunction(runtime, "Promise");
