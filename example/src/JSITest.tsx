@@ -5,7 +5,6 @@ import {
   initWhisper,
   initWhisperVad,
   releaseAllWhisper,
-  installJSIBindings,
   WhisperContext,
   WhisperVadContext,
 } from '../../src'
@@ -76,10 +75,6 @@ const JSITest: React.FC = () => {
   const [vadContext, setVadContext] = useState<WhisperVadContext | null>(null)
   const [contextsInitialized, setContextsInitialized] = useState(false)
 
-  const jsiAvailable =
-    typeof (global as any).whisperTranscribeData === 'function' &&
-    typeof (global as any).whisperVadDetectSpeech === 'function'
-
   const addTestResult = (result: string) => {
     setTestResults((prev) => [...prev, result])
   }
@@ -100,11 +95,6 @@ const JSITest: React.FC = () => {
     const audioData = wavFileReader.getAudioData()
 
     setTestResults([])
-
-    if (!jsiAvailable) {
-      addTestResult('❌ JSI functions not available')
-      return
-    }
 
     if (!contextsInitialized || !whisperContext || !vadContext) {
       addTestResult(
@@ -197,11 +187,6 @@ const JSITest: React.FC = () => {
     addTestResult('🔄 Initializing contexts...')
 
     try {
-      // Install JSI bindings first
-      addTestResult('📦 Installing JSI bindings...')
-      await installJSIBindings()
-      addTestResult('✅ JSI bindings installed')
-
       // Initialize Whisper context
       addTestResult('🧠 Initializing Whisper context...')
       const newWhisperContext = await initWhisper({
@@ -251,9 +236,6 @@ const JSITest: React.FC = () => {
       <Text style={styles.title}>JSI Functions Test</Text>
 
       <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>
-          {`JSI Status: ${jsiAvailable ? '✅ Available' : '❌ Not Available'}`}
-        </Text>
         <Text style={styles.statusText}>
           {`Contexts: ${
             contextsInitialized ? '✅ Initialized' : '❌ Not Initialized'
