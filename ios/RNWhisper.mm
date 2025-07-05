@@ -352,37 +352,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    [self invalidate];
+    [self releaseAllContexts];
     resolve(nil);
-}
-
-- (void)invalidate {
-    [super invalidate];
-
-    if (contexts == nil) {
-        return;
-    }
-
-    for (NSNumber *contextId in contexts) {
-        RNWhisperContext *context = contexts[contextId];
-        [context invalidate];
-    }
-
-    if (vadContexts != nil) {
-        for (NSNumber *contextId in vadContexts) {
-            RNWhisperVadContext *vadContext = vadContexts[contextId];
-            [vadContext invalidate];
-        }
-        [vadContexts removeAllObjects];
-        vadContexts = nil;
-    }
-
-    rnwhisper::job_abort_all(); // graceful abort
-
-    [contexts removeAllObjects];
-    contexts = nil;
-
-    [RNWhisperDownloader clearCache];
 }
 
 // MARK: - AudioSessionUtils
@@ -574,14 +545,40 @@ RCT_REMAP_METHOD(releaseVadContext,
 RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
+    [self releaseAllVadContexts];
+    resolve(nil);
+}
+
+- (void)releaseAllContexts {
+    rnwhisper::job_abort_all(); // graceful abort
+    if (contexts != nil) {
+        for (NSNumber *contextId in contexts) {
+            RNWhisperContext *context = contexts[contextId];
+            [context invalidate];
+        }
+        [contexts removeAllObjects];
+        contexts = nil;
+    }
+}
+
+- (void)releaseAllVadContexts {
     if (vadContexts != nil) {
         for (NSNumber *contextId in vadContexts) {
             RNWhisperVadContext *vadContext = vadContexts[contextId];
             [vadContext invalidate];
         }
         [vadContexts removeAllObjects];
+        vadContexts = nil;
     }
-    resolve(nil);
+}
+
+- (void)invalidate {
+    [super invalidate];
+
+    [self releaseAllContexts];
+    [self releaseAllVadContexts];
+
+    [RNWhisperDownloader clearCache];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

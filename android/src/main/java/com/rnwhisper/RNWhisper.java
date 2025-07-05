@@ -326,7 +326,7 @@ public class RNWhisper implements LifecycleEventListener {
       @Override
       protected Void doInBackground(Void... voids) {
         try {
-          onHostDestroy();
+          releaseAllContexts();
         } catch (Exception e) {
           exception = e;
         }
@@ -529,10 +529,7 @@ public class RNWhisper implements LifecycleEventListener {
       @Override
       protected Void doInBackground(Void... voids) {
         try {
-          for (WhisperVadContext vadContext : vadContexts.values()) {
-            vadContext.release();
-          }
-          vadContexts.clear();
+          releaseAllVadContexts();
         } catch (Exception e) {
           exception = e;
         }
@@ -560,11 +557,26 @@ public class RNWhisper implements LifecycleEventListener {
   public void onHostPause() {
   }
 
-  @Override
-  public void onHostDestroy() {
+  private void releaseAllContexts() {
     for (WhisperContext context : contexts.values()) {
       context.stopCurrentTranscribe();
     }
+    WhisperContext.abortAllTranscribe(); // graceful abort
+    for (WhisperContext context : contexts.values()) {
+      context.release();
+    }
+    contexts.clear();
+  }
+
+  private void releaseAllVadContexts() {
+    for (WhisperVadContext vadContext : vadContexts.values()) {
+      vadContext.release();
+    }
+    vadContexts.clear();
+  }
+
+  @Override
+  public void onHostDestroy() {
     for (AsyncTask task : tasks.keySet()) {
       try {
         task.get();
@@ -572,15 +584,8 @@ public class RNWhisper implements LifecycleEventListener {
         Log.e(NAME, "Failed to wait for task", e);
       }
     }
-    for (WhisperContext context : contexts.values()) {
-      context.release();
-    }
-    for (WhisperVadContext vadContext : vadContexts.values()) {
-      vadContext.release();
-    }
-    WhisperContext.abortAllTranscribe(); // graceful abort
-    contexts.clear();
-    vadContexts.clear();
     downloader.clearCache();
+    releaseAllContexts();
+    releaseAllVadContexts();
   }
 }
