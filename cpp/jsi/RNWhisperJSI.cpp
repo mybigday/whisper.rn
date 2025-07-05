@@ -296,11 +296,11 @@ CallbackInfo extractCallbacks(Runtime& runtime, const Object& optionsObj) {
 }
 
 // Helper function to create segments array
-Array createSegmentsArray(Runtime& runtime, struct whisper_context* ctx) {
+Array createSegmentsArray(Runtime& runtime, struct whisper_context* ctx, int offset) {
     int n_segments = whisper_full_n_segments(ctx);
     auto segmentsArray = Array(runtime, n_segments);
 
-    for (int i = 0; i < n_segments; i++) {
+    for (int i = offset; i < n_segments; i++) {
         const char* text = whisper_full_get_segment_text(ctx, i);
         auto segmentObj = Object(runtime);
         segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, text));
@@ -313,11 +313,11 @@ Array createSegmentsArray(Runtime& runtime, struct whisper_context* ctx) {
 }
 
 // Helper function to create full text from segments
-std::string createFullTextFromSegments(struct whisper_context* ctx) {
+std::string createFullTextFromSegments(struct whisper_context* ctx, int offset) {
     int n_segments = whisper_full_n_segments(ctx);
     std::string fullText = "";
 
-    for (int i = 0; i < n_segments; i++) {
+    for (int i = offset; i < n_segments; i++) {
         const char* text = whisper_full_get_segment_text(ctx, i);
         fullText += text;
     }
@@ -491,8 +491,9 @@ void installJSIBindings(
                                                     auto resultObj = Object(runtime);
                                                     resultObj.setProperty(runtime, "nNew", Value(n_new));
                                                     resultObj.setProperty(runtime, "totalNNew", Value(current_total));
-                                                    resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, ctx));
-                                                    resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(ctx)));
+                                                    auto offset = current_total - n_new;
+                                                    resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, ctx, offset));
+                                                    resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(ctx, offset)));
                                                     callback->call(runtime, resultObj);
                                                 } catch (...) {
                                                     logError("Error in new segments callback");
@@ -526,8 +527,8 @@ void installJSIBindings(
                                     if (code == 0) {
                                         auto resultObj = Object(runtime);
                                         resultObj.setProperty(runtime, "code", Value(code));
-                                        resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(context)));
-                                        resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, context));
+                                        resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(context, 0)));
+                                        resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, context, 0));
                                         resolvePtr->call(runtime, resultObj);
                                     } else {
                                         std::string errorMsg = (code == -2) ? "Failed to create transcription job" :
