@@ -357,41 +357,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    [self invalidate];
+    [self releaseAllContexts];
     resolve(nil);
-}
-
-- (void)cleanup {
-    rnwhisper::job_abort_all(); // graceful abort
-
-    if (contexts == nil) {
-        for (NSNumber *contextId in contexts) {
-            RNWhisperContext *context = contexts[contextId];
-            [context invalidate];
-            // Also remove from unified context management
-            rnwhisper_jsi::removeContext([contextId intValue]);
-        }
-        [contexts removeAllObjects];
-        contexts = nil;
-    }
-
-    if (vadContexts != nil) {
-        for (NSNumber *contextId in vadContexts) {
-            RNWhisperVadContext *vadContext = vadContexts[contextId];
-            [vadContext invalidate];
-            // Also remove from unified context management
-            rnwhisper_jsi::removeVadContext([contextId intValue]);
-        }
-        [vadContexts removeAllObjects];
-        vadContexts = nil;
-    }
-}
-
-- (void)invalidate {
-    [super invalidate];
-    [RNWhisperDownloader clearCache];
-    [self cleanup];
-    rnwhisper_jsi::cleanupJSIBindings();
 }
 
 // MARK: - AudioSessionUtils
@@ -587,14 +554,31 @@ RCT_REMAP_METHOD(releaseVadContext,
 RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
+    [self releaseAllVadContexts];
+    resolve(nil);
+}
+
+- (void)releaseAllContexts {
+    rnwhisper::job_abort_all(); // graceful abort
+    if (contexts != nil) {
+        for (NSNumber *contextId in contexts) {
+            RNWhisperContext *context = contexts[contextId];
+            [context invalidate];
+        }
+        [contexts removeAllObjects];
+        contexts = nil;
+    }
+}
+
+- (void)releaseAllVadContexts {
     if (vadContexts != nil) {
         for (NSNumber *contextId in vadContexts) {
             RNWhisperVadContext *vadContext = vadContexts[contextId];
             [vadContext invalidate];
         }
         [vadContexts removeAllObjects];
+        vadContexts = nil;
     }
-    resolve(nil);
 }
 
 RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
@@ -624,6 +608,15 @@ RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
     } else {
         reject(@"whisper_jsi_error", @"Runtime not available", nil);
     }
+}
+
+- (void)invalidate {
+    [super invalidate];
+
+    [self releaseAllContexts];
+    [self releaseAllVadContexts];
+
+    [RNWhisperDownloader clearCache];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED
