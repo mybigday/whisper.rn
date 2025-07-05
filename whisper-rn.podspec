@@ -42,7 +42,6 @@ Pod::Spec.new do |s|
 
   s.requires_arc = true
 
-  s.dependency "React-Core"
 
   s.compiler_flags = base_compiler_flags
   s.pod_target_xcconfig = {
@@ -51,9 +50,13 @@ Pod::Spec.new do |s|
     "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags + " -std=c++17"
   }
 
+  s.dependency "React-callinvoker"
+  s.dependency "React"
   # Don't install the dependencies when we run `pod install` in the old architecture.
   if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
     install_modules_dependencies(s)
+  else
+    s.dependency "React-Core"
   end
 
   s.subspec "no-require-arc" do |ss|
