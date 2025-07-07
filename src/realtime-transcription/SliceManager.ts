@@ -14,9 +14,9 @@ export class SliceManager {
   private sampleRate: number
 
   constructor(
-    sliceDurationSec: number = 25,
-    maxSlicesInMemory: number = 3,
-    sampleRate: number = 16000,
+    sliceDurationSec = 30,
+    maxSlicesInMemory = 1,
+    sampleRate = 16000,
   ) {
     this.sliceDurationSec = sliceDurationSec
     this.maxSlicesInMemory = maxSlicesInMemory
@@ -232,7 +232,9 @@ export class SliceManager {
    * Force move to the next slice, finalizing the current one regardless of capacity
    */
   forceNextSlice(): { slice?: AudioSlice } {
-    const currentSlice = this.slices.find((s) => s.index === this.currentSliceIndex)
+    const currentSlice = this.slices.find(
+      (s) => s.index === this.currentSliceIndex,
+    )
 
     if (currentSlice && currentSlice.sampleCount > 0) {
       // Finalize current slice

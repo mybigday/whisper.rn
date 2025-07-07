@@ -11,23 +11,9 @@ import type {
   RealtimeTranscriberDependencies,
   AudioStreamData,
   AudioSliceNoData,
+  AudioStreamInterface,
 } from './types'
 import { VAD_PRESETS } from './types'
-
-interface InternalRealtimeOptions {
-  audioSliceSec: number
-  audioMinSec: number
-  maxSlicesInMemory: number
-  vadOptions: VadOptions
-  vadPreset?: keyof typeof VAD_PRESETS
-  autoSliceOnSpeechEnd: boolean
-  autoSliceThreshold: number
-  transcribeOptions: any
-  initialPrompt?: string
-  promptPreviousSlices: boolean
-  fs?: WavFileWriterFs
-  audioOutputPath?: string
-}
 
 /**
  * RealtimeTranscriber provides real-time audio transcription with VAD support.
@@ -44,13 +30,26 @@ export class RealtimeTranscriber {
 
   private vadContext?: WhisperVadContext
 
-  private audioStream: import('./types').AudioStreamInterface
+  private audioStream: AudioStreamInterface
 
   private sliceManager: SliceManager
 
   private callbacks: RealtimeTranscriberCallbacks = {}
 
-  private options: InternalRealtimeOptions
+  private options: {
+    audioSliceSec: number
+    audioMinSec: number
+    maxSlicesInMemory: number
+    vadOptions: VadOptions
+    vadPreset?: keyof typeof VAD_PRESETS
+    autoSliceOnSpeechEnd: boolean
+    autoSliceThreshold: number
+    transcribeOptions: any
+    initialPrompt?: string
+    promptPreviousSlices: boolean
+    fs?: WavFileWriterFs
+    audioOutputPath?: string
+  }
 
   private isActive = false
 

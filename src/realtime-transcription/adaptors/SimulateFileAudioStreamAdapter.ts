@@ -31,7 +31,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
 
   private statusCallback?: (isRecording: boolean) => void
 
-  private streamInterval?: NodeJS.Timeout
+  private streamInterval?: ReturnType<typeof setInterval>
 
   private currentBytePosition = 0
 

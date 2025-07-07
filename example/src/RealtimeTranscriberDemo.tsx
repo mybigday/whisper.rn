@@ -308,13 +308,6 @@ export default function RealtimeTranscriberDemo() {
             maxLen: 1,
           },
           audioOutputPath: `${fileDir}/realtime-recording.wav`,
-          audioStreamConfig: {
-            sampleRate: 16000,
-            channels: 1,
-            bitsPerSample: 16,
-            bufferSize: 16 * 1024,
-            audioSource: 6,
-          },
         }
 
         // Create appropriate audio stream adapter
@@ -356,7 +349,7 @@ export default function RealtimeTranscriberDemo() {
           audioStream = new AudioPcmStreamAdapter()
         }
 
-        await audioStream.initialize(options.audioStreamConfig!)
+        await audioStream.initialize({})
         audioStreamRef.current = audioStream
 
         // Create dependencies

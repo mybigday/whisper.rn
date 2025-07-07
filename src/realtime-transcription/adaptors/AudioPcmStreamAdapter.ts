@@ -23,13 +23,13 @@ export class AudioPcmStreamAdapter implements AudioStreamInterface {
     }
 
     try {
-      this.config = config
+      this.config = config || null
 
       // Initialize LiveAudioStream
       LiveAudioStream.init({
-        sampleRate: config.sampleRate,
-        channels: config.channels,
-        bitsPerSample: config.bitsPerSample,
+        sampleRate: config.sampleRate || 16000,
+        channels: config.channels || 1,
+        bitsPerSample: config.bitsPerSample || 16,
         audioSource: config.audioSource || 6,
         bufferSize: config.bufferSize || 16 * 1024,
         wavFile: '', // We handle file writing separately
@@ -47,7 +47,7 @@ export class AudioPcmStreamAdapter implements AudioStreamInterface {
   }
 
   async start(): Promise<void> {
-    if (!this.isInitialized || !this.config) {
+    if (!this.isInitialized) {
       throw new Error('AudioStream not initialized')
     }
 
@@ -129,8 +129,8 @@ export class AudioPcmStreamAdapter implements AudioStreamInterface {
 
       const streamData: AudioStreamData = {
         data: audioData,
-        sampleRate: this.config.sampleRate,
-        channels: this.config.channels,
+        sampleRate: this.config.sampleRate || 16000,
+        channels: this.config.channels || 1,
         timestamp: Date.now(),
       }
 

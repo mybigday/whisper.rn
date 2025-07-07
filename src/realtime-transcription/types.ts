@@ -2,6 +2,8 @@ import type {
   TranscribeFileOptions,
   TranscribeResult,
   VadOptions,
+  WhisperContext,
+  WhisperVadContext,
 } from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
 
@@ -15,9 +17,9 @@ export interface AudioStreamData {
 }
 
 export interface AudioStreamConfig {
-  sampleRate: number
-  channels: number
-  bitsPerSample: number
+  sampleRate?: number
+  channels?: number
+  bitsPerSample?: number
   bufferSize?: number
   audioSource?: number
 }
@@ -231,8 +233,8 @@ export interface RealtimeTranscriberCallbacks {
 // === Context Interfaces ===
 
 export interface RealtimeTranscriberContexts {
-  whisperContext: import('../index').WhisperContext
-  vadContext?: import('../index').WhisperVadContext
+  whisperContext: WhisperContext
+  vadContext?: WhisperVadContext
 }
 
 export interface RealtimeTranscriberDependencies {
