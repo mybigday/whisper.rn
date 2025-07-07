@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { View, Text, Button, StyleSheet, ScrollView } from 'react-native'
 import RNFS from 'react-native-fs'
 import {
@@ -77,6 +77,8 @@ const JSITest: React.FC = () => {
   const [vadContext, setVadContext] = useState<WhisperVadContext | null>(null)
   const [contextsInitialized, setContextsInitialized] = useState(false)
 
+  const arrayBufferRef = useRef<ArrayBuffer | null>(null)
+
   const addTestResult = (result: string) => {
     setTestResults((prev) => [...prev, result])
   }
@@ -84,17 +86,26 @@ const JSITest: React.FC = () => {
   const testJSIFunctions = async () => {
     // Download the JFK audio file
     const jfkAudioPath = `${RNFS.DocumentDirectoryPath}/jfk.wav`
-    if (!(await RNFS.exists(jfkAudioPath))) {
+    let arrayBuffer: ArrayBuffer | null = arrayBufferRef.current
+    if (!arrayBuffer) {
       await RNFS.downloadFile({
         fromUrl: JFK_AUDIO_URL,
         toFile: jfkAudioPath,
       }).promise
+
+      const wavFileReader = new WavFileReader(jfkAudioPath)
+      await wavFileReader.initialize()
+
+      const audioData = wavFileReader.getAudioData()
+
+      if (!audioData) {
+        addTestResult('❌ Audio data not found')
+        return
+      }
+
+      arrayBuffer = audioData.buffer as ArrayBuffer
+      arrayBufferRef.current = arrayBuffer
     }
-
-    const wavFileReader = new WavFileReader(jfkAudioPath)
-    await wavFileReader.initialize()
-
-    const audioData = wavFileReader.getAudioData()
 
     setTestResults([])
 
@@ -107,9 +118,6 @@ const JSITest: React.FC = () => {
 
     try {
       addTestResult('🧪 Converting audio data to ArrayBuffer...')
-
-      // Convert audio data to 16-bit PCM ArrayBuffer
-      const arrayBuffer = audioData?.buffer || new ArrayBuffer(0)
 
       addTestResult(`✅ ArrayBuffer created: ${arrayBuffer.byteLength} bytes`)
 
@@ -229,6 +237,7 @@ const JSITest: React.FC = () => {
       setWhisperContext(null)
       setVadContext(null)
       setContextsInitialized(false)
+      arrayBufferRef.current = null
       addTestResult('✅ All contexts released')
     } catch (error) {
       addTestResult(`❌ Error releasing contexts: ${error}`)
