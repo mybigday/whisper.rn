@@ -8942,6 +8942,10 @@ void whisper_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
     wsp_ggml_log_set(g_state.log_callback, g_state.log_callback_user_data);
 }
 
+const char * whisper_version(void) {
+    return "1.7.6";
+}
+
 WSP_GGML_ATTRIBUTE_FORMAT(2, 3)
 static void whisper_log_internal(wsp_ggml_log_level level, const char * format, ...) {
     va_list args;

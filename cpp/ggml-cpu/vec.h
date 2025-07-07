@@ -58,7 +58,7 @@ inline static void wsp_ggml_vec_set_bf16(const int n, wsp_ggml_bf16_t * x, const
 inline static void wsp_ggml_vec_add_f32 (const int n, float * z, const float * x, const float * y) { for (int i = 0; i < n; ++i) z[i]  = x[i] + y[i]; }
 inline static void wsp_ggml_vec_add_f16 (const int n, wsp_ggml_fp16_t * z, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * y) {
     for (int i = 0; i < n; ++i) {
-        z[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(x[i]) + WSP_GGML_FP16_TO_FP32(y[i]));
+        z[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(x[i]) + WSP_GGML_CPU_FP16_TO_FP32(y[i]));
     }
 }
 inline static void wsp_ggml_vec_add1_f32(const int n, float * z, const float * x, const float   v) { for (int i = 0; i < n; ++i) z[i]  = x[i] + v;    }
@@ -67,7 +67,7 @@ inline static void wsp_ggml_vec_acc1_f32(const int n, float * y, const float   v
 inline static void wsp_ggml_vec_sub_f32 (const int n, float * z, const float * x, const float * y) { for (int i = 0; i < n; ++i) z[i]  = x[i] - y[i]; }
 inline static void wsp_ggml_vec_sub_f16 (const int n, wsp_ggml_fp16_t * z, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * y) {
     for (int i = 0; i < n; ++i) {
-        z[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(x[i]) - WSP_GGML_FP16_TO_FP32(y[i]));
+        z[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(x[i]) - WSP_GGML_CPU_FP16_TO_FP32(y[i]));
     }
 }
 inline static void wsp_ggml_vec_set_f32 (const int n, float * x, const float   v)                  { for (int i = 0; i < n; ++i) x[i]  = v;           }
@@ -75,20 +75,20 @@ inline static void wsp_ggml_vec_cpy_f32 (const int n, float * y, const float * x
 inline static void wsp_ggml_vec_neg_f32 (const int n, float * y, const float * x)                  { for (int i = 0; i < n; ++i) y[i]  = -x[i];       }
 inline static void wsp_ggml_vec_neg_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(-WSP_GGML_FP16_TO_FP32(x[i]));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(-WSP_GGML_CPU_FP16_TO_FP32(x[i]));
     }
 }
 
 inline static void wsp_ggml_vec_mul_f32 (const int n, float * z, const float * x, const float * y) { for (int i = 0; i < n; ++i) z[i]  = x[i]*y[i];   }
 inline static void wsp_ggml_vec_mul_f16 (const int n, wsp_ggml_fp16_t * z, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * y) {
     for (int i = 0; i < n; ++i) {
-        z[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(x[i]) * WSP_GGML_FP16_TO_FP32(y[i]));
+        z[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(x[i]) * WSP_GGML_CPU_FP16_TO_FP32(y[i]));
     }
 }
 inline static void wsp_ggml_vec_div_f32 (const int n, float * z, const float * x, const float * y) { for (int i = 0; i < n; ++i) z[i]  = x[i]/y[i];   }
 inline static void wsp_ggml_vec_div_f16 (const int n, wsp_ggml_fp16_t * z, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * y) {
     for (int i = 0; i < n; ++i) {
-        z[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(x[i]) / WSP_GGML_FP16_TO_FP32(y[i]));
+        z[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(x[i]) / WSP_GGML_CPU_FP16_TO_FP32(y[i]));
     }
 }
 
@@ -131,13 +131,13 @@ inline static void wsp_ggml_vec_dot_f16_unroll(const int n, const int xs, float 
     // leftovers
     for (int i = np; i < n; ++i) {
         for (int j = 0; j < WSP_GGML_VEC_DOT_UNROLL; ++j) {
-            sumf[j] += (wsp_ggml_float)(WSP_GGML_FP16_TO_FP32(x[j][i])*WSP_GGML_FP16_TO_FP32(y[i]));
+            sumf[j] += (wsp_ggml_float)(WSP_GGML_CPU_FP16_TO_FP32(x[j][i])*WSP_GGML_CPU_FP16_TO_FP32(y[i]));
         }
     }
 #else
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < WSP_GGML_VEC_DOT_UNROLL; ++j) {
-            sumf[j] += (wsp_ggml_float)(WSP_GGML_FP16_TO_FP32(x[j][i])*WSP_GGML_FP16_TO_FP32(y[i]));
+            sumf[j] += (wsp_ggml_float)(WSP_GGML_CPU_FP16_TO_FP32(x[j][i])*WSP_GGML_CPU_FP16_TO_FP32(y[i]));
         }
     }
 #endif
@@ -280,12 +280,12 @@ inline static void wsp_ggml_vec_mad_f16(const int n, wsp_ggml_fp16_t * WSP_GGML_
 
     // leftovers
     for (int i = np; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(y[i]) + WSP_GGML_FP16_TO_FP32(x[i])*v);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(y[i]) + WSP_GGML_CPU_FP16_TO_FP32(x[i])*v);
     }
 #else
     // scalar
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(y[i]) + WSP_GGML_FP16_TO_FP32(x[i])*v);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(y[i]) + WSP_GGML_CPU_FP16_TO_FP32(x[i])*v);
     }
 #endif
 }
@@ -430,12 +430,12 @@ inline static void wsp_ggml_vec_scale_f16(const int n, wsp_ggml_fp16_t * y, cons
 
     // leftovers
     for (int i = np; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(y[i])*v);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(y[i])*v);
     }
 #else
     // scalar
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(y[i])*v);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(y[i])*v);
     }
 #endif
 }
@@ -444,103 +444,103 @@ inline static void wsp_ggml_vec_norm_f32 (const int n, float * s, const float * 
 inline static void wsp_ggml_vec_sqr_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = x[i]*x[i];   }
 inline static void wsp_ggml_vec_sqr_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_FP16_TO_FP32(x[i]);
-        y[i] = WSP_GGML_FP32_TO_FP16(v*v);
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(v*v);
     }
 }
 inline static void wsp_ggml_vec_sqrt_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = sqrtf(x[i]); }
 inline static void wsp_ggml_vec_sqrt_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(sqrtf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(sqrtf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_log_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = logf(x[i]);  }
 inline static void wsp_ggml_vec_log_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(logf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(logf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_sin_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = sinf(x[i]);  }
 inline static void wsp_ggml_vec_sin_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(sinf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(sinf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_cos_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = cosf(x[i]);  }
 inline static void wsp_ggml_vec_cos_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(cosf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(cosf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_abs_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = fabsf(x[i]); }
 inline static void wsp_ggml_vec_abs_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(fabsf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(fabsf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_sgn_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : ((x[i] < 0.f) ? -1.f : 0.f); }
 inline static void wsp_ggml_vec_sgn_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_FP16_TO_FP32(x[i]);
-        y[i] = WSP_GGML_FP32_TO_FP16((v > 0.f) ? 1.f : ((v < 0.f) ? -1.f : 0.f));
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((v > 0.f) ? 1.f : ((v < 0.f) ? -1.f : 0.f));
     }
 }
 inline static void wsp_ggml_vec_step_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : 0.f; }
 inline static void wsp_ggml_vec_step_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16((WSP_GGML_FP16_TO_FP32(x[i]) > 0.f) ? 1.f : 0.f);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((WSP_GGML_CPU_FP16_TO_FP32(x[i]) > 0.f) ? 1.f : 0.f);
     }
 }
 inline static void wsp_ggml_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = tanhf(x[i]);  }
 inline static void wsp_ggml_vec_tanh_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(tanhf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(tanhf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_elu_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : expm1f(x[i]); }
 inline static void wsp_ggml_vec_elu_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(expm1f(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(expm1f(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 inline static void wsp_ggml_vec_relu_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.f; }
 inline static void wsp_ggml_vec_relu_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_FP16_TO_FP32(x[i]);
-        y[i] = WSP_GGML_FP32_TO_FP16((v > 0.f) ? v : 0.f);
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((v > 0.f) ? v : 0.f);
     }
 }
 inline static void wsp_ggml_vec_leaky_relu_f32 (const int n, float * y, const float * x, const float ns) { for (int i = 0; i < n; ++i) y[i] = ((x[i] > 0.f) ? x[i] : 0.f) + ns * ((x[i] < 0.0f) ? x[i] : 0.f); }
 inline static void wsp_ggml_vec_leaky_relu_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const float ns) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_FP16_TO_FP32(x[i]);
-        y[i] = WSP_GGML_FP32_TO_FP16(((v > 0.f) ? v : 0.f) + ns * ((v < 0.0f) ? v : 0.f));
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(((v > 0.f) ? v : 0.f) + ns * ((v < 0.0f) ? v : 0.f));
     }
 }
 inline static void wsp_ggml_vec_sigmoid_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = 1.f / (1.f + expf(-x[i])); }
 inline static void wsp_ggml_vec_sigmoid_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(1.f / (1.f + expf(-WSP_GGML_FP16_TO_FP32(x[i]))));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(1.f / (1.f + expf(-WSP_GGML_CPU_FP16_TO_FP32(x[i]))));
     }
 }
 // TODO: optimize performance
 inline static void wsp_ggml_vec_hardswish_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = x[i] * fminf(1.0f, fmaxf(0.0f, (x[i] + 3.0f) / 6.0f)); }
 inline static void wsp_ggml_vec_hardswish_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_FP16_TO_FP32(x[i]);
-        y[i] = WSP_GGML_FP32_TO_FP16(v * fminf(1.0f, fmaxf(0.0f, (v + 3.0f) / 6.0f)));
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(v * fminf(1.0f, fmaxf(0.0f, (v + 3.0f) / 6.0f)));
     }
 }
 inline static void wsp_ggml_vec_hardsigmoid_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = fminf(1.0f, fmaxf(0.0f, (x[i] + 3.0f) / 6.0f)); }
 inline static void wsp_ggml_vec_hardsigmoid_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(fminf(1.0f, fmaxf(0.0f, (WSP_GGML_FP16_TO_FP32(x[i]) + 3.0f) / 6.0f)));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(fminf(1.0f, fmaxf(0.0f, (WSP_GGML_CPU_FP16_TO_FP32(x[i]) + 3.0f) / 6.0f)));
     }
 }
 inline static void wsp_ggml_vec_exp_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = expf(x[i]); }
 inline static void wsp_ggml_vec_exp_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(expf(WSP_GGML_FP16_TO_FP32(x[i])));
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(expf(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
     }
 }
 
@@ -562,9 +562,9 @@ inline static void wsp_ggml_vec_gelu_f16(const int n, wsp_ggml_fp16_t * y, const
 
 inline static void wsp_ggml_vec_gelu_erf_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        float xi = WSP_GGML_FP16_TO_FP32(x[i]);
+        float xi = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
         float res = 0.5f*xi*(1.0f + erff(xi*SQRT_2_INV));
-        y[i] = WSP_GGML_FP32_TO_FP16(res);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(res);
     }
 }
 
@@ -577,9 +577,9 @@ inline static void wsp_ggml_vec_gelu_f32(const int n, float * y, const float * x
         } else if (x[i] >= 10.0f) {
             y[i] = x[i];
         } else {
-            wsp_ggml_fp16_t fp16 = WSP_GGML_FP32_TO_FP16(x[i]);
+            wsp_ggml_fp16_t fp16 = WSP_GGML_CPU_FP32_TO_FP16(x[i]);
             memcpy(&t, &fp16, sizeof(uint16_t));
-            y[i] = WSP_GGML_FP16_TO_FP32(wsp_ggml_table_gelu_f16[t]);
+            y[i] = WSP_GGML_CPU_FP16_TO_FP32(wsp_ggml_table_gelu_f16[t]);
         }
     }
 }
@@ -613,9 +613,9 @@ inline static float wsp_ggml_gelu_quick_f32(float x) {
 inline static void wsp_ggml_vec_gelu_quick_f32(const int n, float * y, const float * x) {
     uint16_t t;
     for (int i = 0; i < n; ++i) {
-        wsp_ggml_fp16_t fp16 = WSP_GGML_FP32_TO_FP16(x[i]);
+        wsp_ggml_fp16_t fp16 = WSP_GGML_CPU_FP32_TO_FP16(x[i]);
         memcpy(&t, &fp16, sizeof(uint16_t));
-        y[i] = WSP_GGML_FP16_TO_FP32(wsp_ggml_table_gelu_quick_f16[t]);
+        y[i] = WSP_GGML_CPU_FP16_TO_FP32(wsp_ggml_table_gelu_quick_f16[t]);
     }
 }
 #else
@@ -628,8 +628,8 @@ inline static void wsp_ggml_vec_gelu_quick_f32(const int n, float * y, const flo
 
 inline static void wsp_ggml_vec_gelu_quick_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_FP16_TO_FP32(x[i]);
-        y[i] = WSP_GGML_FP32_TO_FP16(v*(1.0f/(1.0f+expf(GELU_QUICK_COEF*v))));
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(v*(1.0f/(1.0f+expf(GELU_QUICK_COEF*v))));
     }
 }
 
@@ -638,8 +638,8 @@ inline static float wsp_ggml_silu_f32(float x) {
     return x/(1.0f + expf(-x));
 }
 inline static wsp_ggml_fp16_t wsp_ggml_silu_f16(wsp_ggml_fp16_t x) {
-    float v = WSP_GGML_FP16_TO_FP32(x);
-    return WSP_GGML_FP32_TO_FP16(v/(1.0f + expf(-v)));
+    float v = WSP_GGML_CPU_FP16_TO_FP32(x);
+    return WSP_GGML_CPU_FP32_TO_FP16(v/(1.0f + expf(-v)));
 }
 
 #if __FINITE_MATH_ONLY__
@@ -888,9 +888,9 @@ inline static float wsp_ggml_silu_backward_f32(float x, float dy) {
 }
 
 inline static wsp_ggml_fp16_t wsp_ggml_silu_backward_f16(wsp_ggml_fp16_t x, wsp_ggml_fp16_t dy) {
-    const float v = WSP_GGML_FP16_TO_FP32(x);
+    const float v = WSP_GGML_CPU_FP16_TO_FP32(x);
     const float s = 1.0f/(1.0f + expf(-v));
-    return WSP_GGML_FP32_TO_FP16(WSP_GGML_FP16_TO_FP32(dy)*s*(1.0f + v*(1.0f - s)));
+    return WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(dy)*s*(1.0f + v*(1.0f - s)));
 }
 
 inline static void wsp_ggml_vec_silu_backward_f32(const int n, float * dx, const float * x, const float * dy) {
@@ -902,6 +902,60 @@ inline static void wsp_ggml_vec_silu_backward_f32(const int n, float * dx, const
 inline static void wsp_ggml_vec_silu_backward_f16(const int n, wsp_ggml_fp16_t * dx, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * dy) {
     for (int i = 0; i < n; ++i) {
         dx[i] = wsp_ggml_silu_backward_f16(x[i], dy[i]);
+    }
+}
+
+inline static void wsp_ggml_vec_reglu_f32 (const int n, float * y, const float * x, const float * g) {
+    for (int i = 0; i < n; ++i) {
+        y[i] = (x[i] > 0.f) ? x[i] * g[i] : 0.f;
+    }
+}
+
+inline static void wsp_ggml_vec_reglu_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * g) {
+    for (int i = 0; i < n; ++i) {
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((v > 0.f) ? v * WSP_GGML_CPU_FP16_TO_FP32(g[i]) : 0.f);
+    }
+}
+
+#ifdef WSP_GGML_GELU_FP16
+inline static void wsp_ggml_vec_geglu_f32(const int n, float * y, const float * x, const float * g) {
+    uint16_t t;
+    for (int i = 0; i < n; ++i) {
+        if (x[i] <= -10.0f) {
+            y[i] = 0.0f;
+        } else if (x[i] >= 10.0f) {
+            y[i] = x[i] * g[i];
+        } else {
+            wsp_ggml_fp16_t fp16 = WSP_GGML_CPU_FP32_TO_FP16(x[i]);
+            memcpy(&t, &fp16, sizeof(uint16_t));
+            y[i] = WSP_GGML_CPU_FP16_TO_FP32(wsp_ggml_table_gelu_f16[t]) * g[i];
+        }
+    }
+}
+#else
+inline static void wsp_ggml_vec_geglu_f32(const int n, float * y, const float * x, const float * g) {
+    for (int i = 0; i < n; ++i) {
+        y[i] = wsp_ggml_gelu_f32(x[i]) * g[i];
+    }
+}
+#endif
+
+inline static void wsp_ggml_vec_geglu_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * g) {
+    const uint16_t * i16 = (const uint16_t *) x;
+    for (int i = 0; i < n; ++i) {
+        float v = WSP_GGML_CPU_FP16_TO_FP32(g[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(wsp_ggml_table_gelu_f16[i16[i]]) * v);
+    }
+}
+
+void wsp_ggml_vec_swiglu_f32(const int n, float * y, const float * x, const float * g);
+
+inline static void wsp_ggml_vec_swiglu_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * g) {
+    for (int i = 0; i < n; ++i) {
+        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        float w = WSP_GGML_CPU_FP16_TO_FP32(g[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((v/(1.0f + expf(-v))) * w);
     }
 }
 
@@ -928,7 +982,7 @@ inline static void wsp_ggml_vec_sum_f32_ggf(const int n, wsp_ggml_float * s, con
 inline static void wsp_ggml_vec_sum_f16_ggf(const int n, float * s, const wsp_ggml_fp16_t * x) {
     float sum = 0.0f;
     for (int i = 0; i < n; ++i) {
-        sum += WSP_GGML_FP16_TO_FP32(x[i]);
+        sum += WSP_GGML_CPU_FP16_TO_FP32(x[i]);
     }
     *s = sum;
 }
