@@ -94,7 +94,7 @@ public class WhisperVadContext {
 
     public void release() {
         if (vadContext != 0) {
-            WhisperContext.freeVadContext(vadContext);
+            WhisperContext.freeVadContext(id, vadContext);
             vadContext = 0;
         }
     }

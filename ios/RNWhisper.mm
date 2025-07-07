@@ -4,6 +4,7 @@
 #import "RNWhisperDownloader.h"
 #import "RNWhisperAudioUtils.h"
 #import "RNWhisperAudioSessionUtils.h"
+#import "RNWhisperJSI.h"
 #include <stdlib.h>
 #include <string>
 
@@ -90,6 +91,8 @@ RCT_REMAP_METHOD(initContext,
     }
 
     [contexts setObject:context forKey:[NSNumber numberWithInt:contextId]];
+    // Also add to unified context management - store raw context pointer like Android
+    rnwhisper_jsi::addContext(contextId, reinterpret_cast<long>([context getContext]));
 
     resolve(@{
         @"contextId": @(contextId),
@@ -345,6 +348,8 @@ RCT_REMAP_METHOD(releaseContext,
     }
     [context invalidate];
     [contexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    // Also remove from unified context management
+    rnwhisper_jsi::removeContext(contextId);
     resolve(nil);
 }
 
@@ -455,6 +460,8 @@ RCT_REMAP_METHOD(initVadContext,
     }
 
     [vadContexts setObject:vadContext forKey:[NSNumber numberWithInt:contextId]];
+    // Also add to unified context management - store raw VAD context pointer like Android
+    rnwhisper_jsi::addVadContext(contextId, reinterpret_cast<long>([vadContext getVadContext]));
 
     resolve(@{
         @"contextId": @(contextId),
@@ -539,6 +546,8 @@ RCT_REMAP_METHOD(releaseVadContext,
     }
     [vadContext invalidate];
     [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    // Also remove from unified context management
+    rnwhisper_jsi::removeVadContext(contextId);
     resolve(nil);
 }
 
@@ -569,6 +578,35 @@ RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
         }
         [vadContexts removeAllObjects];
         vadContexts = nil;
+    }
+}
+
+RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RCTBridge *bridge = [RCTBridge currentBridge];
+    if (bridge == nil) {
+        reject(@"whisper_jsi_error", @"Bridge not available", nil);
+        return;
+    }
+
+    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge;
+    auto callInvoker = bridge.jsCallInvoker;
+    if (cxxBridge.runtime) {
+        facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
+
+        if (callInvoker) {
+          callInvoker->invokeAsync([runtime, callInvoker]() {
+            rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
+          });
+        } else {
+          reject(@"whisper_jsi_error", @"CallInvoker not available", nil);
+          return;
+        }
+
+        resolve(@{});
+    } else {
+        reject(@"whisper_jsi_error", @"Runtime not available", nil);
     }
 }
 

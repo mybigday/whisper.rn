@@ -11,6 +11,11 @@
 #include "rn-whisper.h"
 #include "ggml.h"
 #include "jni-utils.h"
+#include "RNWhisperJSI.h"
+
+// Include fbjni headers for type-safe JNI
+#include <fbjni/fbjni.h>
+#include <ReactCommon/CallInvokerHolder.h>
 
 #define UNUSED(x) (void)(x)
 #define TAG "JNI"
@@ -193,7 +198,7 @@ extern "C" {
 
 JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initContext(
-        JNIEnv *env, jobject thiz, jstring model_path_str) {
+        JNIEnv *env, jobject thiz, jint context_id, jstring model_path_str) {
     UNUSED(thiz);
     struct whisper_context_params cparams;
 
@@ -205,6 +210,7 @@ Java_com_rnwhisper_WhisperContext_initContext(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     context = whisper_init_from_file_with_params(model_path_chars, cparams);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper_jsi::addContext(context_id, reinterpret_cast<jlong>(context));
     return reinterpret_cast<jlong>(context);
 }
 
@@ -542,11 +548,12 @@ Java_com_rnwhisper_WhisperContext_getTextSegmentT1(
 
 JNIEXPORT void JNICALL
 Java_com_rnwhisper_WhisperContext_freeContext(
-        JNIEnv *env, jobject thiz, jlong context_ptr) {
+        JNIEnv *env, jobject thiz, jint context_id, jlong context_ptr) {
     UNUSED(env);
     UNUSED(thiz);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     whisper_free(context);
+    rnwhisper_jsi::removeContext(context_id);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -576,6 +583,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initVadContext(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jstring model_path_str
 ) {
     UNUSED(thiz);
@@ -585,6 +593,7 @@ Java_com_rnwhisper_WhisperContext_initVadContext(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     vad_context = whisper_vad_init_from_file_with_params(model_path_chars, vad_params);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper_jsi::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -592,6 +601,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initVadContextWithAsset(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject asset_manager,
     jstring model_path_str
 ) {
@@ -602,6 +612,7 @@ Java_com_rnwhisper_WhisperContext_initVadContextWithAsset(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     vad_context = whisper_vad_init_from_asset(env, asset_manager, model_path_chars, vad_params);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper_jsi::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -609,6 +620,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initVadContextWithInputStream(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject input_stream
 ) {
     UNUSED(thiz);
@@ -616,6 +628,7 @@ Java_com_rnwhisper_WhisperContext_initVadContextWithInputStream(
 
     struct whisper_vad_context *vad_context = nullptr;
     vad_context = whisper_vad_init_from_input_stream(env, input_stream, vad_params);
+    rnwhisper_jsi::addVadContext(context_id, reinterpret_cast<jlong>(vad_context));
     return reinterpret_cast<jlong>(vad_context);
 }
 
@@ -623,12 +636,14 @@ JNIEXPORT void JNICALL
 Java_com_rnwhisper_WhisperContext_freeVadContext(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jlong vad_context_ptr
 ) {
     UNUSED(env);
     UNUSED(thiz);
     struct whisper_vad_context *vad_context = reinterpret_cast<struct whisper_vad_context *>(vad_context_ptr);
     whisper_vad_free(vad_context);
+    rnwhisper_jsi::removeVadContext(context_id);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -724,6 +739,68 @@ Java_com_rnwhisper_WhisperContext_vadFreeSegments(
     UNUSED(thiz);
     struct whisper_vad_segments *segments = reinterpret_cast<struct whisper_vad_segments *>(segments_ptr);
     whisper_vad_free_segments(segments);
+}
+
+// JSI Installation function using fbjni
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_installJSIBindings(
+    JNIEnv *env,
+    jclass clazz,
+    jlong runtimePtr,
+    jobject callInvokerHolder
+) {
+    auto runtime = reinterpret_cast<facebook::jsi::Runtime*>(runtimePtr);
+
+    if (runtime == nullptr) {
+        LOGW("Runtime is null, cannot install JSI bindings");
+        return;
+    }
+
+    std::shared_ptr<facebook::react::CallInvoker> callInvoker = nullptr;
+
+    if (callInvokerHolder != nullptr) {
+        try {
+            // Use fbjni for type-safe access to CallInvoker
+            auto holder = facebook::jni::alias_ref<facebook::react::CallInvokerHolder::javaobject>{
+                reinterpret_cast<facebook::react::CallInvokerHolder::javaobject>(callInvokerHolder)
+            };
+
+            if (holder) {
+                callInvoker = holder->cthis()->getCallInvoker();
+                LOGI("Successfully obtained CallInvoker using fbjni");
+            }
+        } catch (const std::exception& e) {
+            LOGW("Failed to obtain CallInvoker: %s", e.what());
+        } catch (...) {
+            LOGW("Failed to obtain CallInvoker: unknown error");
+        }
+    }
+
+    if (callInvoker == nullptr) {
+        LOGW("CallInvoker is null, cannot install JSI bindings");
+        return;
+    }
+
+    callInvoker->invokeAsync([runtime, callInvoker]() {
+        try {
+            rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
+            LOGI("JSI bindings installed successfully on JS thread");
+        } catch (const facebook::jsi::JSError& e) {
+            LOGW("JSError installing JSI bindings: %s", e.getMessage().c_str());
+        } catch (const std::exception& e) {
+            LOGW("Exception installing JSI bindings: %s", e.what());
+        } catch (...) {
+            LOGW("Unknown error installing JSI bindings");
+        }
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_rnwhisper_WhisperContext_cleanupJSIBindings(
+    JNIEnv *env,
+    jclass clazz
+) {
+    rnwhisper_jsi::cleanupJSIBindings();
 }
 
 } // extern "C"

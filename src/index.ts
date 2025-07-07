@@ -5,7 +5,10 @@ import {
   DeviceEventEmitterStatic,
   Image,
 } from 'react-native'
-import RNWhisper, { NativeWhisperContext, NativeWhisperVadContext } from './NativeRNWhisper'
+import RNWhisper, {
+  NativeWhisperContext,
+  NativeWhisperVadContext,
+} from './NativeRNWhisper'
 import type {
   TranscribeOptions,
   TranscribeResult,
@@ -20,6 +23,43 @@ import type {
   AudioSessionModeIos,
 } from './AudioSessionIos'
 import { version } from './version.json'
+
+declare global {
+  // eslint-disable-next-line no-var
+  var whisperTranscribeData: (
+    contextId: number,
+    options: TranscribeOptions,
+    data: ArrayBuffer | SharedArrayBuffer,
+  ) => Promise<TranscribeResult>
+  // eslint-disable-next-line no-var
+  var whisperVadDetectSpeech: (
+    contextId: number,
+    options: VadOptions,
+    audioData: ArrayBuffer | SharedArrayBuffer,
+  ) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
+}
+
+let jsiWhisperTranscribeData: (
+  contextId: number,
+  options: TranscribeOptions,
+  data: ArrayBuffer | SharedArrayBuffer,
+) => Promise<TranscribeResult>
+let jsiWhisperVadDetectSpeech: (
+  contextId: number,
+  options: VadOptions,
+  audioData: ArrayBuffer | SharedArrayBuffer,
+) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
+
+RNWhisper.installJSIBindings()
+  .then(() => {
+    jsiWhisperTranscribeData = global.whisperTranscribeData
+    delete (global as any).whisperTranscribeData
+    jsiWhisperVadDetectSpeech = global.whisperVadDetectSpeech
+    delete (global as any).whisperVadDetectSpeech
+  })
+  .catch((e) => {
+    console.warn('Failed to install JSI bindings', e)
+  })
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
 if (Platform.OS === 'ios') {
@@ -188,10 +228,7 @@ export type BenchResult = {
 }
 
 const updateAudioSession = async (setting: AudioSessionSettingIos) => {
-  await AudioSessionIos.setCategory(
-    setting.category,
-    setting.options || [],
-  )
+  await AudioSessionIos.setCategory(setting.category, setting.options || [])
   if (setting.mode) {
     await AudioSessionIos.setMode(setting.mode)
   }
@@ -199,6 +236,8 @@ const updateAudioSession = async (setting: AudioSessionSettingIos) => {
 }
 
 export class WhisperContext {
+  ptr: number
+
   id: number
 
   gpu: boolean = false
@@ -206,16 +245,22 @@ export class WhisperContext {
   reasonNoGPU: string = ''
 
   constructor({
+    contextPtr,
     contextId,
     gpu,
     reasonNoGPU,
   }: NativeWhisperContext) {
+    this.ptr = contextPtr
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
   }
 
-  private transcribeWithNativeMethod(method: 'transcribeFile' | 'transcribeData', data: string, options: TranscribeFileOptions = {}): {
+  private transcribeWithNativeMethod(
+    method: 'transcribeFile' | 'transcribeData',
+    data: string,
+    options: TranscribeFileOptions = {},
+  ): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
@@ -322,13 +367,74 @@ export class WhisperContext {
   }
 
   /**
-   * Transcribe audio data (base64 encoded float32 PCM data)
+   * Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
-  transcribeData(data: string, options: TranscribeFileOptions = {}): {
+  transcribeData(
+    data: string | ArrayBuffer | SharedArrayBuffer,
+    options: TranscribeFileOptions = {},
+  ): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
+    if (data instanceof ArrayBuffer || data instanceof SharedArrayBuffer) {
+      // Use JSI function for ArrayBuffer
+      if (!jsiWhisperTranscribeData) {
+        throw new Error('JSI binding `whisperTranscribeData` not installed')
+      }
+      return this.transcribeDataArrayBuffer(data, options)
+    }
     return this.transcribeWithNativeMethod('transcribeData', data, options)
+  }
+
+  /**
+   * Transcribe audio data from ArrayBuffer (16-bit PCM, mono, 16kHz)
+   */
+  private transcribeDataArrayBuffer(
+    data: ArrayBuffer | SharedArrayBuffer,
+    options: TranscribeFileOptions = {},
+  ): {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  } {
+    const { onProgress, onNewSegments, ...rest } = options
+
+    // Generate a unique jobId for this transcription
+    const jobId = Math.floor(Math.random() * 10000)
+
+    const jsiOptions = {
+      ...rest,
+      onProgress: onProgress || undefined,
+      onNewSegments: onNewSegments || undefined,
+      jobId, // Pass jobId to native implementation
+    }
+
+    let isAborted = false
+    const promise = jsiWhisperTranscribeData(this.id, jsiOptions, data)
+      .then((result: any) => {
+        if (isAborted) {
+          return { ...result, isAborted: true }
+        }
+        return result
+      })
+      .catch((error: any) => {
+        if (isAborted) {
+          return { isAborted: true, error: 'Transcription aborted' }
+        }
+        throw error
+      })
+
+    return {
+      stop: async () => {
+        isAborted = true
+        try {
+          // Use the existing native abort method
+          await RNWhisper.abortTranscribe(this.id, jobId)
+        } catch (error) {
+          // Ignore errors if context is already released or job doesn't exist
+        }
+      },
+      promise,
+    }
   }
 
   /** Transcribe the microphone audio stream, the microphone user permission is required */
@@ -361,7 +467,7 @@ export class WhisperContext {
               t0: segment.t0 + tOffset,
               t1: segment.t1 + tOffset,
             })) || [],
-        }
+        },
       }
     }
 
@@ -404,7 +510,10 @@ export class WhisperContext {
       // iOS: Update audio session state
       await updateAudioSession(options?.audioSessionOnStartIos)
     }
-    if (Platform.OS === 'ios' && typeof options?.audioSessionOnStopIos === 'object') {
+    if (
+      Platform.OS === 'ios' &&
+      typeof options?.audioSessionOnStopIos === 'object'
+    ) {
       prevAudioSession = options?.audioSessionOnStopIos
     }
 
@@ -468,8 +577,16 @@ export class WhisperContext {
 
   async bench(maxThreads: number): Promise<BenchResult> {
     const result = await RNWhisper.bench(this.id, maxThreads)
-    const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] = JSON.parse(result)
-    return { config, nThreads, encodeMs, decodeMs, batchMs, promptMs } as BenchResult
+    const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] =
+      JSON.parse(result)
+    return {
+      config,
+      nThreads,
+      encodeMs,
+      decodeMs,
+      batchMs,
+      promptMs,
+    } as BenchResult
   }
 
   async release(): Promise<void> {
@@ -495,7 +612,7 @@ export type ContextOptions = {
   /** Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. */
   useGpu?: boolean
   /** Use Flash Attention, only recommended if GPU available */
-  useFlashAttn?: boolean,
+  useFlashAttn?: boolean
 }
 
 const coreMLModelAssetPaths = [
@@ -557,17 +674,18 @@ export async function initWhisper({
     path = filePath
   }
   if (path.startsWith('file://')) path = path.slice(7)
-  const { contextId, gpu, reasonNoGPU } = await RNWhisper.initContext({
-    filePath: path,
-    isBundleAsset: !!isBundleAsset,
-    useFlashAttn,
-    useGpu,
-    useCoreMLIos,
-    // Only development mode need download Core ML model assets (from packager server)
-    downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
-    coreMLAssets,
-  })
-  return new WhisperContext({ contextId, gpu, reasonNoGPU })
+  const { contextPtr, contextId, gpu, reasonNoGPU } =
+    await RNWhisper.initContext({
+      filePath: path,
+      isBundleAsset: !!isBundleAsset,
+      useFlashAttn,
+      useGpu,
+      useCoreMLIos,
+      // Only development mode need download Core ML model assets (from packager server)
+      downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
+      coreMLAssets,
+    })
+  return new WhisperContext({ contextPtr, contextId, gpu, reasonNoGPU })
 }
 
 export async function releaseAllWhisper(): Promise<void> {
@@ -608,11 +726,7 @@ export class WhisperVadContext {
 
   reasonNoGPU: string = ''
 
-  constructor({
-    contextId,
-    gpu,
-    reasonNoGPU,
-  }: NativeWhisperVadContext) {
+  constructor({ contextId, gpu, reasonNoGPU }: NativeWhisperVadContext) {
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
@@ -624,7 +738,7 @@ export class WhisperVadContext {
    */
   async detectSpeech(
     filePathOrBase64: string | number,
-    options: VadOptions = {}
+    options: VadOptions = {},
   ): Promise<VadSegment[]> {
     let path = ''
     if (typeof filePathOrBase64 === 'number') {
@@ -654,12 +768,27 @@ export class WhisperVadContext {
   }
 
   /**
-   * Detect speech segments in raw audio data (base64 encoded float32 PCM data)
+   * Detect speech segments in raw audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
   async detectSpeechData(
-    audioData: string,
-    options: VadOptions = {}
+    audioData: string | ArrayBuffer | SharedArrayBuffer,
+    options: VadOptions = {},
   ): Promise<VadSegment[]> {
+    if (
+      audioData instanceof ArrayBuffer ||
+      audioData instanceof SharedArrayBuffer
+    ) {
+      // Use JSI function for ArrayBuffer
+      if (!jsiWhisperVadDetectSpeech) {
+        throw new Error('JSI binding `whisperVadDetectSpeech` not installed')
+      }
+      const result = await jsiWhisperVadDetectSpeech(
+        this.id,
+        options,
+        audioData,
+      )
+      return result.segments || []
+    }
     return RNWhisper.vadDetectSpeech(this.id, audioData, options)
   }
 

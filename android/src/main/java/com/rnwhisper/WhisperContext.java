@@ -81,6 +81,14 @@ public class WhisperContext {
     fullHandler = null;
   }
 
+  public int getId() {
+    return id;
+  }
+
+  public long getContextPtr() {
+    return context;
+  }
+
   private boolean vad(int sliceIndex, int nSamples, int n) {
     if (isTranscribing) return true;
     return vadSimple(jobId, sliceIndex, nSamples, n);
@@ -430,7 +438,7 @@ public class WhisperContext {
 
   public void release() {
     stopCurrentTranscribe();
-    freeContext(context);
+    freeContext(id, context);
   }
 
   static {
@@ -497,10 +505,10 @@ public class WhisperContext {
   }
 
   // JNI methods
-  protected static native long initContext(String modelPath);
-  protected static native long initContextWithAsset(AssetManager assetManager, String modelPath);
-  protected static native long initContextWithInputStream(PushbackInputStream inputStream);
-  protected static native void freeContext(long contextPtr);
+  protected static native long initContext(int contextId, String modelPath);
+  protected static native long initContextWithAsset(int contextId, AssetManager assetManager, String modelPath);
+  protected static native long initContextWithInputStream(int contextId, PushbackInputStream inputStream);
+  protected static native void freeContext(int contextId, long contextPtr);
 
   protected static native int fullWithNewJob(
     int job_id,
@@ -535,10 +543,10 @@ public class WhisperContext {
   protected static native String bench(long context, int n_threads);
 
   // VAD JNI methods
-  protected static native long initVadContext(String modelPath);
-  protected static native long initVadContextWithAsset(AssetManager assetManager, String modelPath);
-  protected static native long initVadContextWithInputStream(PushbackInputStream inputStream);
-  protected static native void freeVadContext(long vadContextPtr);
+  protected static native long initVadContext(int contextId, String modelPath);
+  protected static native long initVadContextWithAsset(int contextId, AssetManager assetManager, String modelPath);
+  protected static native long initVadContextWithInputStream(int contextId, PushbackInputStream inputStream);
+  protected static native void freeVadContext(int contextId, long vadContextPtr);
   protected static native boolean vadDetectSpeech(long vadContextPtr, float[] audioData, int nSamples);
   protected static native long vadGetSegmentsFromProbs(long vadContextPtr, float threshold,
                                                        int minSpeechDurationMs, int minSilenceDurationMs,
@@ -559,4 +567,8 @@ public class WhisperContext {
       return null;
     }
   }
+
+  // JSI Installation
+  protected static native void installJSIBindings(long runtimePtr, Object callInvokerHolder);
+  protected static native void cleanupJSIBindings();
 }
