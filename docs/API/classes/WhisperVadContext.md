@@ -34,7 +34,7 @@
 
 #### Defined in
 
-[index.ts:611](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L611)
+[index.ts:729](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L729)
 
 ## Properties
 
@@ -44,7 +44,7 @@
 
 #### Defined in
 
-[index.ts:607](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L607)
+[index.ts:725](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L725)
 
 ___
 
@@ -54,7 +54,7 @@ ___
 
 #### Defined in
 
-[index.ts:605](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L605)
+[index.ts:723](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L723)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[index.ts:609](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L609)
+[index.ts:727](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L727)
 
 ## Methods
 
@@ -88,7 +88,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:625](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L625)
+[index.ts:739](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L739)
 
 ___
 
@@ -96,13 +96,13 @@ ___
 
 ▸ **detectSpeechData**(`audioData`, `options?`): `Promise`<[`VadSegment`](../README.md#vadsegment)[]\>
 
-Detect speech segments in raw audio data (base64 encoded float32 PCM data)
+Detect speech segments in raw audio data (base64 encoded float32 PCM data or ArrayBuffer)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `audioData` | `string` |
+| `audioData` | `string` \| `ArrayBuffer` \| `SharedArrayBuffer` |
 | `options` | [`VadOptions`](../README.md#vadoptions) |
 
 #### Returns
@@ -111,7 +111,7 @@ Detect speech segments in raw audio data (base64 encoded float32 PCM data)
 
 #### Defined in
 
-[index.ts:659](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L659)
+[index.ts:773](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L773)
 
 ___
 
@@ -125,4 +125,4 @@ ___
 
 #### Defined in
 
-[index.ts:666](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L666)
+[index.ts:795](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L795)

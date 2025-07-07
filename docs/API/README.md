@@ -65,7 +65,7 @@ whisper.rn
 
 #### Defined in
 
-[index.ts:80](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L80)
+[index.ts:120](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L120)
 
 ___
 
@@ -86,7 +86,7 @@ ___
 
 #### Defined in
 
-[index.ts:181](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L181)
+[index.ts:221](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L221)
 
 ___
 
@@ -109,7 +109,7 @@ ___
 
 #### Defined in
 
-[index.ts:480](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L480)
+[index.ts:597](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L597)
 
 ___
 
@@ -119,7 +119,7 @@ ___
 
 #### Defined in
 
-[index.ts:63](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L63)
+[index.ts:103](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L103)
 
 ___
 
@@ -137,7 +137,7 @@ ___
 
 #### Defined in
 
-[index.ts:56](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L56)
+[index.ts:96](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L96)
 
 ___
 
@@ -156,7 +156,7 @@ ___
 
 #### Defined in
 
-[index.ts:49](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L49)
+[index.ts:89](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L89)
 
 ___
 
@@ -186,7 +186,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -204,7 +204,7 @@ ___
 
 #### Defined in
 
-[index.ts:74](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L74)
+[index.ts:114](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L114)
 
 ___
 
@@ -229,7 +229,7 @@ ___
 
 #### Defined in
 
-[index.ts:142](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L142)
+[index.ts:182](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L182)
 
 ___
 
@@ -247,7 +247,7 @@ ___
 
 #### Defined in
 
-[index.ts:175](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L175)
+[index.ts:215](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L215)
 
 ___
 
@@ -271,7 +271,7 @@ ___
 
 #### Defined in
 
-[index.ts:162](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L162)
+[index.ts:202](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L202)
 
 ___
 
@@ -281,7 +281,7 @@ ___
 
 #### Defined in
 
-[index.ts:88](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L88)
+[index.ts:128](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L128)
 
 ___
 
@@ -299,7 +299,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/NativeRNWhisper.ts#L37)
 
 ___
 
@@ -318,7 +318,7 @@ ___
 
 #### Defined in
 
-[index.ts:594](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L594)
+[index.ts:712](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L712)
 
 ___
 
@@ -339,7 +339,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:68](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L68)
+[NativeRNWhisper.ts:69](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/NativeRNWhisper.ts#L69)
 
 ___
 
@@ -356,7 +356,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:96](https://github.com/mybigday/whisper.rn/blob/a11299e/src/NativeRNWhisper.ts#L96)
+[NativeRNWhisper.ts:97](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/NativeRNWhisper.ts#L97)
 
 ## Variables
 
@@ -381,7 +381,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/a11299e/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/AudioSessionIos.ts#L50)
 
 ___
 
@@ -393,7 +393,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:586](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L586)
+[index.ts:704](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L704)
 
 ___
 
@@ -405,7 +405,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:583](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L583)
+[index.ts:701](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L701)
 
 ___
 
@@ -417,7 +417,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:578](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L578)
+[index.ts:696](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L696)
 
 ## Functions
 
@@ -437,7 +437,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:508](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L508)
+[index.ts:625](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L625)
 
 ___
 
@@ -461,7 +461,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:676](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L676)
+[index.ts:805](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L805)
 
 ___
 
@@ -475,7 +475,7 @@ ___
 
 #### Defined in
 
-[index.ts:573](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L573)
+[index.ts:691](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L691)
 
 ___
 
@@ -493,4 +493,4 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:713](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L713)
+[index.ts:842](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L842)
