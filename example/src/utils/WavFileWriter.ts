@@ -15,7 +15,7 @@ export class WavFileWriter {
 
   private isWriting = false
 
-  private writeQueue: Buffer[] = []
+  private writeQueue: Uint8Array[] = []
 
   constructor(filePath: string, config: WavFileConfig) {
     this.filePath = filePath
@@ -46,7 +46,7 @@ export class WavFileWriter {
   /**
    * Append PCM audio data to the WAV file
    */
-  async appendAudioData(audioData: Buffer): Promise<void> {
+  async appendAudioData(audioData: Uint8Array): Promise<void> {
     if (!this.isWriting) {
       throw new Error('WAV file not initialized')
     }

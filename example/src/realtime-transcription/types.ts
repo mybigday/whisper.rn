@@ -7,7 +7,7 @@ import type {
 // === Audio Stream Interfaces ===
 
 export interface AudioStreamData {
-  data: Buffer
+  data: Uint8Array
   sampleRate: number
   channels: number
   timestamp: number

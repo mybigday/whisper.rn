@@ -1,5 +1,4 @@
 /* eslint-disable class-methods-use-this */
-import type { Buffer } from 'buffer'
 import type {
   WhisperContext,
   WhisperVadContext,
@@ -60,7 +59,7 @@ export class RealtimeTranscriber {
 
   private vadEnabled = false
 
-  private transcriptionQueue: Array<{ sliceIndex: number; audioData: Buffer }> =
+  private transcriptionQueue: Array<{ sliceIndex: number; audioData: Uint8Array }> =
     []
 
   private accumulatedData: Uint8Array = new Uint8Array(0)
@@ -237,7 +236,7 @@ export class RealtimeTranscriber {
   /**
    * Accumulate audio data for slice management
    */
-  private accumulateAudioData(newData: Buffer): void {
+  private accumulateAudioData(newData: Uint8Array): void {
     const combined = new Uint8Array(
       this.accumulatedData.length + newData.length,
     )
@@ -484,7 +483,7 @@ export class RealtimeTranscriber {
    * Detect speech using VAD context
    */
   private async detectSpeech(
-    audioData: Buffer,
+    audioData: Uint8Array,
     sliceIndex: number,
   ): Promise<VADEvent> {
     if (!this.vadContext) {
@@ -510,11 +509,11 @@ export class RealtimeTranscriber {
     }
 
     try {
-      const audioBase64 = audioData.toString('base64')
+      const audioBuffer = audioData.buffer as SharedArrayBuffer
 
       // Use VAD context to detect speech segments
       const vadSegments = await this.vadContext.detectSpeechData(
-        audioBase64,
+        audioBuffer,
         this.options.vadOptions,
       )
 
@@ -601,7 +600,7 @@ export class RealtimeTranscriber {
    */
   private async processTranscription(item: {
     sliceIndex: number
-    audioData: Buffer
+    audioData: Uint8Array
   }): Promise<void> {
     if (!this.isActive) {
       return
@@ -615,8 +614,9 @@ export class RealtimeTranscriber {
     const startTime = Date.now()
 
     try {
+      const audioBuffer = item.audioData.buffer as SharedArrayBuffer
       const { promise } = this.whisperContext.transcribeData(
-        item.audioData.toString('base64'),
+        audioBuffer,
         {
           ...this.options.transcribeOptions,
           onProgress: undefined, // Disable progress for realtime

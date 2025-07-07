@@ -1,5 +1,3 @@
-/* eslint-disable class-methods-use-this */
-import { Buffer } from 'buffer'
 import type { AudioSlice, MemoryUsage } from './types'
 
 export class SliceManager {
@@ -137,14 +135,14 @@ export class SliceManager {
   /**
    * Get audio data for transcription (base64 encoded)
    */
-  getAudioDataForTranscription(sliceIndex: number): Buffer | null {
+  getAudioDataForTranscription(sliceIndex: number): Uint8Array | null {
     const slice = this.slices.find((s) => s.index === sliceIndex)
     if (!slice || slice.sampleCount === 0) {
       return null
     }
 
     // Convert Uint8Array to base64 (same as TranscribeData.tsx)
-    return Buffer.from(slice.data.subarray(0, slice.sampleCount))
+    return slice.data.subarray(0, slice.sampleCount)
   }
 
   /**

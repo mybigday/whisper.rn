@@ -1,4 +1,3 @@
-import { Buffer } from 'buffer'
 import type {
   AudioStreamInterface,
   AudioStreamConfig,
@@ -272,7 +271,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
 
     // Create stream data using the original file's format
     const streamData: AudioStreamData = {
-      data: Buffer.from(audioChunk),
+      data: audioChunk,
       sampleRate: header.sampleRate,
       channels: header.channels,
       timestamp: Date.now(),

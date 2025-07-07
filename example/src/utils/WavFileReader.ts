@@ -183,7 +183,7 @@ export class WavFileReader {
   /**
    * Convert base64 string to Uint8Array
    */
-  private static base64ToUint8Array(base64: string): Uint8Array {
+  static base64ToUint8Array(base64: string): Uint8Array {
     const binaryString = atob(base64)
     const bytes = new Uint8Array(binaryString.length)
     for (let i = 0; i < binaryString.length; i += 1) {
