@@ -129,6 +129,17 @@ export class WavFileReader {
     return this.audioData.slice(start, end)
   }
 
+  getAudioData(): Uint8Array | null {
+    return this.audioData
+  }
+
+  getAudioDataBase64(): string | null {
+    if (!this.audioData) {
+      return null
+    }
+    return WavFileReader.uint8ArrayToBase64(this.audioData)
+  }
+
   /**
    * Get WAV file header information
    */
@@ -179,6 +190,14 @@ export class WavFileReader {
       bytes[i] = binaryString.charCodeAt(i)
     }
     return bytes
+  }
+
+  private static uint8ArrayToBase64(buffer: Uint8Array): string {
+    let binary = ''
+    for (let i = 0; i < buffer.length; i += 1) {
+      binary += String.fromCharCode(buffer[i] || 0) // Handle undefined
+    }
+    return btoa(binary)
   }
 
   /**

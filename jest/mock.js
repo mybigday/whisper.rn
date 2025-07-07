@@ -2,6 +2,7 @@ const { NativeModules, DeviceEventEmitter } = require('react-native')
 
 if (!NativeModules.RNWhisper) {
   NativeModules.RNWhisper = {
+    installJSIBindings: jest.fn(() => Promise.resolve()),
     initContext: jest.fn(() => Promise.resolve({ contextId: 1 })),
     transcribeFile: jest.fn(() => Promise.resolve({
       result: ' Test',

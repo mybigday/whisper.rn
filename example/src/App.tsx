@@ -12,6 +12,7 @@ import TranscribeData from './TranscribeData'
 import Vad from './Vad'
 import Bench from './Bench'
 import RealtimeTranscriberDemo from './RealtimeTranscriberDemo'
+import JSITestScreen from './JSITest'
 
 enableScreens()
 
@@ -66,6 +67,12 @@ function HomeScreen({ navigation }: { navigation: any }) {
       >
         <Text style={styles.buttonText}>Benchmark</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('JSITest')}
+      >
+        <Text style={styles.buttonText}>JSI Test</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -83,6 +90,7 @@ function App() {
           <Stack.Screen name="RealtimeTranscriberDemo" component={RealtimeTranscriberDemo} />
           <Stack.Screen name="VAD" component={Vad} />
           <Stack.Screen name="Bench" component={Bench} />
+          <Stack.Screen name="JSITest" component={JSITestScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>

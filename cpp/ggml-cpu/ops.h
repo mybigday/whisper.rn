@@ -20,6 +20,9 @@
 
 static const size_t CACHE_LINE_SIZE_F32 = CACHE_LINE_SIZE/sizeof(float);
 
+// Work buffer size for im2col operations in CONV2D
+#define WSP_GGML_IM2COL_WORK_SIZE (16 * 1024 * 1024)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,6 +56,7 @@ void wsp_ggml_compute_forward_permute(const struct wsp_ggml_compute_params * par
 void wsp_ggml_compute_forward_transpose(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_get_rows(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_get_rows_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_set_rows(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_diag(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_diag_mask_inf(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_diag_mask_zero(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -64,6 +68,7 @@ void wsp_ggml_compute_forward_clamp(const struct wsp_ggml_compute_params * param
 void wsp_ggml_compute_forward_conv_transpose_1d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_im2col(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_im2col_back_f32(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_conv_2d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_conv_transpose_2d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_conv_2d_dw(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_pool_1d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -93,6 +98,7 @@ void wsp_ggml_compute_forward_ssm_scan(const struct wsp_ggml_compute_params * pa
 void wsp_ggml_compute_forward_win_part(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_win_unpart(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_unary(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_glu(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_get_rel_pos(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_add_rel_pos(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_rwkv_wkv6(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -105,6 +111,7 @@ void wsp_ggml_compute_forward_custom(const struct wsp_ggml_compute_params * para
 void wsp_ggml_compute_forward_cross_entropy_loss(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_cross_entropy_loss_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_opt_step_adamw(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_mul_mat(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 
 #ifdef __cplusplus
 }

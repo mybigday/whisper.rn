@@ -4,6 +4,7 @@
 #import "RNWhisperDownloader.h"
 #import "RNWhisperAudioUtils.h"
 #import "RNWhisperAudioSessionUtils.h"
+#import "RNWhisperJSI.h"
 #include <stdlib.h>
 #include <string>
 
@@ -90,6 +91,8 @@ RCT_REMAP_METHOD(initContext,
     }
 
     [contexts setObject:context forKey:[NSNumber numberWithInt:contextId]];
+    // Also add to unified context management - store raw context pointer like Android
+    rnwhisper_jsi::addContext(contextId, reinterpret_cast<long>([context getContext]));
 
     resolve(@{
         @"contextId": @(contextId),
@@ -345,6 +348,8 @@ RCT_REMAP_METHOD(releaseContext,
     }
     [context invalidate];
     [contexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    // Also remove from unified context management
+    rnwhisper_jsi::removeContext(contextId);
     resolve(nil);
 }
 
@@ -352,37 +357,8 @@ RCT_REMAP_METHOD(releaseAllContexts,
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    [self invalidate];
+    [self releaseAllContexts];
     resolve(nil);
-}
-
-- (void)invalidate {
-    [super invalidate];
-
-    if (contexts == nil) {
-        return;
-    }
-
-    for (NSNumber *contextId in contexts) {
-        RNWhisperContext *context = contexts[contextId];
-        [context invalidate];
-    }
-
-    if (vadContexts != nil) {
-        for (NSNumber *contextId in vadContexts) {
-            RNWhisperVadContext *vadContext = vadContexts[contextId];
-            [vadContext invalidate];
-        }
-        [vadContexts removeAllObjects];
-        vadContexts = nil;
-    }
-
-    rnwhisper::job_abort_all(); // graceful abort
-
-    [contexts removeAllObjects];
-    contexts = nil;
-
-    [RNWhisperDownloader clearCache];
 }
 
 // MARK: - AudioSessionUtils
@@ -484,6 +460,8 @@ RCT_REMAP_METHOD(initVadContext,
     }
 
     [vadContexts setObject:vadContext forKey:[NSNumber numberWithInt:contextId]];
+    // Also add to unified context management - store raw VAD context pointer like Android
+    rnwhisper_jsi::addVadContext(contextId, reinterpret_cast<long>([vadContext getVadContext]));
 
     resolve(@{
         @"contextId": @(contextId),
@@ -568,20 +546,77 @@ RCT_REMAP_METHOD(releaseVadContext,
     }
     [vadContext invalidate];
     [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    // Also remove from unified context management
+    rnwhisper_jsi::removeVadContext(contextId);
     resolve(nil);
 }
 
 RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
+    [self releaseAllVadContexts];
+    resolve(nil);
+}
+
+- (void)releaseAllContexts {
+    rnwhisper::job_abort_all(); // graceful abort
+    if (contexts != nil) {
+        for (NSNumber *contextId in contexts) {
+            RNWhisperContext *context = contexts[contextId];
+            [context invalidate];
+        }
+        [contexts removeAllObjects];
+        contexts = nil;
+    }
+}
+
+- (void)releaseAllVadContexts {
     if (vadContexts != nil) {
         for (NSNumber *contextId in vadContexts) {
             RNWhisperVadContext *vadContext = vadContexts[contextId];
             [vadContext invalidate];
         }
         [vadContexts removeAllObjects];
+        vadContexts = nil;
     }
-    resolve(nil);
+}
+
+RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+{
+    RCTBridge *bridge = [RCTBridge currentBridge];
+    if (bridge == nil) {
+        reject(@"whisper_jsi_error", @"Bridge not available", nil);
+        return;
+    }
+
+    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge;
+    auto callInvoker = bridge.jsCallInvoker;
+    if (cxxBridge.runtime) {
+        facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
+
+        if (callInvoker) {
+          callInvoker->invokeAsync([runtime, callInvoker]() {
+            rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
+          });
+        } else {
+          reject(@"whisper_jsi_error", @"CallInvoker not available", nil);
+          return;
+        }
+
+        resolve(@{});
+    } else {
+        reject(@"whisper_jsi_error", @"Runtime not available", nil);
+    }
+}
+
+- (void)invalidate {
+    [super invalidate];
+
+    [self releaseAllContexts];
+    [self releaseAllVadContexts];
+
+    [RNWhisperDownloader clearCache];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

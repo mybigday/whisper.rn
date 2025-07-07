@@ -48,28 +48,38 @@ static struct wsp_ggml_backend_metal_device_context {
     int            mtl_device_ref_count;
     id<MTLLibrary> mtl_library;
 
+    NSLock * mtl_lock;
+
     bool has_simdgroup_reduction;
     bool has_simdgroup_mm;
     bool has_residency_sets;
     bool has_bfloat;
     bool use_bfloat;
 
+    size_t max_size;
+
     char name[128];
 } g_wsp_ggml_ctx_dev_main = {
     /*.mtl_device              =*/ nil,
     /*.mtl_device_ref_count    =*/ 0,
     /*.mtl_library             =*/ nil,
+    /*.mtl_lock                =*/ nil,
     /*.has_simdgroup_reduction =*/ false,
     /*.has_simdgroup_mm        =*/ false,
     /*.has_residency_sets      =*/ false,
     /*.has_bfloat              =*/ false,
     /*.use_bfloat              =*/ false,
+    /*.max_size                =*/ 0,
     /*.name                    =*/ "",
 };
 
 // acquire
 static id<MTLDevice> wsp_ggml_backend_metal_device_acq(struct wsp_ggml_backend_metal_device_context * ctx) {
     assert(ctx != NULL);
+
+    if (ctx->mtl_lock == nil) {
+        ctx->mtl_lock = [[NSLock alloc] init];
+    }
 
     if (ctx->mtl_device == nil) {
         ctx->mtl_device = MTLCreateSystemDefaultDevice();
@@ -94,6 +104,8 @@ static id<MTLDevice> wsp_ggml_backend_metal_device_acq(struct wsp_ggml_backend_m
         ctx->use_bfloat = false;
 #endif
 
+        ctx->max_size = ctx->mtl_device.maxBufferLength;
+
         strncpy(ctx->name, [[ctx->mtl_device name] UTF8String], sizeof(ctx->name) - 1);
     }
 
@@ -110,6 +122,11 @@ static void wsp_ggml_backend_metal_device_rel(struct wsp_ggml_backend_metal_devi
     ctx->mtl_device_ref_count--;
 
     if (ctx->mtl_device_ref_count == 0) {
+        if (ctx->mtl_lock) {
+            [ctx->mtl_lock release];
+            ctx->mtl_lock = nil;
+        }
+
         if (ctx->mtl_library) {
             [ctx->mtl_library release];
             ctx->mtl_library = nil;
@@ -185,6 +202,15 @@ enum wsp_ggml_metal_kernel_type {
     WSP_GGML_METAL_KERNEL_TYPE_GET_ROWS_IQ4_NL,
     WSP_GGML_METAL_KERNEL_TYPE_GET_ROWS_IQ4_XS,
     WSP_GGML_METAL_KERNEL_TYPE_GET_ROWS_I32,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_F32,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_F16,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_BF16,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q8_0,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q4_0,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q4_1,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q5_0,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q5_1,
+    WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_IQ4_NL,
     WSP_GGML_METAL_KERNEL_TYPE_RMS_NORM,
     WSP_GGML_METAL_KERNEL_TYPE_L2_NORM,
     WSP_GGML_METAL_KERNEL_TYPE_GROUP_NORM,
@@ -194,11 +220,14 @@ enum wsp_ggml_metal_kernel_type {
     WSP_GGML_METAL_KERNEL_TYPE_RWKV_WKV6_F32,
     WSP_GGML_METAL_KERNEL_TYPE_RWKV_WKV7_F32,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32,
+    WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32_C4,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32,
+    WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_C4,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_1ROW,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_L4,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F16,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32,
+    WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_C4,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_1ROW,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_L4,
     WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_BF16,
@@ -497,6 +526,9 @@ enum wsp_ggml_metal_kernel_type {
     WSP_GGML_METAL_KERNEL_TYPE_SIN,
     WSP_GGML_METAL_KERNEL_TYPE_COS,
     WSP_GGML_METAL_KERNEL_TYPE_NEG,
+    WSP_GGML_METAL_KERNEL_TYPE_REGLU,
+    WSP_GGML_METAL_KERNEL_TYPE_GEGLU,
+    WSP_GGML_METAL_KERNEL_TYPE_SWIGLU,
     WSP_GGML_METAL_KERNEL_TYPE_SUM_ROWS,
     WSP_GGML_METAL_KERNEL_TYPE_MEAN,
     WSP_GGML_METAL_KERNEL_TYPE_POOL_2D_AVG_F32,
@@ -981,7 +1013,7 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
     struct wsp_ggml_backend_metal_context * ctx = calloc(1, sizeof(struct wsp_ggml_backend_metal_context));
     struct wsp_ggml_backend_metal_device_context * ctx_dev = dev->context;
 
-    id<MTLDevice> device = wsp_ggml_backend_metal_device_acq(ctx_dev);
+    id<MTLDevice> device = ctx_dev->mtl_device;
 
     WSP_GGML_LOG_INFO("%s: picking default device: %s\n", __func__, [[device name] UTF8String]);
 
@@ -995,9 +1027,16 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
     ctx->d_queue = dispatch_queue_create("ggml-metal", DISPATCH_QUEUE_CONCURRENT);
 
     // load library
-    if (ctx_dev->mtl_library == nil) {
-        ctx_dev->mtl_library = wsp_ggml_metal_load_library(device, ctx_dev->use_bfloat);
+    {
+        [ctx_dev->mtl_lock lock];
+
+        if (ctx_dev->mtl_library == nil) {
+            ctx_dev->mtl_library = wsp_ggml_metal_load_library(device, ctx_dev->use_bfloat);
+        }
+
+        [ctx_dev->mtl_lock unlock];
     }
+
     id<MTLLibrary> metal_library = ctx_dev->mtl_library;
     if (metal_library == nil) {
         WSP_GGML_LOG_ERROR("%s: error: metal library is nil\n", __func__);
@@ -1146,6 +1185,15 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_GET_ROWS_IQ4_NL,                 get_rows_iq4_nl,                 true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_GET_ROWS_IQ4_XS,                 get_rows_iq4_xs,                 true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_GET_ROWS_I32,                    get_rows_i32,                    true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_F32,                    set_rows_f32,                    true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_F16,                    set_rows_f16,                    true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_BF16,                   set_rows_bf16,                   use_bfloat);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q8_0,                   set_rows_q8_0,                   true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q4_0,                   set_rows_q4_0,                   true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q4_1,                   set_rows_q4_1,                   true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q5_0,                   set_rows_q5_0,                   true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q5_1,                   set_rows_q5_1,                   true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_IQ4_NL,                 set_rows_iq4_nl,                 true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_RMS_NORM,                        rms_norm,                        has_simdgroup_reduction);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_L2_NORM,                         l2_norm,                         has_simdgroup_reduction);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_GROUP_NORM,                      group_norm,                      has_simdgroup_reduction);
@@ -1155,11 +1203,14 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_RWKV_WKV6_F32,                   rwkv_wkv6_f32,                   true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_RWKV_WKV7_F32,                   rwkv_wkv7_f32,                   true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32,                  mul_mv_f32_f32,                  has_simdgroup_reduction);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32_C4,               mul_mv_f32_f32_c4,               true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32,                 mul_mv_bf16_f32,                 has_simdgroup_reduction && use_bfloat);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_C4,              mul_mv_bf16_f32_c4,              use_bfloat);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_1ROW,            mul_mv_bf16_f32_1row,            has_simdgroup_reduction && use_bfloat);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_L4,              mul_mv_bf16_f32_l4,              has_simdgroup_reduction && use_bfloat);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_BF16,                mul_mv_bf16_bf16,                has_simdgroup_reduction && use_bfloat);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32,                  mul_mv_f16_f32,                  has_simdgroup_reduction);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_C4,               mul_mv_f16_f32_c4,               true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_1ROW,             mul_mv_f16_f32_1row,             has_simdgroup_reduction);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_L4,               mul_mv_f16_f32_l4,               has_simdgroup_reduction);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F16,                  mul_mv_f16_f16,                  has_simdgroup_reduction);
@@ -1458,6 +1509,9 @@ static struct wsp_ggml_backend_metal_context * wsp_ggml_metal_init(wsp_ggml_back
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SIN,                             sin,                             true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_COS,                             cos,                             true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_NEG,                             neg,                             true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_REGLU,                           reglu,                           true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_GEGLU,                           geglu,                           true);
+        WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SWIGLU,                          swiglu,                          true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_SUM_ROWS,                        sum_rows,                        true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_MEAN,                            mean,                            true);
         WSP_GGML_METAL_ADD_KERNEL(WSP_GGML_METAL_KERNEL_TYPE_ARGMAX,                          argmax,                          true);
@@ -1609,6 +1663,10 @@ static bool wsp_ggml_metal_supports_op(const struct wsp_ggml_backend_metal_devic
     const bool use_bfloat              = ctx_dev->use_bfloat;
 
     if (!use_bfloat) {
+        if (op->type == WSP_GGML_TYPE_BF16) {
+            return false;
+        }
+
         for (size_t i = 0, n = 3; i < n; ++i) {
             if (op->src[i] != NULL && op->src[i]->type == WSP_GGML_TYPE_BF16) {
                 return false;
@@ -1630,6 +1688,15 @@ static bool wsp_ggml_metal_supports_op(const struct wsp_ggml_backend_metal_devic
                 case WSP_GGML_UNARY_OP_NEG:
                     return wsp_ggml_is_contiguous(op->src[0]) && op->src[0]->type == WSP_GGML_TYPE_F32;
                 default:
+                    return false;
+            }
+        case WSP_GGML_OP_GLU:
+            switch (wsp_ggml_get_glu_op(op)) {
+                case WSP_GGML_GLU_OP_REGLU:
+                case WSP_GGML_GLU_OP_GEGLU:
+                case WSP_GGML_GLU_OP_SWIGLU:
+                    return wsp_ggml_is_contiguous_1(op->src[0]) && op->src[0]->type == WSP_GGML_TYPE_F32;
+               default:
                     return false;
             }
         case WSP_GGML_OP_NONE:
@@ -1777,6 +1844,27 @@ static bool wsp_ggml_metal_supports_op(const struct wsp_ggml_backend_metal_devic
         case WSP_GGML_OP_GET_ROWS:
             {
                 return op->ne[3] == 1;
+            }
+        case WSP_GGML_OP_SET_ROWS:
+            {
+                if (op->src[0]->type != WSP_GGML_TYPE_F32) {
+                    return false;
+                }
+
+                switch (op->type) {
+                    case WSP_GGML_TYPE_F32:
+                    case WSP_GGML_TYPE_F16:
+                    case WSP_GGML_TYPE_BF16:
+                    case WSP_GGML_TYPE_Q8_0:
+                    case WSP_GGML_TYPE_Q4_0:
+                    case WSP_GGML_TYPE_Q4_1:
+                    case WSP_GGML_TYPE_Q5_0:
+                    case WSP_GGML_TYPE_Q5_1:
+                    case WSP_GGML_TYPE_IQ4_NL:
+                        return true;
+                    default:
+                        return false;
+                };
             }
         default:
             return false;
@@ -2350,6 +2438,62 @@ static bool wsp_ggml_metal_encode_node(
                     WSP_GGML_ABORT("fatal error");
                 }
             } break;
+        case WSP_GGML_OP_GLU:
+            {
+                WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0));
+
+                if (src1) {
+                    WSP_GGML_ASSERT(wsp_ggml_are_same_shape(src0, src1));
+                }
+
+                id<MTLComputePipelineState> pipeline = nil;
+
+                switch (wsp_ggml_get_glu_op(node)) {
+                    case WSP_GGML_GLU_OP_REGLU:
+                        pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_REGLU].pipeline;
+                        break;
+                    case WSP_GGML_GLU_OP_GEGLU:
+                        pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_GEGLU].pipeline;
+                        break;
+                    case WSP_GGML_GLU_OP_SWIGLU:
+                        pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SWIGLU].pipeline;
+                        break;
+                    default:
+                        WSP_GGML_ABORT("fatal error");
+                }
+
+                const int32_t swp = ((const int32_t *) dst->op_params)[1];
+
+                const int32_t i00 = swp ? ne0 : 0;
+                const int32_t i10 = swp ? 0 : ne0;
+
+                wsp_ggml_metal_kargs_glu args = {
+                    /*.ne00 =*/ ne00,
+                    /*.nb01 =*/ nb01,
+                    /*.ne10 =*/ src1 ? ne10 : ne00,
+                    /*.nb11 =*/ src1 ? nb11 : nb01,
+                    /*.ne0  =*/ ne0,
+                    /*.nb1  =*/ nb1,
+                    /*.i00  =*/ src1 ? 0 : i00,
+                    /*.i10  =*/ src1 ? 0 : i10,
+                };
+
+                [encoder setComputePipelineState:pipeline];
+                [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
+                if (src1) {
+                    [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
+                } else {
+                    [encoder setBuffer:id_src0 offset:offs_src0 atIndex:1];
+                }
+                [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
+                [encoder setBytes:&args length:sizeof(args) atIndex:3];
+
+                const int64_t nrows = wsp_ggml_nrows(src0);
+
+                const int32_t nth = MIN((int) pipeline.maxTotalThreadsPerThreadgroup, ne00/2);
+
+                [encoder dispatchThreadgroups:MTLSizeMake(nrows, 1, 1) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+            } break;
         case WSP_GGML_OP_SQR:
             {
                 WSP_GGML_ASSERT(wsp_ggml_is_contiguous(src0));
@@ -2430,6 +2574,7 @@ static bool wsp_ggml_metal_encode_node(
                     nth *= 2;
                 }
 
+                nth = MIN(nth, (int) pipeline.maxTotalThreadsPerThreadgroup);
                 nth = MIN(nth, ne00);
 
                 wsp_ggml_metal_kargs_sum_rows args = {
@@ -3090,14 +3235,23 @@ static bool wsp_ggml_metal_encode_node(
                                 nsg = 1;
                                 nr0 = 1;
                                 nr1 = 4;
-                                pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32].pipeline;
+                                if (ne00 == 4) {
+                                    nr0 = 32;
+                                    pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32_C4].pipeline;
+                                } else {
+                                    pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F32_F32].pipeline;
+                                }
                             } break;
                         case WSP_GGML_TYPE_F16:
                             {
                                 nsg = 1;
                                 nr0 = 1;
                                 if (src1t == WSP_GGML_TYPE_F32) {
-                                    if (ne11 * ne12 < 4) {
+                                    if (ne00 == 4) {
+                                        nr0 = 32;
+                                        nr1 = 4;
+                                        pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_C4].pipeline;
+                                    } else if (ne11 * ne12 < 4) {
                                         pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_1ROW].pipeline;
                                     } else if (ne00 >= 128 && ne01 >= 8 && ne00%4 == 0) {
                                         pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_F16_F32_L4].pipeline;
@@ -3116,7 +3270,11 @@ static bool wsp_ggml_metal_encode_node(
                                 nsg = 1;
                                 nr0 = 1;
                                 if (src1t == WSP_GGML_TYPE_F32) {
-                                    if (ne11 * ne12 < 4) {
+                                    if (ne00 == 4) {
+                                        nr0 = 32;
+                                        nr1 = 4;
+                                        pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_C4].pipeline;
+                                    } else if (ne11 * ne12 < 4) {
                                         pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_1ROW].pipeline;
                                     } else if (ne00 >= 128 && ne01 >= 8 && ne00%4 == 0) {
                                         pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_MUL_MV_BF16_F32_L4].pipeline;
@@ -3737,12 +3895,73 @@ static bool wsp_ggml_metal_encode_node(
                 };
 
                 [encoder setComputePipelineState:pipeline];
-                [encoder setBuffer:id_src0     offset:offs_src0 atIndex:0];
-                [encoder setBuffer:id_src1     offset:offs_src1 atIndex:1];
-                [encoder setBuffer:id_dst      offset:offs_dst  atIndex:2];
-                [encoder setBytes:&args length:sizeof(args) atIndex:3];
+                [encoder setBytes:&args    length:sizeof(args) atIndex:0];
+                [encoder setBuffer:id_src0 offset:offs_src0    atIndex:1];
+                [encoder setBuffer:id_src1 offset:offs_src1    atIndex:2];
+                [encoder setBuffer:id_dst  offset:offs_dst     atIndex:3];
 
                 [encoder dispatchThreadgroups:MTLSizeMake(ne10, ne11, 1) threadsPerThreadgroup:MTLSizeMake(32, 1, 1)];
+            } break;
+        case WSP_GGML_OP_SET_ROWS:
+            {
+                id<MTLComputePipelineState> pipeline = nil;
+
+                switch (dst->type) {
+                    case WSP_GGML_TYPE_F32:    pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_F32   ].pipeline; break;
+                    case WSP_GGML_TYPE_F16:    pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_F16   ].pipeline; break;
+                    case WSP_GGML_TYPE_BF16:   pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_BF16  ].pipeline; break;
+                    case WSP_GGML_TYPE_Q8_0:   pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q8_0  ].pipeline; break;
+                    case WSP_GGML_TYPE_Q4_0:   pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q4_0  ].pipeline; break;
+                    case WSP_GGML_TYPE_Q4_1:   pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q4_1  ].pipeline; break;
+                    case WSP_GGML_TYPE_Q5_0:   pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q5_0  ].pipeline; break;
+                    case WSP_GGML_TYPE_Q5_1:   pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_Q5_1  ].pipeline; break;
+                    case WSP_GGML_TYPE_IQ4_NL: pipeline = ctx->kernels[WSP_GGML_METAL_KERNEL_TYPE_SET_ROWS_IQ4_NL].pipeline; break;
+                    default: WSP_GGML_ABORT("not implemented");
+                }
+
+                const int32_t nk0 = ne0/wsp_ggml_blck_size(dst->type);
+
+                int nth = 32; // SIMD width
+
+                while (nth < nk0 && nth < (int) pipeline.maxTotalThreadsPerThreadgroup) {
+                    nth *= 2;
+                }
+
+                int nrptg = 1;
+                if (nth > nk0) {
+                    nrptg = (nth + nk0 - 1)/nk0;
+                    nth   = nk0;
+
+                    if (nrptg*nth > (int) pipeline.maxTotalThreadsPerThreadgroup) {
+                        nrptg--;
+                    }
+                }
+
+                nth = MIN(nth, nk0);
+
+                wsp_ggml_metal_kargs_set_rows args = {
+                    /*.nk0  =*/ nk0,
+                    /*.ne01 =*/ ne01,
+                    /*.nb01 =*/ nb01,
+                    /*.nb02 =*/ nb02,
+                    /*.nb03 =*/ nb03,
+                    /*.ne11 =*/ ne11,
+                    /*.ne12 =*/ ne12,
+                    /*.nb10 =*/ nb10,
+                    /*.nb11 =*/ nb11,
+                    /*.nb12 =*/ nb12,
+                    /*.nb1  =*/ nb1,
+                    /*.nb2  =*/ nb2,
+                    /*.nb3  =*/ nb3,
+                };
+
+                [encoder setComputePipelineState:pipeline];
+                [encoder setBytes:&args    length:sizeof(args) atIndex:0];
+                [encoder setBuffer:id_src0 offset:offs_src0    atIndex:1];
+                [encoder setBuffer:id_src1 offset:offs_src1    atIndex:2];
+                [encoder setBuffer:id_dst  offset:offs_dst     atIndex:3];
+
+                [encoder dispatchThreadgroups:MTLSizeMake((ne01 + nrptg - 1)/nrptg, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, nrptg, 1)];
             } break;
         case WSP_GGML_OP_RMS_NORM:
             {
@@ -3760,6 +3979,7 @@ static bool wsp_ggml_metal_encode_node(
                     nth *= 2;
                 }
 
+                nth = MIN(nth, (int) pipeline.maxTotalThreadsPerThreadgroup);
                 nth = MIN(nth, ne00/4);
 
                 wsp_ggml_metal_kargs_rms_norm args = {
@@ -3796,6 +4016,7 @@ static bool wsp_ggml_metal_encode_node(
                     nth *= 2;
                 }
 
+                nth = MIN(nth, (int) pipeline.maxTotalThreadsPerThreadgroup);
                 nth = MIN(nth, ne00/4);
 
                 wsp_ggml_metal_kargs_l2_norm args = {
@@ -3868,6 +4089,7 @@ static bool wsp_ggml_metal_encode_node(
                     nth *= 2;
                 }
 
+                nth = MIN(nth, (int) pipeline.maxTotalThreadsPerThreadgroup);
                 nth = MIN(nth, ne00/4);
 
                 wsp_ggml_metal_kargs_norm args = {
@@ -4954,8 +5176,39 @@ static bool wsp_ggml_metal_encode_node(
                     default: WSP_GGML_ABORT("not implemented");
                 }
 
+                WSP_GGML_ASSERT(ne00 % wsp_ggml_blck_size(src0->type) == 0);
+
+                // TODO: support
+                //const int32_t nk00 = ne00/wsp_ggml_blck_size(dst->type);
+                const int32_t nk00 = ne00;
+
+                int nth = 32; // SIMD width
+
+                while (nth < nk00 && nth < (int) pipeline.maxTotalThreadsPerThreadgroup) {
+                    nth *= 2;
+                }
+
+                nth = MIN(nth, (int) pipeline.maxTotalThreadsPerThreadgroup);
+
+                // when rows are small, we can batch them together in a single threadgroup
+                int nrptg = 1;
+
+                // TODO: relax this constraint in the future
+                if (wsp_ggml_blck_size(src0->type) == 1 && wsp_ggml_blck_size(dst->type) == 1) {
+                    if (nth > nk00) {
+                        nrptg = (nth + nk00 - 1)/nk00;
+                        nth   = nk00;
+
+                        if (nrptg*nth > (int) pipeline.maxTotalThreadsPerThreadgroup) {
+                            nrptg--;
+                        }
+                    }
+                }
+
+                nth = MIN(nth, nk00);
+
                 wsp_ggml_metal_kargs_cpy args = {
-                    /*.ne00 =*/ ne00,
+                    /*.ne00 =*/ nk00,
                     /*.ne01 =*/ ne01,
                     /*.ne02 =*/ ne02,
                     /*.ne03 =*/ ne03,
@@ -4978,11 +5231,7 @@ static bool wsp_ggml_metal_encode_node(
                 [encoder setBuffer:id_src0 offset:offs_src0 atIndex:1];
                 [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
 
-                WSP_GGML_ASSERT(ne00 % wsp_ggml_blck_size(src0->type) == 0);
-                int nth = MIN(1024, ne00/wsp_ggml_blck_size(src0->type));
-
-                [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
-
+                [encoder dispatchThreadgroups:MTLSizeMake((ne01 + nrptg - 1)/nrptg, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, nrptg, 1)];
             } break;
         case WSP_GGML_OP_SET:
             {
@@ -5288,7 +5537,6 @@ static void wsp_ggml_backend_metal_buffer_free_buffer(wsp_ggml_backend_buffer_t 
     }
 
     wsp_ggml_backend_metal_buffer_rset_free(ctx);
-    wsp_ggml_backend_metal_device_rel(buffer->buft->device->context);
 
     if (ctx->owned) {
 #if TARGET_OS_OSX
@@ -5397,7 +5645,10 @@ static wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_type_alloc_buffer
     }
 
     struct wsp_ggml_backend_metal_device_context * ctx_dev = (struct wsp_ggml_backend_metal_device_context *)buft->device->context;
-    id<MTLDevice> device = wsp_ggml_backend_metal_device_acq(ctx_dev);
+
+    WSP_GGML_ASSERT(ctx_dev->mtl_device != nil);
+
+    id<MTLDevice> device = ctx_dev->mtl_device;
 
     ctx->all_data = wsp_ggml_metal_host_malloc(size_aligned);
     ctx->all_size = size_aligned;
@@ -5420,14 +5671,12 @@ static wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_type_alloc_buffer
     if (size_aligned > 0 && (ctx->all_data == NULL || ctx->buffers[0].metal == nil)) {
         WSP_GGML_LOG_ERROR("%s: error: failed to allocate buffer, size = %8.2f MiB\n", __func__, size_aligned / 1024.0 / 1024.0);
         free(ctx);
-        wsp_ggml_backend_metal_device_rel(ctx_dev);
         return NULL;
     }
 
     if (!wsp_ggml_backend_metal_buffer_rset_init(ctx, ctx_dev, device)) {
         WSP_GGML_LOG_ERROR("%s: error: failed to initialize residency set\n", __func__);
         free(ctx);
-        wsp_ggml_backend_metal_device_rel(ctx_dev);
         return NULL;
     }
 
@@ -5438,17 +5687,14 @@ static wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_type_alloc_buffer
 
 static size_t wsp_ggml_backend_metal_buffer_type_get_alignment(wsp_ggml_backend_buffer_type_t buft) {
     return 32;
+
     WSP_GGML_UNUSED(buft);
 }
 
 static size_t wsp_ggml_backend_metal_buffer_type_get_max_size(wsp_ggml_backend_buffer_type_t buft) {
-    id<MTLDevice> device = wsp_ggml_backend_metal_device_acq(buft->device->context);
-    const size_t max_size = device.maxBufferLength;
-    wsp_ggml_backend_metal_device_rel(buft->device->context);
+    const size_t max_size = ((struct wsp_ggml_backend_metal_device_context *)buft->device->context)->max_size;
 
     return max_size;
-
-    WSP_GGML_UNUSED(buft);
 }
 
 static bool wsp_ggml_backend_metal_buffer_type_is_host(wsp_ggml_backend_buffer_type_t buft) {
@@ -5521,7 +5767,10 @@ wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_from_ptr(void * data, si
     }
 
     struct wsp_ggml_backend_metal_device_context * ctx_dev = &g_wsp_ggml_ctx_dev_main;
-    id<MTLDevice> device = wsp_ggml_backend_metal_device_acq(ctx_dev);
+
+    WSP_GGML_ASSERT(ctx_dev->mtl_device != nil);
+
+    id<MTLDevice> device = ctx_dev->mtl_device;
 
     // the buffer fits into the max buffer size allowed by the device
     if (size_aligned <= device.maxBufferLength) {
@@ -5577,7 +5826,6 @@ wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_buffer_from_ptr(void * data, si
     if (!wsp_ggml_backend_metal_buffer_rset_init(ctx, ctx_dev, device)) {
         WSP_GGML_LOG_ERROR("%s: error: failed to initialize residency set\n", __func__);
         free(ctx);
-        wsp_ggml_backend_metal_device_rel(ctx_dev);
         return NULL;
     }
 
@@ -5593,10 +5841,8 @@ static const char * wsp_ggml_backend_metal_name(wsp_ggml_backend_t backend) {
 }
 
 static void wsp_ggml_backend_metal_free(wsp_ggml_backend_t backend) {
-    struct wsp_ggml_backend_metal_context        * ctx     = backend->context;
-    struct wsp_ggml_backend_metal_device_context * ctx_dev = backend->device->context;
+    struct wsp_ggml_backend_metal_context * ctx = backend->context;
 
-    wsp_ggml_backend_metal_device_rel(ctx_dev);
     wsp_ggml_metal_free(ctx);
 
     free(backend);
@@ -5736,6 +5982,8 @@ bool wsp_ggml_backend_metal_supports_family(wsp_ggml_backend_t backend, int fami
 
     struct wsp_ggml_backend_metal_device_context * ctx_dev = backend->device->context;
 
+    WSP_GGML_ASSERT(ctx_dev->mtl_device != nil);
+
     return [ctx_dev->mtl_device supportsFamily:(MTLGPUFamilyApple1 + family - 1)];
 }
 
@@ -5755,10 +6003,7 @@ static const char * wsp_ggml_backend_metal_device_get_name(wsp_ggml_backend_dev_
 }
 
 static const char * wsp_ggml_backend_metal_device_get_description(wsp_ggml_backend_dev_t dev) {
-    // acq/rel just to populate ctx->name in case it hasn't been done yet
     struct wsp_ggml_backend_metal_device_context * ctx_dev = (struct wsp_ggml_backend_metal_device_context *)dev->context;
-    wsp_ggml_backend_metal_device_acq(ctx_dev);
-    wsp_ggml_backend_metal_device_rel(ctx_dev);
 
     return ctx_dev->name;
 }
@@ -5766,12 +6011,10 @@ static const char * wsp_ggml_backend_metal_device_get_description(wsp_ggml_backe
 static void wsp_ggml_backend_metal_device_get_memory(wsp_ggml_backend_dev_t dev, size_t * free, size_t * total) {
     if (@available(macOS 10.12, iOS 16.0, *)) {
         struct wsp_ggml_backend_metal_device_context * ctx_dev = (struct wsp_ggml_backend_metal_device_context *)dev->context;
-        id<MTLDevice> device = wsp_ggml_backend_metal_device_acq(ctx_dev);
+        id<MTLDevice> device = ctx_dev->mtl_device;
 
         *total = device.recommendedMaxWorkingSetSize;
         *free  = *total - device.currentAllocatedSize;
-
-        wsp_ggml_backend_metal_device_rel(ctx_dev);
     } else {
         *free = 1;
         *total = 1;
@@ -5849,7 +6092,10 @@ static wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_device_buffer_from_ptr(w
     }
 
     struct wsp_ggml_backend_metal_device_context * ctx_dev = (struct wsp_ggml_backend_metal_device_context *)dev->context;
-    id<MTLDevice> device = wsp_ggml_backend_metal_device_acq(ctx_dev);
+
+    WSP_GGML_ASSERT(ctx_dev->mtl_device != nil);
+
+    id<MTLDevice> device = ctx_dev->mtl_device;
 
     // the buffer fits into the max buffer size allowed by the device
     if (size_aligned <= device.maxBufferLength) {
@@ -5905,7 +6151,6 @@ static wsp_ggml_backend_buffer_t wsp_ggml_backend_metal_device_buffer_from_ptr(w
     if (!wsp_ggml_backend_metal_buffer_rset_init(ctx, ctx_dev, device)) {
         WSP_GGML_LOG_ERROR("%s: error: failed to initialize residency set\n", __func__);
         free(ctx);
-        wsp_ggml_backend_metal_device_rel(ctx_dev);
         return NULL;
     }
 
@@ -5919,8 +6164,9 @@ static bool wsp_ggml_backend_metal_device_supports_op(wsp_ggml_backend_dev_t dev
 }
 
 static bool wsp_ggml_backend_metal_device_supports_buft(wsp_ggml_backend_dev_t dev, wsp_ggml_backend_buffer_type_t buft) {
-    return buft->iface.get_name == wsp_ggml_backend_metal_buffer_type_get_name ||
-            buft->iface.get_name == wsp_ggml_backend_metal_buffer_from_ptr_type_get_name;
+    return
+        buft->iface.get_name == wsp_ggml_backend_metal_buffer_type_get_name ||
+        buft->iface.get_name == wsp_ggml_backend_metal_buffer_from_ptr_type_get_name;
 
     WSP_GGML_UNUSED(dev);
 }
@@ -6005,8 +6251,19 @@ static struct wsp_ggml_backend_reg_i wsp_ggml_backend_metal_reg_i = {
     /* .get_proc_address = */ wsp_ggml_backend_metal_get_proc_address,
 };
 
+// called upon program exit
+static void wsp_ggml_metal_cleanup(void) {
+    wsp_ggml_backend_metal_device_rel(&g_wsp_ggml_ctx_dev_main);
+}
+
+// TODO: make thread-safe
 wsp_ggml_backend_reg_t wsp_ggml_backend_metal_reg(void) {
-    // TODO: make this thread-safe somehow?
+    wsp_ggml_backend_metal_device_acq(&g_wsp_ggml_ctx_dev_main);
+
+    // register cleanup callback
+    // TODO: not ideal, but not sure if there is a better way to do this in Objective-C
+    atexit(wsp_ggml_metal_cleanup);
+
     {
         g_wsp_ggml_backend_metal_reg = (struct wsp_ggml_backend_reg) {
             /* .api_version = */ WSP_GGML_BACKEND_API_VERSION,

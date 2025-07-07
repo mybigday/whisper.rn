@@ -109,7 +109,7 @@ jobs:
         run: |
           yarn build:ios
 
-  build-android-from-source:
+  build-android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -120,22 +120,4 @@ jobs:
 
       - name: Build example for Android
         run: |
-          yarn build:android
-
-  build-android-libs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Build libraries
-        run: |
-          yarn build:android-libs
-
-      - name: Build example for Android
-        run: |
-          sed -i 's/rnwhisperBuildFromSource=true/rnwhisperBuildFromSource=false/g' example/android/gradle.properties
           yarn build:android

@@ -26,6 +26,11 @@ public class RNWhisperModule extends NativeRNWhisperSpec {
     rnwhisper = new RNWhisper(reactContext);
   }
 
+  @ReactMethod
+  public void installJSIBindings(Promise promise) {
+    rnwhisper.installJSIBindings(promise);
+  }
+
   @Override
   @NonNull
   public String getName() {

@@ -416,6 +416,7 @@ static bool wsp_ggml_backend_cpu_device_supports_op(wsp_ggml_backend_dev_t dev, 
 
     switch (op->op) {
         case WSP_GGML_OP_CPY:
+        case WSP_GGML_OP_SET_ROWS:
             return
                 op->type != WSP_GGML_TYPE_IQ3_XXS &&
                 op->type != WSP_GGML_TYPE_IQ3_S   &&
@@ -577,6 +578,9 @@ static wsp_ggml_backend_feature * wsp_ggml_backend_cpu_get_features(wsp_ggml_bac
         }
         if (wsp_ggml_cpu_has_vxe()) {
             features.push_back({ "VXE", "1" });
+        }
+        if (wsp_ggml_cpu_has_nnpa()) {
+            features.push_back({ "NNPA", "1" });
         }
         if (wsp_ggml_cpu_has_wasm_simd()) {
             features.push_back({ "WASM_SIMD", "1" });

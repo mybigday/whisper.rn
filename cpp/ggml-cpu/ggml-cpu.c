@@ -72,6 +72,9 @@
 #define UNUSED WSP_GGML_UNUSED
 #define SWAP(x, y, T) do { T SWAP = x; (x) = y; (y) = SWAP; } while (0)
 
+// precomputed f32 table for f16 (256 KB) (simd-mappings.h)
+float wsp_ggml_table_f32_f16[1 << 16];
+
 #if defined(__ARM_ARCH)
 struct wsp_ggml_arm_arch_features_type {
     int sve_cnt;
@@ -192,6 +195,7 @@ typedef pthread_t wsp_ggml_thread_t;
 
 static const struct wsp_ggml_type_traits_cpu type_traits_cpu[WSP_GGML_TYPE_COUNT] = {
     [WSP_GGML_TYPE_F32] = {
+        .from_float               = (wsp_ggml_from_float_t) wsp_ggml_cpu_fp32_to_fp32,
         .vec_dot                  = (wsp_ggml_vec_dot_t) wsp_ggml_vec_dot_f32,
         .vec_dot_type             = WSP_GGML_TYPE_F32,
         .nrows                    = 1,
@@ -736,7 +740,7 @@ struct wsp_ggml_tensor * wsp_ggml_set_i32 (struct wsp_ggml_tensor * tensor, int3
             {
                 assert(tensor->nb[0] == sizeof(wsp_ggml_fp16_t));
                 for (int i = 0; i < n; i++) {
-                    wsp_ggml_vec_set_f16(nc, (wsp_ggml_fp16_t *)(data + i*n1), WSP_GGML_FP32_TO_FP16(value));
+                    wsp_ggml_vec_set_f16(nc, (wsp_ggml_fp16_t *)(data + i*n1), WSP_GGML_CPU_FP32_TO_FP16(value));
                 }
             } break;
         case WSP_GGML_TYPE_BF16:
@@ -795,7 +799,7 @@ struct wsp_ggml_tensor * wsp_ggml_set_f32(struct wsp_ggml_tensor * tensor, float
             {
                 assert(tensor->nb[0] == sizeof(wsp_ggml_fp16_t));
                 for (int i = 0; i < n; i++) {
-                    wsp_ggml_vec_set_f16(nc, (wsp_ggml_fp16_t *)(data + i*n1), WSP_GGML_FP32_TO_FP16(value));
+                    wsp_ggml_vec_set_f16(nc, (wsp_ggml_fp16_t *)(data + i*n1), WSP_GGML_CPU_FP32_TO_FP16(value));
                 }
             } break;
         case WSP_GGML_TYPE_BF16:
@@ -846,7 +850,7 @@ int32_t wsp_ggml_get_i32_1d(const struct wsp_ggml_tensor * tensor, int i) {
         case WSP_GGML_TYPE_F16:
             {
                 WSP_GGML_ASSERT(tensor->nb[0] == sizeof(wsp_ggml_fp16_t));
-                return WSP_GGML_FP16_TO_FP32(((wsp_ggml_fp16_t *)(tensor->data))[i]);
+                return WSP_GGML_CPU_FP16_TO_FP32(((wsp_ggml_fp16_t *)(tensor->data))[i]);
             }
         case WSP_GGML_TYPE_BF16:
             {
@@ -891,7 +895,7 @@ void wsp_ggml_set_i32_1d(const struct wsp_ggml_tensor * tensor, int i, int32_t v
         case WSP_GGML_TYPE_F16:
             {
                 WSP_GGML_ASSERT(tensor->nb[0] == sizeof(wsp_ggml_fp16_t));
-                ((wsp_ggml_fp16_t *)(tensor->data))[i] = WSP_GGML_FP32_TO_FP16(value);
+                ((wsp_ggml_fp16_t *)(tensor->data))[i] = WSP_GGML_CPU_FP32_TO_FP16(value);
             } break;
         case WSP_GGML_TYPE_BF16:
             {
@@ -920,7 +924,7 @@ int32_t wsp_ggml_get_i32_nd(const struct wsp_ggml_tensor * tensor, int i0, int i
         case WSP_GGML_TYPE_I32:
             return ((int32_t *) data)[0];
         case WSP_GGML_TYPE_F16:
-            return WSP_GGML_FP16_TO_FP32(((wsp_ggml_fp16_t *) data)[0]);
+            return WSP_GGML_CPU_FP16_TO_FP32(((wsp_ggml_fp16_t *) data)[0]);
         case WSP_GGML_TYPE_BF16:
             return WSP_GGML_BF16_TO_FP32(((wsp_ggml_bf16_t *) data)[0]);
         case WSP_GGML_TYPE_F32:
@@ -947,7 +951,7 @@ void wsp_ggml_set_i32_nd(const struct wsp_ggml_tensor * tensor, int i0, int i1, 
             } break;
         case WSP_GGML_TYPE_F16:
             {
-                ((wsp_ggml_fp16_t *)(data))[0] = WSP_GGML_FP32_TO_FP16(value);
+                ((wsp_ggml_fp16_t *)(data))[0] = WSP_GGML_CPU_FP32_TO_FP16(value);
             } break;
         case WSP_GGML_TYPE_BF16:
             {
@@ -985,7 +989,7 @@ float wsp_ggml_get_f32_1d(const struct wsp_ggml_tensor * tensor, int i) {
             }
         case WSP_GGML_TYPE_F16:
             {
-                return WSP_GGML_FP16_TO_FP32(((wsp_ggml_fp16_t *)(tensor->data))[i]);
+                return WSP_GGML_CPU_FP16_TO_FP32(((wsp_ggml_fp16_t *)(tensor->data))[i]);
             }
         case WSP_GGML_TYPE_BF16:
             {
@@ -1024,7 +1028,7 @@ void wsp_ggml_set_f32_1d(const struct wsp_ggml_tensor * tensor, int i, float val
             } break;
         case WSP_GGML_TYPE_F16:
             {
-                ((wsp_ggml_fp16_t *)(tensor->data))[i] = WSP_GGML_FP32_TO_FP16(value);
+                ((wsp_ggml_fp16_t *)(tensor->data))[i] = WSP_GGML_CPU_FP32_TO_FP16(value);
             } break;
         case WSP_GGML_TYPE_BF16:
             {
@@ -1051,7 +1055,7 @@ float wsp_ggml_get_f32_nd(const struct wsp_ggml_tensor * tensor, int i0, int i1,
         case WSP_GGML_TYPE_I32:
             return ((int32_t *) data)[0];
         case WSP_GGML_TYPE_F16:
-            return WSP_GGML_FP16_TO_FP32(((wsp_ggml_fp16_t *) data)[0]);
+            return WSP_GGML_CPU_FP16_TO_FP32(((wsp_ggml_fp16_t *) data)[0]);
         case WSP_GGML_TYPE_BF16:
             return WSP_GGML_BF16_TO_FP32(((wsp_ggml_bf16_t *) data)[0]);
         case WSP_GGML_TYPE_F32:
@@ -1078,7 +1082,7 @@ void wsp_ggml_set_f32_nd(const struct wsp_ggml_tensor * tensor, int i0, int i1, 
             } break;
         case WSP_GGML_TYPE_F16:
             {
-                ((wsp_ggml_fp16_t *)(data))[0] = WSP_GGML_FP32_TO_FP16(value);
+                ((wsp_ggml_fp16_t *)(data))[0] = WSP_GGML_CPU_FP32_TO_FP16(value);
             } break;
         case WSP_GGML_TYPE_BF16:
             {
@@ -1189,7 +1193,7 @@ static void wsp_ggml_compute_forward_mul_mat_one_chunk(
     }
 }
 
-static void wsp_ggml_compute_forward_mul_mat(
+void wsp_ggml_compute_forward_mul_mat(
         const struct wsp_ggml_compute_params * params,
               struct wsp_ggml_tensor * dst) {
 
@@ -1814,6 +1818,10 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
             {
                 wsp_ggml_compute_forward_get_rows_back(params, tensor);
             } break;
+        case WSP_GGML_OP_SET_ROWS:
+            {
+                wsp_ggml_compute_forward_set_rows(params, tensor);
+            } break;
         case WSP_GGML_OP_DIAG:
             {
                 wsp_ggml_compute_forward_diag(params, tensor);
@@ -1857,6 +1865,10 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
         case WSP_GGML_OP_IM2COL_BACK:
             {
                 wsp_ggml_compute_forward_im2col_back_f32(params, tensor);
+            } break;
+        case WSP_GGML_OP_CONV_2D:
+            {
+                wsp_ggml_compute_forward_conv_2d(params, tensor);
             } break;
         case WSP_GGML_OP_CONV_2D_DW:
             {
@@ -1940,6 +1952,10 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
         case WSP_GGML_OP_UNARY:
             {
                 wsp_ggml_compute_forward_unary(params, tensor);
+            } break;
+        case WSP_GGML_OP_GLU:
+            {
+                wsp_ggml_compute_forward_glu(params, tensor);
             } break;
         case WSP_GGML_OP_GET_REL_POS:
             {
@@ -2151,6 +2167,18 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
                     WSP_GGML_ABORT("fatal error");
             }
             break;
+        case WSP_GGML_OP_GLU:
+            switch (wsp_ggml_get_glu_op(node)) {
+                case WSP_GGML_GLU_OP_REGLU:
+                case WSP_GGML_GLU_OP_GEGLU:
+                case WSP_GGML_GLU_OP_SWIGLU:
+                    {
+                        n_tasks = n_threads;
+                    } break;
+                default:
+                    WSP_GGML_ABORT("fatal error");
+            }
+            break;
         case WSP_GGML_OP_SILU_BACK:
         case WSP_GGML_OP_MUL:
         case WSP_GGML_OP_DIV:
@@ -2167,6 +2195,7 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
                 n_tasks = n_threads;
             } break;
         case WSP_GGML_OP_GET_ROWS:
+        case WSP_GGML_OP_SET_ROWS:
             {
                 // FIXME: get_rows can use additional threads, but the cost of launching additional threads
                 // decreases performance with GPU offloading
@@ -2203,6 +2232,7 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
             } break;
         case WSP_GGML_OP_IM2COL:
         case WSP_GGML_OP_IM2COL_BACK:
+        case WSP_GGML_OP_CONV_2D:
         case WSP_GGML_OP_CONV_2D_DW:
         case WSP_GGML_OP_CONV_TRANSPOSE_1D:
         case WSP_GGML_OP_CONV_TRANSPOSE_2D:
@@ -2721,6 +2751,10 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                             WSP_GGML_ABORT("fatal error");
                         }
                     } break;
+                case WSP_GGML_OP_CONV_2D:
+                    {
+                        cur = WSP_GGML_IM2COL_WORK_SIZE;
+                    } break;
                 case WSP_GGML_OP_CONV_TRANSPOSE_2D:
                     {
                         const int64_t ne00 = node->src[0]->ne[0]; // W
@@ -3121,6 +3155,10 @@ enum wsp_ggml_status wsp_ggml_graph_compute_with_ctx(struct wsp_ggml_context * c
     return wsp_ggml_graph_compute(cgraph, &cplan);
 }
 
+void wsp_ggml_cpu_fp32_to_fp32(const float * x, float * y, int64_t n) {
+    memcpy(y, x, n * sizeof(float));
+}
+
 void wsp_ggml_cpu_fp32_to_fp16(const float * x, wsp_ggml_fp16_t * y, int64_t n) {
     int64_t i = 0;
 #if defined(__F16C__)
@@ -3141,9 +3179,24 @@ void wsp_ggml_cpu_fp32_to_fp16(const float * x, wsp_ggml_fp16_t * y, int64_t n) 
         __m128i y_vec = _mm_cvtps_ph(x_vec, _MM_FROUND_TO_NEAREST_INT);
         _mm_storel_epi64((__m128i *)(y + i), y_vec);
     }
+#elif defined(__NNPA__)
+    for (; i + 7 < n; i += 8) {
+        float32x4_t v_xh = vec_xl(0, (const float *)(x + i + 0));
+        float32x4_t v_xl = vec_xl(0, (const float *)(x + i + 4));
+        uint16x8_t v_yd = vec_round_from_fp32(v_xh, v_xl, 0);
+        uint16x8_t v_y = vec_convert_to_fp16(v_yd, 0);
+        vec_xst(v_y, 0, (wsp_ggml_fp16_t *)(y + i));
+    }
+    for (; i + 3 < n; i += 4) {
+        float32x4_t v_x = vec_xl(0, (const float *)(x + i));
+        float32x4_t v_zero = vec_splats(0.0f);
+        uint16x8_t v_yd = vec_round_from_fp32(v_x, v_zero, 0);
+        uint16x8_t v_y = vec_convert_to_fp16(v_yd, 0);
+        vec_xst(v_y, 0, (wsp_ggml_fp16_t *)(y + i));
+    }
 #endif
     for (; i < n; ++i) {
-        y[i] = WSP_GGML_FP32_TO_FP16(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(x[i]);
     }
 }
 
@@ -3167,9 +3220,25 @@ void wsp_ggml_cpu_fp16_to_fp32(const wsp_ggml_fp16_t * x, float * y, int64_t n) 
         __m128 y_vec = _mm_cvtph_ps(x_vec);
         _mm_storeu_ps(y + i, y_vec);
     }
+#elif defined(__NNPA__)
+    for (; i + 7 < n; i += 8) {
+        uint16x8_t v_x = vec_xl(0, (const wsp_ggml_fp16_t *)(x + i));
+        uint16x8_t v_yd = vec_convert_from_fp16(v_x, 0);
+        float32x4_t v_yh = vec_extend_to_fp32_hi(v_yd, 0);
+        float32x4_t v_yl = vec_extend_to_fp32_lo(v_yd, 0);
+        vec_xst(v_yh, 0, (float *)(y + i + 0));
+        vec_xst(v_yl, 0, (float *)(y + i + 4));
+    }
+    for (; i + 3 < n; i += 4) {
+        uint16x8_t v_x = vec_xl(0, (const wsp_ggml_fp16_t *)(x + i));
+        uint16x8_t v_yd = vec_convert_from_fp16(v_x, 0);
+        float32x4_t v_yh = vec_extend_to_fp32_hi(v_yd, 0);
+        vec_xst(v_yh, 0, (float *)(y + i));
+    }
 #endif
+
     for (; i < n; ++i) {
-        y[i] = WSP_GGML_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
     }
 }
 
@@ -3369,6 +3438,14 @@ int wsp_ggml_cpu_has_vxe(void) {
 #endif
 }
 
+int wsp_ggml_cpu_has_nnpa(void) {
+#if defined(WSP_GGML_NNPA)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 int wsp_ggml_cpu_has_neon(void) {
 #if defined(__ARM_ARCH) && defined(__ARM_NEON)
     return 1;
@@ -3418,7 +3495,7 @@ int wsp_ggml_cpu_has_sme(void) {
 }
 
 void wsp_ggml_cpu_init(void) {
-    // needed to initialize f16 tables
+    // needed to initialize wsp_ggml_time
     {
         struct wsp_ggml_init_params params = { 0, NULL, false };
         struct wsp_ggml_context * ctx = wsp_ggml_init(params);
@@ -3439,9 +3516,10 @@ void wsp_ggml_cpu_init(void) {
                     uint16_t u16;
                     wsp_ggml_fp16_t fp16;
                 } u = {i};
-                float f = WSP_GGML_FP16_TO_FP32(u.fp16);
-                wsp_ggml_table_gelu_f16[i] = WSP_GGML_FP32_TO_FP16(wsp_ggml_gelu_f32(f));
-                wsp_ggml_table_gelu_quick_f16[i] = WSP_GGML_FP32_TO_FP16(wsp_ggml_gelu_quick_f32(f));
+                float f = WSP_GGML_COMPUTE_FP16_TO_FP32(u.fp16);
+                wsp_ggml_table_f32_f16[i] = f;
+                wsp_ggml_table_gelu_f16[i] = WSP_GGML_CPU_FP32_TO_FP16(wsp_ggml_gelu_f32(f));
+                wsp_ggml_table_gelu_quick_f16[i] = WSP_GGML_CPU_FP32_TO_FP16(wsp_ggml_gelu_quick_f32(f));
             }
 
             const uint64_t t_end = wsp_ggml_time_us(); UNUSED(t_end);

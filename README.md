@@ -38,9 +38,7 @@ Add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
 -keep class com.rnwhisper.** { *; }
 ```
 
-By default, `whisper.rn` will use pre-built libraries for Android. If you want to build from source, please set `rnwhisperBuildFromSource` to `true` in `android/gradle.properties`.
-
-For build from source, it's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
+It's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
 #### Expo
 
