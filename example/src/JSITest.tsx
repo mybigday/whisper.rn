@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { View, Text, Button, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, ScrollView } from 'react-native'
 import RNFS from 'react-native-fs'
 import {
   initWhisper,
@@ -11,6 +11,7 @@ import {
 } from '../../src'
 import contextOpts from './context-opts'
 import { WavFileReader } from '../../src/utils/WavFileReader'
+import { Button } from './Button'
 
 // JFK audio file URL from whisper.cpp repository
 const JFK_AUDIO_URL =
@@ -68,6 +69,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 5,
     fontFamily: 'Courier',
+  },
+  initializedButton: {
+    backgroundColor: '#4CAF50',
   },
 })
 
@@ -272,7 +276,7 @@ const JSITest: React.FC = () => {
         <Button
           title="Initialize Contexts"
           onPress={initializeContexts}
-          color={contextsInitialized ? '#4CAF50' : '#2196F3'}
+          style={contextsInitialized ? styles.initializedButton : undefined}
         />
         <Button
           title="Test JSI Functions"

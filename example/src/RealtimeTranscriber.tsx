@@ -137,8 +137,8 @@ export default function RealtimeTranscriberDemo() {
   const [vadEvents, setVadEvents] = useState<VADEvent[]>([])
 
   // Auto-slice configuration
-  const [autoSliceOnSpeechEnd, setAutoSliceOnSpeechEnd] = useState(false)
-  const autoSliceThreshold = 0.85 // Fixed 85% threshold
+  const [autoSliceOnSpeechEnd, setAutoSliceOnSpeechEnd] = useState(true)
+  const autoSliceThreshold = 0.5 // Fixed 85% threshold
 
   // File simulation specific state
   const [useFileSimulation, setUseFileSimulation] = useState(false)
