@@ -16,11 +16,9 @@ import { initWhisper, initWhisperVad, libVersion } from '../../src'
 import type { WhisperContext, WhisperVadContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, toTimestamp } from './utils/common'
+import { createDir, fileDir, toTimestamp } from './util'
 import {
   RealtimeTranscriber,
-  LiveAudioStreamAdapter,
-  SimulateFileAudioStreamAdapter,
   VAD_PRESETS,
   type TranscribeEvent,
   type VADEvent,
@@ -28,7 +26,9 @@ import {
   type StatsEvent,
   type RealtimeTranscriberDependencies,
   type AudioStreamInterface,
-} from './realtime-transcription'
+} from '../../src/realtime-transcription'
+import { SimulateFileAudioStreamAdapter } from '../../src/realtime-transcription/adaptors/SimulateFileAudioStreamAdapter'
+import { AudioPcmStreamAdapter } from '../../src/realtime-transcription/adaptors/AudioPcmStreamAdapter'
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -328,6 +328,7 @@ export default function RealtimeTranscriberDemo() {
             const filePath = await downloadAudioFile()
 
             audioStream = new SimulateFileAudioStreamAdapter({
+              fs: RNFS,
               filePath,
               playbackSpeed,
               chunkDurationMs: 100,
@@ -352,7 +353,7 @@ export default function RealtimeTranscriberDemo() {
           }
         } else {
           log('Creating live audio adapter...')
-          audioStream = new LiveAudioStreamAdapter()
+          audioStream = new AudioPcmStreamAdapter()
         }
 
         await audioStream.initialize(options.audioStreamConfig!)

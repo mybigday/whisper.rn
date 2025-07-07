@@ -2,7 +2,8 @@ import type {
   TranscribeFileOptions,
   TranscribeResult,
   VadOptions,
-} from '../../../src'
+} from '../index'
+import type { WavFileWriterFs } from './WavFileWriter'
 
 // === Audio Stream Interfaces ===
 
@@ -175,6 +176,7 @@ export interface RealtimeOptions {
   promptPreviousSlices?: boolean // Add transcription results from previous slices as prompt (default: true)
 
   // File settings
+  fs?: WavFileWriterFs
   audioOutputPath?: string
 
   // Audio stream configuration
@@ -229,8 +231,8 @@ export interface RealtimeTranscriberCallbacks {
 // === Context Interfaces ===
 
 export interface RealtimeTranscriberContexts {
-  whisperContext: import('../../../src').WhisperContext
-  vadContext?: import('../../../src').WhisperVadContext
+  whisperContext: import('../index').WhisperContext
+  vadContext?: import('../index').WhisperVadContext
 }
 
 export interface RealtimeTranscriberDependencies {

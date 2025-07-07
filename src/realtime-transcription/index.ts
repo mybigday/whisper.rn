@@ -1,10 +1,6 @@
 // Main transcriber class
 export { RealtimeTranscriber } from './RealtimeTranscriber'
 
-// Audio stream adapters
-export { LiveAudioStreamAdapter } from './LiveAudioStreamAdapter'
-export { SimulateFileAudioStreamAdapter } from './SimulateFileAudioStreamAdapter'
-
 // Slice manager (for advanced use cases)
 export { SliceManager } from './SliceManager'
 

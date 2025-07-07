@@ -14,7 +14,7 @@ import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.
 import type { WhisperContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, modelHost, toTimestamp } from './utils/common'
+import { createDir, fileDir, modelHost, toTimestamp } from './util'
 
 const sampleFile = require('../assets/jfk.wav')
 

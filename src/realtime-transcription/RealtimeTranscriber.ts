@@ -1,11 +1,7 @@
 /* eslint-disable class-methods-use-this */
-import type {
-  WhisperContext,
-  WhisperVadContext,
-  VadOptions,
-} from '../../../src'
+import type { WhisperContext, WhisperVadContext, VadOptions } from '../index'
 import { SliceManager } from './SliceManager'
-import { WavFileWriter } from '../utils/WavFileWriter'
+import { WavFileWriter, WavFileWriterFs } from './WavFileWriter'
 import type {
   RealtimeOptions,
   TranscribeEvent,
@@ -29,6 +25,7 @@ interface InternalRealtimeOptions {
   transcribeOptions: any
   initialPrompt?: string
   promptPreviousSlices: boolean
+  fs?: WavFileWriterFs
   audioOutputPath?: string
 }
 
@@ -61,8 +58,10 @@ export class RealtimeTranscriber {
 
   private vadEnabled = false
 
-  private transcriptionQueue: Array<{ sliceIndex: number; audioData: Uint8Array }> =
-    []
+  private transcriptionQueue: Array<{
+    sliceIndex: number
+    audioData: Uint8Array
+  }> = []
 
   private accumulatedData: Uint8Array = new Uint8Array(0)
 
@@ -147,12 +146,16 @@ export class RealtimeTranscriber {
       this.reset()
 
       // Initialize WAV file writer if output path is specified
-      if (this.options.audioOutputPath) {
-        this.wavFileWriter = new WavFileWriter(this.options.audioOutputPath, {
-          sampleRate: 16000, // Default sample rate
-          channels: 1,
-          bitsPerSample: 16,
-        })
+      if (this.options.fs && this.options.audioOutputPath) {
+        this.wavFileWriter = new WavFileWriter(
+          this.options.fs,
+          this.options.audioOutputPath,
+          {
+            sampleRate: 16000, // Default sample rate
+            channels: 1,
+            bitsPerSample: 16,
+          },
+        )
         await this.wavFileWriter.initialize()
       }
 
@@ -650,14 +653,11 @@ export class RealtimeTranscriber {
       const prompt = this.buildPrompt(item.sliceIndex)
 
       const audioBuffer = item.audioData.buffer as SharedArrayBuffer
-      const { promise } = this.whisperContext.transcribeData(
-        audioBuffer,
-        {
-          ...this.options.transcribeOptions,
-          prompt, // Include the constructed prompt
-          onProgress: undefined, // Disable progress for realtime
-        },
-      )
+      const { promise } = this.whisperContext.transcribeData(audioBuffer, {
+        ...this.options.transcribeOptions,
+        prompt, // Include the constructed prompt
+        onProgress: undefined, // Disable progress for realtime
+      })
 
       const result = await promise
       const endTime = Date.now()

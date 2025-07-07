@@ -2,10 +2,11 @@ import type {
   AudioStreamInterface,
   AudioStreamConfig,
   AudioStreamData,
-} from './types'
-import { WavFileReader } from '../utils/WavFileReader'
+} from '../types'
+import { WavFileReader, WavFileReaderFs } from './simulate-file/WavFileReader'
 
 export interface SimulateFileOptions {
+  fs: WavFileReaderFs
   filePath: string
   playbackSpeed?: number // Default: 1.0 (real-time), 0.5 (half speed), 2.0 (double speed)
   chunkDurationMs?: number // Default: 100ms chunks
@@ -47,7 +48,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       loop: false,
       ...options,
     }
-    this.fileReader = new WavFileReader(this.options.filePath)
+    this.fileReader = new WavFileReader(this.options.fs, this.options.filePath)
   }
 
   async initialize(config: AudioStreamConfig): Promise<void> {

@@ -1,8 +1,10 @@
+/* eslint-disable import/no-extraneous-dependencies */
+// @ts-ignore
 import LiveAudioStream from '@fugood/react-native-audio-pcm-stream'
-import type { AudioStreamInterface, AudioStreamConfig, AudioStreamData } from './types'
-import { WavFileReader } from '../utils/WavFileReader'
+import type { AudioStreamInterface, AudioStreamConfig, AudioStreamData } from '../types'
+import { base64ToUint8Array } from '../utils'
 
-export class LiveAudioStreamAdapter implements AudioStreamInterface {
+export class AudioPcmStreamAdapter implements AudioStreamInterface {
   private isInitialized = false
 
   private recording = false
@@ -123,7 +125,7 @@ export class LiveAudioStreamAdapter implements AudioStreamInterface {
     }
 
     try {
-      const audioData = WavFileReader.base64ToUint8Array(base64Data)
+      const audioData = base64ToUint8Array(base64Data)
 
       const streamData: AudioStreamData = {
         data: audioData,

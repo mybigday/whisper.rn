@@ -10,7 +10,7 @@ import {
   WhisperVadContext,
 } from '../../src'
 import contextOpts from './context-opts'
-import { WavFileReader } from './utils/WavFileReader'
+import { WavFileReader } from '../../src/realtime-transcription/adaptors/simulate-file/WavFileReader'
 
 // JFK audio file URL from whisper.cpp repository
 const JFK_AUDIO_URL =
@@ -95,7 +95,7 @@ const JSITest: React.FC = () => {
         }).promise
       }
 
-      const wavFileReader = new WavFileReader(jfkAudioPath)
+      const wavFileReader = new WavFileReader(RNFS, jfkAudioPath)
       await wavFileReader.initialize()
 
       const audioData = wavFileReader.getAudioData()

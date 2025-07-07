@@ -6,10 +6,10 @@ import RNFS from 'react-native-fs'
 import Sound from 'react-native-sound'
 import { initWhisper, libVersion } from '../../src'
 import type { WhisperContext } from '../../src'
+import { WavFileWriter } from '../../src/realtime-transcription/WavFileWriter'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { WavFileWriter } from './utils/WavFileWriter'
-import { createDir, fileDir } from './utils/common'
+import { createDir, fileDir } from './util'
 
 const styles = StyleSheet.create({
   scrollview: { flexGrow: 1, justifyContent: 'center' },
@@ -103,9 +103,9 @@ export default function TranscribeData() {
       if (!recordedDataRef.current) return log('No recorded data')
       if (!whisperContext) return log('No context')
 
-      const wavFileWriter = new WavFileWriter(recordFile, audioOptions)
+      const wavFileWriter = new WavFileWriter(RNFS, recordFile, audioOptions)
       await wavFileWriter.initialize()
-      await wavFileWriter.appendAudioData(Buffer.from(recordedDataRef.current!))
+      await wavFileWriter.appendAudioData(recordedDataRef.current)
       await wavFileWriter.finalize()
 
       // Read the wav file as base64
