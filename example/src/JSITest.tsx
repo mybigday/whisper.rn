@@ -5,6 +5,7 @@ import {
   initWhisper,
   initWhisperVad,
   releaseAllWhisper,
+  releaseAllWhisperVad,
   WhisperContext,
   WhisperVadContext,
 } from '../../src'
@@ -222,6 +223,7 @@ const JSITest: React.FC = () => {
     try {
       addTestResult('🗑️ Releasing all contexts...')
       await releaseAllWhisper()
+      await releaseAllWhisperVad()
       setWhisperContext(null)
       setVadContext(null)
       setContextsInitialized(false)
