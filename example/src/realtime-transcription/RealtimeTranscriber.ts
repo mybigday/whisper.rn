@@ -93,13 +93,13 @@ export class RealtimeTranscriber {
 
     // Set default options with proper types
     this.options = {
-      audioSliceSec: options.audioSliceSec || 25,
+      audioSliceSec: options.audioSliceSec || 30,
       audioMinSec: options.audioMinSec || 1,
       maxSlicesInMemory: options.maxSlicesInMemory || 3,
       vadOptions: options.vadOptions || VAD_PRESETS.DEFAULT,
       vadPreset: options.vadPreset,
-      autoSliceOnSpeechEnd: options.autoSliceOnSpeechEnd || false,
-      autoSliceThreshold: options.autoSliceThreshold || 0.85,
+      autoSliceOnSpeechEnd: options.autoSliceOnSpeechEnd || true,
+      autoSliceThreshold: options.autoSliceThreshold || 0.5,
       transcribeOptions: options.transcribeOptions || {},
       audioOutputPath: options.audioOutputPath,
     }
