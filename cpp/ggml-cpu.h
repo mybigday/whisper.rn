@@ -101,6 +101,7 @@ extern "C" {
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_riscv_v    (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_vsx        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_vxe        (void);
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_nnpa       (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_wasm_simd  (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_llamafile  (void);
 
@@ -133,6 +134,7 @@ extern "C" {
 
     WSP_GGML_BACKEND_API wsp_ggml_backend_reg_t wsp_ggml_backend_cpu_reg(void);
 
+    WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp32_to_fp32(const float *,       float *, int64_t);
     WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp32_to_fp16(const float *, wsp_ggml_fp16_t *, int64_t);
     WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp16_to_fp32(const wsp_ggml_fp16_t *, float *, int64_t);
     WSP_GGML_BACKEND_API void wsp_ggml_cpu_fp32_to_bf16(const float *, wsp_ggml_bf16_t *, int64_t);
