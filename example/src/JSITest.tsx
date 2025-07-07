@@ -9,6 +9,7 @@ import {
   WhisperContext,
   WhisperVadContext,
 } from '../../src'
+import contextOpts from './context-opts'
 import { WavFileReader } from './utils/WavFileReader'
 
 // JFK audio file URL from whisper.cpp repository
@@ -192,6 +193,7 @@ const JSITest: React.FC = () => {
       addTestResult('🧠 Initializing Whisper context...')
       const newWhisperContext = await initWhisper({
         filePath: require('../assets/ggml-base.bin'),
+        ...contextOpts,
       })
       setWhisperContext(newWhisperContext)
       addTestResult(
