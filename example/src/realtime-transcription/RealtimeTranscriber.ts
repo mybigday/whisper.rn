@@ -27,6 +27,8 @@ interface InternalRealtimeOptions {
   autoSliceOnSpeechEnd: boolean
   autoSliceThreshold: number
   transcribeOptions: any
+  initialPrompt?: string
+  promptPreviousSlices: boolean
   audioOutputPath?: string
 }
 
@@ -101,6 +103,8 @@ export class RealtimeTranscriber {
       autoSliceOnSpeechEnd: options.autoSliceOnSpeechEnd || true,
       autoSliceThreshold: options.autoSliceThreshold || 0.5,
       transcribeOptions: options.transcribeOptions || {},
+      initialPrompt: options.initialPrompt,
+      promptPreviousSlices: options.promptPreviousSlices ?? true,
       audioOutputPath: options.audioOutputPath,
     }
 
@@ -596,6 +600,34 @@ export class RealtimeTranscriber {
   }
 
   /**
+   * Build prompt from initial prompt and previous slices
+   */
+  private buildPrompt(currentSliceIndex: number): string | undefined {
+    const promptParts: string[] = []
+
+    // Add initial prompt if provided
+    if (this.options.initialPrompt) {
+      promptParts.push(this.options.initialPrompt)
+    }
+
+    // Add previous slice results if enabled
+    if (this.options.promptPreviousSlices) {
+      // Get transcription results from previous slices (up to the current slice)
+      const previousResults = Array.from(this.transcriptionResults.entries())
+        .filter(([sliceIndex]) => sliceIndex < currentSliceIndex)
+        .sort(([a], [b]) => a - b) // Sort by slice index
+        .map(([, result]) => result.transcribeEvent.data?.result)
+        .filter((result): result is string => Boolean(result)) // Filter out empty results with type guard
+
+      if (previousResults.length > 0) {
+        promptParts.push(...previousResults)
+      }
+    }
+
+    return promptParts.join(' ') || undefined
+  }
+
+  /**
    * Process a single transcription
    */
   private async processTranscription(item: {
@@ -614,11 +646,15 @@ export class RealtimeTranscriber {
     const startTime = Date.now()
 
     try {
+      // Build prompt from initial prompt and previous slices
+      const prompt = this.buildPrompt(item.sliceIndex)
+
       const audioBuffer = item.audioData.buffer as SharedArrayBuffer
       const { promise } = this.whisperContext.transcribeData(
         audioBuffer,
         {
           ...this.options.transcribeOptions,
+          prompt, // Include the constructed prompt
           onProgress: undefined, // Disable progress for realtime
         },
       )

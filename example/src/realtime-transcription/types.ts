@@ -170,6 +170,10 @@ export interface RealtimeOptions {
   // Transcription settings
   transcribeOptions?: TranscribeFileOptions
 
+  // Prompt settings
+  initialPrompt?: string // Initial prompt to use for transcription
+  promptPreviousSlices?: boolean // Add transcription results from previous slices as prompt (default: true)
+
   // File settings
   audioOutputPath?: string
 

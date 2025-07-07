@@ -88,10 +88,12 @@ const JSITest: React.FC = () => {
     const jfkAudioPath = `${RNFS.DocumentDirectoryPath}/jfk.wav`
     let arrayBuffer: ArrayBuffer | null = arrayBufferRef.current
     if (!arrayBuffer) {
-      await RNFS.downloadFile({
-        fromUrl: JFK_AUDIO_URL,
-        toFile: jfkAudioPath,
-      }).promise
+      if (!(await RNFS.exists(jfkAudioPath))) {
+        await RNFS.downloadFile({
+          fromUrl: JFK_AUDIO_URL,
+          toFile: jfkAudioPath,
+        }).promise
+      }
 
       const wavFileReader = new WavFileReader(jfkAudioPath)
       await wavFileReader.initialize()
