@@ -12,6 +12,7 @@
 
 - [gpu](WhisperContext.md#gpu)
 - [id](WhisperContext.md#id)
+- [ptr](WhisperContext.md#ptr)
 - [reasonNoGPU](WhisperContext.md#reasonnogpu)
 
 ### Methods
@@ -36,7 +37,7 @@
 
 #### Defined in
 
-[index.ts:208](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L208)
+[index.ts:247](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L247)
 
 ## Properties
 
@@ -46,7 +47,7 @@
 
 #### Defined in
 
-[index.ts:204](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L204)
+[index.ts:243](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L243)
 
 ___
 
@@ -56,7 +57,17 @@ ___
 
 #### Defined in
 
-[index.ts:202](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L202)
+[index.ts:241](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L241)
+
+___
+
+### ptr
+
+• **ptr**: `number`
+
+#### Defined in
+
+[index.ts:239](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L239)
 
 ___
 
@@ -66,7 +77,7 @@ ___
 
 #### Defined in
 
-[index.ts:206](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L206)
+[index.ts:245](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L245)
 
 ## Methods
 
@@ -86,7 +97,7 @@ ___
 
 #### Defined in
 
-[index.ts:469](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L469)
+[index.ts:578](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L578)
 
 ___
 
@@ -100,7 +111,7 @@ ___
 
 #### Defined in
 
-[index.ts:475](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L475)
+[index.ts:592](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L592)
 
 ___
 
@@ -129,7 +140,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:296](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L296)
+[index.ts:341](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L341)
 
 ___
 
@@ -137,13 +148,13 @@ ___
 
 ▸ **transcribeData**(`data`, `options?`): `Object`
 
-Transcribe audio data (base64 encoded float32 PCM data)
+Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `data` | `string` |
+| `data` | `string` \| `ArrayBuffer` \| `SharedArrayBuffer` |
 | `options` | [`TranscribeFileOptions`](../README.md#transcribefileoptions) |
 
 #### Returns
@@ -157,7 +168,7 @@ Transcribe audio data (base64 encoded float32 PCM data)
 
 #### Defined in
 
-[index.ts:327](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L327)
+[index.ts:372](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L372)
 
 ___
 
@@ -179,4 +190,4 @@ Transcribe the microphone audio stream, the microphone user permission is requir
 
 #### Defined in
 
-[index.ts:335](https://github.com/mybigday/whisper.rn/blob/a11299e/src/index.ts#L335)
+[index.ts:441](https://github.com/mybigday/whisper.rn/blob/a6284b1/src/index.ts#L441)
