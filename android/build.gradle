@@ -102,6 +102,7 @@ android {
       "**/libreactnative.so",
       "**/libreactnativejni.so",
       "**/libturbomodulejsijni.so",
+      "**/libreact_nativemodule_core.so",
     ]
   }
 
