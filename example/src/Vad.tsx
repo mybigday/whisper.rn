@@ -8,7 +8,7 @@ import { initWhisperVad, libVersion } from '../../src' // whisper.rn
 import type { WhisperVadContext, VadSegment } from '../../src'
 import { Button } from './Button'
 import { createDir, fileDir, vadModelHost, toTimestamp } from './util'
-import { WavFileWriter } from '../../src/realtime-transcription/WavFileWriter'
+import { WavFileWriter } from '../../src/utils/WavFileWriter'
 
 const sampleFile = require('../assets/jfk.wav')
 

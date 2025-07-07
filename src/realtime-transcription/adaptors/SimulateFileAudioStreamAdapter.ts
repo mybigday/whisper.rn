@@ -3,7 +3,7 @@ import type {
   AudioStreamConfig,
   AudioStreamData,
 } from '../types'
-import { WavFileReader, WavFileReaderFs } from './simulate-file/WavFileReader'
+import { WavFileReader, WavFileReaderFs } from '../../utils/WavFileReader'
 
 export interface SimulateFileOptions {
   fs: WavFileReaderFs

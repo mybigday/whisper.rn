@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import type { WhisperContext, WhisperVadContext, VadOptions } from '../index'
 import { SliceManager } from './SliceManager'
-import { WavFileWriter, WavFileWriterFs } from './WavFileWriter'
+import { WavFileWriter, WavFileWriterFs } from '../utils/WavFileWriter'
 import type {
   RealtimeOptions,
   TranscribeEvent,

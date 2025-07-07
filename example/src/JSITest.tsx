@@ -10,7 +10,7 @@ import {
   WhisperVadContext,
 } from '../../src'
 import contextOpts from './context-opts'
-import { WavFileReader } from '../../src/realtime-transcription/adaptors/simulate-file/WavFileReader'
+import { WavFileReader } from '../../src/utils/WavFileReader'
 
 // JFK audio file URL from whisper.cpp repository
 const JFK_AUDIO_URL =

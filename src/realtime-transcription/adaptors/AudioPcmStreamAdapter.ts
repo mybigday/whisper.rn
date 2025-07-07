@@ -2,7 +2,7 @@
 // @ts-ignore
 import LiveAudioStream from '@fugood/react-native-audio-pcm-stream'
 import type { AudioStreamInterface, AudioStreamConfig, AudioStreamData } from '../types'
-import { base64ToUint8Array } from '../utils'
+import { base64ToUint8Array } from '../../utils/common'
 
 export class AudioPcmStreamAdapter implements AudioStreamInterface {
   private isInitialized = false

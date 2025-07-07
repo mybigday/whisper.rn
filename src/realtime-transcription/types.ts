@@ -3,7 +3,7 @@ import type {
   TranscribeResult,
   VadOptions,
 } from '../index'
-import type { WavFileWriterFs } from './WavFileWriter'
+import type { WavFileWriterFs } from '../utils/WavFileWriter'
 
 // === Audio Stream Interfaces ===
 
