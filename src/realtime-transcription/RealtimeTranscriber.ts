@@ -156,9 +156,9 @@ export class RealtimeTranscriber {
           this.fs,
           this.options.audioOutputPath,
           {
-            sampleRate: 16000, // Default sample rate
-            channels: 1,
-            bitsPerSample: 16,
+            sampleRate: this.options.audioStreamConfig?.sampleRate || 16000,
+            channels: this.options.audioStreamConfig?.channels || 1,
+            bitsPerSample: this.options.audioStreamConfig?.bitsPerSample || 16,
           },
         )
         await this.wavFileWriter.initialize()
@@ -578,16 +578,8 @@ export class RealtimeTranscriber {
       }
     } catch (error) {
       this.log(`VAD detection error: ${error}`)
-
-      // Return default silence event on error
-      return {
-        type: 'silence',
-        lastSpeechDetectedTime: 0,
-        timestamp: Date.now(),
-        confidence: 0.0,
-        duration: 0,
-        sliceIndex,
-      }
+      // Re-throw the error so it can be handled by the caller
+      throw error
     }
   }
 
@@ -712,6 +704,19 @@ export class RealtimeTranscriber {
         `Transcribed speech segment ${item.sliceIndex}: "${result.result}"`,
       )
     } catch (error) {
+      // Emit error event to transcribe callback
+      const errorEvent: RealtimeTranscribeEvent = {
+        type: 'error',
+        sliceIndex: item.sliceIndex,
+        data: undefined,
+        isCapturing: this.audioStream.isRecording(),
+        processTime: Date.now() - startTime,
+        recordingTime: 0,
+        memoryUsage: this.sliceManager.getMemoryUsage(),
+      }
+
+      this.callbacks.onTranscribe?.(errorEvent)
+
       this.handleError(
         `Transcription failed for speech segment ${item.sliceIndex}: ${error}`,
       )
@@ -823,6 +828,19 @@ export class RealtimeTranscriber {
       this.log('Cannot force next slice - transcriber is not active')
       return
     }
+
+    // Emit start event to indicate slice processing has started
+    const startEvent: RealtimeTranscribeEvent = {
+      type: 'start',
+      sliceIndex: -1, // Use -1 to indicate forced slice
+      data: undefined,
+      isCapturing: this.audioStream.isRecording(),
+      processTime: 0,
+      recordingTime: 0,
+      memoryUsage: this.sliceManager.getMemoryUsage(),
+    }
+
+    this.callbacks.onTranscribe?.(startEvent)
 
     // Check if there are pending transcriptions or currently transcribing
     if (this.isTranscribing || this.transcriptionQueue.length > 0) {
@@ -962,7 +980,7 @@ export class RealtimeTranscriber {
   /**
    * Debug logging
    */
-  private log(message: string): void {
-    console.log(`[RealtimeTranscriber] ${message}`)
+  private log(_message: string): void {
+    // console.log(`[RealtimeTranscriber] ${_message}`)
   }
 }

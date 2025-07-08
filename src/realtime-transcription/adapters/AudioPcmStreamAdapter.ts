@@ -120,7 +120,7 @@ export class AudioPcmStreamAdapter implements AudioStreamInterface {
    * Handle incoming audio data from LiveAudioStream
    */
   private handleAudioData(base64Data: string): void {
-    if (!this.dataCallback || !this.config) {
+    if (!this.dataCallback) {
       return
     }
 
@@ -129,8 +129,8 @@ export class AudioPcmStreamAdapter implements AudioStreamInterface {
 
       const streamData: AudioStreamData = {
         data: audioData,
-        sampleRate: this.config.sampleRate || 16000,
-        channels: this.config.channels || 1,
+        sampleRate: this.config?.sampleRate || 16000,
+        channels: this.config?.channels || 1,
         timestamp: Date.now(),
       }
 

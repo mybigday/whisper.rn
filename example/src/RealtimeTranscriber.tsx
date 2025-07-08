@@ -25,8 +25,8 @@ import {
   type RealtimeStatsEvent,
   type AudioStreamInterface,
 } from '../../src/realtime-transcription'
-import { SimulateFileAudioStreamAdapter } from '../../src/realtime-transcription/adaptors/SimulateFileAudioStreamAdapter'
-import { AudioPcmStreamAdapter } from '../../src/realtime-transcription/adaptors/AudioPcmStreamAdapter'
+import { SimulateFileAudioStreamAdapter } from '../../src/realtime-transcription/adapters/SimulateFileAudioStreamAdapter'
+import { AudioPcmStreamAdapter } from '../../src/realtime-transcription/adapters/AudioPcmStreamAdapter'
 
 if (Platform.OS === 'android') {
   // Request record audio permission

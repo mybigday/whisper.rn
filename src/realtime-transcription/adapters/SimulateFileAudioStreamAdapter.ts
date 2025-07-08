@@ -121,7 +121,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       // Start streaming chunks
       this.startStreaming()
 
-      console.log('File audio simulation started')
+      // console.log('File audio simulation started')
     } catch (error) {
       this.recording = false
       this.statusCallback?.(false)
@@ -148,7 +148,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       }
 
       this.statusCallback?.(false)
-      console.log('File audio simulation stopped')
+      // console.log('File audio simulation stopped')
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown stop error'
@@ -177,7 +177,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
     this.isInitialized = false
     this.currentBytePosition = 0
     this.pausedTime = 0
-    console.log('SimulateFileAudioStreamAdapter released')
+    // console.log('SimulateFileAudioStreamAdapter released')
   }
 
   /**
@@ -248,17 +248,17 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
         this.startTime = Date.now()
         this.pausedTime = 0
         this.hasReachedEnd = false
-        console.log('Looping audio file simulation')
+        // console.log('Looping audio file simulation')
         return
       }
 
       // Stop streaming due to no new buffer
-      console.log('Audio file simulation completed - no new buffer available')
+      // console.log('Audio file simulation completed - no new buffer available')
       this.hasReachedEnd = true
 
       // Call the end-of-file callback if provided
       if (this.options.onEndOfFile) {
-        console.log('Calling onEndOfFile callback')
+        // console.log('Calling onEndOfFile callback')
         this.options.onEndOfFile()
       }
 
@@ -322,7 +322,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       this.pausedTime = 0
     }
 
-    console.log(`Seeked to ${clampedTime.toFixed(2)}s`)
+    // console.log(`Seeked to ${clampedTime.toFixed(2)}s`)
   }
 
   /**
