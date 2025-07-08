@@ -120,7 +120,7 @@ export const VAD_PRESETS = {
   },
 }
 
-export interface VADEvent {
+export interface VadEvent {
   type: 'speech_start' | 'speech_end' | 'speech_continue' | 'silence'
   timestamp: number
   lastSpeechDetectedTime: number
@@ -153,7 +153,7 @@ export interface TranscribeEvent {
     totalSamples: number
     estimatedMB: number
   }
-  vadEvent?: VADEvent
+  vadEvent?: VadEvent
 }
 
 export interface RealtimeOptions {
@@ -223,7 +223,7 @@ export interface StatsEvent {
 
 export interface RealtimeTranscriberCallbacks {
   onTranscribe?: (event: TranscribeEvent) => void
-  onVAD?: (event: VADEvent) => void
+  onVad?: (event: VadEvent) => void
   onError?: (error: string) => void
   onStatusChange?: (isActive: boolean) => void
   onStatsUpdate?: (event: StatsEvent) => void

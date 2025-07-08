@@ -5,7 +5,7 @@ import { WavFileWriter, WavFileWriterFs } from '../utils/WavFileWriter'
 import type {
   RealtimeOptions,
   TranscribeEvent,
-  VADEvent,
+  VadEvent,
   RealtimeTranscriberCallbacks,
   StatsEvent,
   RealtimeTranscriberDependencies,
@@ -308,7 +308,7 @@ export class RealtimeTranscriber {
   /**
    * Check if auto-slice should be triggered based on VAD event and timing
    */
-  private async checkAutoSlice(vadEvent: VADEvent, _slice: any): Promise<void> {
+  private async checkAutoSlice(vadEvent: VadEvent, _slice: any): Promise<void> {
     if (!this.options.autoSliceOnSpeechEnd || !this.vadEnabled) {
       return
     }
@@ -388,7 +388,7 @@ export class RealtimeTranscriber {
       vadEvent.timestamp = Date.now()
 
       // Emit VAD event
-      this.callbacks.onVAD?.(vadEvent)
+      this.callbacks.onVad?.(vadEvent)
 
       // Check if auto-slice should be triggered
       await this.checkAutoSlice(vadEvent, slice)
@@ -502,14 +502,14 @@ export class RealtimeTranscriber {
   private async detectSpeech(
     audioData: Uint8Array,
     sliceIndex: number,
-  ): Promise<VADEvent> {
+  ): Promise<VadEvent> {
     if (!this.vadContext) {
       // When no VAD context is available, assume speech is always detected
       // but still follow the state machine pattern
       const currentTimestamp = Date.now()
 
       // Assume speech is always detected when no VAD context
-      const vadEventType: VADEvent['type'] =
+      const vadEventType: VadEvent['type'] =
         this.lastVadState === 'silence' ? 'speech_start' : 'speech_continue'
 
       // Update VAD state
@@ -554,7 +554,7 @@ export class RealtimeTranscriber {
       const currentTimestamp = Date.now()
 
       // Determine VAD event type based on current and previous state
-      let vadEventType: VADEvent['type']
+      let vadEventType: VadEvent['type']
       if (isSpeech) {
         vadEventType =
           this.lastVadState === 'silence' ? 'speech_start' : 'speech_continue'

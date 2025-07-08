@@ -29,7 +29,7 @@
   ],
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
-    "docgen": "typedoc src/index.ts --plugin typedoc-plugin-markdown --excludePrivate --readme none --out docs/API",
+    "docgen": "typedoc src/index.ts src/realtime-transcription/index.ts --plugin typedoc-plugin-markdown --excludePrivate --readme none --out docs/API",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "build": "bob build",

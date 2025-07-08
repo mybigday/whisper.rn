@@ -21,7 +21,7 @@ import {
   RealtimeTranscriber,
   VAD_PRESETS,
   type TranscribeEvent,
-  type VADEvent,
+  type VadEvent,
   type RealtimeOptions,
   type StatsEvent,
   type RealtimeTranscriberDependencies,
@@ -134,7 +134,7 @@ export default function RealtimeTranscriberDemo() {
     useState<keyof typeof VAD_PRESETS>('DEFAULT')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
-  const [vadEvents, setVadEvents] = useState<VADEvent[]>([])
+  const [vadEvents, setVadEvents] = useState<VadEvent[]>([])
 
   // Auto-slice configuration
   const [autoSliceOnSpeechEnd, setAutoSliceOnSpeechEnd] = useState(true)
@@ -362,7 +362,7 @@ export default function RealtimeTranscriberDemo() {
         // Create RealtimeTranscriber if not exists
         const transcriber = new RealtimeTranscriber(dependencies, options, {
           onTranscribe: handleTranscribeEvent,
-          onVAD: handleVADEvent,
+          onVad: handleVadEvent,
           onError: handleError,
           onStatusChange: handleStatusChange,
           onStatsUpdate: handleStatsUpdate,
@@ -452,7 +452,7 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
-  const handleVADEvent = (vadEvent: VADEvent) => {
+  const handleVadEvent = (vadEvent: VadEvent) => {
     setVadEvents((prev) => [...prev.slice(-19), vadEvent]) // Keep last 20 events
 
     if (vadEvent.type !== 'silence') {

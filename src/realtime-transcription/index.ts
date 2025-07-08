@@ -4,6 +4,8 @@ export { RealtimeTranscriber } from './RealtimeTranscriber'
 // Slice manager (for advanced use cases)
 export { SliceManager } from './SliceManager'
 
+export type { WavFileWriterFs } from '../utils/WavFileWriter'
+
 // Types and interfaces
 export type {
   // Audio Stream types
@@ -12,7 +14,7 @@ export type {
   AudioStreamInterface,
 
   // VAD and event types
-  VADEvent,
+  VadEvent,
   TranscribeEvent,
   StatsEvent,
 
@@ -26,6 +28,7 @@ export type {
   AudioSlice,
   AudioSliceNoData,
   MemoryUsage,
+
 } from './types'
 
 // VAD presets constant
