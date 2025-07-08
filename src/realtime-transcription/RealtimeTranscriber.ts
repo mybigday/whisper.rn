@@ -33,6 +33,8 @@ export class RealtimeTranscriber {
 
   private audioStream: AudioStreamInterface
 
+  private fs?: WavFileWriterFs
+
   private sliceManager: SliceManager
 
   private callbacks: RealtimeTranscriberCallbacks = {}
@@ -48,7 +50,6 @@ export class RealtimeTranscriber {
     transcribeOptions: any
     initialPrompt?: string
     promptPreviousSlices: boolean
-    fs?: WavFileWriterFs
     audioOutputPath?: string
     audioStreamConfig?: AudioStreamConfig
   }
@@ -91,6 +92,7 @@ export class RealtimeTranscriber {
     this.whisperContext = dependencies.contexts.whisperContext
     this.vadContext = dependencies.contexts.vadContext
     this.audioStream = dependencies.audioStream
+    this.fs = dependencies.fs
     this.callbacks = callbacks
 
     // Set default options with proper types
@@ -147,9 +149,9 @@ export class RealtimeTranscriber {
       this.reset()
 
       // Initialize WAV file writer if output path is specified
-      if (this.options.fs && this.options.audioOutputPath) {
+      if (this.fs && this.options.audioOutputPath) {
         this.wavFileWriter = new WavFileWriter(
-          this.options.fs,
+          this.fs,
           this.options.audioOutputPath,
           {
             sampleRate: 16000, // Default sample rate

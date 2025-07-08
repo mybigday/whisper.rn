@@ -177,8 +177,7 @@ export interface RealtimeOptions {
   initialPrompt?: string // Initial prompt to use for transcription
   promptPreviousSlices?: boolean // Add transcription results from previous slices as prompt (default: true)
 
-  // File settings
-  fs?: WavFileWriterFs
+  // File settings (Only used if fs dependency is provided)
   audioOutputPath?: string
 
   // Audio stream configuration
@@ -240,4 +239,5 @@ export interface RealtimeTranscriberContexts {
 export interface RealtimeTranscriberDependencies {
   contexts: RealtimeTranscriberContexts
   audioStream: AudioStreamInterface
+  fs?: WavFileWriterFs
 }
