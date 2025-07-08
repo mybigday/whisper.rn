@@ -47,10 +47,16 @@ describe('SimulateFileAudioStreamAdapter', () => {
     // Setup default mocks
     mockWavFileReader.initialize.mockResolvedValue(undefined)
     mockWavFileReader.getHeader.mockReturnValue(sampleHeader)
-    mockWavFileReader.getAudioSlice.mockReturnValue(new Uint8Array([1, 2, 3, 4]))
+    mockWavFileReader.getAudioSlice.mockReturnValue(
+      new Uint8Array([1, 2, 3, 4]),
+    )
     mockWavFileReader.getTotalDataSize.mockReturnValue(16000)
-    mockWavFileReader.byteToTime.mockImplementation((byte: number) => byte / 3200)
-    mockWavFileReader.timeToByte.mockImplementation((time: number) => Math.floor(time * 3200))
+    mockWavFileReader.byteToTime.mockImplementation(
+      (byte: number) => byte / 3200,
+    )
+    mockWavFileReader.timeToByte.mockImplementation((time: number) =>
+      Math.floor(time * 3200),
+    )
 
     adapter = new SimulateFileAudioStreamAdapter({
       fs: mockFs,
@@ -101,11 +107,15 @@ describe('SimulateFileAudioStreamAdapter', () => {
     })
 
     it('should handle initialization error', async () => {
-      mockWavFileReader.initialize.mockRejectedValue(new Error('File not found'))
+      mockWavFileReader.initialize.mockRejectedValue(
+        new Error('File not found'),
+      )
 
       adapter.onError(mockErrorCallback)
 
-      await expect(adapter.initialize({})).rejects.toThrow('Failed to initialize SimulateFileAudioStreamAdapter: File not found')
+      await expect(adapter.initialize({})).rejects.toThrow(
+        'Failed to initialize SimulateFileAudioStreamAdapter: File not found',
+      )
       expect(mockErrorCallback).toHaveBeenCalledWith('File not found')
     })
 
@@ -114,8 +124,12 @@ describe('SimulateFileAudioStreamAdapter', () => {
 
       adapter.onError(mockErrorCallback)
 
-      await expect(adapter.initialize({})).rejects.toThrow('Failed to initialize SimulateFileAudioStreamAdapter: Failed to read WAV file header')
-      expect(mockErrorCallback).toHaveBeenCalledWith('Failed to read WAV file header')
+      await expect(adapter.initialize({})).rejects.toThrow(
+        'Failed to initialize SimulateFileAudioStreamAdapter: Failed to read WAV file header',
+      )
+      expect(mockErrorCallback).toHaveBeenCalledWith(
+        'Failed to read WAV file header',
+      )
     })
   })
 
@@ -144,7 +158,9 @@ describe('SimulateFileAudioStreamAdapter', () => {
         filePath: 'test.wav',
       })
 
-      await expect(uninitializedAdapter.start()).rejects.toThrow('Adapter not initialized')
+      await expect(uninitializedAdapter.start()).rejects.toThrow(
+        'Adapter not initialized',
+      )
     })
 
     it('should handle multiple start calls gracefully', async () => {
@@ -318,8 +334,12 @@ describe('SimulateFileAudioStreamAdapter', () => {
     })
 
     it('should throw error for invalid playback speed', () => {
-      expect(() => adapter.setPlaybackSpeed(0)).toThrow('Playback speed must be greater than 0')
-      expect(() => adapter.setPlaybackSpeed(-1)).toThrow('Playback speed must be greater than 0')
+      expect(() => adapter.setPlaybackSpeed(0)).toThrow(
+        'Playback speed must be greater than 0',
+      )
+      expect(() => adapter.setPlaybackSpeed(-1)).toThrow(
+        'Playback speed must be greater than 0',
+      )
     })
 
     it('should reset buffer to beginning', async () => {
@@ -414,7 +434,9 @@ describe('SimulateFileAudioStreamAdapter', () => {
 
       jest.advanceTimersByTime(150)
 
-      expect(mockErrorCallback).toHaveBeenCalledWith('WAV file header not available')
+      expect(mockErrorCallback).toHaveBeenCalledWith(
+        'WAV file header not available',
+      )
     })
 
     it('should handle missing data callback', async () => {

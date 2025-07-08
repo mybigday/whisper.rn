@@ -1,3 +1,4 @@
+// @ts-ignore
 import LiveAudioStream from '@fugood/react-native-audio-pcm-stream'
 import { AudioPcmStreamAdapter } from '../AudioPcmStreamAdapter'
 
@@ -235,7 +236,7 @@ describe('AudioPcmStreamAdapter', () => {
 
       // Get the data handler that was registered with LiveAudioStream
       const dataHandler = mockLiveAudioStream.on.mock.calls.find(
-        (call) => call[0] === 'data',
+        (call: any) => call[0] === 'data',
       )?.[1]
       expect(dataHandler).toBeDefined()
 
@@ -257,7 +258,7 @@ describe('AudioPcmStreamAdapter', () => {
       })
 
       const dataHandler = mockLiveAudioStream.on.mock.calls.find(
-        (call) => call[0] === 'data',
+        (call: any) => call[0] === 'data',
       )?.[1]
 
       dataHandler!('invalid_base64')
@@ -270,7 +271,7 @@ describe('AudioPcmStreamAdapter', () => {
       await adapterWithoutCallback.initialize({})
 
       const dataHandler = mockLiveAudioStream.on.mock.calls.find(
-        (call) => call[0] === 'data',
+        (call: any) => call[0] === 'data',
       )?.[1]
 
       // Should not throw
@@ -313,10 +314,9 @@ describe('AudioPcmStreamAdapter', () => {
 
       // After release, callbacks should be cleared
       const dataHandler = mockLiveAudioStream.on.mock.calls.find(
-        (call) => call[0] === 'data',
+        (call: any) => call[0] === 'data',
       )?.[1]
       expect(() => dataHandler!('test_data')).not.toThrow()
     })
   })
-
 })
