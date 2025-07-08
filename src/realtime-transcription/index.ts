@@ -14,15 +14,14 @@ export type {
   AudioStreamInterface,
 
   // VAD and event types
-  VadEvent,
-  TranscribeEvent,
-  StatsEvent,
+  RealtimeVadEvent,
+  RealtimeTranscribeEvent,
+  RealtimeStatsEvent,
 
   // Configuration types
+  RealtimeTranscriberDependencies,
   RealtimeOptions,
   RealtimeTranscriberCallbacks,
-  RealtimeTranscriberContexts,
-  RealtimeTranscriberDependencies,
 
   // Audio slice types
   AudioSlice,

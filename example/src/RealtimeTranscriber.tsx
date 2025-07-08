@@ -20,11 +20,9 @@ import { createDir, fileDir, toTimestamp } from './util'
 import {
   RealtimeTranscriber,
   VAD_PRESETS,
-  type TranscribeEvent,
-  type VadEvent,
-  type RealtimeOptions,
-  type StatsEvent,
-  type RealtimeTranscriberDependencies,
+  type RealtimeTranscribeEvent,
+  type RealtimeVadEvent,
+  type RealtimeStatsEvent,
   type AudioStreamInterface,
 } from '../../src/realtime-transcription'
 import { SimulateFileAudioStreamAdapter } from '../../src/realtime-transcription/adaptors/SimulateFileAudioStreamAdapter'
@@ -134,7 +132,7 @@ export default function RealtimeTranscriberDemo() {
     useState<keyof typeof VAD_PRESETS>('DEFAULT')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
-  const [vadEvents, setVadEvents] = useState<VadEvent[]>([])
+  const [vadEvents, setVadEvents] = useState<RealtimeVadEvent[]>([])
 
   // Auto-slice configuration
   const [autoSliceOnSpeechEnd, setAutoSliceOnSpeechEnd] = useState(true)
@@ -161,7 +159,6 @@ export default function RealtimeTranscriberDemo() {
       whisperContextRef.current?.release()
       vadContextRef.current?.release()
       realtimeTranscriberRef.current?.release()
-      audioStreamRef.current?.release()
     },
     [],
   )
@@ -295,21 +292,6 @@ export default function RealtimeTranscriberDemo() {
       await createDir(log)
 
       if (!realtimeTranscriberRef.current) {
-        const options: RealtimeOptions = {
-          audioSliceSec: 30,
-          audioMinSec: 0.5,
-          maxSlicesInMemory: 1,
-          vadPreset: currentVadPreset,
-          vadOptions: VAD_PRESETS[currentVadPreset],
-          autoSliceOnSpeechEnd,
-          autoSliceThreshold,
-          transcribeOptions: {
-            language: 'en',
-            maxLen: 1,
-          },
-          audioOutputPath: `${fileDir}/realtime-recording.wav`,
-        }
-
         // Create appropriate audio stream adapter
         let audioStream: AudioStreamInterface
 
@@ -350,23 +332,39 @@ export default function RealtimeTranscriberDemo() {
         }
         audioStreamRef.current = audioStream
 
-        // Create dependencies
-        const dependencies: RealtimeTranscriberDependencies = {
-          contexts: {
+        // Create RealtimeTranscriber if not exists
+        const transcriber = new RealtimeTranscriber(
+          // Dependencies
+          {
             whisperContext: whisperContextRef.current,
             vadContext: vadContextRef.current,
+            audioStream,
+            fs: RNFS,
           },
-          audioStream,
-        }
-
-        // Create RealtimeTranscriber if not exists
-        const transcriber = new RealtimeTranscriber(dependencies, options, {
-          onTranscribe: handleTranscribeEvent,
-          onVad: handleVadEvent,
-          onError: handleError,
-          onStatusChange: handleStatusChange,
-          onStatsUpdate: handleStatsUpdate,
-        })
+          // Options
+          {
+            audioSliceSec: 30,
+            audioMinSec: 0.5,
+            maxSlicesInMemory: 1,
+            vadPreset: currentVadPreset,
+            vadOptions: VAD_PRESETS[currentVadPreset],
+            autoSliceOnSpeechEnd,
+            autoSliceThreshold,
+            transcribeOptions: {
+              language: 'en',
+              maxLen: 1,
+            },
+            audioOutputPath: `${fileDir}/realtime-recording.wav`,
+          },
+          // Callbacks
+          {
+            onTranscribe: handleTranscribeEvent,
+            onVad: handleVadEvent,
+            onError: handleError,
+            onStatusChange: handleStatusChange,
+            onStatsUpdate: handleStatsUpdate,
+          },
+        )
 
         realtimeTranscriberRef.current = transcriber
       }
@@ -403,7 +401,7 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
-  const handleTranscribeEvent = (event: TranscribeEvent) => {
+  const handleTranscribeEvent = (event: RealtimeTranscribeEvent) => {
     const { data, sliceIndex } = event
 
     if (data?.result) {
@@ -452,7 +450,7 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
-  const handleVadEvent = (vadEvent: VadEvent) => {
+  const handleVadEvent = (vadEvent: RealtimeVadEvent) => {
     setVadEvents((prev) => [...prev.slice(-19), vadEvent]) // Keep last 20 events
 
     if (vadEvent.type !== 'silence') {
@@ -462,7 +460,7 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
-  const handleStatsUpdate = (statsEvent: StatsEvent) => {
+  const handleStatsUpdate = (statsEvent: RealtimeStatsEvent) => {
     setRealtimeStats(statsEvent.data)
 
     // Log significant changes

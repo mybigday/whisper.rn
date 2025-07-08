@@ -18,12 +18,11 @@
 - [AudioStreamInterface](../interfaces/realtime_transcription.AudioStreamInterface.md)
 - [MemoryUsage](../interfaces/realtime_transcription.MemoryUsage.md)
 - [RealtimeOptions](../interfaces/realtime_transcription.RealtimeOptions.md)
+- [RealtimeStatsEvent](../interfaces/realtime_transcription.RealtimeStatsEvent.md)
+- [RealtimeTranscribeEvent](../interfaces/realtime_transcription.RealtimeTranscribeEvent.md)
 - [RealtimeTranscriberCallbacks](../interfaces/realtime_transcription.RealtimeTranscriberCallbacks.md)
-- [RealtimeTranscriberContexts](../interfaces/realtime_transcription.RealtimeTranscriberContexts.md)
 - [RealtimeTranscriberDependencies](../interfaces/realtime_transcription.RealtimeTranscriberDependencies.md)
-- [StatsEvent](../interfaces/realtime_transcription.StatsEvent.md)
-- [TranscribeEvent](../interfaces/realtime_transcription.TranscribeEvent.md)
-- [VadEvent](../interfaces/realtime_transcription.VadEvent.md)
+- [RealtimeVadEvent](../interfaces/realtime_transcription.RealtimeVadEvent.md)
 - [WavFileWriterFs](../interfaces/realtime_transcription.WavFileWriterFs.md)
 
 ### Variables
@@ -99,4 +98,4 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:39](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L39)
+[realtime-transcription/types.ts:39](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L39)

@@ -36,13 +36,13 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:225](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L225)
+[realtime-transcription/types.ts:225](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L225)
 
 ___
 
 ### onStatsUpdate
 
-• `Optional` **onStatsUpdate**: (`event`: [`StatsEvent`](realtime_transcription.StatsEvent.md)) => `void`
+• `Optional` **onStatsUpdate**: (`event`: [`RealtimeStatsEvent`](realtime_transcription.RealtimeStatsEvent.md)) => `void`
 
 #### Type declaration
 
@@ -52,7 +52,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [`StatsEvent`](realtime_transcription.StatsEvent.md) |
+| `event` | [`RealtimeStatsEvent`](realtime_transcription.RealtimeStatsEvent.md) |
 
 ##### Returns
 
@@ -60,7 +60,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:227](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L227)
+[realtime-transcription/types.ts:227](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L227)
 
 ___
 
@@ -84,13 +84,13 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:226](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L226)
+[realtime-transcription/types.ts:226](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L226)
 
 ___
 
 ### onTranscribe
 
-• `Optional` **onTranscribe**: (`event`: [`TranscribeEvent`](realtime_transcription.TranscribeEvent.md)) => `void`
+• `Optional` **onTranscribe**: (`event`: [`RealtimeTranscribeEvent`](realtime_transcription.RealtimeTranscribeEvent.md)) => `void`
 
 #### Type declaration
 
@@ -100,7 +100,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [`TranscribeEvent`](realtime_transcription.TranscribeEvent.md) |
+| `event` | [`RealtimeTranscribeEvent`](realtime_transcription.RealtimeTranscribeEvent.md) |
 
 ##### Returns
 
@@ -108,13 +108,13 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:223](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L223)
+[realtime-transcription/types.ts:223](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L223)
 
 ___
 
 ### onVad
 
-• `Optional` **onVad**: (`event`: [`VadEvent`](realtime_transcription.VadEvent.md)) => `void`
+• `Optional` **onVad**: (`event`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)) => `void`
 
 #### Type declaration
 
@@ -124,7 +124,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [`VadEvent`](realtime_transcription.VadEvent.md) |
+| `event` | [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md) |
 
 ##### Returns
 
@@ -132,4 +132,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:224](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L224)
+[realtime-transcription/types.ts:224](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L224)

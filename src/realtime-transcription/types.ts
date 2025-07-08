@@ -118,7 +118,7 @@ export const VAD_PRESETS = {
   },
 }
 
-export interface VadEvent {
+export interface RealtimeVadEvent {
   type: 'speech_start' | 'speech_end' | 'speech_continue' | 'silence'
   timestamp: number
   lastSpeechDetectedTime: number
@@ -139,7 +139,7 @@ export interface VadEvent {
   environmentNoise?: number
 }
 
-export interface TranscribeEvent {
+export interface RealtimeTranscribeEvent {
   type: 'start' | 'transcribe' | 'end' | 'error'
   sliceIndex: number
   data?: TranscribeResult
@@ -151,7 +151,7 @@ export interface TranscribeEvent {
     totalSamples: number
     estimatedMB: number
   }
-  vadEvent?: VadEvent
+  vadEvent?: RealtimeVadEvent
 }
 
 export interface RealtimeOptions {
@@ -200,7 +200,7 @@ export interface MemoryUsage {
   estimatedMB: number
 }
 
-export interface StatsEvent {
+export interface RealtimeStatsEvent {
   timestamp: number
   type:
     | 'slice_processed'
@@ -220,11 +220,11 @@ export interface StatsEvent {
 }
 
 export interface RealtimeTranscriberCallbacks {
-  onTranscribe?: (event: TranscribeEvent) => void
-  onVad?: (event: VadEvent) => void
+  onTranscribe?: (event: RealtimeTranscribeEvent) => void
+  onVad?: (event: RealtimeVadEvent) => void
   onError?: (error: string) => void
   onStatusChange?: (isActive: boolean) => void
-  onStatsUpdate?: (event: StatsEvent) => void
+  onStatsUpdate?: (event: RealtimeStatsEvent) => void
 }
 
 // === Context Interfaces ===
@@ -246,13 +246,9 @@ export type WhisperVadContextLike = {
   ) => Promise<Array<{ t0: number; t1: number }>>
 }
 
-export interface RealtimeTranscriberContexts {
+export interface RealtimeTranscriberDependencies {
   whisperContext: WhisperContextLike
   vadContext?: WhisperVadContextLike
-}
-
-export interface RealtimeTranscriberDependencies {
-  contexts: RealtimeTranscriberContexts
   audioStream: AudioStreamInterface
   fs?: WavFileWriterFs
 }

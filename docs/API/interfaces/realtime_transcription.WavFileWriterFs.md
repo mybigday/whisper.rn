@@ -38,7 +38,7 @@
 
 #### Defined in
 
-[utils/WavFileWriter.ts:11](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/utils/WavFileWriter.ts#L11)
+[utils/WavFileWriter.ts:11](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/utils/WavFileWriter.ts#L11)
 
 ___
 
@@ -62,7 +62,7 @@ ___
 
 #### Defined in
 
-[utils/WavFileWriter.ts:13](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/utils/WavFileWriter.ts#L13)
+[utils/WavFileWriter.ts:13](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/utils/WavFileWriter.ts#L13)
 
 ___
 
@@ -87,7 +87,7 @@ ___
 
 #### Defined in
 
-[utils/WavFileWriter.ts:12](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/utils/WavFileWriter.ts#L12)
+[utils/WavFileWriter.ts:12](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/utils/WavFileWriter.ts#L12)
 
 ___
 
@@ -111,7 +111,7 @@ ___
 
 #### Defined in
 
-[utils/WavFileWriter.ts:14](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/utils/WavFileWriter.ts#L14)
+[utils/WavFileWriter.ts:14](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/utils/WavFileWriter.ts#L14)
 
 ___
 
@@ -137,4 +137,4 @@ ___
 
 #### Defined in
 
-[utils/WavFileWriter.ts:10](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/utils/WavFileWriter.ts#L10)
+[utils/WavFileWriter.ts:10](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/utils/WavFileWriter.ts#L10)

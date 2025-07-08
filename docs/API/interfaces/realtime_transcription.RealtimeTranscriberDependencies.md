@@ -9,8 +9,9 @@
 ### Properties
 
 - [audioStream](realtime_transcription.RealtimeTranscriberDependencies.md#audiostream)
-- [contexts](realtime_transcription.RealtimeTranscriberDependencies.md#contexts)
 - [fs](realtime_transcription.RealtimeTranscriberDependencies.md#fs)
+- [vadContext](realtime_transcription.RealtimeTranscriberDependencies.md#vadcontext)
+- [whisperContext](realtime_transcription.RealtimeTranscriberDependencies.md#whispercontext)
 
 ## Properties
 
@@ -20,17 +21,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:256](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L256)
-
-___
-
-### contexts
-
-• **contexts**: [`RealtimeTranscriberContexts`](realtime_transcription.RealtimeTranscriberContexts.md)
-
-#### Defined in
-
-[realtime-transcription/types.ts:255](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L255)
+[realtime-transcription/types.ts:252](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L252)
 
 ___
 
@@ -40,4 +31,24 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:257](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L257)
+[realtime-transcription/types.ts:253](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L253)
+
+___
+
+### vadContext
+
+• `Optional` **vadContext**: `WhisperVadContextLike`
+
+#### Defined in
+
+[realtime-transcription/types.ts:251](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L251)
+
+___
+
+### whisperContext
+
+• **whisperContext**: `WhisperContextLike`
+
+#### Defined in
+
+[realtime-transcription/types.ts:250](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L250)
