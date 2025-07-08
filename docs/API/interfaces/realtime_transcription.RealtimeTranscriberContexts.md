@@ -15,18 +15,18 @@
 
 ### vadContext
 
-• `Optional` **vadContext**: [`WhisperVadContext`](../classes/index.WhisperVadContext.md)
+• `Optional` **vadContext**: `WhisperVadContextLike`
 
 #### Defined in
 
-[realtime-transcription/types.ts:236](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/types.ts#L236)
+[realtime-transcription/types.ts:251](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L251)
 
 ___
 
 ### whisperContext
 
-• **whisperContext**: [`WhisperContext`](../classes/index.WhisperContext.md)
+• **whisperContext**: `WhisperContextLike`
 
 #### Defined in
 
-[realtime-transcription/types.ts:235](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/types.ts#L235)
+[realtime-transcription/types.ts:250](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L250)

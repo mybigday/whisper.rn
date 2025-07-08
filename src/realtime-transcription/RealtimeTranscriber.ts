@@ -1,5 +1,5 @@
 /* eslint-disable class-methods-use-this */
-import type { WhisperContext, WhisperVadContext, VadOptions } from '../index'
+import type { VadOptions } from '../index'
 import { SliceManager } from './SliceManager'
 import { WavFileWriter, WavFileWriterFs } from '../utils/WavFileWriter'
 import type {
@@ -13,6 +13,8 @@ import type {
   AudioSliceNoData,
   AudioStreamInterface,
   AudioStreamConfig,
+  WhisperContextLike,
+  WhisperVadContextLike,
 } from './types'
 import { VAD_PRESETS } from './types'
 
@@ -27,9 +29,9 @@ import { VAD_PRESETS } from './types'
  * - Queue-based transcription processing
  */
 export class RealtimeTranscriber {
-  private whisperContext: WhisperContext
+  private whisperContext: WhisperContextLike
 
-  private vadContext?: WhisperVadContext
+  private vadContext?: WhisperVadContextLike
 
   private audioStream: AudioStreamInterface
 

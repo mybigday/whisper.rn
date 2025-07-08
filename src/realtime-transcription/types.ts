@@ -1,9 +1,7 @@
 import type {
-  TranscribeFileOptions,
+  TranscribeOptions,
   TranscribeResult,
   VadOptions,
-  WhisperContext,
-  WhisperVadContext,
 } from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
 
@@ -171,7 +169,7 @@ export interface RealtimeOptions {
   autoSliceThreshold?: number // default: 0.85 - percentage of audioSliceSec to trigger auto-slice
 
   // Transcription settings
-  transcribeOptions?: TranscribeFileOptions
+  transcribeOptions?: TranscribeOptions
 
   // Prompt settings
   initialPrompt?: string // Initial prompt to use for transcription
@@ -231,9 +229,26 @@ export interface RealtimeTranscriberCallbacks {
 
 // === Context Interfaces ===
 
+export type WhisperContextLike = {
+  transcribeData: (
+    data: SharedArrayBuffer,
+    options: TranscribeOptions,
+  ) => {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  }
+}
+
+export type WhisperVadContextLike = {
+  detectSpeechData: (
+    data: SharedArrayBuffer,
+    options: VadOptions,
+  ) => Promise<Array<{ t0: number; t1: number }>>
+}
+
 export interface RealtimeTranscriberContexts {
-  whisperContext: WhisperContext
-  vadContext?: WhisperVadContext
+  whisperContext: WhisperContextLike
+  vadContext?: WhisperVadContextLike
 }
 
 export interface RealtimeTranscriberDependencies {

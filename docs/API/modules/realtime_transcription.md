@@ -99,4 +99,4 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:41](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/types.ts#L41)
+[realtime-transcription/types.ts:39](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/types.ts#L39)

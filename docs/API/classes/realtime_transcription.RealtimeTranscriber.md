@@ -48,7 +48,7 @@ Features:
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:87](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L87)
+[realtime-transcription/RealtimeTranscriber.ts:89](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L89)
 
 ## Methods
 
@@ -85,7 +85,7 @@ Get current statistics
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:779](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L779)
+[realtime-transcription/RealtimeTranscriber.ts:781](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L781)
 
 ___
 
@@ -101,7 +101,7 @@ Get all transcription results
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:809](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L809)
+[realtime-transcription/RealtimeTranscriber.ts:811](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L811)
 
 ___
 
@@ -117,7 +117,7 @@ Force move to the next slice, finalizing the current one regardless of capacity
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:819](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L819)
+[realtime-transcription/RealtimeTranscriber.ts:821](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L821)
 
 ___
 
@@ -133,7 +133,7 @@ Release all resources
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:893](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L893)
+[realtime-transcription/RealtimeTranscriber.ts:895](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L895)
 
 ___
 
@@ -149,7 +149,7 @@ Reset all components
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:865](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L865)
+[realtime-transcription/RealtimeTranscriber.ts:867](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L867)
 
 ___
 
@@ -165,7 +165,7 @@ Start realtime transcription
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:139](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L139)
+[realtime-transcription/RealtimeTranscriber.ts:141](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L141)
 
 ___
 
@@ -181,7 +181,7 @@ Stop realtime transcription
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:189](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L189)
+[realtime-transcription/RealtimeTranscriber.ts:191](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L191)
 
 ___
 
@@ -205,7 +205,7 @@ Update auto-slice options dynamically
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:761](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L761)
+[realtime-transcription/RealtimeTranscriber.ts:763](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L763)
 
 ___
 
@@ -227,7 +227,7 @@ Update callbacks
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:747](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L747)
+[realtime-transcription/RealtimeTranscriber.ts:749](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L749)
 
 ___
 
@@ -249,4 +249,4 @@ Update VAD options dynamically
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:754](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/RealtimeTranscriber.ts#L754)
+[realtime-transcription/RealtimeTranscriber.ts:756](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/RealtimeTranscriber.ts#L756)

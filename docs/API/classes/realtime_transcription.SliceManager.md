@@ -39,7 +39,7 @@
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:16](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L16)
+[realtime-transcription/SliceManager.ts:16](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L16)
 
 ## Methods
 
@@ -65,7 +65,7 @@ Add audio data to the current slice
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:29](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L29)
+[realtime-transcription/SliceManager.ts:29](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L29)
 
 ___
 
@@ -85,7 +85,7 @@ Force move to the next slice, finalizing the current one regardless of capacity
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:234](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L234)
+[realtime-transcription/SliceManager.ts:234](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L234)
 
 ___
 
@@ -107,7 +107,7 @@ Get audio data for transcription (base64 encoded)
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:138](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L138)
+[realtime-transcription/SliceManager.ts:138](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L138)
 
 ___
 
@@ -130,7 +130,7 @@ Get current slice information
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:222](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L222)
+[realtime-transcription/SliceManager.ts:222](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L222)
 
 ___
 
@@ -146,7 +146,7 @@ Get memory usage statistics
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:185](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L185)
+[realtime-transcription/SliceManager.ts:185](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L185)
 
 ___
 
@@ -168,7 +168,7 @@ Get a slice by index
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:151](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L151)
+[realtime-transcription/SliceManager.ts:151](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L151)
 
 ___
 
@@ -184,7 +184,7 @@ Get a slice for transcription
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:106](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L106)
+[realtime-transcription/SliceManager.ts:106](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L106)
 
 ___
 
@@ -206,7 +206,7 @@ Mark a slice as processed
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:121](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L121)
+[realtime-transcription/SliceManager.ts:121](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L121)
 
 ___
 
@@ -222,7 +222,7 @@ Move to the next slice for transcription
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:131](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L131)
+[realtime-transcription/SliceManager.ts:131](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L131)
 
 ___
 
@@ -238,4 +238,4 @@ Reset all slices and indices
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:205](https://github.com/mybigday/whisper.rn/blob/874c510/src/realtime-transcription/SliceManager.ts#L205)
+[realtime-transcription/SliceManager.ts:205](https://github.com/mybigday/whisper.rn/blob/5c1c70c/src/realtime-transcription/SliceManager.ts#L205)
