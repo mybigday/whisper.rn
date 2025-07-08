@@ -14,6 +14,7 @@
 - [audioStreamConfig](realtime_transcription.RealtimeOptions.md#audiostreamconfig)
 - [autoSliceOnSpeechEnd](realtime_transcription.RealtimeOptions.md#autosliceonspeechend)
 - [autoSliceThreshold](realtime_transcription.RealtimeOptions.md#autoslicethreshold)
+- [debug](realtime_transcription.RealtimeOptions.md#debug)
 - [initialPrompt](realtime_transcription.RealtimeOptions.md#initialprompt)
 - [maxSlicesInMemory](realtime_transcription.RealtimeOptions.md#maxslicesinmemory)
 - [promptPreviousSlices](realtime_transcription.RealtimeOptions.md#promptpreviousslices)
@@ -29,7 +30,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:160](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L160)
+[realtime-transcription/types.ts:156](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L156)
 
 ___
 
@@ -39,7 +40,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:179](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L179)
+[realtime-transcription/types.ts:175](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L175)
 
 ___
 
@@ -49,7 +50,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:159](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L159)
+[realtime-transcription/types.ts:155](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L155)
 
 ___
 
@@ -59,7 +60,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L182)
+[realtime-transcription/types.ts:178](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L178)
 
 ___
 
@@ -69,7 +70,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:168](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L168)
+[realtime-transcription/types.ts:164](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L164)
 
 ___
 
@@ -79,7 +80,17 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:169](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L169)
+[realtime-transcription/types.ts:165](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L165)
+
+___
+
+### debug
+
+• `Optional` **debug**: `boolean`
+
+#### Defined in
+
+[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L181)
 
 ___
 
@@ -89,7 +100,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:175](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L175)
+[realtime-transcription/types.ts:171](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L171)
 
 ___
 
@@ -99,7 +110,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:161](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L161)
+[realtime-transcription/types.ts:157](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L157)
 
 ___
 
@@ -109,7 +120,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:176](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L176)
+[realtime-transcription/types.ts:172](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L172)
 
 ___
 
@@ -119,7 +130,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:172](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L172)
+[realtime-transcription/types.ts:168](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L168)
 
 ___
 
@@ -129,14 +140,14 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:164](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L164)
+[realtime-transcription/types.ts:160](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L160)
 
 ___
 
 ### vadPreset
 
-• `Optional` **vadPreset**: ``"DEFAULT"`` \| ``"SENSITIVE"`` \| ``"VERY_SENSITIVE"`` \| ``"CONSERVATIVE"`` \| ``"VERY_CONSERVATIVE"`` \| ``"CONTINUOUS_SPEECH"`` \| ``"MEETING"`` \| ``"NOISY_ENVIRONMENT"``
+• `Optional` **vadPreset**: ``"continuous"`` \| ``"default"`` \| ``"sensitive"`` \| ``"very-sensitive"`` \| ``"conservative"`` \| ``"very-conservative"`` \| ``"meeting"`` \| ``"noisy"``
 
 #### Defined in
 
-[realtime-transcription/types.ts:165](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L165)
+[realtime-transcription/types.ts:161](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L161)

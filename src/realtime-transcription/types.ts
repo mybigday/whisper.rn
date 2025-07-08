@@ -1,8 +1,4 @@
-import type {
-  TranscribeOptions,
-  TranscribeResult,
-  VadOptions,
-} from '../index'
+import type { TranscribeOptions, TranscribeResult, VadOptions } from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
 
 // === Audio Stream Interfaces ===
@@ -38,7 +34,7 @@ export interface AudioStreamInterface {
 // Pre-defined VAD configurations for different use cases
 export const VAD_PRESETS = {
   // Default - balanced performance
-  DEFAULT: {
+  default: {
     threshold: 0.5,
     minSpeechDurationMs: 250,
     minSilenceDurationMs: 100,
@@ -48,7 +44,7 @@ export const VAD_PRESETS = {
   },
 
   // Sensitive - good for quiet environments
-  SENSITIVE: {
+  sensitive: {
     threshold: 0.3,
     minSpeechDurationMs: 100,
     minSilenceDurationMs: 50,
@@ -58,7 +54,7 @@ export const VAD_PRESETS = {
   },
 
   // Very sensitive - catches even quiet speech
-  VERY_SENSITIVE: {
+  'very-sensitive': {
     threshold: 0.2,
     minSpeechDurationMs: 100,
     minSilenceDurationMs: 50,
@@ -68,7 +64,7 @@ export const VAD_PRESETS = {
   },
 
   // Conservative - avoids false positives
-  CONSERVATIVE: {
+  conservative: {
     threshold: 0.7,
     minSpeechDurationMs: 500,
     minSilenceDurationMs: 200,
@@ -78,7 +74,7 @@ export const VAD_PRESETS = {
   },
 
   // Very conservative - only clear speech
-  VERY_CONSERVATIVE: {
+  'very-conservative': {
     threshold: 0.8,
     minSpeechDurationMs: 750,
     minSilenceDurationMs: 300,
@@ -88,7 +84,7 @@ export const VAD_PRESETS = {
   },
 
   // Continuous speech - for presentations/lectures
-  CONTINUOUS_SPEECH: {
+  continuous: {
     threshold: 0.4,
     minSpeechDurationMs: 200,
     minSilenceDurationMs: 300,
@@ -98,7 +94,7 @@ export const VAD_PRESETS = {
   },
 
   // Meeting mode - handles multiple speakers
-  MEETING: {
+  meeting: {
     threshold: 0.45,
     minSpeechDurationMs: 300,
     minSilenceDurationMs: 150,
@@ -108,7 +104,7 @@ export const VAD_PRESETS = {
   },
 
   // Noisy environment - more strict thresholds
-  NOISY_ENVIRONMENT: {
+  noisy: {
     threshold: 0.75,
     minSpeechDurationMs: 400,
     minSilenceDurationMs: 100,

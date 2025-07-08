@@ -39,63 +39,63 @@
 
 | Name | Type |
 | :------ | :------ |
-| `CONSERVATIVE` | { `maxSpeechDurationS`: `number` = 25; `minSilenceDurationMs`: `number` = 200; `minSpeechDurationMs`: `number` = 500; `samplesOverlap`: `number` = 0.05; `speechPadMs`: `number` = 20; `threshold`: `number` = 0.7 } |
-| `CONSERVATIVE.maxSpeechDurationS` | `number` |
-| `CONSERVATIVE.minSilenceDurationMs` | `number` |
-| `CONSERVATIVE.minSpeechDurationMs` | `number` |
-| `CONSERVATIVE.samplesOverlap` | `number` |
-| `CONSERVATIVE.speechPadMs` | `number` |
-| `CONSERVATIVE.threshold` | `number` |
-| `CONTINUOUS_SPEECH` | { `maxSpeechDurationS`: `number` = 60; `minSilenceDurationMs`: `number` = 300; `minSpeechDurationMs`: `number` = 200; `samplesOverlap`: `number` = 0.15; `speechPadMs`: `number` = 50; `threshold`: `number` = 0.4 } |
-| `CONTINUOUS_SPEECH.maxSpeechDurationS` | `number` |
-| `CONTINUOUS_SPEECH.minSilenceDurationMs` | `number` |
-| `CONTINUOUS_SPEECH.minSpeechDurationMs` | `number` |
-| `CONTINUOUS_SPEECH.samplesOverlap` | `number` |
-| `CONTINUOUS_SPEECH.speechPadMs` | `number` |
-| `CONTINUOUS_SPEECH.threshold` | `number` |
-| `DEFAULT` | { `maxSpeechDurationS`: `number` = 30; `minSilenceDurationMs`: `number` = 100; `minSpeechDurationMs`: `number` = 250; `samplesOverlap`: `number` = 0.1; `speechPadMs`: `number` = 30; `threshold`: `number` = 0.5 } |
-| `DEFAULT.maxSpeechDurationS` | `number` |
-| `DEFAULT.minSilenceDurationMs` | `number` |
-| `DEFAULT.minSpeechDurationMs` | `number` |
-| `DEFAULT.samplesOverlap` | `number` |
-| `DEFAULT.speechPadMs` | `number` |
-| `DEFAULT.threshold` | `number` |
-| `MEETING` | { `maxSpeechDurationS`: `number` = 45; `minSilenceDurationMs`: `number` = 150; `minSpeechDurationMs`: `number` = 300; `samplesOverlap`: `number` = 0.2; `speechPadMs`: `number` = 75; `threshold`: `number` = 0.45 } |
-| `MEETING.maxSpeechDurationS` | `number` |
-| `MEETING.minSilenceDurationMs` | `number` |
-| `MEETING.minSpeechDurationMs` | `number` |
-| `MEETING.samplesOverlap` | `number` |
-| `MEETING.speechPadMs` | `number` |
-| `MEETING.threshold` | `number` |
-| `NOISY_ENVIRONMENT` | { `maxSpeechDurationS`: `number` = 25; `minSilenceDurationMs`: `number` = 100; `minSpeechDurationMs`: `number` = 400; `samplesOverlap`: `number` = 0.1; `speechPadMs`: `number` = 40; `threshold`: `number` = 0.75 } |
-| `NOISY_ENVIRONMENT.maxSpeechDurationS` | `number` |
-| `NOISY_ENVIRONMENT.minSilenceDurationMs` | `number` |
-| `NOISY_ENVIRONMENT.minSpeechDurationMs` | `number` |
-| `NOISY_ENVIRONMENT.samplesOverlap` | `number` |
-| `NOISY_ENVIRONMENT.speechPadMs` | `number` |
-| `NOISY_ENVIRONMENT.threshold` | `number` |
-| `SENSITIVE` | { `maxSpeechDurationS`: `number` = 15; `minSilenceDurationMs`: `number` = 50; `minSpeechDurationMs`: `number` = 100; `samplesOverlap`: `number` = 0.2; `speechPadMs`: `number` = 50; `threshold`: `number` = 0.3 } |
-| `SENSITIVE.maxSpeechDurationS` | `number` |
-| `SENSITIVE.minSilenceDurationMs` | `number` |
-| `SENSITIVE.minSpeechDurationMs` | `number` |
-| `SENSITIVE.samplesOverlap` | `number` |
-| `SENSITIVE.speechPadMs` | `number` |
-| `SENSITIVE.threshold` | `number` |
-| `VERY_CONSERVATIVE` | { `maxSpeechDurationS`: `number` = 20; `minSilenceDurationMs`: `number` = 300; `minSpeechDurationMs`: `number` = 750; `samplesOverlap`: `number` = 0.05; `speechPadMs`: `number` = 10; `threshold`: `number` = 0.8 } |
-| `VERY_CONSERVATIVE.maxSpeechDurationS` | `number` |
-| `VERY_CONSERVATIVE.minSilenceDurationMs` | `number` |
-| `VERY_CONSERVATIVE.minSpeechDurationMs` | `number` |
-| `VERY_CONSERVATIVE.samplesOverlap` | `number` |
-| `VERY_CONSERVATIVE.speechPadMs` | `number` |
-| `VERY_CONSERVATIVE.threshold` | `number` |
-| `VERY_SENSITIVE` | { `maxSpeechDurationS`: `number` = 15; `minSilenceDurationMs`: `number` = 50; `minSpeechDurationMs`: `number` = 100; `samplesOverlap`: `number` = 0.3; `speechPadMs`: `number` = 100; `threshold`: `number` = 0.2 } |
-| `VERY_SENSITIVE.maxSpeechDurationS` | `number` |
-| `VERY_SENSITIVE.minSilenceDurationMs` | `number` |
-| `VERY_SENSITIVE.minSpeechDurationMs` | `number` |
-| `VERY_SENSITIVE.samplesOverlap` | `number` |
-| `VERY_SENSITIVE.speechPadMs` | `number` |
-| `VERY_SENSITIVE.threshold` | `number` |
+| `conservative` | { `maxSpeechDurationS`: `number` = 25; `minSilenceDurationMs`: `number` = 200; `minSpeechDurationMs`: `number` = 500; `samplesOverlap`: `number` = 0.05; `speechPadMs`: `number` = 20; `threshold`: `number` = 0.7 } |
+| `conservative.maxSpeechDurationS` | `number` |
+| `conservative.minSilenceDurationMs` | `number` |
+| `conservative.minSpeechDurationMs` | `number` |
+| `conservative.samplesOverlap` | `number` |
+| `conservative.speechPadMs` | `number` |
+| `conservative.threshold` | `number` |
+| `continuous` | { `maxSpeechDurationS`: `number` = 60; `minSilenceDurationMs`: `number` = 300; `minSpeechDurationMs`: `number` = 200; `samplesOverlap`: `number` = 0.15; `speechPadMs`: `number` = 50; `threshold`: `number` = 0.4 } |
+| `continuous.maxSpeechDurationS` | `number` |
+| `continuous.minSilenceDurationMs` | `number` |
+| `continuous.minSpeechDurationMs` | `number` |
+| `continuous.samplesOverlap` | `number` |
+| `continuous.speechPadMs` | `number` |
+| `continuous.threshold` | `number` |
+| `default` | { `maxSpeechDurationS`: `number` = 30; `minSilenceDurationMs`: `number` = 100; `minSpeechDurationMs`: `number` = 250; `samplesOverlap`: `number` = 0.1; `speechPadMs`: `number` = 30; `threshold`: `number` = 0.5 } |
+| `default.maxSpeechDurationS` | `number` |
+| `default.minSilenceDurationMs` | `number` |
+| `default.minSpeechDurationMs` | `number` |
+| `default.samplesOverlap` | `number` |
+| `default.speechPadMs` | `number` |
+| `default.threshold` | `number` |
+| `meeting` | { `maxSpeechDurationS`: `number` = 45; `minSilenceDurationMs`: `number` = 150; `minSpeechDurationMs`: `number` = 300; `samplesOverlap`: `number` = 0.2; `speechPadMs`: `number` = 75; `threshold`: `number` = 0.45 } |
+| `meeting.maxSpeechDurationS` | `number` |
+| `meeting.minSilenceDurationMs` | `number` |
+| `meeting.minSpeechDurationMs` | `number` |
+| `meeting.samplesOverlap` | `number` |
+| `meeting.speechPadMs` | `number` |
+| `meeting.threshold` | `number` |
+| `noisy` | { `maxSpeechDurationS`: `number` = 25; `minSilenceDurationMs`: `number` = 100; `minSpeechDurationMs`: `number` = 400; `samplesOverlap`: `number` = 0.1; `speechPadMs`: `number` = 40; `threshold`: `number` = 0.75 } |
+| `noisy.maxSpeechDurationS` | `number` |
+| `noisy.minSilenceDurationMs` | `number` |
+| `noisy.minSpeechDurationMs` | `number` |
+| `noisy.samplesOverlap` | `number` |
+| `noisy.speechPadMs` | `number` |
+| `noisy.threshold` | `number` |
+| `sensitive` | { `maxSpeechDurationS`: `number` = 15; `minSilenceDurationMs`: `number` = 50; `minSpeechDurationMs`: `number` = 100; `samplesOverlap`: `number` = 0.2; `speechPadMs`: `number` = 50; `threshold`: `number` = 0.3 } |
+| `sensitive.maxSpeechDurationS` | `number` |
+| `sensitive.minSilenceDurationMs` | `number` |
+| `sensitive.minSpeechDurationMs` | `number` |
+| `sensitive.samplesOverlap` | `number` |
+| `sensitive.speechPadMs` | `number` |
+| `sensitive.threshold` | `number` |
+| `very-conservative` | { `maxSpeechDurationS`: `number` = 20; `minSilenceDurationMs`: `number` = 300; `minSpeechDurationMs`: `number` = 750; `samplesOverlap`: `number` = 0.05; `speechPadMs`: `number` = 10; `threshold`: `number` = 0.8 } |
+| `very-conservative.maxSpeechDurationS` | `number` |
+| `very-conservative.minSilenceDurationMs` | `number` |
+| `very-conservative.minSpeechDurationMs` | `number` |
+| `very-conservative.samplesOverlap` | `number` |
+| `very-conservative.speechPadMs` | `number` |
+| `very-conservative.threshold` | `number` |
+| `very-sensitive` | { `maxSpeechDurationS`: `number` = 15; `minSilenceDurationMs`: `number` = 50; `minSpeechDurationMs`: `number` = 100; `samplesOverlap`: `number` = 0.3; `speechPadMs`: `number` = 100; `threshold`: `number` = 0.2 } |
+| `very-sensitive.maxSpeechDurationS` | `number` |
+| `very-sensitive.minSilenceDurationMs` | `number` |
+| `very-sensitive.minSpeechDurationMs` | `number` |
+| `very-sensitive.samplesOverlap` | `number` |
+| `very-sensitive.speechPadMs` | `number` |
+| `very-sensitive.threshold` | `number` |
 
 #### Defined in
 
-[realtime-transcription/types.ts:39](https://github.com/mybigday/whisper.rn/blob/4ad9647/src/realtime-transcription/types.ts#L39)
+[realtime-transcription/types.ts:35](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L35)

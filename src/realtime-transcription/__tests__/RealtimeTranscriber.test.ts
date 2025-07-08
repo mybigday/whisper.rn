@@ -99,7 +99,7 @@ describe('RealtimeTranscriber', () => {
         audioSliceSec: 2,
         audioMinSec: 0.5,
         maxSlicesInMemory: 3,
-        vadOptions: VAD_PRESETS.DEFAULT,
+        vadOptions: VAD_PRESETS.default,
         autoSliceOnSpeechEnd: true,
       },
       mockCallbacks
@@ -140,7 +140,7 @@ describe('RealtimeTranscriber', () => {
           audioSliceSec: 5,
           audioMinSec: 2,
           maxSlicesInMemory: 5,
-          vadPreset: 'SENSITIVE',
+          vadPreset: 'sensitive',
           autoSliceOnSpeechEnd: false,
         }
       )
@@ -156,7 +156,7 @@ describe('RealtimeTranscriber', () => {
           audioStream: mockAudioStream,
         },
         {
-          vadPreset: 'VERY_SENSITIVE',
+          vadPreset: 'very-sensitive',
           vadOptions: { threshold: 0.8 }, // Should be overridden by preset
         }
       )
@@ -667,7 +667,7 @@ describe('RealtimeTranscriber', () => {
           audioSliceSec: 2,
           audioMinSec: 0.5,
           maxSlicesInMemory: 3,
-          vadOptions: VAD_PRESETS.DEFAULT,
+          vadOptions: VAD_PRESETS.default,
           autoSliceOnSpeechEnd: true,
         },
         mockCallbacks

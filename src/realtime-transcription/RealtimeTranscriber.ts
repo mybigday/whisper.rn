@@ -103,7 +103,7 @@ export class RealtimeTranscriber {
       audioSliceSec: options.audioSliceSec || 30,
       audioMinSec: options.audioMinSec || 1,
       maxSlicesInMemory: options.maxSlicesInMemory || 3,
-      vadOptions: options.vadOptions || VAD_PRESETS.DEFAULT,
+      vadOptions: options.vadOptions || VAD_PRESETS.default,
       vadPreset: options.vadPreset,
       autoSliceOnSpeechEnd: options.autoSliceOnSpeechEnd || true,
       autoSliceThreshold: options.autoSliceThreshold || 0.5,

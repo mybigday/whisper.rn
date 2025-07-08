@@ -129,7 +129,7 @@ export default function RealtimeTranscriberDemo() {
   ])
   const [transcribeResult, setTranscribeResult] = useState<string | null>(null)
   const [currentVadPreset, setCurrentVadPreset] =
-    useState<keyof typeof VAD_PRESETS>('DEFAULT')
+    useState<keyof typeof VAD_PRESETS>('default')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
   const [vadEvents, setVadEvents] = useState<RealtimeVadEvent[]>([])
