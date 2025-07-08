@@ -12,6 +12,7 @@ import type {
   AudioStreamData,
   AudioSliceNoData,
   AudioStreamInterface,
+  AudioStreamConfig,
 } from './types'
 import { VAD_PRESETS } from './types'
 
@@ -49,6 +50,7 @@ export class RealtimeTranscriber {
     promptPreviousSlices: boolean
     fs?: WavFileWriterFs
     audioOutputPath?: string
+    audioStreamConfig?: AudioStreamConfig
   }
 
   private isActive = false
@@ -159,6 +161,13 @@ export class RealtimeTranscriber {
       }
 
       // Start audio recording
+      await this.audioStream.initialize({
+        sampleRate: this.options.audioStreamConfig?.sampleRate || 16000,
+        channels: this.options.audioStreamConfig?.channels || 1,
+        bitsPerSample: this.options.audioStreamConfig?.bitsPerSample || 16,
+        audioSource: this.options.audioStreamConfig?.audioSource || 6,
+        bufferSize: this.options.audioStreamConfig?.bufferSize || 16 * 1024,
+      })
       await this.audioStream.start()
 
       // Emit stats update for status change

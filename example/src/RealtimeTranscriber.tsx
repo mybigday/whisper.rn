@@ -348,8 +348,6 @@ export default function RealtimeTranscriberDemo() {
           log('Creating live audio adapter...')
           audioStream = new AudioPcmStreamAdapter()
         }
-
-        await audioStream.initialize({})
         audioStreamRef.current = audioStream
 
         // Create dependencies
