@@ -180,6 +180,9 @@ export interface RealtimeOptions {
 
   // Audio stream configuration
   audioStreamConfig?: AudioStreamConfig
+
+  // Debug settings
+  debug?: boolean // default: false - enable console logging for debugging
 }
 
 export interface AudioSlice {

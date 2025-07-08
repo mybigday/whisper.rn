@@ -12,6 +12,7 @@ export interface SimulateFileOptions {
   chunkDurationMs?: number // Default: 100ms chunks
   loop?: boolean // Default: false
   onEndOfFile?: () => void // Callback when end of file is reached
+  debug?: boolean // Default: false - enable console logging for debugging
 }
 
 export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
@@ -46,6 +47,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       playbackSpeed: 1.0,
       chunkDurationMs: 100,
       loop: false,
+      debug: false,
       ...options,
     }
     this.fileReader = new WavFileReader(this.options.fs, this.options.filePath)
@@ -70,25 +72,25 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
 
       // Warn about mismatched formats but allow processing
       if (header.sampleRate !== config.sampleRate) {
-        console.warn(
+        this.log(
           `WAV file sample rate (${header.sampleRate}Hz) differs from config (${config.sampleRate}Hz)`,
         )
       }
 
       if (header.channels !== config.channels) {
-        console.warn(
+        this.log(
           `WAV file channels (${header.channels}) differs from config (${config.channels})`,
         )
       }
 
       if (header.bitsPerSample !== config.bitsPerSample) {
-        console.warn(
+        this.log(
           `WAV file bits per sample (${header.bitsPerSample}) differs from config (${config.bitsPerSample})`,
         )
       }
 
       this.isInitialized = true
-      console.log(
+      this.log(
         `Simulate audio stream initialized: ${header.duration.toFixed(2)}s at ${
           this.options.playbackSpeed
         }x speed`,
@@ -121,7 +123,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       // Start streaming chunks
       this.startStreaming()
 
-      // console.log('File audio simulation started')
+      this.log('File audio simulation started')
     } catch (error) {
       this.recording = false
       this.statusCallback?.(false)
@@ -148,7 +150,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       }
 
       this.statusCallback?.(false)
-      // console.log('File audio simulation stopped')
+      this.log('File audio simulation stopped')
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown stop error'
@@ -177,7 +179,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
     this.isInitialized = false
     this.currentBytePosition = 0
     this.pausedTime = 0
-    // console.log('SimulateFileAudioStreamAdapter released')
+    this.log('SimulateFileAudioStreamAdapter released')
   }
 
   /**
@@ -248,17 +250,17 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
         this.startTime = Date.now()
         this.pausedTime = 0
         this.hasReachedEnd = false
-        // console.log('Looping audio file simulation')
+        this.log('Looping audio file simulation')
         return
       }
 
       // Stop streaming due to no new buffer
-      // console.log('Audio file simulation completed - no new buffer available')
+      this.log('Audio file simulation completed - no new buffer available')
       this.hasReachedEnd = true
 
       // Call the end-of-file callback if provided
       if (this.options.onEndOfFile) {
-        // console.log('Calling onEndOfFile callback')
+        this.log('Calling onEndOfFile callback')
         this.options.onEndOfFile()
       }
 
@@ -322,7 +324,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       this.pausedTime = 0
     }
 
-    // console.log(`Seeked to ${clampedTime.toFixed(2)}s`)
+    this.log(`Seeked to ${clampedTime.toFixed(2)}s`)
   }
 
   /**
@@ -342,14 +344,14 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       })
     }
 
-    console.log(`Playback speed set to ${speed}x`)
+    this.log(`Playback speed set to ${speed}x`)
   }
 
   /**
    * Reset file buffer to beginning
    */
   resetBuffer(): void {
-    console.log('Resetting file buffer to beginning')
+    this.log('Resetting file buffer to beginning')
 
     // Reset position and timing
     this.currentBytePosition = 0
@@ -359,11 +361,20 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
 
     // If currently playing, restart streaming from beginning
     if (this.recording) {
-      console.log('Restarting streaming from beginning')
+      this.log('Restarting streaming from beginning')
       // Stop and restart to apply the reset
       this.stop().then(() => {
         this.start()
       })
+    }
+  }
+
+  /**
+   * Debug logging
+   */
+  private log(message: string): void {
+    if (this.options.debug) {
+      console.log(`[SimulateFileAudioStreamAdapter] ${message}`)
     }
   }
 }

@@ -317,6 +317,7 @@ export default function RealtimeTranscriberDemo() {
                   stopRealtimeTranscription()
                 }, 1000) // Small delay to allow final processing
               },
+              debug: true,
             })
           } catch (error) {
             log('Failed to download audio file for simulation')
@@ -343,6 +344,7 @@ export default function RealtimeTranscriberDemo() {
           },
           // Options
           {
+            debug: true,
             audioSliceSec: 30,
             audioMinSec: 0.5,
             maxSlicesInMemory: 1,

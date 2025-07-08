@@ -54,6 +54,7 @@ export class RealtimeTranscriber {
     promptPreviousSlices: boolean
     audioOutputPath?: string
     audioStreamConfig?: AudioStreamConfig
+    debug: boolean
   }
 
   private isActive = false
@@ -110,6 +111,7 @@ export class RealtimeTranscriber {
       initialPrompt: options.initialPrompt,
       promptPreviousSlices: options.promptPreviousSlices ?? true,
       audioOutputPath: options.audioOutputPath,
+      debug: options.debug || false,
     }
 
     // Apply VAD preset if specified
@@ -239,7 +241,7 @@ export class RealtimeTranscriber {
       // Write to WAV file if enabled (convert to Uint8Array for WavFileWriter)
       if (this.wavFileWriter) {
         this.wavFileWriter.appendAudioData(streamData.data).catch((error) => {
-          console.warn('Failed to write audio to WAV file:', error)
+          this.log(`Failed to write audio to WAV file: ${error}`)
         })
       }
 
@@ -898,7 +900,7 @@ export class RealtimeTranscriber {
     // Cancel WAV file writing if in progress
     if (this.wavFileWriter) {
       this.wavFileWriter.cancel().catch((error) => {
-        console.warn('Failed to cancel WAV file writing:', error)
+        this.log(`Failed to cancel WAV file writing: ${error}`)
       })
       this.wavFileWriter = null
     }
@@ -980,7 +982,9 @@ export class RealtimeTranscriber {
   /**
    * Debug logging
    */
-  private log(_message: string): void {
-    // console.log(`[RealtimeTranscriber] ${_message}`)
+  private log(message: string): void {
+    if (this.options.debug) {
+      console.log(`[RealtimeTranscriber] ${message}`)
+    }
   }
 }
