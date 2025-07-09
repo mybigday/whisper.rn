@@ -141,7 +141,6 @@ export class SliceManager {
       return null
     }
 
-    // Convert Uint8Array to base64 (same as TranscribeData.tsx)
     return slice.data.subarray(0, slice.sampleCount)
   }
 
