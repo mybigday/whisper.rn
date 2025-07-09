@@ -230,14 +230,12 @@ export interface RealtimeStatsEvent {
   type:
     | 'slice_processed'
     | 'vad_change'
-    | 'queue_change'
     | 'memory_change'
     | 'status_change'
   data: {
     isActive: boolean
     isTranscribing: boolean
     vadEnabled: boolean
-    queueLength: number
     audioStats: any
     vadStats: any
     sliceStats: any

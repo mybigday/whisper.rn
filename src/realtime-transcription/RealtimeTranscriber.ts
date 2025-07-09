@@ -491,9 +491,6 @@ export class RealtimeTranscriber {
         `Queued slice ${slice.index} for transcription (${slice.data.length} samples)`,
       )
 
-      // Emit stats update for queue change
-      this.emitStatsUpdate('queue_change')
-
       await this.processTranscriptionQueue()
     } catch (error: any) {
       this.handleError(`Failed to queue slice for transcription: ${error}`)
@@ -730,9 +727,6 @@ export class RealtimeTranscriber {
       } else {
         this.isTranscribing = false
       }
-
-      // Emit stats update for queue change
-      this.emitStatsUpdate('queue_change')
     }
   }
 
@@ -791,7 +785,6 @@ export class RealtimeTranscriber {
       isActive: this.isActive,
       isTranscribing: this.isTranscribing,
       vadEnabled: this.vadEnabled,
-      queueLength: this.transcriptionQueue.length,
       audioStats: {
         isRecording: this.audioStream.isRecording(),
         accumulatedSamples: this.accumulatedData.length,
@@ -957,11 +950,6 @@ export class RealtimeTranscriber {
       current.isActive !== previous.isActive ||
       current.isTranscribing !== previous.isTranscribing
     ) {
-      return true
-    }
-
-    // Emit on queue length changes
-    if (current.queueLength !== previous.queueLength) {
       return true
     }
 

@@ -121,7 +121,6 @@ describe('RealtimeTranscriber', () => {
         isActive: false,
         isTranscribing: false,
         vadEnabled: false,
-        queueLength: 0,
         audioStats: expect.any(Object),
         vadStats: expect.any(Object),
         sliceStats: expect.any(Object),
@@ -446,21 +445,6 @@ describe('RealtimeTranscriber', () => {
       await promptTranscriber.stop()
       await promptTranscriber.release()
     })
-
-    it('should manage transcription queue correctly', async () => {
-      // Add multiple chunks quickly
-      for (let i = 0; i < 3; i += 1) {
-        const audioData = new Uint8Array(16000)
-        audioData.fill(i)
-        mockAudioStream.simulateDataChunk(audioData)
-      }
-
-      // Allow processing to complete
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      const stats = transcriber.getStatistics()
-      expect(stats.queueLength).toBeGreaterThanOrEqual(0)
-    })
   })
 
   describe('auto-slicing', () => {
@@ -573,7 +557,6 @@ describe('RealtimeTranscriber', () => {
         isActive: false,
         isTranscribing: false,
         vadEnabled: true,
-        queueLength: 0,
         audioStats: expect.any(Object),
         vadStats: expect.any(Object),
         sliceStats: expect.any(Object),
@@ -722,7 +705,6 @@ describe('RealtimeTranscriber', () => {
       const stats = transcriber.getStatistics()
       expect(stats.isActive).toBe(false)
       expect(stats.isTranscribing).toBe(false)
-      expect(stats.queueLength).toBe(0)
     })
   })
 })

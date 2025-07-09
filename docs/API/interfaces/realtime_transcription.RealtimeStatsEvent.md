@@ -25,14 +25,13 @@
 | `audioStats` | `any` |
 | `isActive` | `boolean` |
 | `isTranscribing` | `boolean` |
-| `queueLength` | `number` |
 | `sliceStats` | `any` |
 | `vadEnabled` | `boolean` |
 | `vadStats` | `any` |
 
 #### Defined in
 
-[realtime-transcription/types.ts:210](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L210)
+[realtime-transcription/types.ts:235](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/realtime-transcription/types.ts#L235)
 
 ___
 
@@ -42,14 +41,14 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:203](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L203)
+[realtime-transcription/types.ts:229](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/realtime-transcription/types.ts#L229)
 
 ___
 
 ### type
 
-• **type**: ``"slice_processed"`` \| ``"vad_change"`` \| ``"queue_change"`` \| ``"memory_change"`` \| ``"status_change"``
+• **type**: ``"slice_processed"`` \| ``"vad_change"`` \| ``"memory_change"`` \| ``"status_change"``
 
 #### Defined in
 
-[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/95a39c1/src/realtime-transcription/types.ts#L204)
+[realtime-transcription/types.ts:230](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/realtime-transcription/types.ts#L230)

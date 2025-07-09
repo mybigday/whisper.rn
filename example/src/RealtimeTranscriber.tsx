@@ -846,8 +846,7 @@ export default function RealtimeTranscriberDemo() {
           >
             <Text style={styles.statusText}>
               Status: {isTranscribing ? 'TRANSCRIBING' : 'STOPPED'} | VAD:{' '}
-              {realtimeStats.vadEnabled ? 'ON' : 'OFF'} | Queue:{' '}
-              {realtimeStats.queueLength} | Memory:{' '}
+              {realtimeStats.vadEnabled ? 'ON' : 'OFF'} | Memory:{' '}
               {realtimeStats.sliceStats?.memoryUsage?.estimatedMB || 0}MB
             </Text>
             <Text style={styles.statusText}>
