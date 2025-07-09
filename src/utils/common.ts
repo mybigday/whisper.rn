@@ -1,13 +1,11 @@
+const Buffer: any = global.Buffer || require('safe-buffer').Buffer
+
 /**
  * Convert base64 string to Uint8Array
  */
 export function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i += 1) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-  return bytes
+  const buffer = Buffer.from(base64, 'base64')
+  return new Uint8Array(buffer)
 }
 
 /**

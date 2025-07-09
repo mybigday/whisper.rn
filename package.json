@@ -147,5 +147,8 @@
     "type": "all",
     "jsSrcsDir": "./src/"
   },
-  "packageManager": "yarn@1.22.22"
+  "packageManager": "yarn@1.22.22",
+  "dependencies": {
+    "safe-buffer": "^5.2.1"
+  }
 }
