@@ -32,6 +32,32 @@ export interface AudioStreamInterface {
 // === Enhanced VAD Options ===
 
 // Pre-defined VAD configurations for different use cases
+/**
+ * VAD Presets Overview:
+ *
+ *                            VAD Presets
+ *                         /      |      \
+ *                Conservative  Default  Sensitive
+ *                /        |        |        \
+ *        conservative  very-conservative  sensitive  very-sensitive
+ *        (0.7 thresh)   (0.8 thresh)    (0.3 thresh) (0.2 thresh)
+ *        500ms min      750ms min       100ms min    100ms min
+ *        Clear speech   Very clear      Quiet env    Catches whispers
+ *
+ *                         Specialized Presets
+ *                      /        |        \
+ *                continuous   meeting    noisy
+ *                (60s max)    (45s max)  (0.75 thresh)
+ *                Lectures     Multi-spk   Strict for noise
+ *
+ * Key Parameters:
+ * - threshold: 0.0-1.0 (lower = more sensitive)
+ * - minSpeechDurationMs: Min duration to consider speech
+ * - minSilenceDurationMs: Min silence before ending speech
+ * - maxSpeechDurationS: Max continuous speech duration
+ * - speechPadMs: Padding around detected speech
+ * - samplesOverlap: Analysis window overlap (0.0-1.0)
+ */
 export const VAD_PRESETS = {
   // Default - balanced performance
   default: {
