@@ -12,7 +12,7 @@ export interface SimulateFileOptions {
   chunkDurationMs?: number // Default: 100ms chunks
   loop?: boolean // Default: false
   onEndOfFile?: () => void // Callback when end of file is reached
-  debug?: boolean // Default: false - enable console logging for debugging
+  logger?: (message: string) => void // Default: noop - custom logger function
 }
 
 export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
@@ -47,7 +47,7 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       playbackSpeed: 1.0,
       chunkDurationMs: 100,
       loop: false,
-      debug: false,
+      logger: () => {},
       ...options,
     }
     this.fileReader = new WavFileReader(this.options.fs, this.options.filePath)
@@ -370,11 +370,9 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
   }
 
   /**
-   * Debug logging
+   * Logger function
    */
   private log(message: string): void {
-    if (this.options.debug) {
-      console.log(`[SimulateFileAudioStreamAdapter] ${message}`)
-    }
+    this.options.logger?.(`[SimulateFileAudioStreamAdapter] ${message}`)
   }
 }

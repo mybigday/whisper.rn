@@ -203,8 +203,8 @@ export interface RealtimeOptions {
   // Audio stream configuration
   audioStreamConfig?: AudioStreamConfig
 
-  // Debug settings
-  debug?: boolean // default: false - enable console logging for debugging
+  // Logger settings
+  logger?: (message: string) => void // default: noop - custom logger function
 }
 
 export interface AudioSlice {

@@ -291,89 +291,85 @@ export default function RealtimeTranscriberDemo() {
     try {
       await createDir(log)
 
-      if (!realtimeTranscriberRef.current) {
-        // Create appropriate audio stream adapter
-        let audioStream: AudioStreamInterface
+      // Create appropriate audio stream adapter
+      let audioStream: AudioStreamInterface
 
-        if (useFileSimulation) {
-          log('Creating file simulation adapter...')
+      if (useFileSimulation) {
+        log('Creating file simulation adapter...')
 
-          // Download audio file if needed
-          try {
-            const filePath = await downloadAudioFile()
-
-            audioStream = new SimulateFileAudioStreamAdapter({
-              fs: RNFS,
-              filePath,
-              playbackSpeed,
-              chunkDurationMs: 100,
-              loop: false,
-              onEndOfFile: () => {
-                log('File simulation reached end - no new buffer available')
-                log('Automatically stopping realtime transcription...')
-
-                // Automatically stop realtime transcription when file ends
-                setTimeout(() => {
-                  stopRealtimeTranscription()
-                }, 1000) // Small delay to allow final processing
-              },
-              debug: true,
-            })
-          } catch (error) {
-            log('Failed to download audio file for simulation')
-            Alert.alert(
-              'Error',
-              'Could not download audio file for simulation. Please check your internet connection and try again.',
-            )
-            return
-          }
-        } else {
-          log('Creating live audio adapter...')
-          audioStream = new AudioPcmStreamAdapter()
-        }
-        audioStreamRef.current = audioStream
-
-        // Create RealtimeTranscriber if not exists
-        const transcriber = new RealtimeTranscriber(
-          // Dependencies
-          {
-            whisperContext: whisperContextRef.current,
-            vadContext: vadContextRef.current,
-            audioStream,
+        // Download audio file if needed
+        try {
+          audioStream = new SimulateFileAudioStreamAdapter({
             fs: RNFS,
-          },
-          // Options
-          {
-            debug: true,
-            audioSliceSec: 30,
-            audioMinSec: 0.5,
-            maxSlicesInMemory: 1,
-            vadPreset: currentVadPreset,
-            vadOptions: VAD_PRESETS[currentVadPreset],
-            autoSliceOnSpeechEnd,
-            autoSliceThreshold,
-            transcribeOptions: {
-              language: 'en',
-              maxLen: 1,
+            filePath: audioFilePath!,
+            playbackSpeed,
+            chunkDurationMs: 100,
+            loop: false,
+            onEndOfFile: () => {
+              log('File simulation reached end - no new buffer available')
+              log('Automatically stopping realtime transcription...')
+
+              // Automatically stop realtime transcription when file ends
+              setTimeout(() => {
+                stopRealtimeTranscription()
+              }, 1000) // Small delay to allow final processing
             },
-            audioOutputPath: `${fileDir}/realtime-recording.wav`,
-          },
-          // Callbacks
-          {
-            onTranscribe: handleTranscribeEvent,
-            onVad: handleVadEvent,
-            onError: handleError,
-            onStatusChange: handleStatusChange,
-            onStatsUpdate: handleStatsUpdate,
-          },
-        )
+            logger: (message) => console.log(message),
+          })
+        } catch (error) {
+          log('Failed to download audio file for simulation')
+          Alert.alert(
+            'Error',
+            'Could not download audio file for simulation. Please check your internet connection and try again.',
+          )
+          return
+        }
+      } else {
+        log('Creating live audio adapter...')
+        audioStream = new AudioPcmStreamAdapter()
+      }
+      audioStreamRef.current = audioStream
 
-        realtimeTranscriberRef.current = transcriber
+      if (realtimeTranscriberRef.current) {
+        realtimeTranscriberRef.current.release()
       }
 
-      if (useFileSimulation && audioStreamRef.current) {
-        ;(audioStreamRef.current as any).resetBuffer()
-      }
+      // Create RealtimeTranscriber if not exists
+      const transcriber = new RealtimeTranscriber(
+        // Dependencies
+        {
+          whisperContext: whisperContextRef.current,
+          vadContext: vadContextRef.current,
+          audioStream,
+          fs: RNFS,
+        },
+        // Options
+        {
+          logger: (message) => log(message),
+          audioSliceSec: 30,
+          audioMinSec: 0.5,
+          maxSlicesInMemory: 1,
+          vadPreset: currentVadPreset,
+          vadOptions: VAD_PRESETS[currentVadPreset],
+          autoSliceOnSpeechEnd,
+          autoSliceThreshold,
+          transcribeOptions: {
+            language: 'en',
+            maxLen: 1,
+          },
+          audioOutputPath: `${fileDir}/realtime-recording.wav`,
+        },
+        // Callbacks
+        {
+          onTranscribe: handleTranscribeEvent,
+          onVad: handleVadEvent,
+          onError: handleError,
+          onStatusChange: handleStatusChange,
+          onStatsUpdate: handleStatsUpdate,
+        },
+      )
+
+      realtimeTranscriberRef.current = transcriber
 
       // Start transcription
       await realtimeTranscriberRef.current.start()
@@ -643,6 +639,7 @@ export default function RealtimeTranscriberDemo() {
               value={useFileSimulation}
               onValueChange={(value) => {
                 setUseFileSimulation(value)
+                if (value) downloadAudioFile()
                 log(`Audio source: ${value ? 'File Simulation' : 'Live Audio'}`)
               }}
               disabled={isTranscribing}

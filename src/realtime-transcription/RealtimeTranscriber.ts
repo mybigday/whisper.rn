@@ -54,7 +54,7 @@ export class RealtimeTranscriber {
     promptPreviousSlices: boolean
     audioOutputPath?: string
     audioStreamConfig?: AudioStreamConfig
-    debug: boolean
+    logger: (message: string) => void
   }
 
   private isActive = false
@@ -111,7 +111,7 @@ export class RealtimeTranscriber {
       initialPrompt: options.initialPrompt,
       promptPreviousSlices: options.promptPreviousSlices ?? true,
       audioOutputPath: options.audioOutputPath,
-      debug: options.debug || false,
+      logger: options.logger || (() => {}),
     }
 
     // Apply VAD preset if specified
@@ -980,11 +980,9 @@ export class RealtimeTranscriber {
   }
 
   /**
-   * Debug logging
+   * Logger function
    */
   private log(message: string): void {
-    if (this.options.debug) {
-      console.log(`[RealtimeTranscriber] ${message}`)
-    }
+    this.options.logger(`[RealtimeTranscriber] ${message}`)
   }
 }
