@@ -7,6 +7,32 @@
   "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
+  "exports": {
+    ".": {
+      "import": "./lib/module/index",
+      "require": "./lib/commonjs/index",
+      "types": "./lib/typescript/index.d.ts",
+      "react-native": "src/index"
+    },
+    "./realtime-transcription": {
+      "import": "./lib/module/realtime-transcription/index.js",
+      "require": "./lib/commonjs/realtime-transcription/index.js",
+      "types": "./lib/typescript/realtime-transcription/index.d.ts",
+      "react-native": "src/realtime-transcription/index"
+    },
+    "./realtime-transcription/*": {
+      "import": "./lib/module/realtime-transcription/*.js",
+      "require": "./lib/commonjs/realtime-transcription/*.js",
+      "types": "./lib/typescript/realtime-transcription/*.d.ts",
+      "react-native": "src/realtime-transcription/*"
+    },
+    "./realtime-transcription/adapters/*": {
+      "import": "./lib/module/realtime-transcription/adapters/*.js",
+      "require": "./lib/commonjs/realtime-transcription/adapters/*.js",
+      "types": "./lib/typescript/realtime-transcription/adapters/*.d.ts",
+      "react-native": "src/realtime-transcription/adapters/*"
+    }
+  },
   "files": [
     "src",
     "lib",
