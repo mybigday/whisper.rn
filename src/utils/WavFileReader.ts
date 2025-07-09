@@ -1,4 +1,4 @@
-import { base64ToUint8Array, uint8ArrayToBase64 } from './common'
+import { base64ToUint8Array } from './common'
 
 export interface WavFileReaderFs {
   readFile: (filePath: string, encoding: string) => Promise<string>
@@ -146,13 +146,6 @@ export class WavFileReader {
 
   getAudioData(): Uint8Array | null {
     return this.audioData
-  }
-
-  getAudioDataBase64(): string | null {
-    if (!this.audioData) {
-      return null
-    }
-    return uint8ArrayToBase64(this.audioData)
   }
 
   /**
