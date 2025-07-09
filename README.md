@@ -88,57 +88,6 @@ const { result } = await promise
 // result: (The inference text result from audio file)
 ```
 
-## Realtime Transcription
-
-The new `RealtimeTranscriber` provides enhanced realtime transcription with features like Voice Activity Detection (VAD), auto-slicing, and memory management.
-
-```js
-import { RealtimeTranscriber } from 'whisper.rn/realtime-transcription'
-import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters'
-import RNFS from 'react-native-fs' // or any compatible filesystem
-
-// Dependencies
-const whisperContext = await initWhisper({
-  /* ... */
-})
-const vadContext = await initWhisperVad({
-  /* ... */
-})
-const audioStream = new AudioPcmStreamAdapter() // requires @fugood/react-native-audio-pcm-stream
-
-// Create transcriber
-const transcriber = new RealtimeTranscriber(
-  { whisperContext, vadContext, audioStream, fs: RNFS },
-  {
-    audioSliceSec: 30,
-    vadPreset: 'default',
-    autoSliceOnSpeechEnd: true,
-    transcribeOptions: { language: 'en' },
-  },
-  {
-    onTranscribe: (event) => console.log('Transcription:', event.data?.result),
-    onVad: (event) => console.log('VAD:', event.type, event.confidence),
-    onStatusChange: (isActive) =>
-      console.log('Status:', isActive ? 'ACTIVE' : 'INACTIVE'),
-    onError: (error) => console.error('Error:', error),
-  },
-)
-
-// Start/stop transcription
-await transcriber.start()
-await transcriber.stop()
-```
-
-**Dependencies:**
-
-- `@fugood/react-native-audio-pcm-stream` for `AudioPcmStreamAdapter`
-- Compatible filesystem module (e.g., `react-native-fs`). See [filesystem interface](src/utils/WavFileWriter.ts#L9-L16) for TypeScript definition
-
-**Custom Audio Adapters:**
-You can create custom audio stream adapters by implementing the [AudioStreamInterface](src/realtime-transcription/types.ts#L21-L30). This allows integration with different audio sources or custom audio processing pipelines.
-
-**Example:** See [complete example](example/src/RealtimeTranscriber.tsx) for full implementation including file simulation and UI.
-
 ## Voice Activity Detection (VAD)
 
 Voice Activity Detection allows you to detect speech segments in audio data using the Silero VAD model.
@@ -212,37 +161,56 @@ await vadContext.release()
 await releaseAllWhisperVad()
 ```
 
-In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
+## Realtime Transcription
 
-Option 1 - Use options in transcribeRealtime:
+The new `RealtimeTranscriber` provides enhanced realtime transcription with features like Voice Activity Detection (VAD), auto-slicing, and memory management.
 
 ```js
-import { AudioSessionIos } from 'whisper.rn'
+import { RealtimeTranscriber } from 'whisper.rn/realtime-transcription'
+import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters'
+import RNFS from 'react-native-fs' // or any compatible filesystem
 
-const { stop, subscribe } = await whisperContext.transcribeRealtime({
-  audioSessionOnStartIos: {
-    category: AudioSessionIos.Category.PlayAndRecord,
-    options: [AudioSessionIos.CategoryOption.MixWithOthers],
-    mode: AudioSessionIos.Mode.Default,
-  },
-  audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
+// Dependencies
+const whisperContext = await initWhisper({
+  /* ... */
 })
+const vadContext = await initWhisperVad({
+  /* ... */
+})
+const audioStream = new AudioPcmStreamAdapter() // requires @fugood/react-native-audio-pcm-stream
+
+// Create transcriber
+const transcriber = new RealtimeTranscriber(
+  { whisperContext, vadContext, audioStream, fs: RNFS },
+  {
+    audioSliceSec: 30,
+    vadPreset: 'default',
+    autoSliceOnSpeechEnd: true,
+    transcribeOptions: { language: 'en' },
+  },
+  {
+    onTranscribe: (event) => console.log('Transcription:', event.data?.result),
+    onVad: (event) => console.log('VAD:', event.type, event.confidence),
+    onStatusChange: (isActive) =>
+      console.log('Status:', isActive ? 'ACTIVE' : 'INACTIVE'),
+    onError: (error) => console.error('Error:', error),
+  },
+)
+
+// Start/stop transcription
+await transcriber.start()
+await transcriber.stop()
 ```
 
-Option 2 - Manage the Audio Session in anywhere:
+**Dependencies:**
 
-```js
-import { AudioSessionIos } from 'whisper.rn'
+- `@fugood/react-native-audio-pcm-stream` for `AudioPcmStreamAdapter`
+- Compatible filesystem module (e.g., `react-native-fs`). See [filesystem interface](src/utils/WavFileWriter.ts#L9-L16) for TypeScript definition
 
-await AudioSessionIos.setCategory(AudioSessionIos.Category.PlayAndRecord, [
-  AudioSessionIos.CategoryOption.MixWithOthers,
-])
-await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
-await AudioSessionIos.setActive(true)
-// Then you can start do recording
-```
+**Custom Audio Adapters:**
+You can create custom audio stream adapters by implementing the [AudioStreamInterface](src/realtime-transcription/types.ts#L21-L30). This allows integration with different audio sources or custom audio processing pipelines.
 
-In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
+**Example:** See [complete example](example/src/RealtimeTranscriber.tsx) for full implementation including file simulation and UI.
 
 Please visit the [Documentation](docs/) for more details.
 
@@ -371,6 +339,38 @@ subscribe((evt) => {
   if (!isCapturing) console.log('Finished realtime transcribing')
 })
 ```
+
+In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
+
+Option 1 - Use options in transcribeRealtime:
+
+```js
+import { AudioSessionIos } from 'whisper.rn'
+
+const { stop, subscribe } = await whisperContext.transcribeRealtime({
+  audioSessionOnStartIos: {
+    category: AudioSessionIos.Category.PlayAndRecord,
+    options: [AudioSessionIos.CategoryOption.MixWithOthers],
+    mode: AudioSessionIos.Mode.Default,
+  },
+  audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
+})
+```
+
+Option 2 - Manage the Audio Session in anywhere:
+
+```js
+import { AudioSessionIos } from 'whisper.rn'
+
+await AudioSessionIos.setCategory(AudioSessionIos.Category.PlayAndRecord, [
+  AudioSessionIos.CategoryOption.MixWithOthers,
+])
+await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
+await AudioSessionIos.setActive(true)
+// Then you can start do recording
+```
+
+In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
 ## Contributing
 
