@@ -482,7 +482,7 @@ export class RealtimeTranscriber {
       }
 
       // Add to transcription queue
-      this.transcriptionQueue.push({
+      this.transcriptionQueue.unshift({
         sliceIndex: slice.index,
         audioData,
       })
@@ -597,6 +597,7 @@ export class RealtimeTranscriber {
 
     while (this.transcriptionQueue.length > 0) {
       const item = this.transcriptionQueue.shift()
+      this.transcriptionQueue = [] // Old items are not needed anymore
       if (item) {
         // eslint-disable-next-line no-await-in-loop
         await this.processTranscription(item).catch((error) => {

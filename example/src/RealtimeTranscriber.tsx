@@ -180,11 +180,6 @@ export default function RealtimeTranscriberDemo() {
   }, [useFileSimulation, isTranscribing])
 
   const downloadAudioFile = async () => {
-    if (audioFilePath) {
-      // File already downloaded
-      return audioFilePath
-    }
-
     setIsDownloading(true)
     setDownloadProgress(0)
 
@@ -468,8 +463,6 @@ export default function RealtimeTranscriberDemo() {
           statsEvent.data.isActive ? 'ACTIVE' : 'INACTIVE'
         }, transcribing: ${statsEvent.data.isTranscribing}`,
       )
-    } else if (statsEvent.type === 'queue_change') {
-      log(`Queue length: ${statsEvent.data.queueLength}`)
     } else if (statsEvent.type === 'memory_change') {
       const memMB = statsEvent.data.sliceStats?.memoryUsage?.estimatedMB || 0
       log(`Memory usage: ${memMB.toFixed(1)}MB`)
