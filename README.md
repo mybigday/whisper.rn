@@ -166,6 +166,7 @@ await releaseAllWhisperVad()
 The new `RealtimeTranscriber` provides enhanced realtime transcription with features like Voice Activity Detection (VAD), auto-slicing, and memory management.
 
 ```js
+// If your RN packager is not enable package exports support, use whisper.rn/src/realtime-transcription
 import { RealtimeTranscriber } from 'whisper.rn/realtime-transcription'
 import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters'
 import RNFS from 'react-native-fs' // or any compatible filesystem
@@ -316,7 +317,7 @@ Please follow the [Development Workflow section of contributing guide](./CONTRIB
 We have provided a mock version of `whisper.rn` for testing purpose you can use on Jest:
 
 ```js
-jest.mock('whisper.rn', () => require('whisper.rn/jest/mock'))
+jest.mock('whisper.rn', () => require('whisper.rn/jest-mock'))
 ```
 
 ## Deprecated APIs

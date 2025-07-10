@@ -13,12 +13,6 @@
       "require": "./lib/commonjs/*",
       "types": "./lib/typescript/*",
       "react-native": "src/*"
-    },
-    "./jest/*": {
-      "import": "./jest/*",
-      "require": "./jest/*",
-      "types": "./jest/*",
-      "react-native": "jest/*"
     }
   },
   "files": [
