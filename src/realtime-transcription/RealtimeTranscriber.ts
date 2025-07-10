@@ -405,33 +405,19 @@ export class RealtimeTranscriber {
 
       if (isSpeech) {
         const minDuration = this.options.audioMinSec
-        // Check if this is a new speech detection (different from last detected time)
-        if (
-          vadEvent.lastSpeechDetectedTime !== this.lastSpeechDetectedTime ||
-          (vadEvent.lastSpeechDetectedTime - this.lastSpeechDetectedTime) /
-            100 >
-            minDuration
-        ) {
-          this.lastSpeechDetectedTime = vadEvent.lastSpeechDetectedTime
+        // Check minimum duration requirement
+        const speechDuration = slice.data.length / 16000 / 2 // Convert bytes to seconds (16kHz, 16-bit)
 
-          // Check minimum duration requirement
-          const speechDuration = slice.data.length / 16000 / 2 // Convert bytes to seconds (16kHz, 16-bit)
-
-          if (speechDuration >= minDuration) {
-            this.log(
-              `Speech detected in slice ${slice.index}, queueing for transcription`,
-            )
-            await this.queueSliceForTranscription(slice)
-          } else {
-            this.log(
-              `Speech too short in slice ${
-                slice.index
-              } (${speechDuration.toFixed(2)}s < ${minDuration}s), skipping`,
-            )
-          }
+        if (speechDuration >= minDuration) {
+          this.log(
+            `Speech detected in slice ${slice.index}, queueing for transcription`,
+          )
+          await this.queueSliceForTranscription(slice)
         } else {
           this.log(
-            `Skipping transcription for slice ${slice.index} - same detection time as last`,
+            `Speech too short in slice ${
+              slice.index
+            } (${speechDuration.toFixed(2)}s < ${minDuration}s), skipping`,
           )
         }
       } else if (isSpeechEnd) {
@@ -551,7 +537,7 @@ export class RealtimeTranscriber {
       }
 
       const threshold = this.options.vadOptions.threshold || 0.5
-      const isSpeech = confidence > threshold
+      let isSpeech = confidence > threshold
       const currentTimestamp = Date.now()
 
       // Determine VAD event type based on current and previous state
@@ -559,6 +545,20 @@ export class RealtimeTranscriber {
       if (isSpeech) {
         vadEventType =
           this.lastVadState === 'silence' ? 'speech_start' : 'speech_continue'
+
+        const minDuration = this.options.audioMinSec
+        // Check if this is a new speech detection (different from last detected time)
+        if (
+          lastSpeechDetectedTime === this.lastSpeechDetectedTime ||
+          (lastSpeechDetectedTime - this.lastSpeechDetectedTime) /
+            100 <
+            minDuration
+        ) {
+          if (this.lastVadState === 'silence') vadEventType = 'silence'
+          if (this.lastVadState === 'speech') vadEventType = 'speech_end'
+          isSpeech = false
+        }
+        this.lastSpeechDetectedTime = lastSpeechDetectedTime
       } else {
         vadEventType = this.lastVadState === 'speech' ? 'speech_end' : 'silence'
       }
