@@ -1,6 +1,6 @@
 import { initWhisper, releaseAllWhisper } from '..'
 
-jest.mock('..', () => require('../../jest/mock'))
+jest.mock('..', () => require('../jest-mock'))
 
 Math.random = () => 0.5
 
