@@ -505,12 +505,13 @@ export class RealtimeTranscriber {
       // Update VAD state
       this.lastVadState = 'speech'
 
+      const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
       return {
         type: vadEventType,
         lastSpeechDetectedTime: 0,
         timestamp: currentTimestamp,
         confidence: 1.0,
-        duration: audioData.length / 16000 / 2, // Convert bytes to seconds
+        duration: audioData.length / sampleRate / 2, // Convert bytes to seconds
         sliceIndex,
       }
     }
@@ -569,12 +570,13 @@ export class RealtimeTranscriber {
       // Update VAD state for next detection
       this.lastVadState = isSpeech ? 'speech' : 'silence'
 
+      const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
       return {
         type: vadEventType,
         lastSpeechDetectedTime,
         timestamp: currentTimestamp,
         confidence,
-        duration: audioData.length / 16000 / 2, // Convert bytes to seconds
+        duration: audioData.length / sampleRate / 2, // Convert bytes to seconds
         sliceIndex,
         currentThreshold: threshold,
       }
