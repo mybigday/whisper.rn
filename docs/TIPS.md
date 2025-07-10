@@ -21,33 +21,3 @@ It's worth noting that the q8 model demonstrated performance improvements in our
 The default maxThreads value of TranscribeOptions is `2 for 4-core devices, 4 for more cores`.
 
 This is the optimal configuration based on our tests across numerous mobile devices. However, it may not apply universally. If you wish to change it, we advise against using all cores or fewer than 2.
-
-## transcribeRealtime: Set a longer record time
-
-The default `realtimeAudioSec` value of TranscribeOptions is `30` (seconds). If you set a longer time (> 30), we also recommend setting `realtimeAudioSliceSec` (< 30) for enhanced performance.
-
-However, setting slice might result in truncated words, which is not ideal. In the future, we plan to use audio processing tricks like pitch detection to dynamically adjust the timing of slices. Further details are provided in the next section.
-
-## transcribeRealtime: Use Voice Activity Detection (VAD)
-
-In recording, you can use VAD (option: `useVad`) to detect voice activity to determine when to start transcribing. This can help in some situations, like avoid high CPU usage, or avoid the unnecessary transcribe events trigger often.
-
-Currently the VAD implementation is simply using `vad_simple` from whisper.cpp. If you want to quickly test how it performs, you can try `stream` example from whisper.cpp:
-
-```bash
-git clone https://github.com/ggerganov/whisper.cpp
-cd whisper.cpp
-./models/download-ggml-model.sh base
-make -j
-./stream -m ./models/ggml-base.bin
-```
-
-It is currently disabled by default (useVad: false). We will use it for a while to decide whether it should be enabled by default.
-
-## transcribeRealtime: Stop recording by audio processing (Work in Progress)
-
-For instance, you might want to stop recording when a specific audio pitch is detected.
-
-In our case, we use [react-native-audio-pcm-stream](https://github.com/mybigday/react-native-audio-pcm-stream) with [pitchy](https://github.com/ianprime0509/pitchy) to detect audio pitch. Based on this, we decide to stop recording and use the saved audio file for transcription. However, this method is not as timely as using the `transcribeRealtime` function.
-
-Unfortunately, the `transcribeRealtime` function does not currently support audio processing (although it's still possible by modifying the native code). Once we implement the `transcribeBuffer` function ([#52](https://github.com/mybigday/whisper.rn/issues/52)), we can delegate most of the logic of real-time transcription to pure JavaScript and [react-native-audio-pcm-stream](https://github.com/mybigday/react-native-audio-pcm-stream).
