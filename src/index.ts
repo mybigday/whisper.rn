@@ -444,6 +444,10 @@ export class WhisperContext {
     /** Subscribe to realtime transcribe events */
     subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
   }> {
+    console.warn(
+      '`transcribeRealtime` is deprecated, use `RealtimeTranscriber` instead',
+    )
+
     let lastTranscribePayload: TranscribeRealtimeNativePayload
 
     const slices: TranscribeRealtimeNativePayload[] = []

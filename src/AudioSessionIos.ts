@@ -42,10 +42,11 @@ export enum AudioSessionModeIos {
 
 const checkPlatform = () => {
   if (Platform.OS !== 'ios') throw new Error('Only supported on iOS')
+  console.warn('AudioSessionIos is deprecated. To use whisper.rn for realtime transcription, use the new RealtimeTranscriber instead.')
 }
 
 /**
- * AudioSession Utility, iOS only.
+ * [Deprecated] AudioSession Utility, iOS only.
  */
 export default {
   Category: AudioSessionCategoryIos,
@@ -63,7 +64,7 @@ export default {
       options: result.options?.map((option: string) => (option.replace('AVAudioSessionCategoryOption', '') as AudioSessionCategoryOptionIos)),
     }
   },
-  
+
   getCurrentMode: async (): Promise<AudioSessionModeIos> => {
     checkPlatform()
     const mode = await RNWhisper.getAudioSessionCurrentMode()

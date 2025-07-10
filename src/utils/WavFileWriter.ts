@@ -1,4 +1,4 @@
-import RNFS from 'react-native-fs'
+import { base64ToUint8Array, uint8ArrayToBase64 } from './common'
 
 export interface WavFileConfig {
   sampleRate: number
@@ -6,7 +6,17 @@ export interface WavFileConfig {
   bitsPerSample: number
 }
 
+export interface WavFileWriterFs {
+  writeFile: (filePath: string, data: string, encoding: string) => Promise<void>
+  appendFile: (filePath: string, data: string, encoding: string) => Promise<void>
+  readFile: (filePath: string, encoding: string) => Promise<string>
+  exists: (filePath: string) => Promise<boolean>
+  unlink: (filePath: string) => Promise<void>
+}
+
 export class WavFileWriter {
+  private fs: WavFileWriterFs
+
   private filePath: string
 
   private config: WavFileConfig
@@ -15,9 +25,10 @@ export class WavFileWriter {
 
   private isWriting = false
 
-  private writeQueue: Buffer[] = []
+  private writeQueue: Uint8Array[] = []
 
-  constructor(filePath: string, config: WavFileConfig) {
+  constructor(fs: WavFileWriterFs, filePath: string, config: WavFileConfig) {
+    this.fs = fs
     this.filePath = filePath
     this.config = config
   }
@@ -33,7 +44,7 @@ export class WavFileWriter {
     try {
       // Create the initial WAV header (we'll update the size later)
       const header = this.createWavHeader(0)
-      await RNFS.writeFile(this.filePath, WavFileWriter.uint8ArrayToBase64(header), 'base64')
+      await this.fs.writeFile(this.filePath, uint8ArrayToBase64(header), 'base64')
 
       this.dataSize = 0
       this.isWriting = true
@@ -46,7 +57,7 @@ export class WavFileWriter {
   /**
    * Append PCM audio data to the WAV file
    */
-  async appendAudioData(audioData: Buffer): Promise<void> {
+  async appendAudioData(audioData: Uint8Array): Promise<void> {
     if (!this.isWriting) {
       throw new Error('WAV file not initialized')
     }
@@ -82,8 +93,8 @@ export class WavFileWriter {
       })
 
       // Append to file
-      const base64Data = WavFileWriter.uint8ArrayToBase64(combinedData)
-      await RNFS.appendFile(this.filePath, base64Data, 'base64')
+      const base64Data = uint8ArrayToBase64(combinedData)
+      await this.fs.appendFile(this.filePath, base64Data, 'base64')
 
       // Update data size
       this.dataSize += combinedData.length
@@ -109,8 +120,8 @@ export class WavFileWriter {
       await this.processWriteQueue()
 
       // Read the current file
-      const currentData = await RNFS.readFile(this.filePath, 'base64')
-      const currentBytes = WavFileWriter.base64ToUint8Array(currentData)
+      const currentData = await this.fs.readFile(this.filePath, 'base64')
+      const currentBytes = base64ToUint8Array(currentData)
 
       // Create the correct header with final data size
       const correctHeader = this.createWavHeader(this.dataSize)
@@ -121,8 +132,8 @@ export class WavFileWriter {
       finalData.set(currentBytes.slice(44), 44) // Skip old header
 
       // Write the final file
-      const finalBase64 = WavFileWriter.uint8ArrayToBase64(finalData)
-      await RNFS.writeFile(this.filePath, finalBase64, 'base64')
+      const finalBase64 = uint8ArrayToBase64(finalData)
+      await this.fs.writeFile(this.filePath, finalBase64, 'base64')
 
       this.isWriting = false
     } catch (error) {
@@ -160,29 +171,6 @@ export class WavFileWriter {
   }
 
   /**
-   * Convert Uint8Array to base64 string
-   */
-  private static uint8ArrayToBase64(buffer: Uint8Array): string {
-    let binary = ''
-    for (let i = 0; i < buffer.length; i += 1) {
-      binary += String.fromCharCode(buffer[i] || 0) // Handle undefined
-    }
-    return btoa(binary)
-  }
-
-  /**
-   * Convert base64 string to Uint8Array
-   */
-  private static base64ToUint8Array(base64: string): Uint8Array {
-    const binaryString = atob(base64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i += 1) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-    return bytes
-  }
-
-  /**
    * Cancel writing and cleanup
    */
   async cancel(): Promise<void> {
@@ -191,9 +179,9 @@ export class WavFileWriter {
 
     try {
       // Delete the incomplete file
-      const exists = await RNFS.exists(this.filePath)
+      const exists = await this.fs.exists(this.filePath)
       if (exists) {
-        await RNFS.unlink(this.filePath)
+        await this.fs.unlink(this.filePath)
       }
     } catch (error) {
       console.warn(`Failed to cleanup WAV file: ${error}`)

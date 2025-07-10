@@ -7,8 +7,8 @@ import { Buffer } from 'buffer'
 import { initWhisperVad, libVersion } from '../../src' // whisper.rn
 import type { WhisperVadContext, VadSegment } from '../../src'
 import { Button } from './Button'
-import { createDir, fileDir, vadModelHost, toTimestamp } from './utils/common'
-import { WavFileWriter } from './utils/WavFileWriter'
+import { createDir, fileDir, vadModelHost, toTimestamp } from './util'
+import { WavFileWriter } from '../../src/utils/WavFileWriter'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -126,9 +126,9 @@ export default function VadExample() {
       }
 
       // Save the recorded data as WAV file for playback
-      const wavFileWriter = new WavFileWriter(recordFile, audioOptions)
+      const wavFileWriter = new WavFileWriter(RNFS, recordFile, audioOptions)
       await wavFileWriter.initialize()
-      await wavFileWriter.appendAudioData(Buffer.from(recordedDataRef.current!))
+      await wavFileWriter.appendAudioData(recordedDataRef.current!)
       await wavFileWriter.finalize()
 
       log(`Recorded ${recordedDataRef.current.length} bytes of audio data`)

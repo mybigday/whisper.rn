@@ -11,9 +11,9 @@ React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 ## Screenshots
 
 | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/2fea7b2d-c911-44fb-9afc-8efc7b594446" width="300" /> | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/a5005a6c-44f7-4db9-95e8-0fd951a2e147" width="300" /> |
-| :------------------------------------------: | :------------------------------------------: |
-| iOS: Tested on iPhone 13 Pro Max | Android: Tested on Pixel 6 |
-| (tiny.en, Core ML enabled, release mode + archive) | (tiny.en, armv8.2-a+fp16, release mode) |
+| :------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------: |
+|                                           iOS: Tested on iPhone 13 Pro Max                                           |                                              Android: Tested on Pixel 6                                              |
+|                                  (tiny.en, Core ML enabled, release mode + archive)                                  |                                       (tiny.en, armv8.2-a+fp16, release mode)                                        |
 
 ## Installation
 
@@ -49,7 +49,9 @@ You will need to prebuild the project before using it. See [Expo guide](https://
 If you want to use realtime transcribe, you need to add the microphone permission to your app.
 
 ### iOS
-Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
+
+Add these lines to `ios/[YOU_APP_NAME]/info.plist`
+
 ```xml
 <key>NSMicrophoneUsageDescription</key>
 <string>This app requires microphone access in order to transcribe speech</string>
@@ -58,10 +60,13 @@ Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
 For tvOS, please note that the microphone is not supported.
 
 ### Android
-Add the following line to ```android/app/src/main/AndroidManifest.xml```
+
+Add the following line to `android/app/src/main/AndroidManifest.xml`
+
 ```xml
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
+
 ## Tips & Tricks
 
 The [Tips & Tricks](docs/TIPS.md) document is a collection of tips and tricks for using `whisper.rn`.
@@ -81,24 +86,6 @@ const { stop, promise } = whisperContext.transcribe(sampleFilePath, options)
 
 const { result } = await promise
 // result: (The inference text result from audio file)
-```
-
-Use realtime transcribe:
-
-```js
-const { stop, subscribe } = await whisperContext.transcribeRealtime(options)
-
-subscribe(evt => {
-  const { isCapturing, data, processTime, recordingTime } = evt
-  console.log(
-    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
-      // The inference text result from audio record:
-      `Result: ${data.result}\n\n` +
-      `Process time: ${processTime}ms\n` +
-      `Recording time: ${recordingTime}ms`,
-  )
-  if (!isCapturing) console.log('Finished realtime transcribing')
-})
 ```
 
 ## Voice Activity Detection (VAD)
@@ -157,7 +144,11 @@ const segments = await vadContext.detectSpeechData(base64AudioData, {
 
 ```typescript
 segments.forEach((segment, index) => {
-  console.log(`Segment ${index + 1}: ${segment.t0.toFixed(2)}s - ${segment.t1.toFixed(2)}s`)
+  console.log(
+    `Segment ${index + 1}: ${segment.t0.toFixed(2)}s - ${segment.t1.toFixed(
+      2,
+    )}s`,
+  )
   console.log(`Duration: ${(segment.t1 - segment.t0).toFixed(2)}s`)
 })
 ```
@@ -170,35 +161,57 @@ await vadContext.release()
 await releaseAllWhisperVad()
 ```
 
-In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
+## Realtime Transcription
 
-Option 1 - Use options in transcribeRealtime:
+The new `RealtimeTranscriber` provides enhanced realtime transcription with features like Voice Activity Detection (VAD), auto-slicing, and memory management.
+
 ```js
-import { AudioSessionIos } from 'whisper.rn'
+// If your RN packager is not enable package exports support, use whisper.rn/src/realtime-transcription
+import { RealtimeTranscriber } from 'whisper.rn/realtime-transcription'
+import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters'
+import RNFS from 'react-native-fs' // or any compatible filesystem
 
-const { stop, subscribe } = await whisperContext.transcribeRealtime({
-  audioSessionOnStartIos: {
-    category: AudioSessionIos.Category.PlayAndRecord,
-    options: [AudioSessionIos.CategoryOption.MixWithOthers],
-    mode: AudioSessionIos.Mode.Default,
-  },
-  audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
+// Dependencies
+const whisperContext = await initWhisper({
+  /* ... */
 })
-```
+const vadContext = await initWhisperVad({
+  /* ... */
+})
+const audioStream = new AudioPcmStreamAdapter() // requires @fugood/react-native-audio-pcm-stream
 
-Option 2 - Manage the Audio Session in anywhere:
-```js
-import { AudioSessionIos } from 'whisper.rn'
-
-await AudioSessionIos.setCategory(
-  AudioSessionIos.Category.PlayAndRecord, [AudioSessionIos.CategoryOption.MixWithOthers],
+// Create transcriber
+const transcriber = new RealtimeTranscriber(
+  { whisperContext, vadContext, audioStream, fs: RNFS },
+  {
+    audioSliceSec: 30,
+    vadPreset: 'default',
+    autoSliceOnSpeechEnd: true,
+    transcribeOptions: { language: 'en' },
+  },
+  {
+    onTranscribe: (event) => console.log('Transcription:', event.data?.result),
+    onVad: (event) => console.log('VAD:', event.type, event.confidence),
+    onStatusChange: (isActive) =>
+      console.log('Status:', isActive ? 'ACTIVE' : 'INACTIVE'),
+    onError: (error) => console.error('Error:', error),
+  },
 )
-await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
-await AudioSessionIos.setActive(true)
-// Then you can start do recording
+
+// Start/stop transcription
+await transcriber.start()
+await transcriber.stop()
 ```
 
-In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
+**Dependencies:**
+
+- `@fugood/react-native-audio-pcm-stream` for `AudioPcmStreamAdapter`
+- Compatible filesystem module (e.g., `react-native-fs`). See [filesystem interface](src/utils/WavFileWriter.ts#L9-L16) for TypeScript definition
+
+**Custom Audio Adapters:**
+You can create custom audio stream adapters by implementing the [AudioStreamInterface](src/realtime-transcription/types.ts#L21-L30). This allows integration with different audio sources or custom audio processing pipelines.
+
+**Example:** See [complete example](example/src/RealtimeTranscriber.tsx) for full implementation including file simulation and UI.
 
 Please visit the [Documentation](docs/) for more details.
 
@@ -213,8 +226,10 @@ const whisperContext = await initWhisper({
   filePath: require('../assets/ggml-tiny.en.bin'),
 })
 
-const { stop, promise } =
-  whisperContext.transcribe(require('../assets/sample.wav'), options)
+const { stop, promise } = whisperContext.transcribe(
+  require('../assets/sample.wav'),
+  options,
+)
 
 // ...
 ```
@@ -233,18 +248,19 @@ module.exports = {
       ...defaultAssetExts,
       'bin', // whisper.rn: ggml model binary
       'mil', // whisper.rn: CoreML model asset
-    ]
+    ],
   },
 }
 ```
 
 Please note that:
+
 - It will significantly increase the size of the app in release mode.
 - The RN packager is not allowed file size larger than 2GB, so it not able to use original f16 `large` model (2.9GB), you can use quantized models instead.
 
 ## Core ML support
 
-__*Platform: iOS 15.0+, tvOS 15.0+*__
+**_Platform: iOS 15.0+, tvOS 15.0+_**
 
 To use Core ML on iOS, you will need to have the Core ML model files.
 
@@ -301,8 +317,61 @@ Please follow the [Development Workflow section of contributing guide](./CONTRIB
 We have provided a mock version of `whisper.rn` for testing purpose you can use on Jest:
 
 ```js
-jest.mock('whisper.rn', () => require('whisper.rn/jest/mock'))
+jest.mock('whisper.rn', () => require('whisper.rn/jest-mock'))
 ```
+
+## Deprecated APIs
+
+### `transcribeRealtime` (Deprecated)
+
+> ⚠️ **Deprecated**: Use `RealtimeTranscriber` instead for enhanced features and better performance.
+
+```js
+const { stop, subscribe } = await whisperContext.transcribeRealtime(options)
+
+subscribe((evt) => {
+  const { isCapturing, data, processTime, recordingTime } = evt
+  console.log(
+    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
+      `Result: ${data.result}\n\n` +
+      `Process time: ${processTime}ms\n` +
+      `Recording time: ${recordingTime}ms`,
+  )
+  if (!isCapturing) console.log('Finished realtime transcribing')
+})
+```
+
+In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
+
+Option 1 - Use options in transcribeRealtime:
+
+```js
+import { AudioSessionIos } from 'whisper.rn'
+
+const { stop, subscribe } = await whisperContext.transcribeRealtime({
+  audioSessionOnStartIos: {
+    category: AudioSessionIos.Category.PlayAndRecord,
+    options: [AudioSessionIos.CategoryOption.MixWithOthers],
+    mode: AudioSessionIos.Mode.Default,
+  },
+  audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
+})
+```
+
+Option 2 - Manage the Audio Session in anywhere:
+
+```js
+import { AudioSessionIos } from 'whisper.rn'
+
+await AudioSessionIos.setCategory(AudioSessionIos.Category.PlayAndRecord, [
+  AudioSessionIos.CategoryOption.MixWithOthers,
+])
+await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
+await AudioSessionIos.setActive(true)
+// Then you can start do recording
+```
+
+In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
 ## Contributing
 

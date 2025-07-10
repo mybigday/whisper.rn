@@ -4,7 +4,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler'
 import RNFS from 'react-native-fs'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { initWhisper } from '../../src' // whisper.rn
-import { createDir, fileDir, modelHost } from './utils/common'
+import { createDir, fileDir, modelHost } from './util'
 import { Button } from './Button'
 
 const modelList = [

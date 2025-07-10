@@ -1,4 +1,4 @@
-const { NativeModules, DeviceEventEmitter } = require('react-native')
+import { NativeModules, DeviceEventEmitter } from 'react-native'
 
 if (!NativeModules.RNWhisper) {
   NativeModules.RNWhisper = {
@@ -97,4 +97,4 @@ if (!NativeModules.RNWhisper) {
   }
 }
 
-module.exports = jest.requireActual('whisper.rn')
+module.exports = jest.requireActual('whisper.rn/index')

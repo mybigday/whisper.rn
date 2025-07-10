@@ -11,6 +11,7 @@ import Transcribe from './Transcribe'
 import TranscribeData from './TranscribeData'
 import Vad from './Vad'
 import Bench from './Bench'
+import RealtimeTranscriber from './RealtimeTranscriber'
 import JSITestScreen from './JSITest'
 
 enableScreens()
@@ -40,13 +41,19 @@ function HomeScreen({ navigation }: { navigation: any }) {
         style={styles.button}
         onPress={() => navigation.navigate('Transcribe')}
       >
-        <Text style={styles.buttonText}>Example: Transcribe File / Realtime</Text>
+        <Text style={styles.buttonText}>Example: Transcribe File / Realtime (Deprecated)</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
         onPress={() => navigation.navigate('TranscribeData')}
       >
         <Text style={styles.buttonText}>Example: Transcribe Data</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('RealtimeTranscriber')}
+      >
+        <Text style={styles.buttonText}>Example: Realtime Transcription</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
@@ -80,9 +87,10 @@ function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Transcribe" component={Transcribe} />
           <Stack.Screen name="TranscribeData" component={TranscribeData} />
+          <Stack.Screen name="RealtimeTranscriber" component={RealtimeTranscriber} />
           <Stack.Screen name="VAD" component={Vad} />
-          <Stack.Screen name="Bench" component={Bench} />
           <Stack.Screen name="JSITest" component={JSITestScreen} />
+          <Stack.Screen name="Bench" component={Bench} />
         </Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>

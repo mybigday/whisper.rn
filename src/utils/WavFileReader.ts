@@ -1,4 +1,10 @@
-import RNFS from 'react-native-fs'
+import { base64ToUint8Array } from './common'
+
+export interface WavFileReaderFs {
+  readFile: (filePath: string, encoding: string) => Promise<string>
+  exists: (filePath: string) => Promise<boolean>
+  unlink: (filePath: string) => Promise<void>
+}
 
 export interface WavFileHeader {
   sampleRate: number
@@ -15,7 +21,16 @@ export class WavFileReader {
 
   private audioData: Uint8Array | null = null
 
-  constructor(filePath: string) {
+  private fs: {
+    exists: (filePath: string) => Promise<boolean>
+    readFile: (filePath: string, encoding: string) => Promise<string>
+  }
+
+  constructor(fs: {
+    exists: (filePath: string) => Promise<boolean>
+    readFile: (filePath: string, encoding: string) => Promise<string>
+  }, filePath: string) {
+    this.fs = fs
     this.filePath = filePath
   }
 
@@ -25,14 +40,14 @@ export class WavFileReader {
   async initialize(): Promise<void> {
     try {
       // Check if file exists
-      const exists = await RNFS.exists(this.filePath)
+      const exists = await this.fs.exists(this.filePath)
       if (!exists) {
         throw new Error(`WAV file not found: ${this.filePath}`)
       }
 
       // Read the entire file
-      const fileContent = await RNFS.readFile(this.filePath, 'base64')
-      const fileData = WavFileReader.base64ToUint8Array(fileContent)
+      const fileContent = await this.fs.readFile(this.filePath, 'base64')
+      const fileData = base64ToUint8Array(fileContent)
 
       // Parse WAV header
       this.header = WavFileReader.parseWavHeader(fileData)
@@ -133,13 +148,6 @@ export class WavFileReader {
     return this.audioData
   }
 
-  getAudioDataBase64(): string | null {
-    if (!this.audioData) {
-      return null
-    }
-    return WavFileReader.uint8ArrayToBase64(this.audioData)
-  }
-
   /**
    * Get WAV file header information
    */
@@ -178,26 +186,6 @@ export class WavFileReader {
       this.header.channels *
       (this.header.bitsPerSample / 8)
     return Math.floor(timeSeconds * bytesPerSecond)
-  }
-
-  /**
-   * Convert base64 string to Uint8Array
-   */
-  private static base64ToUint8Array(base64: string): Uint8Array {
-    const binaryString = atob(base64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i += 1) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-    return bytes
-  }
-
-  private static uint8ArrayToBase64(buffer: Uint8Array): string {
-    let binary = ''
-    for (let i = 0; i < buffer.length; i += 1) {
-      binary += String.fromCharCode(buffer[i] || 0) // Handle undefined
-    }
-    return btoa(binary)
   }
 
   /**

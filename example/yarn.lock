@@ -4434,11 +4434,6 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
-react-native-audio-api@^0.6.4:
-  version "0.6.4"
-  resolved "https://registry.yarnpkg.com/react-native-audio-api/-/react-native-audio-api-0.6.4.tgz#50bfed7c927b7954e4906c54c37a7964e990f299"
-  integrity sha512-o0/Dts9QIHSiarkb4A7Y4HVEaOBSCtGC7GfgNO7dtlyliJLpjmvcMUvU2BHwBaDlIbhI2z0sSmBo+oWEKxmOAA==
-
 react-native-fs@^2.20.0:
   version "2.20.0"
   resolved "https://registry.yarnpkg.com/react-native-fs/-/react-native-fs-2.20.0.tgz#05a9362b473bfc0910772c0acbb73a78dbc810f6"
