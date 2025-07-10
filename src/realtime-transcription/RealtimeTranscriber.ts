@@ -312,7 +312,10 @@ export class RealtimeTranscriber {
   /**
    * Check if auto-slice should be triggered based on VAD event and timing
    */
-  private async checkAutoSlice(vadEvent: RealtimeVadEvent, _slice: any): Promise<void> {
+  private async checkAutoSlice(
+    vadEvent: RealtimeVadEvent,
+    _slice: any,
+  ): Promise<void> {
     if (!this.options.autoSliceOnSpeechEnd || !this.vadEnabled) {
       return
     }
@@ -415,9 +418,9 @@ export class RealtimeTranscriber {
           await this.queueSliceForTranscription(slice)
         } else {
           this.log(
-            `Speech too short in slice ${
-              slice.index
-            } (${speechDuration.toFixed(2)}s < ${minDuration}s), skipping`,
+            `Speech too short in slice ${slice.index} (${speechDuration.toFixed(
+              2,
+            )}s < ${minDuration}s), skipping`,
           )
         }
       } else if (isSpeechEnd) {
@@ -550,13 +553,13 @@ export class RealtimeTranscriber {
         // Check if this is a new speech detection (different from last detected time)
         if (
           lastSpeechDetectedTime === this.lastSpeechDetectedTime ||
-          (lastSpeechDetectedTime - this.lastSpeechDetectedTime) /
-            100 <
+          (lastSpeechDetectedTime - this.lastSpeechDetectedTime) / 100 <
             minDuration
         ) {
           if (this.lastVadState === 'silence') vadEventType = 'silence'
           if (this.lastVadState === 'speech') vadEventType = 'speech_end'
           isSpeech = false
+          confidence = 0.0
         }
         this.lastSpeechDetectedTime = lastSpeechDetectedTime
       } else {
@@ -667,13 +670,14 @@ export class RealtimeTranscriber {
       const endTime = Date.now()
 
       // Create transcribe event
+      const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
       const transcribeEvent: RealtimeTranscribeEvent = {
         type: 'transcribe',
         sliceIndex: item.sliceIndex,
         data: result,
         isCapturing: this.audioStream.isRecording(),
         processTime: endTime - startTime,
-        recordingTime: (result.segments?.length || 0) * 1000, // Estimate
+        recordingTime: item.audioData.length / (sampleRate / 1000) / 2, // ms,
         memoryUsage: this.sliceManager.getMemoryUsage(),
       }
 
