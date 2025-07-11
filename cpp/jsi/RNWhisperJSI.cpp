@@ -295,6 +295,38 @@ CallbackInfo extractCallbacks(Runtime& runtime, const Object& optionsObj) {
     return info;
 }
 
+// Helper function to extract VAD parameters from options
+whisper_vad_params extractVadParams(Runtime& runtime, const Object& optionsObj) {
+    whisper_vad_params vadParams = whisper_vad_default_params();
+
+    try {
+        auto propNames = optionsObj.getPropertyNames(runtime);
+        for (size_t i = 0; i < propNames.size(runtime); i++) {
+            auto propNameValue = propNames.getValueAtIndex(runtime, i);
+            std::string propName = propNameValue.getString(runtime).utf8(runtime);
+            Value propValue = optionsObj.getProperty(runtime, propNameValue.getString(runtime));
+
+            if (propName == "threshold" && propValue.isNumber()) {
+                vadParams.threshold = (float)propValue.getNumber();
+            } else if (propName == "minSpeechDurationMs" && propValue.isNumber()) {
+                vadParams.min_speech_duration_ms = (int)propValue.getNumber();
+            } else if (propName == "minSilenceDurationMs" && propValue.isNumber()) {
+                vadParams.min_silence_duration_ms = (int)propValue.getNumber();
+            } else if (propName == "maxSpeechDurationS" && propValue.isNumber()) {
+                vadParams.max_speech_duration_s = (float)propValue.getNumber();
+            } else if (propName == "speechPadMs" && propValue.isNumber()) {
+                vadParams.speech_pad_ms = (int)propValue.getNumber();
+            } else if (propName == "samplesOverlap" && propValue.isNumber()) {
+                vadParams.samples_overlap = (float)propValue.getNumber();
+            }
+        }
+    } catch (...) {
+        // Ignore parameter extraction errors
+    }
+
+    return vadParams;
+}
+
 // Helper function to create segments array
 Array createSegmentsArray(Runtime& runtime, struct whisper_context* ctx, int offset) {
     int n_segments = whisper_full_n_segments(ctx);
@@ -355,10 +387,13 @@ Value createPromiseTask(
 
     whisper_full_params params = {};
     CallbackInfo callbackInfo = {};
+    whisper_vad_params vadParams = {};
     if (functionName == "whisperTranscribeData") {
         params = createFullParamsFromJSI(runtime, optionsObj);
         // Extract data from optionsObj before lambda capture
         callbackInfo = extractCallbacks(runtime, optionsObj);
+    } else if (functionName == "whisperVadDetectSpeech") {
+        vadParams = extractVadParams(runtime, optionsObj);
     }
 
     // Create promise
@@ -368,7 +403,7 @@ Value createPromiseTask(
         runtime,
         PropNameID::forAscii(runtime, ""),
         2, // resolve, reject
-        [contextId, audioResult, params, callbackInfo, task, callInvoker, functionName](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
+        [contextId, audioResult, params, callbackInfo, vadParams, task, callInvoker, functionName](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
             if (count != 2) {
                 throw JSError(runtime, "Promise executor expects 2 arguments (resolve, reject)");
             }
@@ -379,10 +414,10 @@ Value createPromiseTask(
 
             // Execute task in ThreadPool
             auto future = getWhisperThreadPool().enqueue([
-                contextId, audioResult, params, callbackInfo, task, resolvePtr, rejectPtr, callInvoker, safeRuntime, functionName]() {
+                contextId, audioResult, params, callbackInfo, vadParams, task, resolvePtr, rejectPtr, callInvoker, safeRuntime, functionName]() {
 
                 try {
-                    task(contextId, audioResult, params, callbackInfo, resolvePtr, rejectPtr, callInvoker, safeRuntime);
+                    task(contextId, audioResult, params, callbackInfo, vadParams, resolvePtr, rejectPtr, callInvoker, safeRuntime);
                 } catch (...) {
                     callInvoker->invokeAsync([rejectPtr, safeRuntime, functionName]() {
                         auto& runtime = *safeRuntime;
@@ -413,7 +448,7 @@ void installJSIBindings(
                 try {
                     return createPromiseTask<whisper_context>(
                         runtime, "whisperTranscribeData", callInvoker, arguments, count,
-                        [](int contextId, const AudioData& audioResult, const whisper_full_params& params, const CallbackInfo& callbackInfo,
+                        [](int contextId, const AudioData& audioResult, const whisper_full_params& params, const CallbackInfo& callbackInfo, const whisper_vad_params& vadParams,
                            std::shared_ptr<Function> resolvePtr, std::shared_ptr<Function> rejectPtr,
                            std::shared_ptr<facebook::react::CallInvoker> callInvoker,
                            std::shared_ptr<Runtime> safeRuntime) {
@@ -566,7 +601,7 @@ void installJSIBindings(
                 try {
                     return createPromiseTask<whisper_vad_context>(
                         runtime, "whisperVadDetectSpeech", callInvoker, arguments, count,
-                        [](int contextId, const AudioData& audioResult, const whisper_full_params& params, const CallbackInfo& callbackInfo,
+                        [](int contextId, const AudioData& audioResult, const whisper_full_params& params, const CallbackInfo& callbackInfo, const whisper_vad_params& vadParams,
                            std::shared_ptr<Function> resolvePtr, std::shared_ptr<Function> rejectPtr,
                            std::shared_ptr<facebook::react::CallInvoker> callInvoker,
                            std::shared_ptr<Runtime> safeRuntime) {
@@ -600,7 +635,8 @@ void installJSIBindings(
                             bool isSpeech = whisper_vad_detect_speech(vadContext, audioResult.data.data(), audioResult.count);
                             logInfo("VAD detection result: %s", isSpeech ? "speech" : "no speech");
 
-                            struct whisper_vad_params vad_params = whisper_vad_default_params();
+                            struct whisper_vad_params vad_params = vadParams;
+
                             struct whisper_vad_segments* segments = nullptr;
                             if (isSpeech) {
                                 segments = whisper_vad_segments_from_probs(vadContext, vad_params);
