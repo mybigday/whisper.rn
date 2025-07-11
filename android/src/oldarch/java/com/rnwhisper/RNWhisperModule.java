@@ -31,6 +31,11 @@ public class RNWhisperModule extends ReactContextBaseJavaModule {
     rnwhisper.installJSIBindings(promise);
   }
 
+  @ReactMethod
+  public void toggleNativeLog(boolean enabled, Promise promise) {
+    rnwhisper.toggleNativeLog(enabled, promise);
+  }
+
   @Override
   @NonNull
   public String getName() {

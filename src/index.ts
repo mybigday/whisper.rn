@@ -82,9 +82,24 @@ export type {
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
 const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
+const EVENT_ON_NATIVE_LOG = '@RNWhisper_onNativeLog'
 
 const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
 const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
+
+const logListeners: Array<(level: string, text: string) => void> = []
+
+// @ts-ignore
+if (EventEmitter) {
+  EventEmitter.addListener(
+    EVENT_ON_NATIVE_LOG,
+    (evt: { level: string; text: string }) => {
+      logListeners.forEach((listener) => listener(evt.level, evt.text))
+    },
+  )
+  // Trigger unset to use default log callback
+  RNWhisper?.toggleNativeLog?.(false)?.catch?.(() => {})
+}
 
 export type TranscribeNewSegmentsResult = {
   nNew: number
@@ -845,4 +860,19 @@ export async function initWhisperVad({
  */
 export async function releaseAllWhisperVad(): Promise<void> {
   return RNWhisper.releaseAllVadContexts()
+}
+
+export async function toggleNativeLog(enabled: boolean): Promise<void> {
+  return RNWhisper.toggleNativeLog(enabled)
+}
+
+export function addNativeLogListener(
+  listener: (level: string, text: string) => void,
+): { remove: () => void } {
+  logListeners.push(listener)
+  return {
+    remove: () => {
+      logListeners.splice(logListeners.indexOf(listener), 1)
+    },
+  }
 }

@@ -6,6 +6,52 @@
 
 @implementation RNWhisperContext
 
+static void whisper_log_callback_default(wsp_ggml_log_level level, const char * text, void * user_data) {
+    (void) level;
+    (void) user_data;
+#ifndef WHISPER_DEBUG
+    if (level == WSP_GGML_LOG_LEVEL_DEBUG) {
+        return;
+    }
+#endif
+    fputs(text, stderr);
+    fflush(stderr);
+}
+
+static void* retained_log_block = nullptr;
+
++ (void)toggleNativeLog:(BOOL)enabled onEmitLog:(void (^)(NSString *level, NSString *text))onEmitLog {
+  if (enabled) {
+      void (^copiedBlock)(NSString *, NSString *) = [onEmitLog copy];
+      retained_log_block = (__bridge_retained void *)(copiedBlock);
+      whisper_log_set([](enum wsp_ggml_log_level level, const char * text, void * data) {
+          whisper_log_callback_default(level, text, data);
+          NSString *levelStr = @"";
+          if (level == WSP_GGML_LOG_LEVEL_ERROR) {
+              levelStr = @"error";
+          } else if (level == WSP_GGML_LOG_LEVEL_INFO) {
+              levelStr = @"info";
+          } else if (level == WSP_GGML_LOG_LEVEL_WARN) {
+              levelStr = @"warn";
+          }
+
+          NSString *textStr = [NSString stringWithUTF8String:text];
+          // NOTE: Convert to UTF-8 string may fail
+          if (!textStr) {
+              return;
+          }
+          void (^block)(NSString *, NSString *) = (__bridge void (^)(NSString *, NSString *))(data);
+          block(levelStr, textStr);
+      }, retained_log_block);
+  } else {
+      whisper_log_set(whisper_log_callback_default, nullptr);
+      if (retained_log_block) {
+          CFRelease(retained_log_block);
+          retained_log_block = nullptr;
+      }
+  }
+}
+
 + (instancetype)initWithModelPath:(NSString *)modelPath
     contextId:(int)contextId
     noCoreML:(BOOL)noCoreML

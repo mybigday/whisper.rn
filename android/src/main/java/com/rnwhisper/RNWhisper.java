@@ -95,6 +95,32 @@ public class RNWhisper implements LifecycleEventListener {
     tasks.put(task, "installJSIBindings");
   }
 
+  public void toggleNativeLog(boolean enabled, Promise promise) {
+    new AsyncTask<Void, Void, Boolean>() {
+      private Exception exception;
+
+      @Override
+      protected Boolean doInBackground(Void... voids) {
+        try {
+          WhisperContext.toggleNativeLog(reactContext, enabled);
+          return true;
+        } catch (Exception e) {
+          exception = e;
+        }
+        return null;
+      }
+
+      @Override
+      protected void onPostExecute(Boolean result) {
+        if (exception != null) {
+          promise.reject(exception);
+          return;
+        }
+        promise.resolve(result);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+  }
+
   private int getResourceIdentifier(String filePath) {
     int identifier = reactContext.getResources().getIdentifier(
       filePath,

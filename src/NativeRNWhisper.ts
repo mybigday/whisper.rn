@@ -100,6 +100,8 @@ export type VadSegment = {
 }
 
 export interface Spec extends TurboModule {
+  toggleNativeLog(enabled: boolean): Promise<void>
+
   getConstants(): {
     useCoreML: boolean
     coreMLAllowFallback: boolean

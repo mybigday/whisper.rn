@@ -7,12 +7,23 @@ import {
 import { enableScreens } from 'react-native-screens'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { toggleNativeLog, addNativeLogListener } from '../../src'
 import Transcribe from './Transcribe'
 import TranscribeData from './TranscribeData'
 import Vad from './Vad'
 import Bench from './Bench'
 import RealtimeTranscriber from './RealtimeTranscriber'
 import JSITestScreen from './JSITest'
+
+// Example: Catch logs from whisper.cpp
+toggleNativeLog(true)
+addNativeLogListener((level, text) => {
+  // eslint-disable-next-line prefer-const
+  let log = (t: string) => t // noop
+  // Uncomment to test:
+  // ;({log} = console)
+  log(['[rnwhisper]', level ? `[${level}]` : '', text].filter(Boolean).join(' '))
+})
 
 enableScreens()
 
