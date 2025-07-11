@@ -123,4 +123,4 @@ Key Parameters:
 
 #### Defined in
 
-[realtime-transcription/types.ts:61](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/realtime-transcription/types.ts#L61)
+[realtime-transcription/types.ts:61](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L61)

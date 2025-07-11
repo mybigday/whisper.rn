@@ -43,10 +43,12 @@
 
 ### Functions
 
+- [addNativeLogListener](index.md#addnativeloglistener)
 - [initWhisper](index.md#initwhisper)
 - [initWhisperVad](index.md#initwhispervad)
 - [releaseAllWhisper](index.md#releaseallwhisper)
 - [releaseAllWhisperVad](index.md#releaseallwhispervad)
+- [toggleNativeLog](index.md#togglenativelog)
 
 ## Type Aliases
 
@@ -65,7 +67,7 @@
 
 #### Defined in
 
-[index.ts:120](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L120)
+[index.ts:135](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L135)
 
 ___
 
@@ -86,7 +88,7 @@ ___
 
 #### Defined in
 
-[index.ts:221](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L221)
+[index.ts:236](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L236)
 
 ___
 
@@ -109,7 +111,7 @@ ___
 
 #### Defined in
 
-[index.ts:601](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L601)
+[index.ts:616](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L616)
 
 ___
 
@@ -119,7 +121,7 @@ ___
 
 #### Defined in
 
-[index.ts:103](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L103)
+[index.ts:118](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L118)
 
 ___
 
@@ -137,7 +139,7 @@ ___
 
 #### Defined in
 
-[index.ts:96](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L96)
+[index.ts:111](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L111)
 
 ___
 
@@ -156,7 +158,7 @@ ___
 
 #### Defined in
 
-[index.ts:89](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L89)
+[index.ts:104](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L104)
 
 ___
 
@@ -186,7 +188,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/0152db5/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -204,7 +206,7 @@ ___
 
 #### Defined in
 
-[index.ts:114](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L114)
+[index.ts:129](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L129)
 
 ___
 
@@ -229,7 +231,7 @@ ___
 
 #### Defined in
 
-[index.ts:182](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L182)
+[index.ts:197](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L197)
 
 ___
 
@@ -247,7 +249,7 @@ ___
 
 #### Defined in
 
-[index.ts:215](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L215)
+[index.ts:230](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L230)
 
 ___
 
@@ -271,7 +273,7 @@ ___
 
 #### Defined in
 
-[index.ts:202](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L202)
+[index.ts:217](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L217)
 
 ___
 
@@ -281,7 +283,7 @@ ___
 
 #### Defined in
 
-[index.ts:128](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L128)
+[index.ts:143](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L143)
 
 ___
 
@@ -299,7 +301,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/0152db5/src/NativeRNWhisper.ts#L37)
 
 ___
 
@@ -318,7 +320,7 @@ ___
 
 #### Defined in
 
-[index.ts:716](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L716)
+[index.ts:731](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L731)
 
 ___
 
@@ -339,7 +341,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:69](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/NativeRNWhisper.ts#L69)
+[NativeRNWhisper.ts:69](https://github.com/mybigday/whisper.rn/blob/0152db5/src/NativeRNWhisper.ts#L69)
 
 ___
 
@@ -356,7 +358,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:97](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/NativeRNWhisper.ts#L97)
+[NativeRNWhisper.ts:97](https://github.com/mybigday/whisper.rn/blob/0152db5/src/NativeRNWhisper.ts#L97)
 
 ## Variables
 
@@ -364,7 +366,7 @@ ___
 
 • **AudioSessionIos**: `Object`
 
-AudioSession Utility, iOS only.
+[Deprecated] AudioSession Utility, iOS only.
 
 #### Type declaration
 
@@ -381,7 +383,7 @@ AudioSession Utility, iOS only.
 
 #### Defined in
 
-[AudioSessionIos.ts:50](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/AudioSessionIos.ts#L50)
+[AudioSessionIos.ts:51](https://github.com/mybigday/whisper.rn/blob/0152db5/src/AudioSessionIos.ts#L51)
 
 ___
 
@@ -393,7 +395,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:708](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L708)
+[index.ts:723](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L723)
 
 ___
 
@@ -405,7 +407,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:705](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L705)
+[index.ts:720](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L720)
 
 ___
 
@@ -417,9 +419,33 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:700](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L700)
+[index.ts:715](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L715)
 
 ## Functions
+
+### addNativeLogListener
+
+▸ **addNativeLogListener**(`listener`): `Object`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `listener` | (`level`: `string`, `text`: `string`) => `void` |
+
+#### Returns
+
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `remove` | () => `void` |
+
+#### Defined in
+
+[index.ts:869](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L869)
+
+___
 
 ### initWhisper
 
@@ -437,7 +463,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:629](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L629)
+[index.ts:644](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L644)
 
 ___
 
@@ -461,7 +487,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:809](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L809)
+[index.ts:824](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L824)
 
 ___
 
@@ -475,7 +501,7 @@ ___
 
 #### Defined in
 
-[index.ts:695](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L695)
+[index.ts:710](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L710)
 
 ___
 
@@ -493,4 +519,24 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:846](https://github.com/mybigday/whisper.rn/blob/16b3c27/src/index.ts#L846)
+[index.ts:861](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L861)
+
+___
+
+### toggleNativeLog
+
+▸ **toggleNativeLog**(`enabled`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `enabled` | `boolean` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[index.ts:865](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L865)
