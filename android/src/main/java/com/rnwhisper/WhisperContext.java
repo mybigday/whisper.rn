@@ -29,6 +29,29 @@ public class WhisperContext {
 
   private static String loadedLibrary = "";
 
+  private static class NativeLogCallback {
+    DeviceEventManagerModule.RCTDeviceEventEmitter eventEmitter;
+
+    public NativeLogCallback(ReactApplicationContext reactContext) {
+      this.eventEmitter = reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class);
+    }
+
+    void emitNativeLog(String level, String text) {
+      WritableMap event = Arguments.createMap();
+      event.putString("level", level);
+      event.putString("text", text);
+      eventEmitter.emit("@RNWhisper_onNativeLog", event);
+    }
+  }
+
+  static void toggleNativeLog(ReactApplicationContext reactContext, boolean enabled) {
+    if (enabled) {
+      setupLog(new NativeLogCallback(reactContext));
+    } else {
+      unsetLog();
+    }
+  }
+
   private static final int SAMPLE_RATE = 16000;
   private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
   private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
@@ -571,4 +594,6 @@ public class WhisperContext {
   // JSI Installation
   protected static native void installJSIBindings(long runtimePtr, Object callInvokerHolder);
   protected static native void cleanupJSIBindings();
+  protected static native void setupLog(NativeLogCallback logCallback);
+  protected static native void unsetLog();
 }

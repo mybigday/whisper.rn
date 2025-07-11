@@ -24,6 +24,16 @@ RCT_EXPORT_MODULE()
   return NO;
 }
 
+RCT_EXPORT_METHOD(toggleNativeLog:(BOOL)enabled) {
+    void (^onEmitLog)(NSString *level, NSString *text) = nil;
+    if (enabled) {
+        onEmitLog = ^(NSString *level, NSString *text) {
+            [self sendEventWithName:@"@RNWhisper_onNativeLog" body:@{ @"level": level, @"text": text }];
+        };
+    }
+    [RNWhisperContext toggleNativeLog:enabled onEmitLog:onEmitLog];
+}
+
 - (NSDictionary *)constantsToExport
 {
   return @{
@@ -107,6 +117,7 @@ RCT_REMAP_METHOD(initContext,
     @"@RNWhisper_onTranscribeNewSegments",
     @"@RNWhisper_onRealtimeTranscribe",
     @"@RNWhisper_onRealtimeTranscribeEnd",
+    @"@RNWhisper_onNativeLog",
   ];
 }
 

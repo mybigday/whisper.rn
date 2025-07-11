@@ -47,6 +47,7 @@ typedef struct {
     bool isMetalEnabled;
 }
 
++ (void)toggleNativeLog:(BOOL)enabled onEmitLog:(void (^)(NSString *level, NSString *text))onEmitLog;
 + (instancetype)initWithModelPath:(NSString *)modelPath contextId:(int)contextId noCoreML:(BOOL)noCoreML noMetal:(BOOL)noMetal useFlashAttn:(BOOL)useFlashAttn;
 - (bool)isMetalEnabled;
 - (NSString *)reasonNoMetal;
