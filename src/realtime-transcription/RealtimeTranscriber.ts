@@ -683,9 +683,6 @@ export class RealtimeTranscriber {
         memoryUsage: this.sliceManager.getMemoryUsage(),
       }
 
-      // Emit transcribe event
-      this.callbacks.onTranscribe?.(transcribeEvent)
-
       // Save transcription results
       const slice = this.sliceManager.getSliceByIndex(item.sliceIndex)
       if (slice) {
@@ -702,6 +699,9 @@ export class RealtimeTranscriber {
           transcribeEvent,
         })
       }
+
+      // Emit transcribe event
+      this.callbacks.onTranscribe?.(transcribeEvent)
 
       // Emit stats update for memory/slice changes
       this.emitStatsUpdate('memory_change')
