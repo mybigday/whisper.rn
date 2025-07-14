@@ -373,6 +373,15 @@ await AudioSessionIos.setActive(true)
 
 In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
+## Apps using `whisper.rn`
+
+- [BRICKS](https://bricks.tools): Our product for building interactive signage in simple way. We provide LLM functions as Generator LLM/Assistant.
+- ... (Any Contribution is welcome)
+
+## Node.js binding
+
+- [whisper.node](https://github.com/mybigday/whisper.node): An another Node.js binding of `whisper.cpp` but made API same as `whisper.rn`.
+
 ## Contributing
 
 See the [contributing guide](CONTRIBUTING.md) to learn how to contribute to the repository and the development workflow.
