@@ -495,6 +495,10 @@ public class WhisperContext {
     }
   }
 
+  public static boolean isNativeLibraryLoaded() {
+    return loadedLibrary != "";
+  }
+
   public static boolean isArm64V8a() {
     return Build.SUPPORTED_ABIS[0].equals("arm64-v8a");
   }

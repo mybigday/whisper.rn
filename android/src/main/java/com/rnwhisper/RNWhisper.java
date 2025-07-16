@@ -64,6 +64,10 @@ public class RNWhisper implements LifecycleEventListener {
   }
 
   public void installJSIBindings(Promise promise) {
+    if (!WhisperContext.isNativeLibraryLoaded()) {
+      promise.reject("Native library not loaded");
+      return;
+    }
 
     AsyncTask task = new AsyncTask<Void, Void, Void>() {
       private Exception exception;
@@ -96,6 +100,11 @@ public class RNWhisper implements LifecycleEventListener {
   }
 
   public void toggleNativeLog(boolean enabled, Promise promise) {
+    if (!WhisperContext.isNativeLibraryLoaded()) {
+      promise.reject("Native library not loaded");
+      return;
+    }
+
     new AsyncTask<Void, Void, Boolean>() {
       private Exception exception;
 
