@@ -478,9 +478,9 @@ public class WhisperContext {
         System.loadLibrary("rnwhisper_v8fp16_va_2");
         loadedLibrary = "rnwhisper_v8fp16_va_2";
       } else {
-        Log.d(NAME, "Loading librnwhisper_v8_va_2.so");
-        System.loadLibrary("rnwhisper_v8_va_2");
-        loadedLibrary = "rnwhisper_v8_va_2";
+        Log.d(NAME, "Loading librnwhisper_v8.so");
+        System.loadLibrary("rnwhisper_v8");
+        loadedLibrary = "rnwhisper_v8";
       }
     } else if (WhisperContext.isArmeabiV7a()) {
       Log.d(NAME, "Loading librnwhisper_vfpv4.so");

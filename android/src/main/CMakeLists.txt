@@ -110,7 +110,7 @@ build_library("rnwhisper" "generic" "")
 
 if (${ANDROID_ABI} STREQUAL "arm64-v8a")
     build_library("rnwhisper_v8fp16_va_2" "arm" "-march=armv8.2-a+fp16")
-    build_library("rnwhisper_v8_va_2" "arm" "-march=armv8.2-a")
+    build_library("rnwhisper_v8" "arm" "-march=armv8-a")
 elseif (${ANDROID_ABI} STREQUAL "armeabi-v7a")
     build_library("rnwhisper_vfpv4" "arm" "-mfpu=neon-vfpv4")
 elseif (${ANDROID_ABI} STREQUAL "x86_64")
