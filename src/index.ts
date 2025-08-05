@@ -50,16 +50,22 @@ let jsiWhisperVadDetectSpeech: (
   audioData: ArrayBuffer | SharedArrayBuffer,
 ) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
 
-RNWhisper.installJSIBindings()
-  .then(() => {
-    jsiWhisperTranscribeData = global.whisperTranscribeData
-    delete (global as any).whisperTranscribeData
-    jsiWhisperVadDetectSpeech = global.whisperVadDetectSpeech
-    delete (global as any).whisperVadDetectSpeech
-  })
-  .catch((e) => {
-    console.warn('Failed to install JSI bindings', e)
-  })
+let jsiInstalled = false
+
+const installJSIBindingsIfNeeded = async () => {
+  if (jsiInstalled) return
+  jsiInstalled = true
+  return RNWhisper.installJSIBindings()
+    .then(() => {
+      jsiWhisperTranscribeData = global.whisperTranscribeData
+      delete (global as any).whisperTranscribeData
+      jsiWhisperVadDetectSpeech = global.whisperVadDetectSpeech
+      delete (global as any).whisperVadDetectSpeech
+    })
+    .catch((e) => {
+      console.warn('Failed to install JSI bindings', e)
+    })
+}
 
 let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
 if (Platform.OS === 'ios') {
@@ -649,6 +655,8 @@ export async function initWhisper({
   useCoreMLIos = true,
   useFlashAttn = false,
 }: ContextOptions): Promise<WhisperContext> {
+  await installJSIBindingsIfNeeded()
+
   let path = ''
   let coreMLAssets: CoreMLAsset[] | undefined
   if (coreMLModelAsset) {
@@ -708,6 +716,8 @@ export async function initWhisper({
 }
 
 export async function releaseAllWhisper(): Promise<void> {
+  await installJSIBindingsIfNeeded()
+
   return RNWhisper.releaseAllContexts()
 }
 
@@ -827,6 +837,8 @@ export async function initWhisperVad({
   useGpu = true,
   nThreads,
 }: VadContextOptions): Promise<WhisperVadContext> {
+  await installJSIBindingsIfNeeded()
+
   let path = ''
   if (typeof filePath === 'number') {
     try {
@@ -859,10 +871,19 @@ export async function initWhisperVad({
  * @returns Promise resolving when all contexts are released
  */
 export async function releaseAllWhisperVad(): Promise<void> {
+  await installJSIBindingsIfNeeded()
+
   return RNWhisper.releaseAllVadContexts()
 }
 
+let logInitialized = false
+
 export async function toggleNativeLog(enabled: boolean): Promise<void> {
+  if (!enabled && !logInitialized) return // If first call is false, skip
+
+  logInitialized = true
+  await installJSIBindingsIfNeeded()
+
   return RNWhisper.toggleNativeLog(enabled)
 }
 
