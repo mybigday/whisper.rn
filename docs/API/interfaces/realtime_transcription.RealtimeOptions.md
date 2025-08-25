@@ -30,7 +30,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L182)
+[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L182)
 
 ___
 
@@ -40,7 +40,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:201](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L201)
+[realtime-transcription/types.ts:201](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L201)
 
 ___
 
@@ -50,7 +50,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L181)
+[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L181)
 
 ___
 
@@ -60,7 +60,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L204)
+[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L204)
 
 ___
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L190)
+[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L190)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L191)
+[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L191)
 
 ___
 
@@ -90,7 +90,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L197)
+[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L197)
 
 ___
 
@@ -114,7 +114,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:207](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L207)
+[realtime-transcription/types.ts:207](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L207)
 
 ___
 
@@ -124,7 +124,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L183)
+[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L183)
 
 ___
 
@@ -134,7 +134,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:198](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L198)
+[realtime-transcription/types.ts:198](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L198)
 
 ___
 
@@ -144,7 +144,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L194)
+[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L194)
 
 ___
 
@@ -154,7 +154,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:186](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L186)
+[realtime-transcription/types.ts:186](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L186)
 
 ___
 
@@ -164,4 +164,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/0152db5/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L187)

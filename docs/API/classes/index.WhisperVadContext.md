@@ -36,7 +36,7 @@
 
 #### Defined in
 
-[index.ts:748](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L748)
+[index.ts:758](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L758)
 
 ## Properties
 
@@ -46,7 +46,7 @@
 
 #### Defined in
 
-[index.ts:744](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L744)
+[index.ts:754](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L754)
 
 ___
 
@@ -56,7 +56,7 @@ ___
 
 #### Defined in
 
-[index.ts:742](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L742)
+[index.ts:752](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L752)
 
 ___
 
@@ -66,7 +66,7 @@ ___
 
 #### Defined in
 
-[index.ts:746](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L746)
+[index.ts:756](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L756)
 
 ## Methods
 
@@ -90,7 +90,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:758](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L758)
+[index.ts:768](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L768)
 
 ___
 
@@ -104,7 +104,7 @@ Detect speech segments in raw audio data (base64 encoded float32 PCM data or Arr
 
 | Name | Type |
 | :------ | :------ |
-| `audioData` | `string` \| `ArrayBuffer` \| `SharedArrayBuffer` |
+| `audioData` | `string` \| `ArrayBuffer` |
 | `options` | [`VadOptions`](../modules/index.md#vadoptions) |
 
 #### Returns
@@ -113,7 +113,7 @@ Detect speech segments in raw audio data (base64 encoded float32 PCM data or Arr
 
 #### Defined in
 
-[index.ts:792](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L792)
+[index.ts:802](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L802)
 
 ___
 
@@ -127,4 +127,4 @@ ___
 
 #### Defined in
 
-[index.ts:814](https://github.com/mybigday/whisper.rn/blob/0152db5/src/index.ts#L814)
+[index.ts:821](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L821)
