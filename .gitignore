@@ -82,3 +82,6 @@ build-ios/
 build-tvos/
 
 ios/rnwhisper.xcframework/**/*.framework
+
+local-plan/
+local-plan-done/

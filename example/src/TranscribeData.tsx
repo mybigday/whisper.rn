@@ -9,7 +9,7 @@ import type { WhisperContext } from '../../src'
 import { WavFileWriter } from '../../src/utils/WavFileWriter'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir } from './util'
+import { createDir, fileDir, downloadModel, whisperModels, WhisperModel } from './util'
 
 const styles = StyleSheet.create({
   scrollview: { flexGrow: 1, justifyContent: 'center' },
@@ -19,10 +19,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 4,
   },
-  buttons: { flexDirection: 'row' },
+  buttons: { flexDirection: 'row', margin: 8 },
   button: { margin: 4, backgroundColor: '#333', borderRadius: 4, padding: 8 },
   buttonClear: { backgroundColor: '#888' },
   buttonText: { fontSize: 14, color: 'white', textAlign: 'center' },
+  configTitle: { fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
   logContainer: {
     backgroundColor: 'lightgray',
     padding: 8,
@@ -52,6 +53,8 @@ export default function TranscribeData() {
   const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const recordedDataRef = useRef<Uint8Array | null>(null)
+  const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
+  const [downloadProgress, setDownloadProgress] = useState<number>(0)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -115,7 +118,7 @@ export default function TranscribeData() {
       log('Start transcribing...')
 
       const startTime = Date.now()
-      const { promise } = await whisperContext.transcribeData(base64Data, {
+      const { promise } = whisperContext.transcribeData(base64Data, {
         language: 'en',
         onProgress: (progress) => {
           log(`Transcribing progress: ${progress}%`)
@@ -140,9 +143,10 @@ export default function TranscribeData() {
       contentContainerStyle={styles.scrollview}
     >
       <View style={styles.container}>
+        <Text style={styles.configTitle}>Transcribe Data Demo</Text>
         <View style={styles.buttons}>
           <Button
-            title="Initialize Context"
+            title="Initialize (Use Asset base.bin)"
             onPress={async () => {
               if (whisperContext) {
                 log('Found previous context')
@@ -163,6 +167,66 @@ export default function TranscribeData() {
             }}
           />
         </View>
+        <Text style={styles.configTitle}>Whisper Model Selection</Text>
+        <View style={styles.buttons}>
+          {whisperModels.map((model) => (
+            <Button
+              key={model}
+              title={model}
+              style={[
+                selectedModel === model ? { backgroundColor: '#007AFF' } : null,
+              ]}
+              onPress={() => setSelectedModel(model)}
+            />
+          ))}
+        </View>
+        {downloadProgress > 0 && downloadProgress < 1 && (
+          <View style={styles.logContainer}>
+            <Text style={styles.logText}>
+              Downloading
+              {' '}
+              {selectedModel}
+              :
+              {' '}
+              {Math.round(downloadProgress * 100)}
+              %
+            </Text>
+          </View>
+        )}
+        <Button
+          title={`Download & Initialize ${selectedModel}`}
+          onPress={async () => {
+            if (whisperContext) {
+              log('Found previous context')
+              await whisperContext.release()
+              whisperContextRef.current = null
+              log('Released previous context')
+            }
+
+            try {
+              const modelFilePath = await downloadModel(
+                selectedModel,
+                (progress) => {
+                  setDownloadProgress(progress)
+                  log(`Download progress: ${Math.round(progress * 100)}%`)
+                },
+                log
+              )
+
+              log('Initialize context...')
+              const startTime = Date.now()
+              const ctx = await initWhisper({ filePath: modelFilePath })
+              const endTime = Date.now()
+              log('Loaded model, ID:', ctx.id)
+              log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+              whisperContextRef.current = ctx
+              setDownloadProgress(0)
+            } catch (error) {
+              log('Error downloading or initializing model:', error)
+              setDownloadProgress(0)
+            }
+          }}
+        />
 
         <View style={styles.buttons}>
           <Button

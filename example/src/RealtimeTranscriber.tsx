@@ -16,7 +16,7 @@ import { initWhisper, initWhisperVad, libVersion } from '../../src'
 import type { WhisperContext, WhisperVadContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, toTimestamp } from './util'
+import { createDir, fileDir, toTimestamp, downloadModel, whisperModels, WhisperModel } from './util'
 import {
   RealtimeTranscriber,
   VAD_PRESETS,
@@ -145,6 +145,8 @@ export default function RealtimeTranscriberDemo() {
   const [audioFilePath, setAudioFilePath] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
+  const [modelDownloadProgress, setModelDownloadProgress] = useState<number>(0)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [
@@ -227,7 +229,7 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
-  const initializeContexts = async () => {
+  const initializeContextsWithAsset = async () => {
     try {
       if (whisperContextRef.current) {
         log('Found previous Whisper context')
@@ -273,6 +275,64 @@ export default function RealtimeTranscriberDemo() {
       log('Both contexts initialized successfully!')
     } catch (error) {
       log('Error initializing contexts:', error)
+      Alert.alert('Error', `Failed to initialize: ${error}`)
+    }
+  }
+
+  const initializeContextsWithDownload = async () => {
+    try {
+      if (whisperContextRef.current) {
+        log('Found previous Whisper context')
+        await whisperContextRef.current.release()
+        whisperContextRef.current = null
+        log('Released previous Whisper context')
+      }
+
+      if (vadContextRef.current) {
+        log('Found previous VAD context')
+        await vadContextRef.current.release()
+        vadContextRef.current = null
+        log('Released previous VAD context')
+      }
+
+      const modelFilePath = await downloadModel(
+        selectedModel,
+        (progress) => {
+          setModelDownloadProgress(progress)
+          log(`Download progress: ${Math.round(progress * 100)}%`)
+        },
+        log
+      )
+
+      log('Initializing Whisper context...')
+      const startTime = Date.now()
+      const whisperCtx = await initWhisper({ filePath: modelFilePath })
+      const endTime = Date.now()
+      log('Loaded Whisper model, ID:', whisperCtx.id)
+      log('Loaded Whisper model in', endTime - startTime, `ms in ${mode} mode`)
+      whisperContextRef.current = whisperCtx
+      setModelDownloadProgress(0)
+
+      log('Initializing VAD context...')
+      const vadStartTime = Date.now()
+      const vadCtx = await initWhisperVad({
+        filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+        useGpu: true,
+        nThreads: 4,
+      })
+      const vadEndTime = Date.now()
+      log('Loaded VAD model, ID:', vadCtx.id)
+      log(
+        'Loaded VAD model in',
+        vadEndTime - vadStartTime,
+        `ms in ${mode} mode`,
+      )
+      vadContextRef.current = vadCtx
+
+      log('Both contexts initialized successfully!')
+    } catch (error) {
+      log('Error initializing contexts:', error)
+      setModelDownloadProgress(0)
       Alert.alert('Error', `Failed to initialize: ${error}`)
     }
   }
@@ -613,10 +673,46 @@ export default function RealtimeTranscriberDemo() {
       contentContainerStyle={styles.scrollview}
     >
       <View style={styles.container}>
+        <Text style={[styles.configTitle, { fontSize: 18, marginBottom: 12, textAlign: 'center' }]}>Realtime Transcriber Demo</Text>
+        {/* Model Selection */}
+        <View style={styles.configContainer}>
+          <Text style={styles.configTitle}>Whisper Model Selection</Text>
+          <View style={styles.buttons}>
+            {whisperModels.map((model) => (
+              <Button
+                key={model}
+                title={model}
+                style={[
+                  selectedModel === model ? { backgroundColor: '#007AFF' } : null,
+                ]}
+                onPress={() => setSelectedModel(model)}
+                disabled={isTranscribing}
+              />
+            ))}
+          </View>
+        </View>
+
         {/* Initialization */}
         <View style={styles.buttons}>
-          <Button title="Initialize Contexts" onPress={initializeContexts} />
+          <Button 
+            title="Initialize (Use Asset)" 
+            onPress={initializeContextsWithAsset} 
+            disabled={isTranscribing}
+          />
+          <Button 
+            title={`Download & Initialize ${selectedModel}`}
+            onPress={initializeContextsWithDownload} 
+            disabled={isTranscribing}
+          />
         </View>
+        
+        {modelDownloadProgress > 0 && modelDownloadProgress < 1 && (
+          <View style={styles.logContainer}>
+            <Text style={styles.logText}>
+              Downloading {selectedModel}: {Math.round(modelDownloadProgress * 100)}%
+            </Text>
+          </View>
+        )}
 
         {/* Audio Source Configuration */}
         <View style={styles.configContainer}>

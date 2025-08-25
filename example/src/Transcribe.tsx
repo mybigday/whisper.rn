@@ -8,13 +8,19 @@ import {
   PermissionsAndroid,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import { unzip } from 'react-native-zip-archive'
 import Sound from 'react-native-sound'
 import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, modelHost, toTimestamp } from './util'
+import {
+  createDir,
+  fileDir,
+  toTimestamp,
+  downloadModel,
+  whisperModels,
+  WhisperModel,
+} from './util'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -38,10 +44,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 4,
   },
-  buttons: { flexDirection: 'row' },
+  buttons: { flexDirection: 'row', margin: 8 },
   button: { margin: 4, backgroundColor: '#333', borderRadius: 4, padding: 8 },
   buttonClear: { backgroundColor: '#888' },
   buttonText: { fontSize: 14, color: 'white', textAlign: 'center' },
+  configTitle: { fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
   logContainer: {
     backgroundColor: 'lightgray',
     padding: 8,
@@ -56,9 +63,6 @@ const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
 const recordFile = `${fileDir}/realtime.wav`
 
-const filterPath = (path: string) =>
-  path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
-
 export default function App() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
   const whisperContext = whisperContextRef.current
@@ -67,28 +71,19 @@ export default function App() {
   const [stopTranscribe, setStopTranscribe] = useState<{
     stop: () => void
   } | null>(null)
+  const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
+  const [downloadProgress, setDownloadProgress] = useState<number>(0)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
   }, [])
 
-  useEffect(() => () => {
-    whisperContextRef.current?.release()
-    whisperContextRef.current = null
-  }, [])
-
-  const progress = useCallback(
-    ({
-      contentLength,
-      bytesWritten,
-    }: {
-      contentLength: number
-      bytesWritten: number
-    }) => {
-      const written = bytesWritten >= 0 ? bytesWritten : 0
-      log(`Download progress: ${Math.round((written / contentLength) * 100)}%`)
+  useEffect(
+    () => () => {
+      whisperContextRef.current?.release()
+      whisperContextRef.current = null
     },
-    [log],
+    [],
   )
 
   return (
@@ -97,9 +92,10 @@ export default function App() {
       contentContainerStyle={styles.scrollview}
     >
       <View style={styles.container}>
+        <Text style={styles.configTitle}>Transcribe File Demo</Text>
         <View style={styles.buttons}>
           <Button
-            title="Initialize (Use Asset)"
+            title="Initialize (Use Asset base.bin)"
             onPress={async () => {
               if (whisperContext) {
                 log('Found previous context')
@@ -119,57 +115,43 @@ export default function App() {
               whisperContextRef.current = ctx
             }}
           />
-          <Button
-            title="Initialize (Download)"
-            onPress={async () => {
-              if (whisperContext) {
-                log('Found previous context')
-                await whisperContext.release()
-                whisperContextRef.current = null
-                log('Released previous context')
-              }
-              await createDir(log)
-              const modelFilePath = `${fileDir}/ggml-base.bin`
-              if (await RNFS.exists(modelFilePath)) {
-                log('Model already exists:')
-                log(filterPath(modelFilePath))
-              } else {
-                log('Start Download Model to:')
-                log(filterPath(modelFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-base.bin`,
-                  toFile: modelFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded model file:')
-                log(filterPath(modelFilePath))
-              }
+        </View>
+        <Text style={styles.configTitle}>Whisper Model Selection</Text>
+        <View style={styles.buttons}>
+          {whisperModels.map((model) => (
+            <Button
+              key={model}
+              title={model}
+              style={[
+                selectedModel === model ? { backgroundColor: '#007AFF' } : null,
+              ]}
+              onPress={() => setSelectedModel(model)}
+            />
+          ))}
+        </View>
+        <Button
+          title={`Download & Initialize ${selectedModel}`}
+          onPress={async () => {
+            if (whisperContext) {
+              log('Found previous context')
+              await whisperContext.release()
+              whisperContextRef.current = null
+              log('Released previous context')
+            }
 
-              // If you don't want to enable Core ML, you can remove this
-              const coremlModelFilePath = `${fileDir}/ggml-base-encoder.mlmodelc.zip`
-              if (
-                Platform.OS === 'ios' &&
-                (await RNFS.exists(coremlModelFilePath))
-              ) {
-                log('Core ML Model already exists:')
-                log(filterPath(coremlModelFilePath))
-              } else if (Platform.OS === 'ios') {
-                log('Start Download Core ML Model to:')
-                log(filterPath(coremlModelFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-base-encoder.mlmodelc.zip`,
-                  toFile: coremlModelFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded Core ML Model model file:')
-                log(filterPath(modelFilePath))
-                await unzip(coremlModelFilePath, fileDir)
-                log('Unzipped Core ML Model model successfully.')
-              }
+            try {
+              const modelFilePath = await downloadModel(
+                selectedModel,
+                (downloadProgressValue) => {
+                  setDownloadProgress(downloadProgressValue)
+                  log(
+                    `Download progress: ${Math.round(
+                      downloadProgressValue * 100,
+                    )}%`,
+                  )
+                },
+                log,
+              )
 
               log('Initialize context...')
               const startTime = Date.now()
@@ -178,9 +160,20 @@ export default function App() {
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
               whisperContextRef.current = ctx
-            }}
-          />
-        </View>
+              setDownloadProgress(0)
+            } catch (error) {
+              log('Error downloading or initializing model:', error)
+              setDownloadProgress(0)
+            }
+          }}
+        />
+        {downloadProgress > 0 && downloadProgress < 1 && (
+          <View style={styles.logContainer}>
+            <Text style={styles.logText}>
+              {`Downloading ${selectedModel}: ${Math.round(downloadProgress * 100)}%`}
+            </Text>
+          </View>
+        )}
         <View style={styles.buttons}>
           <Button
             title="Transcribe File"
@@ -225,14 +218,12 @@ export default function App() {
           />
           <Button
             title={stopTranscribe?.stop ? 'Stop' : 'Realtime'}
-            style={[
-              stopTranscribe?.stop ? styles.buttonClear : null,
-            ]}
+            style={[stopTranscribe?.stop ? styles.buttonClear : null]}
             onPress={async () => {
               if (!whisperContext) return log('No context')
               if (stopTranscribe?.stop) {
                 const t0 = Date.now()
-                await stopTranscribe?.stop()
+                stopTranscribe?.stop()
                 const t1 = Date.now()
                 log('Stopped transcribing in', t1 - t0, 'ms')
                 setStopTranscribe(null)
