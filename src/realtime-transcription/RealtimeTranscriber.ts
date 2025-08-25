@@ -517,7 +517,7 @@ export class RealtimeTranscriber {
     }
 
     try {
-      const audioBuffer = audioData.buffer as SharedArrayBuffer
+      const audioBuffer = audioData.buffer as ArrayBuffer
 
       // Use VAD context to detect speech segments
       const vadSegments = await this.vadContext.detectSpeechData(
@@ -661,7 +661,7 @@ export class RealtimeTranscriber {
       // Build prompt from initial prompt and previous slices
       const prompt = this.buildPrompt(item.sliceIndex)
 
-      const audioBuffer = item.audioData.buffer as SharedArrayBuffer
+      const audioBuffer = item.audioData.buffer as ArrayBuffer
       const { promise } = this.whisperContext.transcribeData(audioBuffer, {
         ...this.options.transcribeOptions,
         prompt, // Include the constructed prompt

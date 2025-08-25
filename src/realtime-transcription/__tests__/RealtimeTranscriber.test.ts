@@ -22,20 +22,11 @@ describe('RealtimeTranscriber', () => {
   let mockFs: any
   let mockCallbacks: any
 
-  // Helper function to create audio data with SharedArrayBuffer for transcription tests
+  // Helper function to create audio data with ArrayBuffer for transcription tests
   const createAudioData = (size: number): Uint8Array => {
-    try {
-      // Try to create SharedArrayBuffer for proper transcription testing
-      const sharedBuffer = new SharedArrayBuffer(size)
-      const audioData = new Uint8Array(sharedBuffer)
-      audioData.fill(1)
-      return audioData
-    } catch (e) {
-      // Fallback to regular ArrayBuffer if SharedArrayBuffer is not available
-      const audioData = new Uint8Array(size)
-      audioData.fill(1)
-      return audioData
-    }
+    const audioData = new Uint8Array(size)
+    audioData.fill(1)
+    return audioData
   }
 
   beforeEach(() => {

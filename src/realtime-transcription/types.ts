@@ -254,7 +254,7 @@ export interface RealtimeTranscriberCallbacks {
 
 export type WhisperContextLike = {
   transcribeData: (
-    data: SharedArrayBuffer,
+    data: ArrayBuffer,
     options: TranscribeOptions,
   ) => {
     stop: () => Promise<void>
@@ -264,7 +264,7 @@ export type WhisperContextLike = {
 
 export type WhisperVadContextLike = {
   detectSpeechData: (
-    data: SharedArrayBuffer,
+    data: ArrayBuffer,
     options: VadOptions,
   ) => Promise<Array<{ t0: number; t1: number }>>
 }

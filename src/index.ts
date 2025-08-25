@@ -29,25 +29,25 @@ declare global {
   var whisperTranscribeData: (
     contextId: number,
     options: TranscribeOptions,
-    data: ArrayBuffer | SharedArrayBuffer,
+    data: ArrayBuffer,
   ) => Promise<TranscribeResult>
   // eslint-disable-next-line no-var
   var whisperVadDetectSpeech: (
     contextId: number,
     options: VadOptions,
-    audioData: ArrayBuffer | SharedArrayBuffer,
+    audioData: ArrayBuffer,
   ) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
 }
 
 let jsiWhisperTranscribeData: (
   contextId: number,
   options: TranscribeOptions,
-  data: ArrayBuffer | SharedArrayBuffer,
+  data: ArrayBuffer,
 ) => Promise<TranscribeResult>
 let jsiWhisperVadDetectSpeech: (
   contextId: number,
   options: VadOptions,
-  audioData: ArrayBuffer | SharedArrayBuffer,
+  audioData: ArrayBuffer,
 ) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
 
 let jsiInstalled = false
@@ -391,13 +391,13 @@ export class WhisperContext {
    * Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
   transcribeData(
-    data: string | ArrayBuffer | SharedArrayBuffer,
+    data: string | ArrayBuffer,
     options: TranscribeFileOptions = {},
   ): {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
-    if (data instanceof ArrayBuffer || data instanceof SharedArrayBuffer) {
+    if (data instanceof ArrayBuffer) {
       // Use JSI function for ArrayBuffer
       if (!jsiWhisperTranscribeData) {
         throw new Error('JSI binding `whisperTranscribeData` not installed')
@@ -411,7 +411,7 @@ export class WhisperContext {
    * Transcribe audio data from ArrayBuffer (16-bit PCM, mono, 16kHz)
    */
   private transcribeDataArrayBuffer(
-    data: ArrayBuffer | SharedArrayBuffer,
+    data: ArrayBuffer,
     options: TranscribeFileOptions = {},
   ): {
     stop: () => Promise<void>
@@ -800,13 +800,10 @@ export class WhisperVadContext {
    * Detect speech segments in raw audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
   async detectSpeechData(
-    audioData: string | ArrayBuffer | SharedArrayBuffer,
+    audioData: string | ArrayBuffer,
     options: VadOptions = {},
   ): Promise<VadSegment[]> {
-    if (
-      audioData instanceof ArrayBuffer ||
-      audioData instanceof SharedArrayBuffer
-    ) {
+    if (audioData instanceof ArrayBuffer) {
       // Use JSI function for ArrayBuffer
       if (!jsiWhisperVadDetectSpeech) {
         throw new Error('JSI binding `whisperVadDetectSpeech` not installed')
