@@ -694,18 +694,18 @@ export default function RealtimeTranscriberDemo() {
 
         {/* Initialization */}
         <View style={styles.buttons}>
-          <Button 
-            title="Initialize (Use Asset)" 
-            onPress={initializeContextsWithAsset} 
+          <Button
+            title="Initialize (Use Asset base.bin)"
+            onPress={initializeContextsWithAsset}
             disabled={isTranscribing}
           />
-          <Button 
+          <Button
             title={`Download & Initialize ${selectedModel}`}
-            onPress={initializeContextsWithDownload} 
+            onPress={initializeContextsWithDownload}
             disabled={isTranscribing}
           />
         </View>
-        
+
         {modelDownloadProgress > 0 && modelDownloadProgress < 1 && (
           <View style={styles.logContainer}>
             <Text style={styles.logText}>

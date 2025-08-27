@@ -87,6 +87,9 @@ export class RealtimeTranscriber {
     { slice: AudioSliceNoData; transcribeEvent: RealtimeTranscribeEvent }
   > = new Map()
 
+  // Store VAD events by slice index for inclusion in transcribe events
+  private vadEvents: Map<number, RealtimeVadEvent> = new Map()
+
   constructor(
     dependencies: RealtimeTranscriberDependencies,
     options: RealtimeOptions = {},
@@ -394,6 +397,9 @@ export class RealtimeTranscriber {
       const vadEvent = await this.detectSpeech(audioData, slice.index)
       vadEvent.timestamp = Date.now()
 
+      // Store VAD event for inclusion in transcribe event
+      this.vadEvents.set(slice.index, vadEvent)
+
       // Emit VAD event
       this.callbacks.onVad?.(vadEvent)
 
@@ -681,6 +687,7 @@ export class RealtimeTranscriber {
         processTime: endTime - startTime,
         recordingTime: item.audioData.length / (sampleRate / 1000) / 2, // ms,
         memoryUsage: this.sliceManager.getMemoryUsage(),
+        vadEvent: this.vadEvents.get(item.sliceIndex),
       }
 
       // Save transcription results
@@ -703,6 +710,8 @@ export class RealtimeTranscriber {
       // Emit transcribe event
       this.callbacks.onTranscribe?.(transcribeEvent)
 
+      this.vadEvents.delete(item.sliceIndex)
+
       // Emit stats update for memory/slice changes
       this.emitStatsUpdate('memory_change')
 
@@ -719,9 +728,12 @@ export class RealtimeTranscriber {
         processTime: Date.now() - startTime,
         recordingTime: 0,
         memoryUsage: this.sliceManager.getMemoryUsage(),
+        vadEvent: this.vadEvents.get(item.sliceIndex),
       }
 
       this.callbacks.onTranscribe?.(errorEvent)
+
+      this.vadEvents.delete(item.sliceIndex)
 
       this.handleError(
         `Transcription failed for speech segment ${item.sliceIndex}: ${error}`,
@@ -907,6 +919,9 @@ export class RealtimeTranscriber {
 
     // Clear transcription results
     this.transcriptionResults.clear()
+
+    // Clear VAD events
+    this.vadEvents.clear()
   }
 
   /**

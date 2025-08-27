@@ -304,6 +304,28 @@ describe('RealtimeTranscriber', () => {
       expect(mockCallbacks.onTranscribe).toHaveBeenCalled()
     })
 
+    it('should include VAD event in transcribe events', async () => {
+      mockVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
+
+      const audioData = createAudioData(16000)
+      mockAudioStream.simulateDataChunk(audioData)
+
+      // Allow processing to complete
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockCallbacks.onTranscribe).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'transcribe',
+          vadEvent: expect.objectContaining({
+            type: expect.stringMatching(/^(speech_start|speech_continue|speech_end|silence)$/),
+            confidence: expect.any(Number),
+            timestamp: expect.any(Number),
+            sliceIndex: expect.any(Number),
+          }),
+        })
+      )
+    })
+
     it('should handle VAD processing errors', async () => {
       mockVadContext.detectSpeechData.mockRejectedValue(new Error('VAD error'))
 
