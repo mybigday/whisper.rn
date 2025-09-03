@@ -280,6 +280,12 @@ void AudioInputCallback(void * inUserData,
         );
     }
     state->transcribeHandler(state->job->job_id, @"end", result);
+
+    // Clean up callback data before removing job
+    if (state->job->params.new_segment_callback_user_data) {
+        cleanup_callback_data(state->job->params.new_segment_callback_user_data);
+    }
+
     rnwhisper::job_remove(state->job->job_id);
 }
 
@@ -400,7 +406,20 @@ struct rnwhisper_segments_callback_data {
     void (^onNewSegments)(NSDictionary *);
     int total_n_new;
     bool tdrzEnable;
+    bool isHeapAllocated; // Track if this needs cleanup
 };
+
+// Helper function to clean up callback data
+void cleanup_callback_data(void *user_data) {
+    if (user_data) {
+        struct rnwhisper_segments_callback_data *data = (struct rnwhisper_segments_callback_data *)user_data;
+        if (data->isHeapAllocated) {
+            // onNewSegments will be automatically released when the struct is freed
+            // since we used [block copy] which creates an autoreleasing reference
+            free(data);
+        }
+    }
+}
 
 - (void)transcribeData:(int)jobId
     audioData:(float *)audioData
@@ -426,51 +445,78 @@ struct rnwhisper_segments_callback_data {
 
         if (options[@"onNewSegments"] && [options[@"onNewSegments"] boolValue]) {
             params.new_segment_callback = [](struct whisper_context * ctx, struct whisper_state * /*state*/, int n_new, void * user_data) {
-                struct rnwhisper_segments_callback_data *data = (struct rnwhisper_segments_callback_data *)user_data;
-                data->total_n_new += n_new;
+                @autoreleasepool {
+                    struct rnwhisper_segments_callback_data *data = (struct rnwhisper_segments_callback_data *)user_data;
+                    data->total_n_new += n_new;
 
-                NSString *text = @"";
-                NSMutableArray *segments = [[NSMutableArray alloc] init];
-                for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
-                    const char * text_cur = whisper_full_get_segment_text(ctx, i);
-                    NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
+                    NSMutableString *builder = [NSMutableString string];       // safer than repeated NSString concat
+                    NSMutableArray *segments = [[NSMutableArray alloc] init];
 
-                    if (data->tdrzEnable && whisper_full_get_segment_speaker_turn_next(ctx, i)) {
-                        [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
+                    for (int i = data->total_n_new - n_new; i < data->total_n_new; i++) {
+                        const char *text_cur = whisper_full_get_segment_text(ctx, i);
+
+                        // Safe decode: handle invalid UTF-8 without returning nil
+                        NSString *segText = @"";
+                        if (text_cur) {
+                            // Try UTF-8 first
+                            segText = [NSString stringWithCString:text_cur encoding:NSUTF8StringEncoding];
+                            if (!segText) {
+                                // Fall back: treat bytes as Latin-1 to avoid nil (common trick for "dirty" UTF-8)
+                                size_t len = strlen(text_cur);
+                                NSData *bytes = [NSData dataWithBytes:text_cur length:len];
+                                segText = [[NSString alloc] initWithData:bytes encoding:NSISOLatin1StringEncoding] ?: @"";
+                            }
+                        }
+
+                        if (data->tdrzEnable && whisper_full_get_segment_speaker_turn_next(ctx, i)) {
+                            segText = [segText stringByAppendingString:@" [SPEAKER_TURN]"];
+                        }
+
+                        if (segText.length) [builder appendString:segText];
+
+                        const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
+                        const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
+                        // Never put nil into an NSDictionary literal
+                        NSDictionary *segment = @{
+                            @"text": segText,                                 // guaranteed non-nil
+                            @"t0": @(t0),
+                            @"t1": @(t1),
+                        };
+                        [segments addObject:segment];
                     }
 
-                    text = [text stringByAppendingString:mutable_ns_text];
-
-                    const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
-                    const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
-                    NSDictionary *segment = @{
-                        @"text": [NSString stringWithString:mutable_ns_text],
-                        @"t0": [NSNumber numberWithLongLong:t0],
-                        @"t1": [NSNumber numberWithLongLong:t1]
+                    NSDictionary *result = @{
+                        @"nNew": @(n_new),
+                        @"totalNNew": @(data->total_n_new),
+                        @"result": builder,                                   // non-nil (possibly empty)
+                        @"segments": segments
                     };
-                    [segments addObject:segment];
-                }
 
-                NSDictionary *result = @{
-                    @"nNew": [NSNumber numberWithInt:n_new],
-                    @"totalNNew": [NSNumber numberWithInt:data->total_n_new],
-                    @"result": text,
-                    @"segments": segments
-                };
-                void (^onNewSegments)(NSDictionary *) = (void (^)(NSDictionary *))data->onNewSegments;
-                onNewSegments(result);
+                    void (^onNewSegments)(NSDictionary *) = data->onNewSegments;
+                    if (onNewSegments) onNewSegments(result);
+                }
             };
-            struct rnwhisper_segments_callback_data user_data = {
-                .onNewSegments = onNewSegments,
-                .tdrzEnable = options[@"tdrzEnable"] && [options[@"tdrzEnable"] boolValue],
-                .total_n_new = 0,
-            };
-            params.new_segment_callback_user_data = &user_data;
+
+            // IMPORTANT: user_data must outlive the callback, and blocks must be copied to the heap.
+            struct rnwhisper_segments_callback_data *user_data =
+                (struct rnwhisper_segments_callback_data *)calloc(1, sizeof(*user_data));
+            user_data->onNewSegments = [onNewSegments copy];
+            user_data->tdrzEnable = (options[@"tdrzEnable"] && [options[@"tdrzEnable"] boolValue]);
+            user_data->total_n_new = 0;
+            user_data->isHeapAllocated = true;
+
+            params.new_segment_callback_user_data = user_data;
         }
 
         rnwhisper::job* job = rnwhisper::job_new(jobId, params);
         self->recordState.job = job;
         int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
+
+        // Clean up callback data before removing job
+        if (job->params.new_segment_callback_user_data) {
+            cleanup_callback_data(job->params.new_segment_callback_user_data);
+        }
+
         rnwhisper::job_remove(jobId);
         self->recordState.job = nullptr;
         self->recordState.isTranscribing = false;
@@ -579,36 +625,51 @@ struct rnwhisper_segments_callback_data {
 }
 
 - (NSMutableDictionary *)getTextSegments {
-    NSString *text = @"";
-    int n_segments = whisper_full_n_segments(self->ctx);
+    @autoreleasepool {
+        NSMutableString *builder = [NSMutableString string];       // safer than repeated NSString concat
+        int n_segments = whisper_full_n_segments(self->ctx);
 
-    NSMutableArray *segments = [[NSMutableArray alloc] init];
-    for (int i = 0; i < n_segments; i++) {
-        const char * text_cur = whisper_full_get_segment_text(self->ctx, i);
-        NSMutableString *mutable_ns_text = [NSMutableString stringWithUTF8String:text_cur];
+        NSMutableArray *segments = [[NSMutableArray alloc] init];
+        for (int i = 0; i < n_segments; i++) {
+            const char *text_cur = whisper_full_get_segment_text(self->ctx, i);
 
-        // Simplified condition
-        if (self->recordState.options[@"tdrzEnable"] &&
-            [self->recordState.options[@"tdrzEnable"] boolValue] &&
-            whisper_full_get_segment_speaker_turn_next(self->ctx, i)) {
-            [mutable_ns_text appendString:@" [SPEAKER_TURN]"];
+            // Safe decode: handle invalid UTF-8 without returning nil
+            NSString *segText = @"";
+            if (text_cur) {
+                // Try UTF-8 first
+                segText = [NSString stringWithCString:text_cur encoding:NSUTF8StringEncoding];
+                if (!segText) {
+                    // Fall back: treat bytes as Latin-1 to avoid nil (common trick for "dirty" UTF-8)
+                    size_t len = strlen(text_cur);
+                    NSData *bytes = [NSData dataWithBytes:text_cur length:len];
+                    segText = [[NSString alloc] initWithData:bytes encoding:NSISOLatin1StringEncoding] ?: @"";
+                }
+            }
+
+            // Simplified condition
+            if (self->recordState.options[@"tdrzEnable"] &&
+                [self->recordState.options[@"tdrzEnable"] boolValue] &&
+                whisper_full_get_segment_speaker_turn_next(self->ctx, i)) {
+                segText = [segText stringByAppendingString:@" [SPEAKER_TURN]"];
+            }
+
+            if (segText.length) [builder appendString:segText];
+
+            const int64_t t0 = whisper_full_get_segment_t0(self->ctx, i);
+            const int64_t t1 = whisper_full_get_segment_t1(self->ctx, i);
+            // Never put nil into an NSDictionary literal
+            NSDictionary *segment = @{
+                @"text": segText,                                 // guaranteed non-nil
+                @"t0": @(t0),
+                @"t1": @(t1),
+            };
+            [segments addObject:segment];
         }
-
-        text = [text stringByAppendingString:mutable_ns_text];
-
-        const int64_t t0 = whisper_full_get_segment_t0(self->ctx, i);
-        const int64_t t1 = whisper_full_get_segment_t1(self->ctx, i);
-        NSDictionary *segment = @{
-            @"text": [NSString stringWithString:mutable_ns_text],
-            @"t0": [NSNumber numberWithLongLong:t0],
-            @"t1": [NSNumber numberWithLongLong:t1]
-        };
-        [segments addObject:segment];
+        NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
+        result[@"result"] = builder;                                   // non-nil (possibly empty)
+        result[@"segments"] = segments;
+        return result;
     }
-    NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
-    result[@"result"] = text;
-    result[@"segments"] = segments;
-    return result;
 }
 
 - (NSString *)bench:(int)maxThreads {
