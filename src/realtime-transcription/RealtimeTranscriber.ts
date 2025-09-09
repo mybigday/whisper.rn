@@ -476,6 +476,23 @@ export class RealtimeTranscriber {
         return
       }
 
+      if (this.callbacks.onBeginTranscribe) {
+        const shouldTranscribe =
+          (await this.callbacks.onBeginTranscribe({
+            sliceIndex: slice.index,
+            audioData,
+            duration: (slice.data.length / 16000 / 2) * 1000, // Convert to milliseconds
+            vadEvent: this.vadEvents.get(slice.index),
+          })) ?? true
+
+        if (!shouldTranscribe) {
+          this.log(
+            `User callback declined transcription for slice ${slice.index}`,
+          )
+          return
+        }
+      }
+
       // Add to transcription queue
       this.transcriptionQueue.unshift({
         sliceIndex: slice.index,

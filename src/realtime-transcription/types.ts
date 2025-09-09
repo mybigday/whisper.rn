@@ -243,6 +243,12 @@ export interface RealtimeStatsEvent {
 }
 
 export interface RealtimeTranscriberCallbacks {
+  onBeginTranscribe?: (sliceInfo: {
+    audioData: Uint8Array
+    sliceIndex: number
+    duration: number
+    vadEvent?: RealtimeVadEvent
+  }) => Promise<boolean>
   onTranscribe?: (event: RealtimeTranscribeEvent) => void
   onVad?: (event: RealtimeVadEvent) => void
   onError?: (error: string) => void
