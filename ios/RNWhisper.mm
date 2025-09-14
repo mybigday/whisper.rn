@@ -357,10 +357,9 @@ RCT_REMAP_METHOD(releaseContext,
         reject(@"whisper_error", @"Context not found", nil);
         return;
     }
-    [context invalidate];
-    [contexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
-    // Also remove from unified context management
     rnwhisper_jsi::removeContext(contextId);
+    [contexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    [context invalidate];
     resolve(nil);
 }
 
@@ -555,10 +554,9 @@ RCT_REMAP_METHOD(releaseVadContext,
         reject(@"whisper_vad_error", @"VAD context not found", nil);
         return;
     }
-    [vadContext invalidate];
-    [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
-    // Also remove from unified context management
     rnwhisper_jsi::removeVadContext(contextId);
+    [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
+    [vadContext invalidate];
     resolve(nil);
 }
 
@@ -574,6 +572,7 @@ RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
     if (contexts != nil) {
         for (NSNumber *contextId in contexts) {
             RNWhisperContext *context = contexts[contextId];
+            rnwhisper_jsi::removeContext(contextId);
             [context invalidate];
         }
         [contexts removeAllObjects];
@@ -585,6 +584,7 @@ RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
     if (vadContexts != nil) {
         for (NSNumber *contextId in vadContexts) {
             RNWhisperVadContext *vadContext = vadContexts[contextId];
+            rnwhisper_jsi::removeVadContext(contextId);
             [vadContext invalidate];
         }
         [vadContexts removeAllObjects];
