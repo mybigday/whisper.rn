@@ -253,6 +253,12 @@ static const struct wsp_ggml_type_traits_cpu type_traits_cpu[WSP_GGML_TYPE_COUNT
         .vec_dot_type             = WSP_GGML_TYPE_Q8_1,
         .nrows                    = 1,
     },
+    [WSP_GGML_TYPE_MXFP4] = {
+        .from_float               = wsp_quantize_row_mxfp4,
+        .vec_dot                  = wsp_ggml_vec_dot_mxfp4_q8_0,
+        .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
+        .nrows                    = 1,
+    },
     [WSP_GGML_TYPE_Q2_K] = {
         .from_float               = wsp_quantize_row_q2_K,
         .vec_dot                  = wsp_ggml_vec_dot_q2_K_q8_K,
@@ -1670,6 +1676,10 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
             {
                 wsp_ggml_compute_forward_add(params, tensor);
             } break;
+        case WSP_GGML_OP_ADD_ID:
+            {
+                wsp_ggml_compute_forward_add_id(params, tensor);
+            } break;
         case WSP_GGML_OP_ADD1:
             {
                 wsp_ggml_compute_forward_add1(params, tensor);
@@ -1924,7 +1934,7 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
             } break;
         case WSP_GGML_OP_FLASH_ATTN_EXT:
             {
-                wsp_ggml_compute_forward_flash_attn_ext(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor->src[3], tensor);
+                wsp_ggml_compute_forward_flash_attn_ext(params, tensor);
             } break;
         case WSP_GGML_OP_FLASH_ATTN_BACK:
             {
@@ -2010,6 +2020,11 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
         case WSP_GGML_OP_OPT_STEP_ADAMW:
             {
                 wsp_ggml_compute_forward_opt_step_adamw(params, tensor);
+            }
+            break;
+        case WSP_GGML_OP_OPT_STEP_SGD:
+            {
+                wsp_ggml_compute_forward_opt_step_sgd(params, tensor);
             }
             break;
         case WSP_GGML_OP_NONE:
@@ -2111,6 +2126,7 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
         case WSP_GGML_OP_DUP:
         case WSP_GGML_OP_CONT:
         case WSP_GGML_OP_ADD:
+        case WSP_GGML_OP_ADD_ID:
         case WSP_GGML_OP_ADD1:
         case WSP_GGML_OP_ACC:
             {
@@ -2172,6 +2188,9 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
                 case WSP_GGML_GLU_OP_REGLU:
                 case WSP_GGML_GLU_OP_GEGLU:
                 case WSP_GGML_GLU_OP_SWIGLU:
+                case WSP_GGML_GLU_OP_SWIGLU_OAI:
+                case WSP_GGML_GLU_OP_GEGLU_ERF:
+                case WSP_GGML_GLU_OP_GEGLU_QUICK:
                     {
                         n_tasks = n_threads;
                     } break;
@@ -2311,6 +2330,7 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
         case WSP_GGML_OP_CROSS_ENTROPY_LOSS:
         case WSP_GGML_OP_CROSS_ENTROPY_LOSS_BACK:
         case WSP_GGML_OP_OPT_STEP_ADAMW:
+        case WSP_GGML_OP_OPT_STEP_SGD:
             {
                 n_tasks = n_threads;
             } break;
@@ -2671,6 +2691,7 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                         }
                     } break;
                 case WSP_GGML_OP_ADD:
+                case WSP_GGML_OP_ADD_ID:
                 case WSP_GGML_OP_ADD1:
                     {
                         if (wsp_ggml_is_quantized(node->src[0]->type)) {

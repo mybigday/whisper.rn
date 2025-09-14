@@ -87,6 +87,8 @@ static void* retained_log_block = nullptr;
 
 #ifdef WSP_GGML_USE_METAL
     if (cparams.use_gpu) {
+        cparams.gpu_device = 0;
+
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
 
         // Check ggml-metal availability

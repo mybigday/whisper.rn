@@ -74,16 +74,26 @@ extern "C" {
         WSP_GGML_OPT_BUILD_TYPE_OPT     = 30,
     };
 
+    enum wsp_ggml_opt_optimizer_type {
+        WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW,
+        WSP_GGML_OPT_OPTIMIZER_TYPE_SGD,
+
+        WSP_GGML_OPT_OPTIMIZER_TYPE_COUNT
+    };
+
     // parameters that control which optimizer is used and how said optimizer tries to find the minimal loss
     struct wsp_ggml_opt_optimizer_params {
-        // AdamW optimizer parameters
         struct {
             float alpha; // learning rate
-            float beta1;
-            float beta2;
+            float beta1; // first AdamW momentum
+            float beta2; // second AdamW momentum
             float eps;   // epsilon for numerical stability
-            float wd;    // weight decay for AdamW, use 0.0f to disable
+            float wd;    // weight decay - 0.0f to disable
         } adamw;
+        struct {
+            float alpha; // learning rate
+            float wd;    // weight decay
+        } sgd;
     };
 
     // callback to calculate optimizer parameters prior to a backward pass
@@ -112,8 +122,11 @@ extern "C" {
 
         int32_t opt_period; // after how many gradient accumulation steps an optimizer step should be done
 
-        wsp_ggml_opt_get_optimizer_params get_opt_pars; // callback for calculating optimizer parameters
-        void * get_opt_pars_ud;                     // userdata for calculating optimizer parameters
+        wsp_ggml_opt_get_optimizer_params get_opt_pars;    // callback for calculating optimizer parameters
+        void *                        get_opt_pars_ud; // userdata for calculating optimizer parameters
+
+        // only WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW needs m, v momenta per parameter tensor
+        enum wsp_ggml_opt_optimizer_type optimizer;
     };
 
     // get parameters for an optimization context with defaults set where possible
@@ -141,6 +154,10 @@ extern "C" {
 
     // get the gradient accumulator for a node from the forward graph
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_grad_acc(wsp_ggml_opt_context_t opt_ctx, struct wsp_ggml_tensor * node);
+
+    WSP_GGML_API enum wsp_ggml_opt_optimizer_type wsp_ggml_opt_context_optimizer_type(wsp_ggml_opt_context_t); //TODO consistent naming scheme
+
+    WSP_GGML_API const char * wsp_ggml_opt_optimizer_name(enum wsp_ggml_opt_optimizer_type);
 
     // ====== Optimization Result ======
 
@@ -226,11 +243,13 @@ extern "C" {
             struct wsp_ggml_tensor            * outputs,        // output tensor, must have shape [ne_label, ndata_batch] if labels are used
             wsp_ggml_opt_dataset_t              dataset,        // dataset with data and optionally also labels
             enum wsp_ggml_opt_loss_type         loss_type,      // loss to minimize
+            enum wsp_ggml_opt_optimizer_type    optimizer,      // sgd or adamw
             wsp_ggml_opt_get_optimizer_params   get_opt_pars,   // callback to get optimizer params, userdata is pointer to epoch (of type int64_t)
             int64_t                         nepoch,         // how many times the dataset should be iterated over
             int64_t                         nbatch_logical, // datapoints optimizer step, must be a multiple of ndata_batch in inputs/outputs
             float                           val_split,      // fraction of the dataset to use for validation, must be in [0.0f, 1.0f)
             bool                            silent);        // whether or not info prints to stderr should be suppressed
+
 
 #ifdef  __cplusplus
 }

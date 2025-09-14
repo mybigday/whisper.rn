@@ -64,9 +64,11 @@ struct wsp_ggml_opt_context {
     int32_t opt_i              = 0;
     bool    loss_per_datapoint = false;
 
-    wsp_ggml_opt_get_optimizer_params get_opt_pars = nullptr;
-    void * get_opt_pars_ud                     = nullptr;
-    struct wsp_ggml_tensor * adamw_params          = nullptr;
+    wsp_ggml_opt_get_optimizer_params get_opt_pars    = nullptr;
+    void *                        get_opt_pars_ud = nullptr;
+    struct wsp_ggml_tensor *          opt_step_params = nullptr; // Stores output of get_opt_pars.
+
+    enum wsp_ggml_opt_optimizer_type optimizer = WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW;
 };
 
 struct wsp_ggml_opt_result {
@@ -229,8 +231,12 @@ struct wsp_ggml_opt_optimizer_params wsp_ggml_opt_get_default_optimizer_params(v
     result.adamw.eps   = 1e-8f;
     result.adamw.wd    = 0.0f;
 
+    result.sgd.alpha   = 1e-3f;
+    result.sgd.wd      = 0.0f;
+
     return result;
 }
+
 
 struct wsp_ggml_opt_optimizer_params wsp_ggml_opt_get_constant_optimizer_params(void * userdata) {
     return *((struct wsp_ggml_opt_optimizer_params *) userdata);
@@ -249,6 +255,7 @@ struct wsp_ggml_opt_params wsp_ggml_opt_default_params(
         /*opt_period      =*/ 1,
         /*get_opt_pars    =*/ wsp_ggml_opt_get_default_optimizer_params,
         /*get_opt_pars_ud =*/ nullptr,
+        /*optimizer       =*/ WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW,
     };
 }
 
@@ -316,8 +323,13 @@ static void wsp_ggml_opt_build(wsp_ggml_opt_context_t opt_ctx) {
     WSP_GGML_ASSERT(opt_ctx->ctx_compute && "no compute context set, either use static graphs or set one with wsp_ggml_opt_prepare_alloc");
     WSP_GGML_ASSERT((!opt_ctx->static_graphs || opt_ctx->inputs->data) && "when using static graphs the inputs must be allocated statically");
 
+    const enum wsp_ggml_opt_optimizer_type optimizer = opt_ctx->optimizer;
+
     const bool accumulate = opt_ctx->build_type_alloc >= WSP_GGML_OPT_BUILD_TYPE_GRAD &&
         !(opt_ctx->static_graphs && opt_ctx->build_type_alloc == WSP_GGML_OPT_BUILD_TYPE_OPT && opt_ctx->opt_period == 1);
+
+    const bool need_momenta = opt_ctx->build_type_alloc == WSP_GGML_OPT_BUILD_TYPE_OPT &&
+        opt_ctx->optimizer == WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW;
 
     wsp_ggml_set_input(opt_ctx->inputs);
     wsp_ggml_set_output(opt_ctx->outputs);
@@ -340,8 +352,7 @@ static void wsp_ggml_opt_build(wsp_ggml_opt_context_t opt_ctx) {
         //   - pred (if using static graphs)
         //   - ncorrect (if using static graphs, 2 tensors).
         constexpr size_t n_loss = 1;
-        const size_t tensors_per_param = (accumulate ? 1 : 0) +
-            (opt_ctx->build_type_alloc == WSP_GGML_OPT_BUILD_TYPE_OPT ? 2 : 0);
+        const size_t tensors_per_param = (accumulate ? 1 : 0) + (need_momenta ? 2 : 0);
         const size_t tensors_const = opt_ctx->static_graphs ? 9 : 0;
         const size_t size_meta = (n_loss + tensors_per_param*n_param + tensors_const) * wsp_ggml_tensor_overhead();
         struct wsp_ggml_init_params params = {
@@ -458,7 +469,7 @@ static void wsp_ggml_opt_build(wsp_ggml_opt_context_t opt_ctx) {
             }
         }
 
-        if (opt_ctx->build_type_alloc >= WSP_GGML_OPT_BUILD_TYPE_OPT) {
+        if (need_momenta && opt_ctx->build_type_alloc >= WSP_GGML_OPT_BUILD_TYPE_OPT) {
             opt_ctx->grad_m.resize(n_nodes);
             opt_ctx->grad_v.resize(n_nodes);
             for (int i = 0; i < n_nodes; ++i) {
@@ -492,23 +503,36 @@ static void wsp_ggml_opt_build(wsp_ggml_opt_context_t opt_ctx) {
     // gb_opt == graph backward optimize, forward pass, then backward pass to calculate gradients, then optimizer step.
     opt_ctx->gb_opt = wsp_ggml_graph_dup(opt_ctx->ctx_compute, opt_ctx->gb_grad, /*force_grads =*/ true);
 
-    opt_ctx->adamw_params = wsp_ggml_new_tensor_1d(opt_ctx->ctx_cpu, WSP_GGML_TYPE_F32, 7);
-    wsp_ggml_set_input(opt_ctx->adamw_params);
-    wsp_ggml_set_name(opt_ctx->adamw_params, "adamw_params");
-
+    opt_ctx->opt_step_params = wsp_ggml_new_tensor_1d(opt_ctx->ctx_cpu, WSP_GGML_TYPE_F32, need_momenta ? 7 : 2);
+    wsp_ggml_tensor * adamw_params = opt_ctx->opt_step_params;
+    wsp_ggml_set_input(adamw_params);
+    const char * optimizer_name = wsp_ggml_opt_optimizer_name(opt_ctx->optimizer);
+    wsp_ggml_format_name(adamw_params, "%s_params", optimizer_name);
     for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
         struct wsp_ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
         struct wsp_ggml_tensor * grad = wsp_ggml_graph_get_grad(opt_ctx->gb_opt, node);
 
         if (grad && (node->flags & WSP_GGML_TENSOR_FLAG_PARAM)) {
-            struct wsp_ggml_tensor * m        = opt_ctx->grad_m[i];
-            struct wsp_ggml_tensor * v        = opt_ctx->grad_v[i];
-            struct wsp_ggml_tensor * opt_step = wsp_ggml_opt_step_adamw(opt_ctx->ctx_compute, node, grad, m, v, opt_ctx->adamw_params);
-
-            wsp_ggml_set_name(m,        (std::string("AdamW m for ")    + std::string(node->name)).c_str());
-            wsp_ggml_set_name(v,        (std::string("AdamW v for ")    + std::string(node->name)).c_str());
-            wsp_ggml_set_name(opt_step, (std::string("AdamW step for ") + std::string(node->name)).c_str());
-
+            struct wsp_ggml_tensor * m = nullptr;
+            struct wsp_ggml_tensor * v = nullptr;
+            if (need_momenta) {
+                m = opt_ctx->grad_m[i];
+                v = opt_ctx->grad_v[i];
+                wsp_ggml_format_name(m, "AdamW m for %s", node->name);
+                wsp_ggml_format_name(v, "AdamW v for %s", node->name);
+            }
+            struct wsp_ggml_tensor * opt_step;
+            switch (optimizer) {
+                case WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW:
+                    opt_step = wsp_ggml_opt_step_adamw(opt_ctx->ctx_compute, node, grad, m, v, adamw_params);
+                    break;
+                case WSP_GGML_OPT_OPTIMIZER_TYPE_SGD:
+                    opt_step = wsp_ggml_opt_step_sgd(opt_ctx->ctx_compute, node, grad, adamw_params);
+                    break;
+                default:
+                    WSP_GGML_ABORT("fatal error");
+            }
+            wsp_ggml_format_name(opt_step, "%s step for %s", optimizer_name, node->name);
             wsp_ggml_build_forward_expand(opt_ctx->gb_opt, opt_step);
         }
     }
@@ -534,6 +558,7 @@ wsp_ggml_opt_context_t wsp_ggml_opt_init(struct wsp_ggml_opt_params params) {
     result->opt_period       = params.opt_period;
     result->get_opt_pars     = params.get_opt_pars;
     result->get_opt_pars_ud  = params.get_opt_pars_ud;
+    result->optimizer        = params.optimizer;
 
     WSP_GGML_ASSERT(result->opt_period >= 1);
 
@@ -756,29 +781,43 @@ void wsp_ggml_opt_alloc(wsp_ggml_opt_context_t opt_ctx, bool backward) {
 void wsp_ggml_opt_eval(wsp_ggml_opt_context_t opt_ctx, wsp_ggml_opt_result_t result) {
     WSP_GGML_ASSERT(opt_ctx->eval_ready);
     if (opt_ctx->allocated_graph == opt_ctx->gb_opt) {
-        struct wsp_ggml_opt_optimizer_params opt_pars = opt_ctx->get_opt_pars(opt_ctx->get_opt_pars_ud);
+        const wsp_ggml_opt_optimizer_params & opt_pars = opt_ctx->get_opt_pars(opt_ctx->get_opt_pars_ud);
 
-        WSP_GGML_ASSERT(opt_pars.adamw.alpha >  0.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.beta1 >= 0.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.beta1 <= 1.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.beta2 >= 0.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.beta2 <= 1.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.eps   >= 0.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.wd    >= 0.0f);
-        WSP_GGML_ASSERT(opt_pars.adamw.wd    <= 1.0f);
+        switch (opt_ctx->optimizer) {
+            case WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW: {
+                WSP_GGML_ASSERT(opt_pars.adamw.alpha > 0.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.beta1 >= 0.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.beta1 <= 1.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.beta2 >= 0.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.beta2 <= 1.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.eps >= 0.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.wd >= 0.0f);
+                WSP_GGML_ASSERT(opt_pars.adamw.wd <= 1.0f);
 
-        // beta1, beta2 after applying warmup
-        const float beta1h = 1.0f/(1.0f - powf(opt_pars.adamw.beta1, opt_ctx->iter));
-        const float beta2h = 1.0f/(1.0f - powf(opt_pars.adamw.beta2, opt_ctx->iter));
+                // beta1, beta2 after applying warmup
+                const float beta1h = 1.0f / (1.0f - powf(opt_pars.adamw.beta1, opt_ctx->iter));
+                const float beta2h = 1.0f / (1.0f - powf(opt_pars.adamw.beta2, opt_ctx->iter));
 
-        float * adamw_par_data = wsp_ggml_get_data_f32(opt_ctx->adamw_params);
-        adamw_par_data[0] = opt_pars.adamw.alpha;
-        adamw_par_data[1] = opt_pars.adamw.beta1;
-        adamw_par_data[2] = opt_pars.adamw.beta2;
-        adamw_par_data[3] = opt_pars.adamw.eps;
-        adamw_par_data[4] = opt_pars.adamw.wd;
-        adamw_par_data[5] = beta1h;
-        adamw_par_data[6] = beta2h;
+                float * adamw_par_data = wsp_ggml_get_data_f32(opt_ctx->opt_step_params);
+                adamw_par_data[0] = opt_pars.adamw.alpha;
+                adamw_par_data[1] = opt_pars.adamw.beta1;
+                adamw_par_data[2] = opt_pars.adamw.beta2;
+                adamw_par_data[3] = opt_pars.adamw.eps;
+                adamw_par_data[4] = opt_pars.adamw.wd;
+                adamw_par_data[5] = beta1h;
+                adamw_par_data[6] = beta2h;
+            } break;
+            case WSP_GGML_OPT_OPTIMIZER_TYPE_SGD: {
+                WSP_GGML_ASSERT(opt_pars.sgd.alpha > 0.0f);
+                WSP_GGML_ASSERT(opt_pars.sgd.wd >= 0.0f);
+                WSP_GGML_ASSERT(opt_pars.sgd.wd <= 1.0f);
+                float * sgd = wsp_ggml_get_data_f32(opt_ctx->opt_step_params);
+                sgd[0] = opt_pars.sgd.alpha;
+                sgd[1] = opt_pars.sgd.wd;
+            } break;
+            default:
+                WSP_GGML_ABORT("fatal error");
+        }
     }
 
     wsp_ggml_backend_sched_graph_compute(opt_ctx->backend_sched, opt_ctx->allocated_graph_copy);
@@ -963,6 +1002,7 @@ void wsp_ggml_opt_fit(
         wsp_ggml_tensor                   * outputs,
         wsp_ggml_opt_dataset_t              dataset,
         enum wsp_ggml_opt_loss_type         loss_type,
+        enum wsp_ggml_opt_optimizer_type    optimizer,
         wsp_ggml_opt_get_optimizer_params   get_opt_pars,
         int64_t                         nepoch,
         int64_t                         nbatch_logical,
@@ -993,6 +1033,7 @@ void wsp_ggml_opt_fit(
     params.opt_period      = opt_period;
     params.get_opt_pars    = get_opt_pars;
     params.get_opt_pars_ud = &epoch;
+    params.optimizer       = optimizer;
     wsp_ggml_opt_context_t opt_ctx = wsp_ggml_opt_init(params);
 
     // Shuffling the data is generally useful but there is only a point if not all data is used in a single batch.
@@ -1034,4 +1075,19 @@ void wsp_ggml_opt_fit(
     wsp_ggml_opt_free(opt_ctx);
     wsp_ggml_opt_result_free(result_train);
     wsp_ggml_opt_result_free(result_val);
+}
+
+enum wsp_ggml_opt_optimizer_type wsp_ggml_opt_context_optimizer_type(wsp_ggml_opt_context_t c) {
+    return c->optimizer;
+}
+
+WSP_GGML_API const char * wsp_ggml_opt_optimizer_name(enum wsp_ggml_opt_optimizer_type o) {
+    switch (o) {
+        case WSP_GGML_OPT_OPTIMIZER_TYPE_ADAMW:
+            return "adamw";
+        case WSP_GGML_OPT_OPTIMIZER_TYPE_SGD:
+            return "sgd";
+        default:
+            return "undefined";
+    };
 }

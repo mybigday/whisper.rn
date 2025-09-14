@@ -22,21 +22,6 @@ static bool wsp_ggml_is_view(const struct wsp_ggml_tensor * t) {
     return t->view_src != NULL;
 }
 
-static bool wsp_ggml_are_same_layout(const struct wsp_ggml_tensor * a, const struct wsp_ggml_tensor * b) {
-    if (a->type != b->type) {
-        return false;
-    }
-    for (int i = 0; i < WSP_GGML_MAX_DIMS; i++) {
-        if (a->ne[i] != b->ne[i]) {
-            return false;
-        }
-        if (a->nb[i] != b->nb[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 // ops that return true for this function must not use restrict pointers for their backend implementations
 static bool wsp_ggml_op_can_inplace(enum wsp_ggml_op op) {
     switch (op) {
@@ -44,6 +29,7 @@ static bool wsp_ggml_op_can_inplace(enum wsp_ggml_op op) {
         case WSP_GGML_OP_DIAG_MASK_ZERO:
         case WSP_GGML_OP_DIAG_MASK_INF:
         case WSP_GGML_OP_ADD:
+        case WSP_GGML_OP_ADD_ID:
         case WSP_GGML_OP_ADD1:
         case WSP_GGML_OP_SUB:
         case WSP_GGML_OP_MUL:

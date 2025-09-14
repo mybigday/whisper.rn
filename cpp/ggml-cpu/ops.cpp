@@ -8,6 +8,7 @@
 #include "vec.h"
 
 #include <float.h>
+#include <algorithm>
 
 // wsp_ggml_compute_forward_dup
 
@@ -1283,6 +1284,7 @@ void wsp_ggml_compute_forward_add(
         case WSP_GGML_TYPE_Q5_0:
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -1305,6 +1307,77 @@ void wsp_ggml_compute_forward_add(
         default:
             {
                 WSP_GGML_ABORT("fatal error");
+            }
+    }
+}
+
+// wsp_ggml_compute_forward_add_id
+
+static void wsp_ggml_compute_forward_add_id_f32(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+    const wsp_ggml_tensor * src1 = dst->src[1];
+    const wsp_ggml_tensor * src2 = dst->src[2];
+
+    WSP_GGML_ASSERT(dst->type  == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(src0->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(src1->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(src2->type == WSP_GGML_TYPE_I32);
+
+    WSP_GGML_ASSERT(src0->nb[0] == sizeof(float));
+    WSP_GGML_ASSERT(src1->nb[0] == sizeof(float));
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nr  = wsp_ggml_nrows(src0);
+
+    WSP_GGML_TENSOR_TERNARY_OP_LOCALS
+
+    WSP_GGML_ASSERT( nb0 == sizeof(float));
+    WSP_GGML_ASSERT(nb10 == sizeof(float));
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int ir = ir0; ir < ir1; ++ir) {
+        // src0 indices
+        const int i3 = ir/(ne2*ne1);
+        const int i2 = (ir - i3*ne2*ne1)/ne1;
+        const int i1 = (ir - i3*ne2*ne1 - i2*ne1);
+
+        // src1 indices
+        const int i11 = *(int32_t *) ((char *) src2->data + i1*nb20 + i2*nb21);
+
+        WSP_GGML_ASSERT(i11 >= 0 && i11 < ne11);
+
+        wsp_ggml_vec_add_f32(ne0,
+                (float *) ((char *) dst->data  + i3*nb3  + i2*nb2  + i1*nb1 ),
+                (float *) ((char *) src0->data + i3*nb03 + i2*nb02 + i1*nb01),
+                (float *) ((char *) src1->data + i11*nb11));
+    }
+}
+
+void wsp_ggml_compute_forward_add_id(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case WSP_GGML_TYPE_F32:
+            {
+                wsp_ggml_compute_forward_add_id_f32(params, dst);
+            } break;
+        default:
+            {
+                WSP_GGML_ABORT("unsupported type for wsp_ggml_compute_forward_add_id: %s", wsp_ggml_type_name(src0->type));
             }
     }
 }
@@ -1660,6 +1733,7 @@ void wsp_ggml_compute_forward_add1(
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
         case WSP_GGML_TYPE_Q8_1:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -1787,6 +1861,7 @@ void wsp_ggml_compute_forward_acc(
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
         case WSP_GGML_TYPE_Q8_1:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -3614,6 +3689,379 @@ static void wsp_ggml_compute_forward_swiglu(
     }
 }
 
+// wsp_ggml_compute_forward_swiglu_oai
+
+static void wsp_ggml_compute_forward_swiglu_oai_f32(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+    const wsp_ggml_tensor * src1 = dst->src[1];
+    char * src0_d = (char *) src0->data;
+    char * src1_d = (char *) (src1 ? src1->data : src0->data);
+    const size_t src0_o = src0->nb[1];
+    const size_t src1_o = src1 ? src1->nb[1] : src0->nb[1];
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(dst));
+
+    if (src1) {
+        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src1));
+        WSP_GGML_ASSERT(src0->type == src1->type);
+    }
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src1 ? src0->ne[0] : src0->ne[0] / 2;
+    const int nr = wsp_ggml_nrows(src0);
+
+    WSP_GGML_ASSERT(dst->ne[0] == nc);
+    WSP_GGML_ASSERT(wsp_ggml_nrows(dst) == nr);
+
+    const int32_t swapped = wsp_ggml_get_op_params_i32(dst, 1);
+    const float alpha = wsp_ggml_get_op_params_f32(dst, 2);
+    const float limit = wsp_ggml_get_op_params_f32(dst, 3);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        float * src0_p = (float *) (src0_d + i1*src0_o);
+        float * src1_p = (float *) (src1_d + i1*src1_o);
+        float * dst_p  = (float *) ((char *) dst->data + i1*(dst->nb[1]));
+
+        if (!src1) {
+            src0_p += swapped ? nc : 0;
+            src1_p += swapped ? 0 : nc;
+        }
+
+        for (int k = 0; k < nc; k++) {
+            const float x = std::min(src0_p[k], limit);
+            const float y = std::clamp(src1_p[k], -limit, limit);
+            const float out_glu = x / (1.f + expf(alpha * (-x)));
+            dst_p[k] = out_glu * (y + 1.f);
+        }
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const float x = dst_p[k];
+            WSP_GGML_UNUSED(x);
+            assert(!isnan(x));
+            assert(!isinf(x));
+        }
+#endif
+    }
+}
+
+static void wsp_ggml_compute_forward_swiglu_oai(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case WSP_GGML_TYPE_F32:
+            {
+                wsp_ggml_compute_forward_swiglu_oai_f32(params, dst);
+            } break;
+        default:
+            {
+                WSP_GGML_ABORT("fatal error");
+            }
+    }
+}
+
+// wsp_ggml_compute_forward_geglu_erf
+
+static void wsp_ggml_compute_forward_geglu_erf_f32(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+    const wsp_ggml_tensor * src1 = dst->src[1];
+    char * src0_d = (char *) src0->data;
+    char * src1_d = (char *) (src1 ? src1->data : src0->data);
+    const size_t src0_o = src0->nb[1];
+    const size_t src1_o = src1 ? src1->nb[1] : src0->nb[1];
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(dst));
+
+    if (src1) {
+        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src1));
+        WSP_GGML_ASSERT(src0->type == src1->type);
+    }
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src1 ? src0->ne[0] : src0->ne[0] / 2;
+    const int nr = wsp_ggml_nrows(src0);
+
+    WSP_GGML_ASSERT(dst->ne[0] == nc);
+    WSP_GGML_ASSERT(wsp_ggml_nrows(dst) == nr);
+
+    const int32_t swapped = wsp_ggml_get_op_params_i32(dst, 1);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        float * src0_p = (float *) (src0_d + i1*src0_o);
+        float * src1_p = (float *) (src1_d + i1*src1_o);
+
+        if (!src1) {
+            src0_p += swapped ? nc : 0;
+            src1_p += swapped ? 0 : nc;
+        }
+
+        wsp_ggml_vec_geglu_erf_f32(nc, (float *) ((char *) dst->data + i1*(dst->nb[1])), src0_p, src1_p);
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const float x = ((float *) ((char *) dst->data + i1*( dst->nb[1])))[k];
+            WSP_GGML_UNUSED(x);
+            assert(!isnan(x));
+            assert(!isinf(x));
+        }
+#endif
+    }
+}
+
+static void wsp_ggml_compute_forward_geglu_erf_f16(
+    const wsp_ggml_compute_params * params,
+    wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+    const wsp_ggml_tensor * src1 = dst->src[1];
+    char * src0_d = (char *) src0->data;
+    char * src1_d = (char *) (src1 ? src1->data : src0->data);
+    const size_t src0_o = src0->nb[1];
+    const size_t src1_o = src1 ? src1->nb[1] : src0->nb[1];
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(dst));
+
+    if (src1) {
+        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src1));
+        WSP_GGML_ASSERT(src0->type == src1->type);
+    }
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src1 ? src0->ne[0] : src0->ne[0] / 2;
+    const int nr = wsp_ggml_nrows(src0);
+
+    WSP_GGML_ASSERT(dst->ne[0] == nc);
+    WSP_GGML_ASSERT(wsp_ggml_nrows(dst) == nr);
+
+    const int32_t swapped = wsp_ggml_get_op_params_i32(dst, 1);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        wsp_ggml_fp16_t * src0_p = (wsp_ggml_fp16_t *) (src0_d + i1*src0_o);
+        wsp_ggml_fp16_t * src1_p = (wsp_ggml_fp16_t *) (src1_d + i1*src1_o);
+
+        if (!src1) {
+            src0_p += swapped ? nc : 0;
+            src1_p += swapped ? 0 : nc;
+        }
+
+        wsp_ggml_vec_geglu_erf_f16(nc, (wsp_ggml_fp16_t *) ((char *) dst->data + i1*(dst->nb[1])), src0_p, src1_p);
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const wsp_ggml_fp16_t x = ((wsp_ggml_fp16_t *) ((char *) dst->data + i1*( dst->nb[1])))[k];
+            const float v = WSP_GGML_FP16_TO_FP32(x);
+            WSP_GGML_UNUSED(v);
+            assert(!isnan(v));
+            assert(!isinf(v));
+        }
+#endif
+    }
+}
+
+static void wsp_ggml_compute_forward_geglu_erf(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case WSP_GGML_TYPE_F32:
+            {
+                wsp_ggml_compute_forward_geglu_erf_f32(params, dst);
+            } break;
+        case WSP_GGML_TYPE_F16:
+            {
+                wsp_ggml_compute_forward_geglu_erf_f16(params, dst);
+            } break;
+        default:
+            {
+                WSP_GGML_ABORT("fatal error");
+            }
+    }
+}
+
+// wsp_ggml_compute_forward_geglu_quick
+
+static void wsp_ggml_compute_forward_geglu_quick_f32(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+    const wsp_ggml_tensor * src1 = dst->src[1];
+    char * src0_d = (char *) src0->data;
+    char * src1_d = (char *) (src1 ? src1->data : src0->data);
+    const size_t src0_o = src0->nb[1];
+    const size_t src1_o = src1 ? src1->nb[1] : src0->nb[1];
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(dst));
+
+    if (src1) {
+        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src1));
+        WSP_GGML_ASSERT(src0->type == src1->type);
+    }
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src1 ? src0->ne[0] : src0->ne[0] / 2;
+    const int nr = wsp_ggml_nrows(src0);
+
+    WSP_GGML_ASSERT(dst->ne[0] == nc);
+    WSP_GGML_ASSERT(wsp_ggml_nrows(dst) == nr);
+
+    const int32_t swapped = wsp_ggml_get_op_params_i32(dst, 1);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        float * src0_p = (float *) (src0_d + i1*src0_o);
+        float * src1_p = (float *) (src1_d + i1*src1_o);
+
+        if (!src1) {
+            src0_p += swapped ? nc : 0;
+            src1_p += swapped ? 0 : nc;
+        }
+
+        wsp_ggml_vec_geglu_quick_f32(nc, (float *) ((char *) dst->data + i1*(dst->nb[1])), src0_p, src1_p);
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const float x = ((float *) ((char *) dst->data + i1*( dst->nb[1])))[k];
+            WSP_GGML_UNUSED(x);
+            assert(!isnan(x));
+            assert(!isinf(x));
+        }
+#endif
+    }
+}
+
+static void wsp_ggml_compute_forward_geglu_quick_f16(
+    const wsp_ggml_compute_params * params,
+    wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+    const wsp_ggml_tensor * src1 = dst->src[1];
+    char * src0_d = (char *) src0->data;
+    char * src1_d = (char *) (src1 ? src1->data : src0->data);
+    const size_t src0_o = src0->nb[1];
+    const size_t src1_o = src1 ? src1->nb[1] : src0->nb[1];
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(dst));
+
+    if (src1) {
+        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src1));
+        WSP_GGML_ASSERT(src0->type == src1->type);
+    }
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src1 ? src0->ne[0] : src0->ne[0] / 2;
+    const int nr = wsp_ggml_nrows(src0);
+
+    WSP_GGML_ASSERT(dst->ne[0] == nc);
+    WSP_GGML_ASSERT(wsp_ggml_nrows(dst) == nr);
+
+    const int32_t swapped = wsp_ggml_get_op_params_i32(dst, 1);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        wsp_ggml_fp16_t * src0_p = (wsp_ggml_fp16_t *) (src0_d + i1*src0_o);
+        wsp_ggml_fp16_t * src1_p = (wsp_ggml_fp16_t *) (src1_d + i1*src1_o);
+
+        if (!src1) {
+            src0_p += swapped ? nc : 0;
+            src1_p += swapped ? 0 : nc;
+        }
+
+        wsp_ggml_vec_geglu_quick_f16(nc, (wsp_ggml_fp16_t *) ((char *) dst->data + i1*(dst->nb[1])), src0_p, src1_p);
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const wsp_ggml_fp16_t x = ((wsp_ggml_fp16_t *) ((char *) dst->data + i1*( dst->nb[1])))[k];
+            const float v = WSP_GGML_FP16_TO_FP32(x);
+            WSP_GGML_UNUSED(v);
+            assert(!isnan(v));
+            assert(!isinf(v));
+        }
+#endif
+    }
+}
+
+static void wsp_ggml_compute_forward_geglu_quick(
+        const wsp_ggml_compute_params * params,
+        wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case WSP_GGML_TYPE_F32:
+            {
+                wsp_ggml_compute_forward_geglu_quick_f32(params, dst);
+            } break;
+        case WSP_GGML_TYPE_F16:
+            {
+                wsp_ggml_compute_forward_geglu_quick_f16(params, dst);
+            } break;
+        default:
+            {
+                WSP_GGML_ABORT("fatal error");
+            }
+    }
+}
+
 // wsp_ggml_compute_forward_norm
 
 static void wsp_ggml_compute_forward_norm_f32(
@@ -3728,6 +4176,9 @@ static void wsp_ggml_compute_forward_rms_norm_f32(
                 // }
 
                 const float scale = 1.0f/sqrtf(mean + eps);
+
+                // if you hit this, likely you got an inf somewhere earlier
+                assert(scale > 0.0f);
 
                 wsp_ggml_vec_scale_f32(ne00, y, scale);
             }
@@ -4310,6 +4761,7 @@ void wsp_ggml_compute_forward_out_prod(
         case WSP_GGML_TYPE_Q5_0:
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -4357,9 +4809,11 @@ static void wsp_ggml_compute_forward_scale_f32(
     WSP_GGML_ASSERT(wsp_ggml_is_contiguous(dst));
     WSP_GGML_ASSERT(wsp_ggml_are_same_shape(src0, dst));
 
-    // scale factor
-    float v;
-    memcpy(&v, dst->op_params, sizeof(float));
+    float s; // scale factor
+    float b; // bias
+
+    memcpy(&s, (float *) dst->op_params + 0, sizeof(float));
+    memcpy(&b, (float *) dst->op_params + 1, sizeof(float));
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -4378,12 +4832,22 @@ static void wsp_ggml_compute_forward_scale_f32(
 
     const size_t nb1 = dst->nb[1];
 
-    for (int i1 = ir0; i1 < ir1; i1++) {
-        if (dst->data != src0->data) {
-            // src0 is same shape as dst => same indices
-            memcpy((char *)dst->data + i1*nb1, (char *)src0->data + i1*nb01, nc * sizeof(float));
+    if (b == 0.0f) {
+        for (int i1 = ir0; i1 < ir1; i1++) {
+            if (dst->data != src0->data) {
+                // src0 is same shape as dst => same indices
+                // TODO: add x parameter to wsp_ggml_vec_scale_f32 and remove this memcpy
+                memcpy((char *)dst->data + i1*nb1, (char *)src0->data + i1*nb01, nc * sizeof(float));
+            }
+            wsp_ggml_vec_scale_f32(nc, (float *) ((char *) dst->data + i1*nb1), s);
         }
-        wsp_ggml_vec_scale_f32(nc, (float *) ((char *) dst->data + i1*nb1), v);
+    } else {
+        for (int i1 = ir0; i1 < ir1; i1++) {
+            wsp_ggml_vec_mad1_f32(nc,
+                (float *) ((char *) dst->data  + i1*nb1),
+                (float *) ((char *) src0->data + i1*nb1),
+                s, b);
+        }
     }
 }
 
@@ -4572,6 +5036,7 @@ void wsp_ggml_compute_forward_set(
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
         case WSP_GGML_TYPE_Q8_1:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -4833,6 +5298,7 @@ void wsp_ggml_compute_forward_get_rows(
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
         case WSP_GGML_TYPE_Q8_1:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -5222,6 +5688,7 @@ static void wsp_ggml_compute_forward_soft_max_f32(
 
     const wsp_ggml_tensor * src0 = dst->src[0];
     const wsp_ggml_tensor * src1 = dst->src[1];
+    const wsp_ggml_tensor * src2 = dst->src[2];
 
     assert(wsp_ggml_is_contiguous(dst));
     assert(wsp_ggml_are_same_shape(src0, dst));
@@ -5232,14 +5699,17 @@ static void wsp_ggml_compute_forward_soft_max_f32(
     memcpy(&scale,    (float *) dst->op_params + 0, sizeof(float));
     memcpy(&max_bias, (float *) dst->op_params + 1, sizeof(float));
 
-    // TODO: handle transposed/permuted matrices
-
     const int ith = params->ith;
     const int nth = params->nth;
 
     WSP_GGML_TENSOR_UNARY_OP_LOCALS
 
-    //const int64_t ne11 = src1 ? src1->ne[1] : 1;
+    const int64_t nb11 = src1 ? src1->nb[1] : 1;
+    const int64_t nb12 = src1 ? src1->nb[2] : 1;
+    const int64_t nb13 = src1 ? src1->nb[3] : 1;
+
+    const int64_t ne12 = src1 ? src1->ne[2] : 1;
+    const int64_t ne13 = src1 ? src1->ne[3] : 1;
 
     // TODO: is this supposed to be ceil instead of floor?
     //       https://huggingface.co/mosaicml/mpt-7b/blob/main/attention.py#L370
@@ -5249,68 +5719,78 @@ static void wsp_ggml_compute_forward_soft_max_f32(
     const float m0 = powf(2.0f, -(max_bias       ) / n_head_log2);
     const float m1 = powf(2.0f, -(max_bias / 2.0f) / n_head_log2);
 
-    const int nc = src0->ne[0];
-    const int nr = wsp_ggml_nrows(src0);
-
-    // rows per thread
-    const int dr = (nr + nth - 1)/nth;
-
-    // row range for this thread
-    const int ir0 = dr*ith;
-    const int ir1 = MIN(ir0 + dr, nr);
-
-    float * wp = (float *) params->wdata + (nc + CACHE_LINE_SIZE_F32) * ith;
+    float * wp = (float *) params->wdata + (ne00 + CACHE_LINE_SIZE_F32) * ith;
 
     const bool use_f16 = (src1 && src1->type == WSP_GGML_TYPE_F16);
 
-    for (int i1 = ir0; i1 < ir1; i1++) {
-        // ALiBi
-        const uint32_t h = (i1/ne01)%ne02; // head
-        const float slope = (max_bias > 0.0f) ? h < n_head_log2 ? powf(m0, h + 1) : powf(m1, 2*(h - n_head_log2) + 1) : 1.0f;
+    // sinks
+    const float * sk = src2 ? (float *)((char *) src2->data) : nullptr;
 
-        float * sp = (float *)((char *) src0->data + i1*src0->nb[1]);
-        float * dp = (float *)((char *)  dst->data +  i1*dst->nb[1]);
+    for (int64_t i03 = 0; i03 < ne03; i03++) {
+        for (int64_t i02 = 0; i02 < ne02; i02++) {
+            for (int64_t i01 = ith; i01 < ne01; i01 += nth) {
+                const int64_t i11 = i01;
+                const int64_t i12 = i02%ne12;
+                const int64_t i13 = i03%ne13;
 
-        // broadcast the mask across rows
-        wsp_ggml_fp16_t * mp_f16 = src1 ? (wsp_ggml_fp16_t *)((char *) src1->data) + (i1%ne01)*ne00 : NULL;
-        float       * mp_f32 = src1 ? (float       *)((char *) src1->data) + (i1%ne01)*ne00 : NULL;
+                // ALiBi
+                const uint32_t h = i02; // head
+                const float slope = (max_bias > 0.0f) ? h < n_head_log2 ? powf(m0, h + 1) : powf(m1, 2*(h - n_head_log2) + 1) : 1.0f;
 
-        wsp_ggml_vec_cpy_f32  (nc, wp, sp);
-        wsp_ggml_vec_scale_f32(nc, wp, scale);
-        if (mp_f32) {
-            if (use_f16) {
-                for (int i = 0; i < nc; ++i) {
-                    wp[i] += slope*WSP_GGML_CPU_FP16_TO_FP32(mp_f16[i]);
+                float * sp = (float *)((char *) src0->data + i01*nb01 + i02*nb02 + i03*nb03);
+                float * dp = (float *)((char *)  dst->data + i01*nb1  + i02*nb2  + i03*nb3);
+
+                // broadcast the mask across rows
+                wsp_ggml_fp16_t * mp_f16 = src1 ? (wsp_ggml_fp16_t *)((char *) src1->data + i11*nb11 + i12*nb12 + i13*nb13) : NULL;
+                float       * mp_f32 = src1 ? (float       *)((char *) src1->data + i11*nb11 + i12*nb12 + i13*nb13) : NULL;
+
+                wsp_ggml_vec_cpy_f32  (ne00, wp, sp);
+                wsp_ggml_vec_scale_f32(ne00, wp, scale);
+                if (mp_f32) {
+                    if (use_f16) {
+                        for (int i = 0; i < ne00; ++i) {
+                            wp[i] += slope*WSP_GGML_CPU_FP16_TO_FP32(mp_f16[i]);
+                        }
+                    } else {
+                        for (int i = 0; i < ne00; ++i) {
+                            wp[i] += slope*mp_f32[i];
+                        }
+                    }
                 }
-            } else {
-                for (int i = 0; i < nc; ++i) {
-                    wp[i] += slope*mp_f32[i];
+
+#ifndef NDEBUG
+                for (int i = 0; i < ne00; ++i) {
+                    //printf("p[%d] = %f\n", i, p[i]);
+                    assert(!isnan(wp[i]));
                 }
+#endif
+
+                float max = -INFINITY;
+                wsp_ggml_vec_max_f32(ne00, &max, wp);
+
+                // if we have sinks, make a correction as if they were included in the softmax
+                if (sk) {
+                    max = MAX(max, sk[i02]);
+                }
+
+                wsp_ggml_float sum = wsp_ggml_vec_soft_max_f32(ne00, dp, wp, max);
+                assert(sum > 0.0);
+
+                if (sk) {
+                    sum += (wsp_ggml_float) expf(sk[i02] - max);
+                }
+
+                sum = 1.0/sum;
+                wsp_ggml_vec_scale_f32(ne00, dp, sum);
+
+#ifndef NDEBUG
+                for (int i = 0; i < ne00; ++i) {
+                    assert(!isnan(dp[i]));
+                    assert(!isinf(dp[i]));
+                }
+#endif
             }
         }
-
-#ifndef NDEBUG
-        for (int i = 0; i < nc; ++i) {
-            //printf("p[%d] = %f\n", i, p[i]);
-            assert(!isnan(wp[i]));
-        }
-#endif
-
-        float max = -INFINITY;
-        wsp_ggml_vec_max_f32(nc, &max, wp);
-
-        wsp_ggml_float sum = wsp_ggml_vec_soft_max_f32(nc, dp, wp, max);
-        assert(sum > 0.0);
-
-        sum = 1.0/sum;
-        wsp_ggml_vec_scale_f32(nc, dp, sum);
-
-#ifndef NDEBUG
-        for (int i = 0; i < nc; ++i) {
-            assert(!isnan(dp[i]));
-            assert(!isinf(dp[i]));
-        }
-#endif
     }
 }
 
@@ -5534,6 +6014,7 @@ void wsp_ggml_compute_forward_clamp(
         case WSP_GGML_TYPE_Q5_1:
         case WSP_GGML_TYPE_Q8_0:
         case WSP_GGML_TYPE_Q8_1:
+        case WSP_GGML_TYPE_MXFP4:
         case WSP_GGML_TYPE_Q2_K:
         case WSP_GGML_TYPE_Q3_K:
         case WSP_GGML_TYPE_Q4_K:
@@ -7687,11 +8168,13 @@ void wsp_ggml_compute_forward_argsort(
 
 static void wsp_ggml_compute_forward_flash_attn_ext_f16(
         const wsp_ggml_compute_params * params,
-        const wsp_ggml_tensor * q,
-        const wsp_ggml_tensor * k,
-        const wsp_ggml_tensor * v,
-        const wsp_ggml_tensor * mask,
         wsp_ggml_tensor * dst) {
+
+    const wsp_ggml_tensor * q     = dst->src[0];
+    const wsp_ggml_tensor * k     = dst->src[1];
+    const wsp_ggml_tensor * v     = dst->src[2];
+    const wsp_ggml_tensor * mask  = dst->src[3];
+    const wsp_ggml_tensor * sinks = dst->src[4];
 
     WSP_GGML_TENSOR_LOCALS(int64_t, neq, q,   ne)
     WSP_GGML_TENSOR_LOCALS(size_t,  nbq, q,   nb)
@@ -7766,7 +8249,7 @@ static void wsp_ggml_compute_forward_flash_attn_ext_f16(
     const float m0 = powf(2.0f, -(max_bias       ) / n_head_log2);
     const float m1 = powf(2.0f, -(max_bias / 2.0f) / n_head_log2);
 
-    wsp_ggml_type    const k_vec_dot_type      = wsp_ggml_get_type_traits_cpu(k->type)->vec_dot_type;
+    wsp_ggml_type         const k_vec_dot_type = wsp_ggml_get_type_traits_cpu(k->type)->vec_dot_type;
     wsp_ggml_from_float_t const q_to_vec_dot   = wsp_ggml_get_type_traits_cpu(k_vec_dot_type)->from_float;
     wsp_ggml_vec_dot_t    const kq_vec_dot     = wsp_ggml_get_type_traits_cpu(k->type)->vec_dot;
     wsp_ggml_to_float_t   const v_to_float     = wsp_ggml_get_type_traits(v->type)->to_float;
@@ -7798,7 +8281,7 @@ static void wsp_ggml_compute_forward_flash_attn_ext_f16(
             memset(VKQ32, 0, DV*sizeof(float));
         }
 
-        const wsp_ggml_fp16_t * mp = mask ? (wsp_ggml_fp16_t *)((char *) mask->data + iq1*mask->nb[1]) : NULL;
+        const wsp_ggml_fp16_t * mp = mask ? (wsp_ggml_fp16_t *)((char *) mask->data + iq1*mask->nb[1] + (iq2%mask->ne[2])*mask->nb[2] + (iq3%mask->ne[3])*mask->nb[3]) : NULL;
 
         // k indices
         const int ik3 = iq3 / rk3;
@@ -7887,6 +8370,23 @@ static void wsp_ggml_compute_forward_flash_attn_ext_f16(
             }
         }
 
+        // sinks
+        if (sinks) {
+            const float s = ((float *)((char *) sinks->data))[h];
+
+            float ms = 1.0f;
+            float vs = 1.0f;
+
+            if (s > M) {
+                ms = expf(M - s);
+                wsp_ggml_vec_scale_f32(DV, VKQ32, ms);
+            } else {
+                vs = expf(s - M);
+            }
+
+            S = S*ms + vs;
+        }
+
         // V /= S
         const float S_inv = 1.0f/S;
         wsp_ggml_vec_scale_f32(DV, VKQ32, S_inv);
@@ -7906,17 +8406,13 @@ static void wsp_ggml_compute_forward_flash_attn_ext_f16(
 
 void wsp_ggml_compute_forward_flash_attn_ext(
         const wsp_ggml_compute_params * params,
-        const wsp_ggml_tensor * q,
-        const wsp_ggml_tensor * k,
-        const wsp_ggml_tensor * v,
-        const wsp_ggml_tensor * mask,
         wsp_ggml_tensor * dst) {
     switch (dst->op_params[3]) {
         case WSP_GGML_PREC_DEFAULT:
         case WSP_GGML_PREC_F32:
             {
                 // uses F32 accumulators
-                wsp_ggml_compute_forward_flash_attn_ext_f16(params, q, k, v, mask, dst);
+                wsp_ggml_compute_forward_flash_attn_ext_f16(params, dst);
             } break;
         default:
             {
@@ -8336,120 +8832,210 @@ void wsp_ggml_compute_forward_ssm_conv(
 static void wsp_ggml_compute_forward_ssm_scan_f32(
         const wsp_ggml_compute_params * params,
         wsp_ggml_tensor * dst) {
-    const wsp_ggml_tensor * src0 = dst->src[0]; // s
-    const wsp_ggml_tensor * src1 = dst->src[1]; // x
-    const wsp_ggml_tensor * src2 = dst->src[2]; // dt
-    const wsp_ggml_tensor * src3 = dst->src[3]; // A
-    const wsp_ggml_tensor * src4 = dst->src[4]; // B
-    const wsp_ggml_tensor * src5 = dst->src[5]; // C
+    const wsp_ggml_tensor * src0 = dst->src[0]; // s  {d_state, dim, n_head, n_seqs+}
+    const wsp_ggml_tensor * src1 = dst->src[1]; // x  {dim, n_head, n_seq_tokens, n_seqs}
+    const wsp_ggml_tensor * src2 = dst->src[2]; // dt {n_head, n_seq_tokens, n_seqs}
+    const wsp_ggml_tensor * src3 = dst->src[3]; // A  {d_state, n_head} or {1, n_head}
+    const wsp_ggml_tensor * src4 = dst->src[4]; // B  {d_state, n_group, n_seq_tokens, n_seqs}
+    const wsp_ggml_tensor * src5 = dst->src[5]; // C  {d_state, n_group, n_seq_tokens, n_seqs}
+    const wsp_ggml_tensor * src6 = dst->src[6]; // ids {n_seqs}
 
     const int ith = params->ith;
     const int nth = params->nth;
 
-    const int64_t nc  = src0->ne[0]; // d_state
-    const int64_t nr  = src0->ne[1]; // d_inner
-    const int64_t n_t = src1->ne[1]; // number of tokens per sequence
-    const int64_t n_s = src0->ne[2]; // number of sequences in the batch
+    const int64_t nc = src0->ne[0]; // d_state
+    const int64_t nr = src0->ne[1]; // dim
+    const int64_t nh = src1->ne[1]; // n_head
+    const int64_t ng = src4->ne[1];
+    const int64_t nt = src1->ne[2]; // number of tokens per sequence
+    const int64_t ns = src1->ne[3]; // number of sequences in the batch
 
-    WSP_GGML_ASSERT(wsp_ggml_nelements(src1) + wsp_ggml_nelements(src0) == wsp_ggml_nelements(dst));
+    // can't use wsp_ggml_nbytes because src1 is not necessarily contiguous
+    const int64_t s_off = wsp_ggml_nelements(src1) * wsp_ggml_element_size(src1);
+
+    WSP_GGML_ASSERT(wsp_ggml_nelements(src1) + nc*nr*nh*ns == wsp_ggml_nelements(dst));
     WSP_GGML_ASSERT(src0->nb[0] == sizeof(float));
     WSP_GGML_ASSERT(src1->nb[0] == sizeof(float));
     WSP_GGML_ASSERT(src2->nb[0] == sizeof(float));
     WSP_GGML_ASSERT(src3->nb[0] == sizeof(float));
     WSP_GGML_ASSERT(src4->nb[0] == sizeof(float));
     WSP_GGML_ASSERT(src5->nb[0] == sizeof(float));
-    // required for the dot product between s and C
-    WSP_GGML_ASSERT(src0->nb[1] == src0->ne[0]*sizeof(float));
-    // required for per-sequence offsets for states
-    WSP_GGML_ASSERT(src0->nb[2] == src0->ne[0]*src0->ne[1]*sizeof(float));
-    // required to get correct offset for state destination (i.e. src1->nb[3])
-    WSP_GGML_ASSERT(src1->nb[3] == src1->ne[0]*src1->ne[1]*src1->ne[2]*sizeof(float));
+    WSP_GGML_ASSERT(src6->nb[0] == sizeof(int32_t));
+    // allows optimizing the modulo since n_group should be a power of 2
+    WSP_GGML_ASSERT((ng & -ng) == ng);
 
-    // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    // heads per thread
+    const int dh = (nh + nth - 1)/nth;
 
-    // row range for this thread
-    const int ir0 = dr*ith;
-    const int ir1 = MIN(ir0 + dr, nr);
-    const int ir  = ir1 - ir0;
+    // head range for this thread
+    const int ih0 = dh*ith;
+    const int ih1 = MIN(ih0 + dh, nh);
 
-    #ifdef __ARM_FEATURE_SVE
-        for (int i3 = 0; i3 < n_s; ++i3) {
-            for (int i2 = 0; i2 < n_t; ++i2) {
-                const float * s0 = (const float *) ((const char *) src0->data + ir0*(src0->nb[1]) + i3*(src0->nb[2])); // {d_state, d_inner, n_s}
-                const float * x  = (const float *) ((const char *) src1->data + ir0*(src1->nb[0]) + i2*(src1->nb[1]) + i3*(src1->nb[2])); // {d_inner, n_t, n_s}
-                const float * dt = (const float *) ((const char *) src2->data + ir0*(src2->nb[0]) + i2*(src2->nb[1]) + i3*(src2->nb[2])); // {d_inner, n_t, n_s}
-                const float * A  = (const float *) ((const char *) src3->data + ir0*(src3->nb[1])); // {d_state, d_inner}
-                const float * B  = (const float *) ((const char *) src4->data +  i2*(src4->nb[1]) + i3*(src4->nb[2])); // {d_state, n_t, n_s}
-                const float * C  = (const float *) ((const char *) src5->data +  i2*(src5->nb[1]) + i3*(src5->nb[2])); // {d_state, n_t, n_s}
-                    float * y  = (      float *) ((      char *) dst->data  + ir0*(src1->nb[0]) + i2*(src1->nb[1]) + i3*(src1->nb[2])); // {d_inner, n_t, n_s}
-                    float * s  = (      float *) ((      char *) dst->data  + ir0*(src0->nb[1]) + i3*(src0->nb[2]) +     src1->nb[3]);  // {d_state, d_inner, n_s}
+    const int32_t * ids = (const int32_t *) src6->data;
 
-                // use the output as the source for the next token-wise iterations
-                if (i2 > 0) { s0 = s; }
+    for (int i3 = 0; i3 < ns; ++i3) {
+        const float * s0 = (const float *) ((const char *) src0->data + ids[i3]*(src0->nb[3])); // {d_state, dim, nh, ns}
+              float * s  = (      float *) ((      char *) dst->data  + i3*(src0->nb[3]) + s_off); // {d_state, dim, nh, ns}
 
-                // d_inner
-                for (int i1 = 0; i1 < ir; ++i1) {
-                    float dt_soft_plus = dt[i1] <= 20.0f ? log1pf(expf(dt[i1])) : dt[i1];
-                    float x_dt = x[i1] * dt_soft_plus;
-                    svfloat32_t vx_dt = WSP_GGML_F32_VEC_SET1(x_dt);
-                    svfloat32_t vdt_soft_plus = WSP_GGML_F32_VEC_SET1(dt_soft_plus);
-                    svfloat32_t r1_vector = WSP_GGML_F32_VEC_ZERO;
+        for (int i2 = 0; i2 < nt; ++i2) {
+            const float * x  = (const float *) ((const char *) src1->data + i2*(src1->nb[2]) + i3*(src1->nb[3])); // {dim, nh, nt, ns}
+            const float * dt = (const float *) ((const char *) src2->data + i2*(src2->nb[1]) + i3*(src2->nb[2])); // {nh, nt, ns}
+            const float * A  = (const float *) ((const char *) src3->data); // {d_state, nh} or {1, nh}
+            const float * B  = (const float *) ((const char *) src4->data + i2*(src4->nb[2]) + i3*(src4->nb[3])); // {d_state, ng, nt, ns}
+            const float * C  = (const float *) ((const char *) src5->data + i2*(src5->nb[2]) + i3*(src5->nb[3])); // {d_state, ng, nt, ns}
+                  float * y  = (      float *) ((      char *) dst->data + i2*(nh*nr*sizeof(float)) + i3*(nt*nh*nr*sizeof(float))); // {dim, nh, nt, ns}
 
-                    for (int64_t k = 0; k < nc; k += svcntw()) {
-                        svfloat32_t vA = WSP_GGML_F32_VEC_LOAD(&A[i1*nc + k]);
-                        svfloat32_t vB = WSP_GGML_F32_VEC_LOAD(&B[k]);
-                        svfloat32_t vC = WSP_GGML_F32_VEC_LOAD(&C[k]);
-                        svfloat32_t vs0 = WSP_GGML_F32_VEC_LOAD(&s0[i1*nc + k]);
+            if (src3->ne[0] == 1) {
+                // Mamba-2 has a scalar decay factor per head; dA can be outside the state-wise loop
 
-                        svfloat32_t t1 = WSP_GGML_F32_VEC_MUL(vdt_soft_plus, vA);
-                        t1 = exp_ps_sve(svptrue_b32(), t1);
-                        svfloat32_t t2 = WSP_GGML_F32_VEC_MUL(vx_dt, vB);
+                // n_head
+                for (int h = ih0; h < ih1; ++h) {
+                    // ref: https://github.com/state-spaces/mamba/blob/62db608da60f6fc790b8ed9f4b3225e95ca15fde/mamba_ssm/ops/triton/softplus.py#L16
+                    const float dt_soft_plus = dt[h] <= 20.0f ? log1pf(expf(dt[h])) : dt[h];
+                    const float dA = expf(dt_soft_plus * A[h]);
 
-                        vs0 = WSP_GGML_F32_VEC_FMA(vs0, t1, t2);
-                        r1_vector = WSP_GGML_F32_VEC_ADD(WSP_GGML_F32_VEC_MUL(vs0, vC), r1_vector);
+                    // dim
+                    for (int i1 = 0; i1 < nr; ++i1) {
+                        const int ii = i1 + h*nr;
+                        const float x_dt = x[ii] * dt_soft_plus;
+                        float sumf = 0.0f;
+#if defined(WSP_GGML_SIMD)
+    #if defined(__ARM_FEATURE_SVE)
+                        const int wsp_ggml_f32_epr = svcntw();
+                        const int wsp_ggml_f32_step = 1 * wsp_ggml_f32_epr;
 
-                        WSP_GGML_F32_VEC_STORE(&s[i1*nc + k], vs0);
-                    }
-                    y[i1] = WSP_GGML_F32xt_REDUCE_ONE(r1_vector);
-                }
-            }
-        }
+                        const int np = (nc & ~(wsp_ggml_f32_step - 1));
+
+                        WSP_GGML_F32_VEC sum = WSP_GGML_F32_VEC_ZERO;
+
+                        WSP_GGML_F32_VEC adA = WSP_GGML_F32_VEC_SET1(dA);
+                        WSP_GGML_F32_VEC axdt = WSP_GGML_F32_VEC_SET1(x_dt);
+
+                        for (int i = 0; i < np; i += wsp_ggml_f32_step) {
+                            // TODO: maybe unroll more?
+                            for (int j = 0; j < 1; j++) {
+                                WSP_GGML_F32_VEC t0 = WSP_GGML_F32_VEC_LOAD(s0 + i + j*wsp_ggml_f32_epr + ii*nc);
+                                WSP_GGML_F32_VEC t1 = WSP_GGML_F32_VEC_LOAD(B + i + j*wsp_ggml_f32_epr + (h & (ng - 1))*nc);
+                                WSP_GGML_F32_VEC t2 = WSP_GGML_F32_VEC_LOAD(C + i + j*wsp_ggml_f32_epr + (h & (ng - 1))*nc);
+
+                                t0 = WSP_GGML_F32_VEC_MUL(t0, adA);
+                                t1 = WSP_GGML_F32_VEC_MUL(t1, axdt);
+
+                                t0 = WSP_GGML_F32_VEC_ADD(t0, t1);
+
+                                sum = WSP_GGML_F32_VEC_FMA(sum, t0, t2);
+
+                                WSP_GGML_F32_VEC_STORE(s + i + j*wsp_ggml_f32_epr + ii*nc, t0);
+                            }
+                        }
+
+                        sumf = WSP_GGML_F32xt_REDUCE_ONE(sum);
     #else
-        for (int i3 = 0; i3 < n_s; ++i3) {
-            for (int i2 = 0; i2 < n_t; ++i2) {
-                const float * s0 = (const float *) ((const char *) src0->data + ir0*(src0->nb[1]) + i3*(src0->nb[2])); // {d_state, d_inner, n_s}
-                const float * x  = (const float *) ((const char *) src1->data + ir0*(src1->nb[0]) + i2*(src1->nb[1]) + i3*(src1->nb[2])); // {d_inner, n_t, n_s}
-                const float * dt = (const float *) ((const char *) src2->data + ir0*(src2->nb[0]) + i2*(src2->nb[1]) + i3*(src2->nb[2])); // {d_inner, n_t, n_s}
-                const float * A  = (const float *) ((const char *) src3->data + ir0*(src3->nb[1])); // {d_state, d_inner}
-                const float * B  = (const float *) ((const char *) src4->data +  i2*(src4->nb[1]) + i3*(src4->nb[2])); // {d_state, n_t, n_s}
-                const float * C  = (const float *) ((const char *) src5->data +  i2*(src5->nb[1]) + i3*(src5->nb[2])); // {d_state, n_t, n_s}
-                    float * y  = (      float *) ((      char *) dst->data  + ir0*(src1->nb[0]) + i2*(src1->nb[1]) + i3*(src1->nb[2])); // {d_inner, n_t, n_s}
-                    float * s  = (      float *) ((      char *) dst->data  + ir0*(src0->nb[1]) + i3*(src0->nb[2]) +     src1->nb[3]);  // {d_state, d_inner, n_s}
+                        const int np = (nc & ~(WSP_GGML_F32_STEP - 1));
 
-                // use the output as the source for the next token-wise iterations
-                if (i2 > 0) { s0 = s; }
+                        WSP_GGML_F32_VEC sum[WSP_GGML_F32_ARR] = { WSP_GGML_F32_VEC_ZERO };
 
-                // d_inner
-                for (int i1 = 0; i1 < ir; ++i1) {
-                    // ref: https://github.com/state-spaces/mamba/blob/34076d664838588a3c97727b263478ab9f621a07/mamba_ssm/ops/triton/selective_state_update.py#L78
-                    float dt_soft_plus = dt[i1] <= 20.0f ? log1pf(expf(dt[i1])) : dt[i1];
-                    float x_dt = x[i1] * dt_soft_plus;
-                    float sumf = 0.0f;
-                    // d_state
-                    for (int i0 = 0; i0 < nc; ++i0) {
-                        int i = i0 + i1*nc;
-                        // state = prev_state * dA + dB * x
-                        float state = (s0[i] * expf(dt_soft_plus * A[i])) + (B[i0] * x_dt);
-                        // y = rowwise_dotprod(state, C)
-                        sumf += state * C[i0];
-                        s[i] = state;
+                        WSP_GGML_F32_VEC adA = WSP_GGML_F32_VEC_SET1(dA);
+                        WSP_GGML_F32_VEC axdt = WSP_GGML_F32_VEC_SET1(x_dt);
+
+                        WSP_GGML_F32_VEC ax[WSP_GGML_F32_ARR];
+                        WSP_GGML_F32_VEC ay[WSP_GGML_F32_ARR];
+                        WSP_GGML_F32_VEC az[WSP_GGML_F32_ARR];
+
+                        for (int i = 0; i < np; i += WSP_GGML_F32_STEP) {
+                            for (int j = 0; j < WSP_GGML_F32_ARR; j++) {
+                                ax[j] = WSP_GGML_F32_VEC_LOAD(s0 + i + j*WSP_GGML_F32_EPR + ii*nc);
+                                ay[j] = WSP_GGML_F32_VEC_LOAD(B + i + j*WSP_GGML_F32_EPR + (h & (ng - 1))*nc);
+                                az[j] = WSP_GGML_F32_VEC_LOAD(C + i + j*WSP_GGML_F32_EPR + (h & (ng - 1))*nc);
+
+                                ax[j] = WSP_GGML_F32_VEC_MUL(ax[j], adA);
+                                ay[j] = WSP_GGML_F32_VEC_MUL(ay[j], axdt);
+
+                                ax[j] = WSP_GGML_F32_VEC_ADD(ax[j], ay[j]);
+
+                                sum[j] = WSP_GGML_F32_VEC_FMA(sum[j], ax[j], az[j]);
+
+                                WSP_GGML_F32_VEC_STORE(s + i + j*WSP_GGML_F32_EPR + ii*nc, ax[j]);
+                            }
+                        }
+
+                        // reduce sum0..sum3 to sum0
+                        WSP_GGML_F32_VEC_REDUCE(sumf, sum);
+    #endif
+#else
+                        const int np = 0;
+#endif
+                        // d_state
+                        for (int i0 = np; i0 < nc; ++i0) {
+                            const int i = i0 + ii*nc;
+                            const int ig = i0 + (h & (ng - 1))*nc;
+                            // state = prev_state * dA + dB * x
+                            const float state = (s0[i] * dA) + (B[ig] * x_dt);
+                            // y = rowwise_dotprod(state, C)
+                            sumf += state * C[ig];
+                            s[i] = state;
+                        }
+                        y[ii] = sumf;
                     }
-                    y[i1] = sumf;
+                }
+            } else {
+                // Mamba-1 has an element-wise decay factor for the states
+
+                // n_head
+                for (int h = ih0; h < ih1; ++h) {
+                    // ref: https://github.com/state-spaces/mamba/blob/62db608da60f6fc790b8ed9f4b3225e95ca15fde/mamba_ssm/ops/triton/softplus.py#L16
+                    const float dt_soft_plus = dt[h] <= 20.0f ? log1pf(expf(dt[h])) : dt[h];
+
+                    // dim
+                    for (int i1 = 0; i1 < nr; ++i1) {
+                        const int ii = i1 + h*nr;
+                        const float x_dt = x[ii] * dt_soft_plus;
+#if defined(__ARM_FEATURE_SVE)
+                        svfloat32_t vx_dt = WSP_GGML_F32_VEC_SET1(x_dt);
+                        svfloat32_t vdt_soft_plus = WSP_GGML_F32_VEC_SET1(dt_soft_plus);
+                        svfloat32_t r1_vector = WSP_GGML_F32_VEC_ZERO;
+
+                        // d_state
+                        // TODO: what happens when (d_state % svcntw()) != 0?
+                        for (int64_t k = 0; k < nc; k += svcntw()) {
+                            svfloat32_t vA = WSP_GGML_F32_VEC_LOAD(&A[h*nc + k]);
+                            svfloat32_t vB = WSP_GGML_F32_VEC_LOAD(&B[k + (h & (ng - 1))*nc]);
+                            svfloat32_t vC = WSP_GGML_F32_VEC_LOAD(&C[k + (h & (ng - 1))*nc]);
+                            svfloat32_t vs0 = WSP_GGML_F32_VEC_LOAD(&s0[ii*nc + k]);
+
+                            svfloat32_t t1 = WSP_GGML_F32_VEC_MUL(vdt_soft_plus, vA);
+                            t1 = exp_ps_sve(svptrue_b32(), t1);
+                            svfloat32_t t2 = WSP_GGML_F32_VEC_MUL(vx_dt, vB);
+
+                            vs0 = WSP_GGML_F32_VEC_FMA(t2, vs0, t1);
+                            r1_vector = WSP_GGML_F32_VEC_ADD(WSP_GGML_F32_VEC_MUL(vs0, vC), r1_vector);
+
+                            WSP_GGML_F32_VEC_STORE(&s[ii*nc + k], vs0);
+                        }
+                        y[ii] = WSP_GGML_F32xt_REDUCE_ONE(r1_vector);
+#else
+                        float sumf = 0.0f;
+                        // NOTE: can't really use WSP_GGML_SIMD here because d_state is usually 16
+                        //       and also because expf is used within the loop.
+                        // d_state
+                        for (int i0 = 0; i0 < nc; ++i0) {
+                            const int i = i0 + ii*nc;
+                            const int ig = i0 + (h & (ng - 1))*nc;
+                            // state = prev_state * dA + dB * x
+                            const float state = (s0[i] * expf(dt_soft_plus * A[i0 + h*nc])) + (B[ig] * x_dt);
+                            // y = rowwise_dotprod(state, C)
+                            sumf += state * C[ig];
+                            s[i] = state;
+                        }
+                        y[ii] = sumf;
+#endif
+                    }
                 }
             }
+            // use the output as the source when it's not the first token-wise iteration
+            s0 = s;
         }
-    #endif
+    }
 }
 
 void wsp_ggml_compute_forward_ssm_scan(
@@ -8687,6 +9273,18 @@ void wsp_ggml_compute_forward_glu(
         case WSP_GGML_GLU_OP_SWIGLU:
             {
                 wsp_ggml_compute_forward_swiglu(params, dst);
+            } break;
+        case WSP_GGML_GLU_OP_SWIGLU_OAI:
+            {
+                wsp_ggml_compute_forward_swiglu_oai(params, dst);
+            } break;
+        case WSP_GGML_GLU_OP_GEGLU_ERF:
+            {
+                wsp_ggml_compute_forward_geglu_erf(params, dst);
+            } break;
+        case WSP_GGML_GLU_OP_GEGLU_QUICK:
+            {
+                wsp_ggml_compute_forward_geglu_quick(params, dst);
             } break;
         default:
             {
@@ -9732,6 +10330,7 @@ static void wsp_ggml_compute_forward_opt_step_adamw_f32(
     const int ir1 = MIN(ir0 + dr, nr);
 
     const float * adamw_params_ptr = wsp_ggml_get_data_f32(adamw_params);
+
     const float alpha  = adamw_params_ptr[0];
     const float beta1  = adamw_params_ptr[1];
     const float beta2  = adamw_params_ptr[2];
@@ -9739,7 +10338,7 @@ static void wsp_ggml_compute_forward_opt_step_adamw_f32(
     const float wd     = adamw_params_ptr[4];
     const float beta1h = adamw_params_ptr[5];
     const float beta2h = adamw_params_ptr[6];
-
+    const float keep   = 1.f - alpha * wd;
     for (int ir = ir0; ir < ir1; ++ir) {
         const int64_t i03 = ir/(ne02*ne01);
         const int64_t i02 = (ir - i03*ne02*ne01)/ne01;
@@ -9762,7 +10361,7 @@ static void wsp_ggml_compute_forward_opt_step_adamw_f32(
             // The weight decay is applied independently of the Adam momenta m and v.
             // This is NOT equivalent to l2 regularization that adds w[i00]*w[i00] to the loss.
             // See: https://arxiv.org/pdf/1711.05101v3.pdf
-            w[i00] = w[i00]*(1.0f - alpha*wd) - alpha*mh/vh;
+            w[i00] = w[i00] * keep - alpha * mh / vh;
         }
     }
 }
@@ -9781,6 +10380,66 @@ void wsp_ggml_compute_forward_opt_step_adamw(
         default:
             {
                 WSP_GGML_ABORT("fatal error");
+            }
+    }
+}
+
+static void wsp_ggml_compute_forward_opt_step_sgd_f32(const wsp_ggml_compute_params * params, wsp_ggml_tensor * dst) {
+    const wsp_ggml_tensor * src0       = dst->src[0];
+    const wsp_ggml_tensor * src0_grad  = dst->src[1];
+    const wsp_ggml_tensor * sgd_params = dst->src[2];
+
+    WSP_GGML_ASSERT(wsp_ggml_are_same_shape(src0, src0_grad));
+    WSP_GGML_ASSERT(wsp_ggml_nelements(sgd_params) == 2);
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nr = wsp_ggml_nrows(src0);
+
+    WSP_GGML_TENSOR_UNARY_OP_LOCALS
+    WSP_GGML_ASSERT(nb00 == sizeof(float));
+
+    // rows per thread
+    const int dr = (nr + nth - 1) / nth;
+
+    // row range for this thread
+    const int ir0 = dr * ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    // using adamw param subset we care about - alpha, wd - could have a separate struct
+    const float * sgd_params_ptr   = wsp_ggml_get_data_f32(sgd_params);
+    const float   alpha            = sgd_params_ptr[0];
+    const float   keep             = 1.f - alpha * sgd_params_ptr[1];
+
+    for (int ir = ir0; ir < ir1; ++ir) {
+        const int64_t i03 = ir / (ne02 * ne01);
+        const int64_t i02 = (ir - i03 * ne02 * ne01) / ne01;
+        const int64_t i01 = (ir - i03 * ne02 * ne01 - i02 * ne01);
+
+        const size_t offset = i03 * nb03 + i02 * nb02 + i01 * nb01;
+
+        float *       w = (float *) ((char *) src0->data + offset);                   // weight
+        const float * g = (const float *) ((const char *) src0_grad->data + offset);  // grad
+
+        for (int i00 = 0; i00 < ne00; ++i00) {
+            w[i00] = w[i00] * keep - alpha * g[i00];
+        }
+    }
+}
+
+void wsp_ggml_compute_forward_opt_step_sgd(const wsp_ggml_compute_params * params, wsp_ggml_tensor * dst) {
+    const wsp_ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case WSP_GGML_TYPE_F32:
+            {
+                wsp_ggml_compute_forward_opt_step_sgd_f32(params, dst);
+            }
+            break;
+        default:
+            {
+                WSP_GGML_ABORT("fatal error - sgd is F32 only");
             }
     }
 }

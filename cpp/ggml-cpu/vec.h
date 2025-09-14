@@ -55,7 +55,22 @@ inline static void wsp_ggml_vec_cpy_i32(const int n, int32_t * y, const int32_t 
 
 inline static void wsp_ggml_vec_set_f16(const int n, wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
 inline static void wsp_ggml_vec_set_bf16(const int n, wsp_ggml_bf16_t * x, const wsp_ggml_bf16_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
-inline static void wsp_ggml_vec_add_f32 (const int n, float * z, const float * x, const float * y) { for (int i = 0; i < n; ++i) z[i]  = x[i] + y[i]; }
+
+inline static void wsp_ggml_vec_add_f32 (const int n, float * z, const float * x, const float * y) {
+    int i = 0;
+#if defined(__AVX2__)
+    for (; i + 7 < n; i += 8) {
+        __m256 vx = _mm256_loadu_ps(x + i);
+        __m256 vy = _mm256_loadu_ps(y + i);
+        __m256 vz = _mm256_add_ps(vx, vy);
+        _mm256_storeu_ps(z + i, vz);
+    }
+#endif
+    for (; i < n; ++i) {
+        z[i] = x[i] + y[i];
+    }
+}
+
 inline static void wsp_ggml_vec_add_f16 (const int n, wsp_ggml_fp16_t * z, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * y) {
     for (int i = 0; i < n; ++i) {
         z[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(x[i]) + WSP_GGML_CPU_FP16_TO_FP32(y[i]));
@@ -163,49 +178,49 @@ inline static void wsp_ggml_vec_mad_f32(const int n, float * WSP_GGML_RESTRICT y
 
             ax1 = WSP_GGML_F32_VEC_LOAD(x + i);
             ay1 = WSP_GGML_F32_VEC_LOAD(y + i);
-            ay1 = WSP_GGML_F32_VEC_FMA(ax1, vx, ay1);
+            ay1 = WSP_GGML_F32_VEC_FMA(ay1, ax1, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i, ay1);
 
             ax2 = WSP_GGML_F32_VEC_LOAD(x + i + 1*wsp_ggml_f32_epr);
             ay2 = WSP_GGML_F32_VEC_LOAD(y + i + 1*wsp_ggml_f32_epr);
-            ay2 = WSP_GGML_F32_VEC_FMA(ax2, vx, ay2);
+            ay2 = WSP_GGML_F32_VEC_FMA(ay2, ax2, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 1*wsp_ggml_f32_epr, ay2);
 
             ax3 = WSP_GGML_F32_VEC_LOAD(x + i + 2*wsp_ggml_f32_epr);
             ay3 = WSP_GGML_F32_VEC_LOAD(y + i + 2*wsp_ggml_f32_epr);
-            ay3 = WSP_GGML_F32_VEC_FMA(ax3, vx, ay3);
+            ay3 = WSP_GGML_F32_VEC_FMA(ay3, ax3, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 2*wsp_ggml_f32_epr, ay3);
 
             ax4 = WSP_GGML_F32_VEC_LOAD(x + i + 3*wsp_ggml_f32_epr);
             ay4 = WSP_GGML_F32_VEC_LOAD(y + i + 3*wsp_ggml_f32_epr);
-            ay4 = WSP_GGML_F32_VEC_FMA(ax4, vx, ay4);
+            ay4 = WSP_GGML_F32_VEC_FMA(ay4, ax4, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 3*wsp_ggml_f32_epr, ay4);
 
             ax5 = WSP_GGML_F32_VEC_LOAD(x + i + 4*wsp_ggml_f32_epr);
             ay5 = WSP_GGML_F32_VEC_LOAD(y + i + 4*wsp_ggml_f32_epr);
-            ay5 = WSP_GGML_F32_VEC_FMA(ax5, vx, ay5);
+            ay5 = WSP_GGML_F32_VEC_FMA(ay5, ax5, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 4*wsp_ggml_f32_epr, ay5);
 
             ax6 = WSP_GGML_F32_VEC_LOAD(x + i + 5*wsp_ggml_f32_epr);
             ay6 = WSP_GGML_F32_VEC_LOAD(y + i + 5*wsp_ggml_f32_epr);
-            ay6 = WSP_GGML_F32_VEC_FMA(ax6, vx, ay6);
+            ay6 = WSP_GGML_F32_VEC_FMA(ay6, ax6, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 5*wsp_ggml_f32_epr, ay6);
 
             ax7 = WSP_GGML_F32_VEC_LOAD(x + i + 6*wsp_ggml_f32_epr);
             ay7 = WSP_GGML_F32_VEC_LOAD(y + i + 6*wsp_ggml_f32_epr);
-            ay7 = WSP_GGML_F32_VEC_FMA(ax7, vx, ay7);
+            ay7 = WSP_GGML_F32_VEC_FMA(ay7, ax7, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 6*wsp_ggml_f32_epr, ay7);
 
             ax8 = WSP_GGML_F32_VEC_LOAD(x + i + 7*wsp_ggml_f32_epr);
             ay8 = WSP_GGML_F32_VEC_LOAD(y + i + 7*wsp_ggml_f32_epr);
-            ay8 = WSP_GGML_F32_VEC_FMA(ax8, vx, ay8);
+            ay8 = WSP_GGML_F32_VEC_FMA(ay8, ax8, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i + 7*wsp_ggml_f32_epr, ay8);
         }
@@ -215,7 +230,7 @@ inline static void wsp_ggml_vec_mad_f32(const int n, float * WSP_GGML_RESTRICT y
         for (int i = np; i < np2; i += wsp_ggml_f32_epr) {
             ax1 = WSP_GGML_F32_VEC_LOAD(x + i);
             ay1 = WSP_GGML_F32_VEC_LOAD(y + i);
-            ay1 = WSP_GGML_F32_VEC_FMA(ax1, vx, ay1);
+            ay1 = WSP_GGML_F32_VEC_FMA(ay1, ax1, vx);
 
             WSP_GGML_F32_VEC_STORE(y + i, ay1);
         }
@@ -347,6 +362,45 @@ inline static void wsp_ggml_vec_mad_f32_unroll(const int n, const int xs, const 
         for (int i = 0; i < n; ++i) {
             y[i] += x[k][i]*v[k][0];
         }
+    }
+#endif
+}
+
+inline static void wsp_ggml_vec_mad1_f32(const int n, float * y, const float * x, const float s, const float b) {
+#if defined(WSP_GGML_USE_ACCELERATE)
+    vDSP_vsmsa(x, 1, &s, &b, y, 1, n);
+#elif defined(WSP_GGML_SIMD)
+    #if defined(__ARM_FEATURE_SVE)
+        // scalar ; TODO: Write SVE code
+        for (int i = 0; i < n; ++i) {
+            y[i] = x[i]*s + b;
+        }
+    #else
+        const int np = (n & ~(WSP_GGML_F32_STEP - 1));
+
+        WSP_GGML_F32_VEC vs = WSP_GGML_F32_VEC_SET1(s);
+        WSP_GGML_F32_VEC vb = WSP_GGML_F32_VEC_SET1(b);
+
+        WSP_GGML_F32_VEC ay[WSP_GGML_F32_ARR];
+
+        for (int i = 0; i < np; i += WSP_GGML_F32_STEP) {
+            for (int j = 0; j < WSP_GGML_F32_ARR; j++) {
+                ay[j] = WSP_GGML_F32_VEC_LOAD(x + i + j*WSP_GGML_F32_EPR);
+                ay[j] = WSP_GGML_F32_VEC_FMA(ay[j], vs, vb);
+
+                WSP_GGML_F32_VEC_STORE(y + i + j*WSP_GGML_F32_EPR, ay[j]);
+            }
+        }
+
+        // leftovers
+        for (int i = np; i < n; ++i) {
+            y[i] = x[i]*s + b;
+        }
+    #endif
+#else
+    // scalar
+    for (int i = 0; i < n; ++i) {
+        y[i] = x[i]*s + b;
     }
 #endif
 }
@@ -953,9 +1007,49 @@ void wsp_ggml_vec_swiglu_f32(const int n, float * y, const float * x, const floa
 
 inline static void wsp_ggml_vec_swiglu_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * g) {
     for (int i = 0; i < n; ++i) {
-        float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
-        float w = WSP_GGML_CPU_FP16_TO_FP32(g[i]);
-        y[i] = WSP_GGML_CPU_FP32_TO_FP16((v/(1.0f + expf(-v))) * w);
+        float xi = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        float gi = WSP_GGML_CPU_FP16_TO_FP32(g[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((xi/(1.0f + expf(-xi))) * gi);
+    }
+}
+
+inline static void wsp_ggml_vec_geglu_erf_f32(const int n, float * y, const float * x, const float * g) {
+    for (int i = 0; i < n; ++i) {
+        float xi = x[i];
+        y[i] = 0.5f * xi * (1.0f + erff(xi*SQRT_2_INV)) * g[i];
+    }
+}
+
+inline static void wsp_ggml_vec_geglu_erf_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * g) {
+    for (int i = 0; i < n; ++i) {
+        float xi = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        float gi = WSP_GGML_CPU_FP16_TO_FP32(g[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(0.5f * xi * (1.0f + erff(xi*SQRT_2_INV)) * gi);
+    }
+}
+
+#ifdef WSP_GGML_GELU_QUICK_FP16
+inline static void wsp_ggml_vec_geglu_quick_f32(const int n, float * y, const float * x, const float * g) {
+    uint16_t t;
+    for (int i = 0; i < n; ++i) {
+        wsp_ggml_fp16_t fp16 = WSP_GGML_CPU_FP32_TO_FP16(x[i]);
+        memcpy(&t, &fp16, sizeof(uint16_t));
+        y[i] = WSP_GGML_CPU_FP16_TO_FP32(wsp_ggml_table_gelu_quick_f16[t]) * g[i];
+    }
+}
+#else
+inline static void wsp_ggml_vec_geglu_quick_f32(const int n, float * y, const float * x, const float * g) {
+    for (int i = 0; i < n; ++i) {
+        y[i] = wsp_ggml_gelu_quick_f32(x[i]) * g[i];
+    }
+}
+#endif
+
+inline static void wsp_ggml_vec_geglu_quick_f16(const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x, const wsp_ggml_fp16_t * g) {
+    const uint16_t * i16 = (const uint16_t *) x;
+    for (int i = 0; i < n; ++i) {
+        float v = WSP_GGML_CPU_FP16_TO_FP32(g[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16(WSP_GGML_CPU_FP16_TO_FP32(wsp_ggml_table_gelu_quick_f16[i16[i]]) * v);
     }
 }
 

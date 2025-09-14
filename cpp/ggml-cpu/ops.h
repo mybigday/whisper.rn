@@ -29,6 +29,7 @@ extern "C" {
 
 void wsp_ggml_compute_forward_dup(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_add(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_add_id(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_add1(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_acc(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_sum(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -82,13 +83,7 @@ void wsp_ggml_compute_forward_arange(const struct wsp_ggml_compute_params * para
 void wsp_ggml_compute_forward_timestep_embedding(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_argsort(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_leaky_relu(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
-void wsp_ggml_compute_forward_flash_attn_ext(
-    const struct wsp_ggml_compute_params * params,
-    const struct wsp_ggml_tensor * q,
-    const struct wsp_ggml_tensor * k,
-    const struct wsp_ggml_tensor * v,
-    const struct wsp_ggml_tensor * mask,
-    struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_flash_attn_ext(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_flash_attn_back(
         const struct wsp_ggml_compute_params * params,
         const bool masked,
@@ -112,7 +107,7 @@ void wsp_ggml_compute_forward_cross_entropy_loss(const struct wsp_ggml_compute_p
 void wsp_ggml_compute_forward_cross_entropy_loss_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_opt_step_adamw(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_mul_mat(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
-
+void wsp_ggml_compute_forward_opt_step_sgd(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 #ifdef __cplusplus
 }
 #endif

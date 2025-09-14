@@ -35,7 +35,7 @@
 
 // ggml-backend interface
 
-std::vector<wsp_ggml_backend_buffer_type_t>& wsp_ggml_backend_cpu_get_extra_buffers_type() {
+std::vector<wsp_ggml_backend_buffer_type_t> & wsp_ggml_backend_cpu_get_extra_buffer_types() {
     static std::vector<wsp_ggml_backend_buffer_type_t> bufts = []() {
         std::vector<wsp_ggml_backend_buffer_type_t> bufts;
 
@@ -57,8 +57,6 @@ std::vector<wsp_ggml_backend_buffer_type_t>& wsp_ggml_backend_cpu_get_extra_buff
         }
 #endif
 
-        bufts.push_back(NULL);
-
         return bufts;
     }();
 
@@ -66,14 +64,20 @@ std::vector<wsp_ggml_backend_buffer_type_t>& wsp_ggml_backend_cpu_get_extra_buff
 }
 
 static wsp_ggml_backend_buffer_type_t * wsp_ggml_backend_cpu_device_get_extra_buffers_type(wsp_ggml_backend_dev_t device) {
-    return wsp_ggml_backend_cpu_get_extra_buffers_type().data();
+    static std::vector<wsp_ggml_backend_buffer_type_t> extra_bufts = [] {
+        std::vector<wsp_ggml_backend_buffer_type_t> bufts = wsp_ggml_backend_cpu_get_extra_buffer_types();
+        bufts.push_back(nullptr);
+        return bufts;
+    }();
+
+    return extra_bufts.data();
 
     WSP_GGML_UNUSED(device);
 }
 
 static bool wsp_ggml_backend_cpu_is_extra_buffer_type(wsp_ggml_backend_buffer_type_t buft) {
-    for (auto * extra : wsp_ggml_backend_cpu_get_extra_buffers_type()) {
-        if (extra && extra == buft) {
+    for (auto * extra : wsp_ggml_backend_cpu_get_extra_buffer_types()) {
+        if (extra == buft) {
             return true;
         }
     }
@@ -210,10 +214,10 @@ wsp_ggml_backend_t wsp_ggml_backend_cpu_init(void) {
     ctx->abort_callback_data = NULL;
 
     wsp_ggml_backend_t cpu_backend = new wsp_ggml_backend {
-        /* .guid      = */ wsp_ggml_backend_cpu_guid(),
-        /* .interface = */ wsp_ggml_backend_cpu_i,
-        /* .device    = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
-        /* .context   = */ ctx,
+        /* .guid    = */ wsp_ggml_backend_cpu_guid(),
+        /* .iface   = */ wsp_ggml_backend_cpu_i,
+        /* .device  = */ wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_cpu_reg(), 0),
+        /* .context = */ ctx,
     };
 
     if (cpu_backend == NULL) {
@@ -397,20 +401,13 @@ static bool wsp_ggml_backend_cpu_device_supports_op(wsp_ggml_backend_dev_t dev, 
         return true;
     }
 
-    // extra_buffer_op?
-    for (auto extra : wsp_ggml_backend_cpu_get_extra_buffers_type()) {
-        if (extra) {
-            auto buf_extra = (ggml::cpu::extra_buffer_type*) extra->context;
-            if (buf_extra && buf_extra->supports_op(dev, op)) {
-                return true;
-            }
-        }
-    }
-
-    // the other case need host buffer.
-    for (int i = 0; i < WSP_GGML_MAX_SRC; i++) {
-        if (op->src[i] && op->src[i]->buffer && !wsp_ggml_backend_buft_is_host(op->src[i]->buffer->buft)) {
-            return false;
+    // check extra buffer types
+    // note: only the first sources are checked for extra buffer types to reduce overhead, increase if necessary
+    for (int i = 0; i < 4; i++) {
+        if (op->src[i] && op->src[i]->buffer &&
+            wsp_ggml_backend_cpu_is_extra_buffer_type(op->src[i]->buffer->buft)) {
+            auto * buf_extra = (ggml::cpu::extra_buffer_type *) op->src[i]->buffer->buft->context;
+            return buf_extra->supports_op(dev, op);
         }
     }
 

@@ -1327,7 +1327,7 @@ static wsp_ggml_backend_t whisper_backend_init_gpu(const whisper_context_params 
         for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
             wsp_ggml_backend_dev_t dev_cur = wsp_ggml_backend_dev_get(i);
             if (wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
-                if (cnt == 0 || cnt == params.gpu_device) {
+                if (cnt == params.gpu_device) {
                     dev = dev_cur;
                 }
 
@@ -1396,7 +1396,7 @@ static buft_list_t make_buft_list(whisper_context_params & params) {
         for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
             wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_get(i);
             if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
-                if (cnt == 0 || cnt == params.gpu_device) {
+                if (cnt == params.gpu_device) {
                     auto * buft = wsp_ggml_backend_dev_buffer_type(dev);
                     if (buft) {
                         buft_list.emplace_back(dev, buft);
@@ -1438,7 +1438,8 @@ static bool weight_buft_supported(const whisper_hparams & hparams, wsp_ggml_tens
         op_supported = true;
     } else {
         switch (op) {
-            // The current extra_buffer_type implementations only support WSP_GGML_OP_MUL_MAT
+            // The current extra_buffer_type implementations only support WSP_GGML_OP_MUL_MAT and WSP_GGML_OP_GET_ROWS
+            case WSP_GGML_OP_GET_ROWS:
             case WSP_GGML_OP_MUL_MAT: {
                 wsp_ggml_init_params params = {
                     /*.mem_size   =*/ 2 * wsp_ggml_tensor_overhead(),
@@ -1454,9 +1455,15 @@ static bool weight_buft_supported(const whisper_hparams & hparams, wsp_ggml_tens
 
                 wsp_ggml_tensor * op_tensor = nullptr;
 
-                int64_t n_ctx = hparams.n_audio_ctx;
-                wsp_ggml_tensor * b = wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, w->ne[0], n_ctx, w->ne[2], w->ne[3]);
-                op_tensor = wsp_ggml_mul_mat(ctx, w, b);
+                if (op == WSP_GGML_OP_MUL_MAT) {
+                    int64_t n_ctx = hparams.n_audio_ctx;
+                    wsp_ggml_tensor * b = wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, w->ne[0], n_ctx, w->ne[2], w->ne[3]);
+                    op_tensor = wsp_ggml_mul_mat(ctx, w, b);
+                } else if (op == WSP_GGML_OP_GET_ROWS) {
+                    int64_t num_indices = 8;
+                    wsp_ggml_tensor * indices = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_I32, num_indices);
+                    op_tensor = wsp_ggml_get_rows(ctx, w, indices);
+                }
 
                 // create a temporary dummy buffer for the weight so that supports_op can check the buffer type
                 WSP_GGML_ASSERT(w->buffer == nullptr);
@@ -2425,6 +2432,8 @@ static bool whisper_encode_internal(
                 return false;
             }
         } else {
+            wsp_ggml_backend_sched_reset(sched);
+
 #if defined(WHISPER_USE_COREML)
             whisper_coreml_encode(wstate.ctx_coreml, mel->ne[0], mel->ne[1], (float *) mel->data, (float *) wstate.embd_enc->data);
 #elif defined(WHISPER_USE_OPENVINO)

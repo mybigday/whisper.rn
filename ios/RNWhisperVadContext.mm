@@ -20,6 +20,8 @@
 
 #ifdef WSP_GGML_USE_METAL
     if (ctx_params.use_gpu) {
+        ctx_params.gpu_device = 0;
+
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
 
         // Check ggml-metal availability
