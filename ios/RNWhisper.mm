@@ -572,7 +572,7 @@ RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
     if (contexts != nil) {
         for (NSNumber *contextId in contexts) {
             RNWhisperContext *context = contexts[contextId];
-            rnwhisper_jsi::removeContext(contextId);
+            rnwhisper_jsi::removeContext([contextId intValue]);
             [context invalidate];
         }
         [contexts removeAllObjects];
@@ -584,7 +584,7 @@ RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
     if (vadContexts != nil) {
         for (NSNumber *contextId in vadContexts) {
             RNWhisperVadContext *vadContext = vadContexts[contextId];
-            rnwhisper_jsi::removeVadContext(contextId);
+            rnwhisper_jsi::removeVadContext([contextId intValue]);
             [vadContext invalidate];
         }
         [vadContexts removeAllObjects];
