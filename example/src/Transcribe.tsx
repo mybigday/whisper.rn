@@ -8,13 +8,11 @@ import {
   PermissionsAndroid,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import Sound from 'react-native-sound'
-import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
+import { initWhisper, libVersion } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
 import {
-  createDir,
   fileDir,
   toTimestamp,
   downloadModel,
@@ -60,8 +58,6 @@ const styles = StyleSheet.create({
 })
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
-
-const recordFile = `${fileDir}/realtime.wav`
 
 export default function App() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
@@ -216,76 +212,6 @@ export default function App() {
               log('Finished transcribing')
             }}
           />
-          <Button
-            title={stopTranscribe?.stop ? 'Stop' : 'Realtime'}
-            style={[stopTranscribe?.stop ? styles.buttonClear : null]}
-            onPress={async () => {
-              if (!whisperContext) return log('No context')
-              if (stopTranscribe?.stop) {
-                const t0 = Date.now()
-                stopTranscribe?.stop()
-                const t1 = Date.now()
-                log('Stopped transcribing in', t1 - t0, 'ms')
-                setStopTranscribe(null)
-                return
-              }
-              log('Start realtime transcribing...')
-              try {
-                await createDir(log)
-                const { stop, subscribe } =
-                  await whisperContext.transcribeRealtime({
-                    maxLen: 1,
-                    language: 'en',
-                    // Enable beam search (may be slower than greedy but more accurate)
-                    // beamSize: 2,
-                    // Record duration in seconds
-                    realtimeAudioSec: 60,
-                    // Slice audio into 25 (or < 30) sec chunks for better performance
-                    realtimeAudioSliceSec: 25,
-                    // Save audio on stop
-                    audioOutputPath: recordFile,
-                    // iOS Audio Session
-                    audioSessionOnStartIos: {
-                      category: AudioSessionIos.Category.PlayAndRecord,
-                      options: [
-                        AudioSessionIos.CategoryOption.MixWithOthers,
-                        AudioSessionIos.CategoryOption.AllowBluetooth,
-                      ],
-                      mode: AudioSessionIos.Mode.Default,
-                    },
-                    audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
-                    // Voice Activity Detection - Start transcribing when speech is detected
-                    // useVad: true,
-                  })
-                setStopTranscribe({ stop })
-                subscribe((evt) => {
-                  const { isCapturing, data, processTime, recordingTime } = evt
-                  setTranscibeResult(
-                    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
-                      `Result: ${data?.result}\n\n` +
-                      `Process time: ${processTime}ms\n` +
-                      `Recording time: ${recordingTime}ms` +
-                      `\n` +
-                      `Segments:` +
-                      `\n${data?.segments
-                        .map(
-                          (segment) =>
-                            `[${toTimestamp(segment.t0)} --> ${toTimestamp(
-                              segment.t1,
-                            )}]  ${segment.text}`,
-                        )
-                        .join('\n')}`,
-                  )
-                  if (!isCapturing) {
-                    setStopTranscribe(null)
-                    log('Finished realtime transcribing')
-                  }
-                })
-              } catch (e) {
-                log('Error:', e)
-              }
-            }}
-          />
         </View>
         <View style={styles.logContainer}>
           {logs.map((msg, index) => (
@@ -323,30 +249,6 @@ export default function App() {
           onPress={async () => {
             await RNFS.unlink(fileDir).catch(() => {})
             log('Deleted files')
-          }}
-        />
-        <Button
-          title="Play Recorded file"
-          style={styles.buttonClear}
-          onPress={async () => {
-            if (!(await RNFS.exists(recordFile))) {
-              log('Recorded file does not exist')
-              return
-            }
-            const player = new Sound(recordFile, '', (e) => {
-              if (e) {
-                log('error', e)
-                return
-              }
-              player.play((success) => {
-                if (success) {
-                  log('successfully finished playing')
-                } else {
-                  log('playback failed due to audio decoding errors')
-                }
-                player.release()
-              })
-            })
           }}
         />
       </View>

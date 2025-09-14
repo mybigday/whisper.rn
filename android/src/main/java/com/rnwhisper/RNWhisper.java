@@ -241,10 +241,6 @@ public class RNWhisper implements LifecycleEventListener {
       promise.reject("Context not found");
       return;
     }
-    if (context.isCapturing()) {
-      promise.reject("The context is in realtime transcribe mode");
-      return;
-    }
     if (context.isTranscribing()) {
       promise.reject("Context is already transcribing");
       return;
@@ -279,10 +275,6 @@ public class RNWhisper implements LifecycleEventListener {
       promise.reject("Context not found");
       return;
     }
-    if (context.isCapturing()) {
-      promise.reject("The context is in realtime transcribe mode");
-      return;
-    }
     if (context.isTranscribing()) {
       promise.reject("Context is already transcribing");
       return;
@@ -292,24 +284,6 @@ public class RNWhisper implements LifecycleEventListener {
     AsyncTask task = transcribe(context, jobId, audioData, options, promise);
 
     tasks.put(task, "transcribeData-" + id);
-  }
-
-  public void startRealtimeTranscribe(double id, double jobId, ReadableMap options, Promise promise) {
-    final WhisperContext context = contexts.get((int) id);
-    if (context == null) {
-      promise.reject("Context not found");
-      return;
-    }
-    if (context.isCapturing()) {
-      promise.reject("Context is already in capturing");
-      return;
-    }
-    int state = context.startRealtimeTranscribe((int) jobId, options);
-    if (state == AudioRecord.STATE_INITIALIZED) {
-      promise.resolve(null);
-      return;
-    }
-    promise.reject("Failed to start realtime transcribe. State: " + state);
   }
 
   public void abortTranscribe(double id, double jobId, Promise promise) {
