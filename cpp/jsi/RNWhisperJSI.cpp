@@ -548,9 +548,14 @@ void installJSIBindings(
                                 logError("Failed to create job for transcription");
                                 code = -2;
                             } else {
-                                code = whisper_full(context, job->params, audioResult.data.data(), audioResult.count);
-                                if (job->is_aborted()) {
-                                    code = -999;
+                                try {
+                                    code = whisper_full(context, job->params, audioResult.data.data(), audioResult.count);
+                                    if (job->is_aborted()) {
+                                        code = -999;
+                                    }
+                                } catch (...) {
+                                    logError("Exception during whisper_full transcription");
+                                    code = -3;
                                 }
                                 rnwhisper::job_remove(callbackInfo.jobId);
                             }
@@ -567,6 +572,7 @@ void installJSIBindings(
                                         resolvePtr->call(runtime, resultObj);
                                     } else {
                                         std::string errorMsg = (code == -2) ? "Failed to create transcription job" :
+                                                              (code == -3) ? "Transcription failed with exception" :
                                                               (code == -999) ? "Transcription was aborted" :
                                                               "Transcription failed";
                                         auto errorObj = createErrorObject(runtime, errorMsg, code);
@@ -631,9 +637,20 @@ void installJSIBindings(
                             logInfo("Starting whisper_vad_detect_speech: vadContext=%p, audioDataCount=%d",
                                    vadContext, audioResult.count);
 
-                            // Perform VAD detection
-                            bool isSpeech = whisper_vad_detect_speech(vadContext, audioResult.data.data(), audioResult.count);
-                            logInfo("VAD detection result: %s", isSpeech ? "speech" : "no speech");
+                            // Perform VAD detection with error handling
+                            bool isSpeech = false;
+                            try {
+                                isSpeech = whisper_vad_detect_speech(vadContext, audioResult.data.data(), audioResult.count);
+                                logInfo("VAD detection result: %s", isSpeech ? "speech" : "no speech");
+                            } catch (...) {
+                                logError("Exception during whisper_vad_detect_speech");
+                                callInvoker->invokeAsync([rejectPtr, safeRuntime]() {
+                                    auto& runtime = *safeRuntime;
+                                    auto errorObj = createErrorObject(runtime, "VAD detection failed with exception");
+                                    rejectPtr->call(runtime, errorObj);
+                                });
+                                return;
+                            }
 
                             struct whisper_vad_params vad_params = vadParams;
 
