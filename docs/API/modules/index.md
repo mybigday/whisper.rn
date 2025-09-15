@@ -4,12 +4,6 @@
 
 ## Table of contents
 
-### Enumerations
-
-- [AudioSessionCategoryIos](../enums/index.AudioSessionCategoryIos.md)
-- [AudioSessionCategoryOptionIos](../enums/index.AudioSessionCategoryOptionIos.md)
-- [AudioSessionModeIos](../enums/index.AudioSessionModeIos.md)
-
 ### Classes
 
 - [WhisperContext](../classes/index.WhisperContext.md)
@@ -17,7 +11,6 @@
 
 ### Type Aliases
 
-- [AudioSessionSettingIos](index.md#audiosessionsettingios)
 - [BenchResult](index.md#benchresult)
 - [ContextOptions](index.md#contextoptions)
 - [TranscribeFileOptions](index.md#transcribefileoptions)
@@ -25,10 +18,6 @@
 - [TranscribeNewSegmentsResult](index.md#transcribenewsegmentsresult)
 - [TranscribeOptions](index.md#transcribeoptions)
 - [TranscribeProgressNativeEvent](index.md#transcribeprogressnativeevent)
-- [TranscribeRealtimeEvent](index.md#transcriberealtimeevent)
-- [TranscribeRealtimeNativeEvent](index.md#transcriberealtimenativeevent)
-- [TranscribeRealtimeNativePayload](index.md#transcriberealtimenativepayload)
-- [TranscribeRealtimeOptions](index.md#transcriberealtimeoptions)
 - [TranscribeResult](index.md#transcriberesult)
 - [VadContextOptions](index.md#vadcontextoptions)
 - [VadOptions](index.md#vadoptions)
@@ -36,7 +25,6 @@
 
 ### Variables
 
-- [AudioSessionIos](index.md#audiosessionios)
 - [isCoreMLAllowFallback](index.md#iscoremlallowfallback)
 - [isUseCoreML](index.md#isusecoreml)
 - [libVersion](index.md#libversion)
@@ -51,25 +39,6 @@
 - [toggleNativeLog](index.md#togglenativelog)
 
 ## Type Aliases
-
-### AudioSessionSettingIos
-
-Ƭ **AudioSessionSettingIos**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `active?` | `boolean` |
-| `category` | [`AudioSessionCategoryIos`](../enums/index.AudioSessionCategoryIos.md) |
-| `mode?` | [`AudioSessionModeIos`](../enums/index.AudioSessionModeIos.md) |
-| `options?` | [`AudioSessionCategoryOptionIos`](../enums/index.AudioSessionCategoryOptionIos.md)[] |
-
-#### Defined in
-
-[index.ts:141](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L141)
-
-___
 
 ### BenchResult
 
@@ -88,7 +57,7 @@ ___
 
 #### Defined in
 
-[index.ts:242](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L242)
+[index.ts:129](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L129)
 
 ___
 
@@ -111,7 +80,7 @@ ___
 
 #### Defined in
 
-[index.ts:622](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L622)
+[index.ts:359](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L359)
 
 ___
 
@@ -121,7 +90,7 @@ ___
 
 #### Defined in
 
-[index.ts:124](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L124)
+[index.ts:112](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L112)
 
 ___
 
@@ -139,7 +108,7 @@ ___
 
 #### Defined in
 
-[index.ts:117](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L117)
+[index.ts:105](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L105)
 
 ___
 
@@ -158,7 +127,7 @@ ___
 
 #### Defined in
 
-[index.ts:110](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L110)
+[index.ts:98](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L98)
 
 ___
 
@@ -188,7 +157,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -206,84 +175,7 @@ ___
 
 #### Defined in
 
-[index.ts:135](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L135)
-
-___
-
-### TranscribeRealtimeEvent
-
-Ƭ **TranscribeRealtimeEvent**: `Object`
-
-#### Type declaration
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `code` | `number` | - |
-| `contextId` | `number` | - |
-| `data?` | [`TranscribeResult`](index.md#transcriberesult) | - |
-| `error?` | `string` | - |
-| `isCapturing` | `boolean` | Is capturing audio, when false, the event is the final result |
-| `isStoppedByAction?` | `boolean` | - |
-| `jobId` | `number` | - |
-| `processTime` | `number` | - |
-| `recordingTime` | `number` | - |
-| `slices?` | { `code`: `number` ; `data?`: [`TranscribeResult`](index.md#transcriberesult) ; `error?`: `string` ; `processTime`: `number` ; `recordingTime`: `number`  }[] | - |
-
-#### Defined in
-
-[index.ts:203](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L203)
-
-___
-
-### TranscribeRealtimeNativeEvent
-
-Ƭ **TranscribeRealtimeNativeEvent**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `contextId` | `number` |
-| `jobId` | `number` |
-| `payload` | [`TranscribeRealtimeNativePayload`](index.md#transcriberealtimenativepayload) |
-
-#### Defined in
-
-[index.ts:236](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L236)
-
-___
-
-### TranscribeRealtimeNativePayload
-
-Ƭ **TranscribeRealtimeNativePayload**: `Object`
-
-#### Type declaration
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `code` | `number` | - |
-| `data?` | [`TranscribeResult`](index.md#transcriberesult) | - |
-| `error?` | `string` | - |
-| `isCapturing` | `boolean` | Is capturing audio, when false, the event is the final result |
-| `isStoppedByAction?` | `boolean` | - |
-| `isUseSlices` | `boolean` | - |
-| `processTime` | `number` | - |
-| `recordingTime` | `number` | - |
-| `sliceIndex` | `number` | - |
-
-#### Defined in
-
-[index.ts:223](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L223)
-
-___
-
-### TranscribeRealtimeOptions
-
-Ƭ **TranscribeRealtimeOptions**: [`TranscribeOptions`](index.md#transcribeoptions) & { `audioOutputPath?`: `string` ; `audioSessionOnStartIos?`: [`AudioSessionSettingIos`](index.md#audiosessionsettingios) ; `audioSessionOnStopIos?`: `string` \| [`AudioSessionSettingIos`](index.md#audiosessionsettingios) ; `realtimeAudioMinSec?`: `number` ; `realtimeAudioSec?`: `number` ; `realtimeAudioSliceSec?`: `number` ; `useVad?`: `boolean` ; `vadFreqThold?`: `number` ; `vadMs?`: `number` ; `vadThold?`: `number`  }
-
-#### Defined in
-
-[index.ts:149](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L149)
+[index.ts:123](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L123)
 
 ___
 
@@ -301,7 +193,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/NativeRNWhisper.ts#L37)
+[NativeRNWhisper.ts:37](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/NativeRNWhisper.ts#L37)
 
 ___
 
@@ -320,7 +212,7 @@ ___
 
 #### Defined in
 
-[index.ts:741](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L741)
+[index.ts:476](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L476)
 
 ___
 
@@ -341,7 +233,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:69](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/NativeRNWhisper.ts#L69)
+[NativeRNWhisper.ts:69](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/NativeRNWhisper.ts#L69)
 
 ___
 
@@ -358,34 +250,9 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:97](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/NativeRNWhisper.ts#L97)
+[NativeRNWhisper.ts:97](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/NativeRNWhisper.ts#L97)
 
 ## Variables
-
-### AudioSessionIos
-
-• **AudioSessionIos**: `Object`
-
-[Deprecated] AudioSession Utility, iOS only.
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `Category` | typeof [`AudioSessionCategoryIos`](../enums/index.AudioSessionCategoryIos.md) |
-| `CategoryOption` | typeof [`AudioSessionCategoryOptionIos`](../enums/index.AudioSessionCategoryOptionIos.md) |
-| `Mode` | typeof [`AudioSessionModeIos`](../enums/index.AudioSessionModeIos.md) |
-| `getCurrentCategory` | () => `Promise`<{ `category`: [`AudioSessionCategoryIos`](../enums/index.AudioSessionCategoryIos.md) ; `options`: [`AudioSessionCategoryOptionIos`](../enums/index.AudioSessionCategoryOptionIos.md)[]  }\> |
-| `getCurrentMode` | () => `Promise`<[`AudioSessionModeIos`](../enums/index.AudioSessionModeIos.md)\> |
-| `setActive` | (`active`: `boolean`) => `Promise`<`void`\> |
-| `setCategory` | (`category`: [`AudioSessionCategoryIos`](../enums/index.AudioSessionCategoryIos.md), `options`: [`AudioSessionCategoryOptionIos`](../enums/index.AudioSessionCategoryOptionIos.md)[]) => `Promise`<`void`\> |
-| `setMode` | (`mode`: [`AudioSessionModeIos`](../enums/index.AudioSessionModeIos.md)) => `Promise`<`void`\> |
-
-#### Defined in
-
-[AudioSessionIos.ts:51](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/AudioSessionIos.ts#L51)
-
-___
 
 ### isCoreMLAllowFallback
 
@@ -395,7 +262,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:733](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L733)
+[index.ts:470](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L470)
 
 ___
 
@@ -407,7 +274,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:730](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L730)
+[index.ts:467](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L467)
 
 ___
 
@@ -419,7 +286,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:725](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L725)
+[index.ts:462](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L462)
 
 ## Functions
 
@@ -443,7 +310,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:887](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L887)
+[index.ts:622](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L622)
 
 ___
 
@@ -463,7 +330,7 @@ ___
 
 #### Defined in
 
-[index.ts:650](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L650)
+[index.ts:387](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L387)
 
 ___
 
@@ -487,7 +354,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:831](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L831)
+[index.ts:566](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L566)
 
 ___
 
@@ -501,7 +368,7 @@ ___
 
 #### Defined in
 
-[index.ts:718](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L718)
+[index.ts:455](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L455)
 
 ___
 
@@ -519,7 +386,7 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:870](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L870)
+[index.ts:605](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L605)
 
 ___
 
@@ -539,4 +406,4 @@ ___
 
 #### Defined in
 
-[index.ts:878](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/index.ts#L878)
+[index.ts:613](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L613)

@@ -122,11 +122,6 @@ export interface Spec extends TurboModule {
     dataBase64: string,
     options: {}, // TranscribeOptions & { onProgress?: boolean, onNewSegments?: boolean }
   ): Promise<TranscribeResult>;
-  startRealtimeTranscribe(
-    contextId: number,
-    jobId: number,
-    options: TranscribeOptions,
-  ): Promise<void>;
   abortTranscribe(contextId: number, jobId: number): Promise<void>;
 
   bench(contextId: number, maxThreads: number): Promise<string>;

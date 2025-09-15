@@ -16,12 +16,6 @@ import type {
   VadOptions,
   VadSegment,
 } from './NativeRNWhisper'
-import AudioSessionIos from './AudioSessionIos'
-import type {
-  AudioSessionCategoryIos,
-  AudioSessionCategoryOptionIos,
-  AudioSessionModeIos,
-} from './AudioSessionIos'
 import { version } from './version.json'
 
 declare global {
@@ -79,9 +73,6 @@ if (Platform.OS === 'android') {
 export type {
   TranscribeOptions,
   TranscribeResult,
-  AudioSessionCategoryIos,
-  AudioSessionCategoryOptionIos,
-  AudioSessionModeIos,
   VadOptions,
   VadSegment,
 }
@@ -89,9 +80,6 @@ export type {
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
 const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
 const EVENT_ON_NATIVE_LOG = '@RNWhisper_onNativeLog'
-
-const EVENT_ON_REALTIME_TRANSCRIBE = '@RNWhisper_onRealtimeTranscribe'
-const EVENT_ON_REALTIME_TRANSCRIBE_END = '@RNWhisper_onRealtimeTranscribeEnd'
 
 const logListeners: Array<(level: string, text: string) => void> = []
 
@@ -138,107 +126,6 @@ export type TranscribeProgressNativeEvent = {
   progress: number
 }
 
-export type AudioSessionSettingIos = {
-  category: AudioSessionCategoryIos
-  options?: AudioSessionCategoryOptionIos[]
-  mode?: AudioSessionModeIos
-  active?: boolean
-}
-
-// Codegen missing TSIntersectionType support so we dont put it into the native spec
-export type TranscribeRealtimeOptions = TranscribeOptions & {
-  /**
-   * Realtime record max duration in seconds.
-   * Due to the whisper.cpp hard constraint - processes the audio in chunks of 30 seconds,
-   * the recommended value will be <= 30 seconds. (Default: 30)
-   */
-  realtimeAudioSec?: number
-  /**
-   * Optimize audio transcription performance by slicing audio samples when `realtimeAudioSec` > 30.
-   * Set `realtimeAudioSliceSec` < 30 so performance improvements can be achieved in the Whisper hard constraint (processes the audio in chunks of 30 seconds).
-   * (Default: Equal to `realtimeMaxAudioSec`)
-   */
-  realtimeAudioSliceSec?: number
-  /**
-   * Min duration of audio to start transcribe in seconds for each slice.
-   * The minimum value is 0.5 ms and maximum value is realtimeAudioSliceSec (Default: 1)
-   */
-  realtimeAudioMinSec?: number
-  /**
-   * Output path for audio file. If not set, the audio file will not be saved
-   * (Default: Undefined)
-   */
-  audioOutputPath?: string
-  /**
-   * Start transcribe on recording when the audio volume is greater than the threshold by using VAD (Voice Activity Detection).
-   * The first VAD will be triggered after 2 second of recording.
-   * (Default: false)
-   */
-  useVad?: boolean
-  /**
-   * The length of the collected audio is used for VAD, cannot be less than 2000ms. (ms) (Default: 2000)
-   */
-  vadMs?: number
-  /**
-   * VAD threshold. (Default: 0.6)
-   */
-  vadThold?: number
-  /**
-   * Frequency to apply High-pass filter in VAD. (Default: 100.0)
-   */
-  vadFreqThold?: number
-  /**
-   * iOS: Audio session settings when start transcribe
-   * Keep empty to use current audio session state
-   */
-  audioSessionOnStartIos?: AudioSessionSettingIos
-  /**
-   * iOS: Audio session settings when stop transcribe
-   * - Keep empty to use last audio session state
-   * - Use `restore` to restore audio session state before start transcribe
-   */
-  audioSessionOnStopIos?: string | AudioSessionSettingIos
-}
-
-export type TranscribeRealtimeEvent = {
-  contextId: number
-  jobId: number
-  /** Is capturing audio, when false, the event is the final result */
-  isCapturing: boolean
-  isStoppedByAction?: boolean
-  code: number
-  data?: TranscribeResult
-  error?: string
-  processTime: number
-  recordingTime: number
-  slices?: Array<{
-    code: number
-    error?: string
-    data?: TranscribeResult
-    processTime: number
-    recordingTime: number
-  }>
-}
-
-export type TranscribeRealtimeNativePayload = {
-  /** Is capturing audio, when false, the event is the final result */
-  isCapturing: boolean
-  isStoppedByAction?: boolean
-  code: number
-  processTime: number
-  recordingTime: number
-  isUseSlices: boolean
-  sliceIndex: number
-  data?: TranscribeResult
-  error?: string
-}
-
-export type TranscribeRealtimeNativeEvent = {
-  contextId: number
-  jobId: number
-  payload: TranscribeRealtimeNativePayload
-}
-
 export type BenchResult = {
   config: string
   nThreads: number
@@ -246,14 +133,6 @@ export type BenchResult = {
   decodeMs: number
   batchMs: number
   promptMs: number
-}
-
-const updateAudioSession = async (setting: AudioSessionSettingIos) => {
-  await AudioSessionIos.setCategory(setting.category, setting.options || [])
-  if (setting.mode) {
-    await AudioSessionIos.setMode(setting.mode)
-  }
-  await AudioSessionIos.setActive(setting.active ?? true)
 }
 
 export class WhisperContext {
@@ -458,148 +337,6 @@ export class WhisperContext {
     }
   }
 
-  /** Transcribe the microphone audio stream, the microphone user permission is required */
-  async transcribeRealtime(options: TranscribeRealtimeOptions = {}): Promise<{
-    /** Stop the realtime transcribe */
-    stop: () => Promise<void>
-    /** Subscribe to realtime transcribe events */
-    subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => void
-  }> {
-    console.warn(
-      '`transcribeRealtime` is deprecated, use `RealtimeTranscriber` instead',
-    )
-
-    let lastTranscribePayload: TranscribeRealtimeNativePayload
-
-    const slices: TranscribeRealtimeNativePayload[] = []
-    let sliceIndex: number = 0
-    let tOffset: number = 0
-
-    const putSlice = (payload: TranscribeRealtimeNativePayload) => {
-      if (!payload.isUseSlices || !payload.data) return
-      if (sliceIndex !== payload.sliceIndex) {
-        const { segments = [] } = slices[sliceIndex]?.data || {}
-        tOffset = segments[segments.length - 1]?.t1 || 0
-      }
-      ;({ sliceIndex } = payload)
-      slices[sliceIndex] = {
-        ...payload,
-        data: {
-          ...payload.data,
-          segments:
-            payload.data.segments.map((segment) => ({
-              ...segment,
-              t0: segment.t0 + tOffset,
-              t1: segment.t1 + tOffset,
-            })) || [],
-        },
-      }
-    }
-
-    const mergeSlicesIfNeeded = (
-      payload: TranscribeRealtimeNativePayload,
-    ): TranscribeRealtimeNativePayload => {
-      if (!payload.isUseSlices) return payload
-
-      const mergedPayload: any = {}
-      slices.forEach((slice) => {
-        mergedPayload.data = {
-          result:
-            (mergedPayload.data?.result || '') + (slice.data?.result || ''),
-          segments: [
-            ...(mergedPayload?.data?.segments || []),
-            ...(slice.data?.segments || []),
-          ],
-        }
-        mergedPayload.processTime = slice.processTime
-        mergedPayload.recordingTime =
-          (mergedPayload?.recordingTime || 0) + slice.recordingTime
-      })
-      return { ...payload, ...mergedPayload, slices }
-    }
-
-    let prevAudioSession: AudioSessionSettingIos | undefined
-    if (Platform.OS === 'ios' && options?.audioSessionOnStartIos) {
-      // iOS: Remember current audio session state
-      if (options?.audioSessionOnStopIos === 'restore') {
-        const categoryResult = await AudioSessionIos.getCurrentCategory()
-        const mode = await AudioSessionIos.getCurrentMode()
-
-        prevAudioSession = {
-          ...categoryResult,
-          mode,
-          active: false, // TODO: Need to check isOtherAudioPlaying to set active
-        }
-      }
-
-      // iOS: Update audio session state
-      await updateAudioSession(options?.audioSessionOnStartIos)
-    }
-    if (
-      Platform.OS === 'ios' &&
-      typeof options?.audioSessionOnStopIos === 'object'
-    ) {
-      prevAudioSession = options?.audioSessionOnStopIos
-    }
-
-    const jobId: number = Math.floor(Math.random() * 10000)
-    try {
-      await RNWhisper.startRealtimeTranscribe(this.id, jobId, options)
-    } catch (e) {
-      if (prevAudioSession) await updateAudioSession(prevAudioSession)
-      throw e
-    }
-
-    return {
-      stop: async () => {
-        await RNWhisper.abortTranscribe(this.id, jobId)
-        if (prevAudioSession) await updateAudioSession(prevAudioSession)
-      },
-      subscribe: (callback: (event: TranscribeRealtimeEvent) => void) => {
-        let transcribeListener: any = EventEmitter.addListener(
-          EVENT_ON_REALTIME_TRANSCRIBE,
-          (evt: TranscribeRealtimeNativeEvent) => {
-            const { contextId, payload } = evt
-            if (contextId !== this.id || evt.jobId !== jobId) return
-            lastTranscribePayload = payload
-            putSlice(payload)
-            callback({
-              contextId,
-              jobId: evt.jobId,
-              ...mergeSlicesIfNeeded(payload),
-            })
-          },
-        )
-        let endListener: any = EventEmitter.addListener(
-          EVENT_ON_REALTIME_TRANSCRIBE_END,
-          (evt: TranscribeRealtimeNativeEvent) => {
-            const { contextId, payload } = evt
-            if (contextId !== this.id || evt.jobId !== jobId) return
-            const lastPayload = {
-              ...lastTranscribePayload,
-              ...payload,
-            }
-            putSlice(lastPayload)
-            callback({
-              contextId,
-              jobId: evt.jobId,
-              ...mergeSlicesIfNeeded(lastPayload),
-              isCapturing: false,
-            })
-            if (transcribeListener) {
-              transcribeListener.remove()
-              transcribeListener = null
-            }
-            if (endListener) {
-              endListener.remove()
-              endListener = null
-            }
-          },
-        )
-      },
-    }
-  }
-
   async bench(maxThreads: number): Promise<BenchResult> {
     const result = await RNWhisper.bench(this.id, maxThreads)
     const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] =
@@ -731,8 +468,6 @@ export const isUseCoreML: boolean = !!useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
 export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
-
-export { AudioSessionIos }
 
 //
 // VAD (Voice Activity Detection) Context

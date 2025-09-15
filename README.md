@@ -44,29 +44,6 @@ It's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root pr
 
 You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
 
-## Add Microphone Permissions (Optional)
-
-If you want to use realtime transcribe, you need to add the microphone permission to your app.
-
-### iOS
-
-Add these lines to `ios/[YOU_APP_NAME]/info.plist`
-
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>This app requires microphone access in order to transcribe speech</string>
-```
-
-For tvOS, please note that the microphone is not supported.
-
-### Android
-
-Add the following line to `android/app/src/main/AndroidManifest.xml`
-
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-```
-
 ## Tips & Tricks
 
 The [Tips & Tricks](docs/TIPS.md) document is a collection of tips and tricks for using `whisper.rn`.
@@ -319,59 +296,6 @@ We have provided a mock version of `whisper.rn` for testing purpose you can use 
 ```js
 jest.mock('whisper.rn', () => require('whisper.rn/jest-mock'))
 ```
-
-## Deprecated APIs
-
-### `transcribeRealtime` (Deprecated)
-
-> ⚠️ **Deprecated**: Use `RealtimeTranscriber` instead for enhanced features and better performance.
-
-```js
-const { stop, subscribe } = await whisperContext.transcribeRealtime(options)
-
-subscribe((evt) => {
-  const { isCapturing, data, processTime, recordingTime } = evt
-  console.log(
-    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
-      `Result: ${data.result}\n\n` +
-      `Process time: ${processTime}ms\n` +
-      `Recording time: ${recordingTime}ms`,
-  )
-  if (!isCapturing) console.log('Finished realtime transcribing')
-})
-```
-
-In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
-
-Option 1 - Use options in transcribeRealtime:
-
-```js
-import { AudioSessionIos } from 'whisper.rn'
-
-const { stop, subscribe } = await whisperContext.transcribeRealtime({
-  audioSessionOnStartIos: {
-    category: AudioSessionIos.Category.PlayAndRecord,
-    options: [AudioSessionIos.CategoryOption.MixWithOthers],
-    mode: AudioSessionIos.Mode.Default,
-  },
-  audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
-})
-```
-
-Option 2 - Manage the Audio Session in anywhere:
-
-```js
-import { AudioSessionIos } from 'whisper.rn'
-
-await AudioSessionIos.setCategory(AudioSessionIos.Category.PlayAndRecord, [
-  AudioSessionIos.CategoryOption.MixWithOthers,
-])
-await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
-await AudioSessionIos.setActive(true)
-// Then you can start do recording
-```
-
-In Android, you may need to request the microphone permission by [`PermissionAndroid`](https://reactnative.dev/docs/permissionsandroid).
 
 ## Apps using `whisper.rn`
 
