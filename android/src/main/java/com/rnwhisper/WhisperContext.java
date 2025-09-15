@@ -168,7 +168,7 @@ public class WhisperContext {
       String text = getTextSegment(context, i);
 
       // If tdrzEnable is enabled and speaker turn is detected
-      if (options.getBoolean("tdrzEnable") && getTextSegmentSpeakerTurnNext(context, i)) {
+      if (options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable") && getTextSegmentSpeakerTurnNext(context, i)) {
           text += " [SPEAKER_TURN]";
       }
 

@@ -192,24 +192,32 @@ export default function App() {
                 // },
               })
               setStopTranscribe({ stop })
-              const { result, segments } = await promise
-              const endTime = Date.now()
-              setStopTranscribe(null)
-              setTranscibeResult(
-                `Transcribed result: ${result}\n` +
-                  `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
-                  `\n` +
-                  `Segments:` +
-                  `\n${segments
-                    .map(
-                      (segment) =>
-                        `[${toTimestamp(segment.t0)} --> ${toTimestamp(
-                          segment.t1,
-                        )}]  ${segment.text}`,
-                    )
-                    .join('\n')}`,
-              )
-              log('Finished transcribing')
+              try {
+                const { result, segments } = await promise
+                const endTime = Date.now()
+                setStopTranscribe(null)
+                setTranscibeResult(
+                  `Transcribed result: ${result}\n` +
+                    `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
+                    `\n` +
+                    `Segments:` +
+                    `\n${segments
+                      .map(
+                        (segment) =>
+                          `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+                            segment.t1,
+                          )}]  ${segment.text}`,
+                      )
+                      .join('\n')}`,
+                )
+                log('Finished transcribing')
+              } catch (error) {
+                log('Error transcribing:', error)
+                setStopTranscribe(null)
+                setTranscibeResult('Error transcribing')
+              } finally {
+                setStopTranscribe(null)
+              }
             }}
           />
         </View>
