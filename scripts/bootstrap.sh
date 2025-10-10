@@ -197,13 +197,13 @@ if [ "$OS" = "Darwin" ]; then
   # Create a symbolic link to ggml-common.h in the current directory
   ln -sf ../ggml-common.h .
 
-  xcrun --sdk iphoneos metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
-  xcrun --sdk iphoneos metallib ggml-metal.air   -o ggml-whisper.metallib
+  xcrun --sdk iphoneos metal -O3 -std=metal3.2 -mios-version-min=16.0 -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_HAS_BF16=1
+  xcrun --sdk iphoneos metallib ggml-metal.air -o ggml-whisper.metallib
   rm ggml-metal.air
   mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper.metallib
 
-  xcrun --sdk iphonesimulator metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
-  xcrun --sdk iphonesimulator metallib ggml-metal.air   -o ggml-whisper.metallib
+  xcrun --sdk iphonesimulator metal -O3 -std=metal3.2 -mios-version-min=16.0 -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_HAS_BF16=1
+  xcrun --sdk iphonesimulator metallib ggml-metal.air -o ggml-whisper.metallib
   rm ggml-metal.air
   mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper-sim.metallib
 
