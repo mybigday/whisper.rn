@@ -31,17 +31,21 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "11.0", :tvos => "11.0" }
   s.source       = { :git => "https://github.com/mybigday/whisper.rn.git", :tag => "#{s.version}" }
 
+  s.requires_arc = true
+
   if ENV["RNWHISPER_BUILD_FROM_SOURCE"] == "1"
     s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,hpp,c,m,mm}"
     s.resources = "cpp/**/*.{metallib}"
     base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE"
+
+    s.subspec "no-require-arc" do |ss|
+      ss.requires_arc = false
+      ss.source_files = "cpp/ggml-metal/*.m"
+    end
   else
     s.source_files = "ios/**/*.{h,m,mm}", "cpp/jsi/*.{h,cpp}"
     s.vendored_frameworks = "ios/rnwhisper.xcframework"
   end
-
-  s.requires_arc = true
-
 
   s.compiler_flags = base_compiler_flags
   s.pod_target_xcconfig = {
@@ -57,10 +61,5 @@ Pod::Spec.new do |s|
     install_modules_dependencies(s)
   else
     s.dependency "React-Core"
-  end
-
-  s.subspec "no-require-arc" do |ss|
-    ss.requires_arc = false
-    ss.source_files = "cpp/ggml-metal/*.m"
   end
 end
