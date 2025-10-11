@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-    #define WSP_GGML_BACKEND_API_VERSION 1
+    #define WSP_GGML_BACKEND_API_VERSION 2
 
     //
     // Backend buffer type
@@ -114,6 +114,9 @@ extern "C" {
         void (*event_record)(wsp_ggml_backend_t backend, wsp_ggml_backend_event_t event);
         // wait for an event on on a different stream
         void (*event_wait)  (wsp_ggml_backend_t backend, wsp_ggml_backend_event_t event);
+
+        // (optional) sort/optimize the nodes in the graph
+        void                      (*graph_optimize)    (wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph);
     };
 
     struct wsp_ggml_backend {

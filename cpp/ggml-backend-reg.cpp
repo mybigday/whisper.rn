@@ -135,6 +135,10 @@ static void * dl_get_sym(dl_handle * handle, const char * name) {
     return p;
 }
 
+static const char * dl_error() {
+    return "";
+}
+
 #else
 
 using dl_handle = void;
@@ -153,6 +157,11 @@ static void * dl_load_library(const fs::path & path) {
 
 static void * dl_get_sym(dl_handle * handle, const char * name) {
     return dlsym(handle, name);
+}
+
+static const char * dl_error() {
+    const char *rslt = dlerror();
+    return rslt != nullptr ? rslt : "";
 }
 
 #endif
@@ -240,7 +249,7 @@ struct wsp_ggml_backend_registry {
         dl_handle_ptr handle { dl_load_library(path) };
         if (!handle) {
             if (!silent) {
-                WSP_GGML_LOG_ERROR("%s: failed to load %s\n", __func__, path_str(path).c_str());
+                WSP_GGML_LOG_ERROR("%s: failed to load %s: %s\n", __func__, path_str(path).c_str(), dl_error());
             }
             return nullptr;
         }
@@ -400,9 +409,8 @@ wsp_ggml_backend_t wsp_ggml_backend_init_by_type(enum wsp_ggml_backend_dev_type 
 
 wsp_ggml_backend_t wsp_ggml_backend_init_best(void) {
     wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_GPU);
-    if (!dev) {
-        dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU);
-    }
+    dev = dev ? dev : wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_IGPU);
+    dev = dev ? dev : wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU);
     if (!dev) {
         return nullptr;
     }
@@ -531,7 +539,7 @@ static wsp_ggml_backend_reg_t wsp_ggml_backend_load_best(const char * name, bool
                 if (filename.native().find(file_prefix) == 0 && ext == file_extension) {
                     dl_handle_ptr handle { dl_load_library(entry) };
                     if (!handle && !silent) {
-                        WSP_GGML_LOG_ERROR("%s: failed to load %s\n", __func__, path_str(entry.path()).c_str());
+                        WSP_GGML_LOG_ERROR("%s: failed to load %s: %s\n", __func__, path_str(entry.path()).c_str(), dl_error());
                     }
                     if (handle) {
                         auto score_fn = (wsp_ggml_backend_score_t) dl_get_sym(handle.get(), "wsp_ggml_backend_score");

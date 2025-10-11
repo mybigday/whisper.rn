@@ -13,8 +13,9 @@ cp ./whisper.cpp/ggml/include/ggml-opt.h ./cpp/ggml-opt.h
 cp ./whisper.cpp/ggml/include/ggml-metal.h ./cpp/ggml-metal.h
 cp ./whisper.cpp/ggml/include/gguf.h ./cpp/gguf.h
 
-cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal.m ./cpp/ggml-metal.m
-cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal-impl.h ./cpp/ggml-metal-impl.h
+cp -r ./whisper.cpp/ggml/src/ggml-metal ./cpp/
+rm ./cpp/ggml-metal/CMakeLists.txt
+rm ./cpp/ggml-metal/ggml-metal.metal
 
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c ./cpp/ggml-cpu/ggml-cpu.c
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp ./cpp/ggml-cpu/ggml-cpu.cpp
@@ -78,8 +79,17 @@ files=(
   "./cpp/ggml-opt.h"
   "./cpp/ggml-opt.cpp"
   "./cpp/ggml-metal.h"
-  "./cpp/ggml-metal.m"
-  "./cpp/ggml-metal-impl.h"
+  "./cpp/ggml-metal/ggml-metal.cpp"
+  "./cpp/ggml-metal/ggml-metal-impl.h"
+  "./cpp/ggml-metal/ggml-metal-common.h"
+  "./cpp/ggml-metal/ggml-metal-common.cpp"
+  "./cpp/ggml-metal/ggml-metal-context.h"
+  "./cpp/ggml-metal/ggml-metal-context.m"
+  "./cpp/ggml-metal/ggml-metal-device.h"
+  "./cpp/ggml-metal/ggml-metal-device.cpp"
+  "./cpp/ggml-metal/ggml-metal-device.m"
+  "./cpp/ggml-metal/ggml-metal-ops.h"
+  "./cpp/ggml-metal/ggml-metal-ops.cpp"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
@@ -183,11 +193,11 @@ cd ../../../
 yarn example
 
 # Apply patch
-patch -p0 -d ./cpp < ./scripts/patches/ggml-metal.m.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml-quants.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
+patch -p0 -d ./cpp/ggml-metal < ./scripts/patches/ggml-metal-device.m.patch
 rm -rf ./cpp/*.orig
 
 if [ "$OS" = "Darwin" ]; then
@@ -200,12 +210,12 @@ if [ "$OS" = "Darwin" ]; then
   xcrun --sdk iphoneos metal -O3 -std=metal3.2 -mios-version-min=16.0 -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_HAS_BF16=1
   xcrun --sdk iphoneos metallib ggml-metal.air -o ggml-whisper.metallib
   rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper.metallib
+  mv ./ggml-whisper.metallib ../../../../cpp/ggml-metal/ggml-whisper.metallib
 
   xcrun --sdk iphonesimulator metal -O3 -std=metal3.2 -mios-version-min=16.0 -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_HAS_BF16=1
   xcrun --sdk iphonesimulator metallib ggml-metal.air -o ggml-whisper.metallib
   rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper-sim.metallib
+  mv ./ggml-whisper.metallib ../../../../cpp/ggml-metal/ggml-whisper-sim.metallib
 
   # Remove the symbolic link
   rm ggml-common.h
