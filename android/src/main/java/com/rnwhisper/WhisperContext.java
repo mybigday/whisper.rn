@@ -10,9 +10,6 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import android.util.Log;
 import android.os.Build;
 import android.content.res.AssetManager;
-import android.media.AudioFormat;
-import android.media.AudioRecord;
-import android.media.MediaRecorder.AudioSource;
 
 import java.util.ArrayList;
 import java.lang.StringBuilder;
@@ -53,10 +50,6 @@ public class WhisperContext {
   }
 
   private static final int SAMPLE_RATE = 16000;
-  private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
-  private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
-  private static final int AUDIO_SOURCE = AudioSource.VOICE_RECOGNITION;
-  private static final int DEFAULT_MAX_AUDIO_SEC = 30;
 
   private int id;
   private ReactApplicationContext reactContext;
@@ -64,44 +57,17 @@ public class WhisperContext {
   private int jobId = -1;
   private DeviceEventManagerModule.RCTDeviceEventEmitter eventEmitter;
 
-  private AudioRecord recorder = null;
-  private int bufferSize;
-  private int nSamplesTranscribing = 0;
-  // Remember number of samples in each slice
-  private ArrayList<Integer> sliceNSamples;
-  // Current buffer slice index
-  private int sliceIndex = 0;
-  // Current transcribing slice index
-  private int transcribeSliceIndex = 0;
-  private boolean isUseSlices = false;
-  private boolean isRealtime = false;
-  private boolean isCapturing = false;
-  private boolean isStoppedByAction = false;
   private boolean isTranscribing = false;
-  private boolean isTdrzEnable = false;
-  private Thread rootFullHandler = null;
-  private Thread fullHandler = null;
 
   public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
     this.id = id;
     this.context = context;
     this.reactContext = reactContext;
     eventEmitter = reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class);
-    bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
   }
 
   private void rewind() {
-    sliceNSamples = null;
-    sliceIndex = 0;
-    transcribeSliceIndex = 0;
-    isUseSlices = false;
-    isRealtime = false;
-    isCapturing = false;
-    isStoppedByAction = false;
     isTranscribing = false;
-    isTdrzEnable = false;
-    rootFullHandler = null;
-    fullHandler = null;
   }
 
   public int getId() {
@@ -110,214 +76,6 @@ public class WhisperContext {
 
   public long getContextPtr() {
     return context;
-  }
-
-  private boolean vad(int sliceIndex, int nSamples, int n) {
-    if (isTranscribing) return true;
-    return vadSimple(jobId, sliceIndex, nSamples, n);
-  }
-
-  private void finishRealtimeTranscribe(WritableMap result) {
-    emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
-    finishRealtimeTranscribeJob(jobId, context, sliceNSamples.stream().mapToInt(i -> i).toArray());
-  }
-
-  public int startRealtimeTranscribe(int jobId, ReadableMap options) {
-    if (isCapturing || isTranscribing) {
-      return -100;
-    }
-
-    recorder = new AudioRecord(AUDIO_SOURCE, SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize);
-
-    int state = recorder.getState();
-    if (state != AudioRecord.STATE_INITIALIZED) {
-      recorder.release();
-      return state;
-    }
-
-    rewind();
-
-    this.jobId = jobId;
-
-    int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
-    final int audioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
-    int realtimeAudioSliceSec = options.hasKey("realtimeAudioSliceSec") ? options.getInt("realtimeAudioSliceSec") : 0;
-    final int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < audioSec ? realtimeAudioSliceSec : audioSec;
-    isUseSlices = audioSliceSec < audioSec;
-
-    double realtimeAudioMinSec = options.hasKey("realtimeAudioMinSec") ? options.getDouble("realtimeAudioMinSec") : 0;
-    final double audioMinSec = realtimeAudioMinSec > 0.5 && realtimeAudioMinSec <= audioSliceSec ? realtimeAudioMinSec : 1;
-
-    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
-
-    createRealtimeTranscribeJob(jobId, context, options);
-
-    sliceNSamples = new ArrayList<Integer>();
-    sliceNSamples.add(0);
-
-    isCapturing = true;
-    recorder.startRecording();
-
-    rootFullHandler = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          short[] buffer = new short[bufferSize];
-          while (isCapturing) {
-            try {
-              int n = recorder.read(buffer, 0, bufferSize);
-              if (n == 0) continue;
-
-              int totalNSamples = 0;
-              for (int i = 0; i < sliceNSamples.size(); i++) {
-                totalNSamples += sliceNSamples.get(i);
-              }
-
-              int nSamples = sliceNSamples.get(sliceIndex);
-              if (totalNSamples + n > audioSec * SAMPLE_RATE) {
-                // Full, stop capturing
-                isCapturing = false;
-                if (
-                  !isTranscribing &&
-                  nSamples == nSamplesTranscribing &&
-                  sliceIndex == transcribeSliceIndex
-                ) {
-                  finishRealtimeTranscribe(Arguments.createMap());
-                } else if (!isTranscribing) {
-                  boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
-                  if (!isSamplesEnough || !vad(sliceIndex, nSamples, 0)) {
-                    finishRealtimeTranscribe(Arguments.createMap());
-                    break;
-                  }
-                  isTranscribing = true;
-                  fullTranscribeSamples(true);
-                }
-                break;
-              }
-
-              // Append to buffer
-              if (nSamples + n > audioSliceSec * SAMPLE_RATE) {
-                Log.d(NAME, "next slice");
-
-                sliceIndex++;
-                nSamples = 0;
-                sliceNSamples.add(0);
-              }
-              putPcmData(jobId, buffer, sliceIndex, nSamples, n);
-
-              boolean isSpeech = vad(sliceIndex, nSamples, n);
-
-              nSamples += n;
-              sliceNSamples.set(sliceIndex, nSamples);
-
-              boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
-              if (!isSamplesEnough || !isSpeech) continue;
-
-              if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
-                isTranscribing = true;
-                fullHandler = new Thread(new Runnable() {
-                  @Override
-                  public void run() {
-                    fullTranscribeSamples(false);
-                  }
-                });
-                fullHandler.start();
-              }
-            } catch (Exception e) {
-              Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
-            }
-          }
-
-          if (!isTranscribing) {
-            finishRealtimeTranscribe(Arguments.createMap());
-          }
-          if (fullHandler != null) {
-            fullHandler.join(); // Wait for full transcribe to finish
-          }
-          recorder.stop();
-        } catch (Exception e) {
-          e.printStackTrace();
-        } finally {
-          recorder.release();
-          recorder = null;
-        }
-      }
-    });
-    rootFullHandler.start();
-    return state;
-  }
-
-  private void fullTranscribeSamples(boolean skipCapturingCheck) {
-    int nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
-
-    if (!isCapturing && !skipCapturingCheck) return;
-
-    nSamplesTranscribing = nSamplesOfIndex;
-    Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
-
-    int timeStart = (int) System.currentTimeMillis();
-    int code = fullWithJob(jobId, context, transcribeSliceIndex, nSamplesTranscribing);
-    int timeEnd = (int) System.currentTimeMillis();
-    int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
-
-    WritableMap payload = Arguments.createMap();
-    payload.putInt("code", code);
-    payload.putInt("processTime", timeEnd - timeStart);
-    payload.putInt("recordingTime", timeRecording);
-    payload.putBoolean("isUseSlices", isUseSlices);
-    payload.putInt("sliceIndex", transcribeSliceIndex);
-
-    if (code == 0) {
-      payload.putMap("data", getTextSegments(0, getTextSegmentCount(context)));
-    } else if (code != -999) { // Not aborted
-      payload.putString("error", "Transcribe failed with code " + code);
-    }
-
-    nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
-    boolean isStopped = isStoppedByAction ||
-      !isCapturing &&
-      nSamplesTranscribing == nSamplesOfIndex &&
-      sliceIndex == transcribeSliceIndex;
-
-    if (
-      // If no more samples on current slice, move to next slice
-      nSamplesTranscribing == sliceNSamples.get(transcribeSliceIndex) &&
-      transcribeSliceIndex != sliceIndex
-    ) {
-      transcribeSliceIndex++;
-      nSamplesTranscribing = 0;
-    }
-
-    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex && code != -999;
-
-    if (isStopped && !continueNeeded) {
-      payload.putBoolean("isCapturing", false);
-      payload.putBoolean("isStoppedByAction", isStoppedByAction);
-      finishRealtimeTranscribe(payload);
-    } else if (code == 0) {
-      payload.putBoolean("isCapturing", true);
-      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-    } else {
-      payload.putBoolean("isCapturing", true);
-      emitTranscribeEvent("@RNWhisper_onRealtimeTranscribe", payload);
-    }
-
-    if (continueNeeded) {
-      // If no more capturing, continue transcribing until all slices are transcribed
-      fullTranscribeSamples(true);
-    } else if (isStopped) {
-      // No next, cleanup
-      rewind();
-    }
-    isTranscribing = false;
-  }
-
-  private void emitTranscribeEvent(final String eventName, final WritableMap payload) {
-    WritableMap event = Arguments.createMap();
-    event.putInt("contextId", WhisperContext.this.id);
-    event.putInt("jobId", jobId);
-    event.putMap("payload", payload);
-    eventEmitter.emit(eventName, event);
   }
 
   private void emitProgress(int progress) {
@@ -341,11 +99,13 @@ public class WhisperContext {
     boolean emitProgressNeeded = false;
     boolean emitNewSegmentsNeeded = false;
     int totalNNew = 0;
+    ReadableMap options;
 
-    public Callback(WhisperContext context, boolean emitProgressNeeded, boolean emitNewSegmentsNeeded) {
+    public Callback(WhisperContext context, ReadableMap options, boolean emitProgressNeeded, boolean emitNewSegmentsNeeded) {
       this.context = context;
       this.emitProgressNeeded = emitProgressNeeded;
       this.emitNewSegmentsNeeded = emitNewSegmentsNeeded;
+      this.options = options;
     }
 
     void onProgress(int progress) {
@@ -358,7 +118,7 @@ public class WhisperContext {
       totalNNew += nNew;
       if (!emitNewSegmentsNeeded) return;
 
-      WritableMap result = context.getTextSegments(totalNNew - nNew, totalNNew);
+      WritableMap result = context.getTextSegments(options, totalNNew - nNew, totalNNew);
       result.putInt("nNew", nNew);
       result.putInt("totalNNew", totalNNew);
       context.emitNewSegments(result);
@@ -366,12 +126,11 @@ public class WhisperContext {
   }
 
   public WritableMap transcribe(int jobId, float[] audioData, ReadableMap options) throws IOException, Exception {
-    if (isCapturing || isTranscribing) {
+    if (isTranscribing) {
       throw new Exception("Context is already in capturing or transcribing");
     }
     rewind();
     this.jobId = jobId;
-    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
     isTranscribing = true;
 
@@ -387,7 +146,7 @@ public class WhisperContext {
       // ReadableMap options,
       options,
       // Callback callback
-      hasProgressCallback || hasNewSegmentsCallback ? new Callback(this, hasProgressCallback, hasNewSegmentsCallback) : null
+      hasProgressCallback || hasNewSegmentsCallback ? new Callback(this, options, hasProgressCallback, hasNewSegmentsCallback) : null
     );
 
     isTranscribing = false;
@@ -395,12 +154,11 @@ public class WhisperContext {
     if (code != 0 && code != 999) {
       throw new Exception("Failed to transcribe the file. Code: " + code);
     }
-    WritableMap result = getTextSegments(0, getTextSegmentCount(context));
-    result.putBoolean("isAborted", isStoppedByAction);
+    WritableMap result = getTextSegments(options, 0, getTextSegmentCount(context));
     return result;
   }
 
-  private WritableMap getTextSegments(int start, int count) {
+  private WritableMap getTextSegments(ReadableMap options, int start, int count) {
     StringBuilder builder = new StringBuilder();
 
     WritableMap data = Arguments.createMap();
@@ -410,14 +168,13 @@ public class WhisperContext {
       String text = getTextSegment(context, i);
 
       // If tdrzEnable is enabled and speaker turn is detected
-      if (this.isTdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
+      if (options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable") && getTextSegmentSpeakerTurnNext(context, i)) {
           text += " [SPEAKER_TURN]";
       }
 
       builder.append(text);
 
       WritableMap segment = Arguments.createMap();
-      Log.d(NAME, "getTextSegments: " + text + " " + transcribeSliceIndex);
       segment.putString("text", text);
       segment.putInt("t0", getTextSegmentT0(context, i));
       segment.putInt("t1", getTextSegmentT1(context, i));
@@ -428,27 +185,14 @@ public class WhisperContext {
     return data;
   }
 
-
-  public boolean isCapturing() {
-    return isCapturing;
-  }
-
   public boolean isTranscribing() {
     return isTranscribing;
   }
 
   public void stopTranscribe(int jobId) {
     abortTranscribe(jobId);
-    isCapturing = false;
-    isStoppedByAction = true;
-    if (rootFullHandler != null) {
-      try {
-        rootFullHandler.join();
-      } catch (Exception e) {
-        Log.e(NAME, "Error joining rootFullHandler: " + e.getMessage());
-      }
-      rootFullHandler = null;
-    }
+    isTranscribing = false;
+    this.jobId = -1;
   }
 
   public void stopCurrentTranscribe() {
@@ -557,20 +301,6 @@ public class WhisperContext {
   protected static native int getTextSegmentT1(long context, int index);
   protected static native boolean getTextSegmentSpeakerTurnNext(long context, int index);
 
-  protected static native void createRealtimeTranscribeJob(
-    int job_id,
-    long context,
-    ReadableMap options
-  );
-  protected static native void finishRealtimeTranscribeJob(int job_id, long context, int[] sliceNSamples);
-  protected static native boolean vadSimple(int job_id, int slice_index, int n_samples, int n);
-  protected static native void putPcmData(int job_id, short[] buffer, int slice_index, int n_samples, int n);
-  protected static native int fullWithJob(
-    int job_id,
-    long context,
-    int slice_index,
-    int n_samples
-  );
   protected static native String bench(long context, int n_threads);
 
   // VAD JNI methods

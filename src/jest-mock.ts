@@ -1,4 +1,4 @@
-import { NativeModules, DeviceEventEmitter } from 'react-native'
+import { NativeModules } from 'react-native'
 
 if (!NativeModules.RNWhisper) {
   NativeModules.RNWhisper = {
@@ -14,43 +14,6 @@ if (!NativeModules.RNWhisper) {
       segments: [{ text: ' Test', t0: 0, t1: 33 }],
       isAborted: false,
     })),
-    startRealtimeTranscribe: jest.fn((contextId, jobId) => {
-      setTimeout(() => {
-        // Start
-        DeviceEventEmitter.emit('@RNWhisper_onRealtimeTranscribe', {
-          contextId,
-          jobId,
-          payload: {
-            isCapturing: true,
-            data: {
-              result: ' Test',
-              segments: [{ text: ' Test', t0: 0, t1: 33 }],
-            },
-            processTime: 100,
-            recordingTime: 1000,
-          },
-        })
-        DeviceEventEmitter.emit('@RNWhisper_onRealtimeTranscribe', {
-          contextId,
-          jobId,
-          payload: {
-            isCapturing: false,
-            data: {
-              result: ' Test',
-              segments: [{ text: ' Test', t0: 0, t1: 33 }],
-            },
-            processTime: 100,
-            recordingTime: 2000,
-          },
-        })
-        // End event
-        DeviceEventEmitter.emit('@RNWhisper_onRealtimeTranscribeEnd', {
-          contextId,
-          jobId,
-          payload: {},
-        })
-      })
-    }),
     bench: jest.fn(() => Promise.resolve({
       config: 'NEON',
       nThreads: 1,

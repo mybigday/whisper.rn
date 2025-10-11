@@ -40,7 +40,6 @@ set(
     ${RNWHISPER_LIB_DIR}/ggml-quants.c
     ${RNWHISPER_LIB_DIR}/gguf.cpp
     ${RNWHISPER_LIB_DIR}/whisper.cpp
-    ${RNWHISPER_LIB_DIR}/rn-audioutils.cpp
     ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
     ${RNWHISPER_LIB_DIR}/jsi/RNWhisperJSI.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp

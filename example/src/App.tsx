@@ -52,7 +52,7 @@ function HomeScreen({ navigation }: { navigation: any }) {
         style={styles.button}
         onPress={() => navigation.navigate('Transcribe')}
       >
-        <Text style={styles.buttonText}>Example: Transcribe File / Realtime (Deprecated)</Text>
+        <Text style={styles.buttonText}>Example: Transcribe File</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
