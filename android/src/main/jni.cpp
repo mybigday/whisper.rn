@@ -276,6 +276,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initContextWithAsset(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject asset_manager,
     jstring model_path_str
 ) {
@@ -290,6 +291,7 @@ Java_com_rnwhisper_WhisperContext_initContextWithAsset(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     context = whisper_init_from_asset(env, asset_manager, model_path_chars, cparams);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper_jsi::addContext(context_id, reinterpret_cast<jlong>(context));
     return reinterpret_cast<jlong>(context);
 }
 
@@ -297,6 +299,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject input_stream
 ) {
     UNUSED(thiz);
@@ -308,6 +311,7 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
 
     struct whisper_context *context = nullptr;
     context = whisper_init_from_input_stream(env, input_stream, cparams);
+    rnwhisper_jsi::addContext(context_id, reinterpret_cast<jlong>(context));
     return reinterpret_cast<jlong>(context);
 }
 
