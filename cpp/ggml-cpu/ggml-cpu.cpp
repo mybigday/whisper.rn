@@ -18,6 +18,10 @@
 #    include "kleidiai/kleidiai.h"
 #endif
 
+#ifdef WSP_GGML_USE_CPU_RISCV64_SPACEMIT
+#    include "spacemit/ime.h"
+#endif
+
 #if defined(_WIN32)
 #    define WIN32_LEAN_AND_MEAN
 #    ifndef NOMINMAX
@@ -42,6 +46,12 @@ std::vector<wsp_ggml_backend_buffer_type_t> & wsp_ggml_backend_cpu_get_extra_buf
 #if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
         if (wsp_ggml_backend_amx_buffer_type()) {
             bufts.push_back(wsp_ggml_backend_amx_buffer_type());
+        }
+#endif
+
+#ifdef WSP_GGML_USE_CPU_RISCV64_SPACEMIT
+        if (wsp_ggml_backend_cpu_riscv64_spacemit_buffer_type()) {
+            bufts.push_back(wsp_ggml_backend_cpu_riscv64_spacemit_buffer_type());
         }
 #endif
 
@@ -190,6 +200,7 @@ static const struct wsp_ggml_backend_i wsp_ggml_backend_cpu_i = {
     /* .graph_compute           = */ wsp_ggml_backend_cpu_graph_compute,
     /* .event_record            = */ NULL,
     /* .event_wait              = */ NULL,
+    /* .graph_optimize          = */ NULL,
 };
 
 static wsp_ggml_guid_t wsp_ggml_backend_cpu_guid(void) {
@@ -348,8 +359,10 @@ static void wsp_ggml_backend_cpu_device_get_memory(wsp_ggml_backend_dev_t dev, s
     long pages = sysconf(_SC_PHYS_PAGES);
     long page_size = sysconf(_SC_PAGE_SIZE);
     *total = pages * page_size;
+
+    // "free" system memory is ill-defined, for practical purposes assume that all of it is free:
     *free = *total;
-#endif
+#endif // _WIN32
 
     WSP_GGML_UNUSED(dev);
 }
@@ -575,9 +588,6 @@ static wsp_ggml_backend_feature * wsp_ggml_backend_cpu_get_features(wsp_ggml_bac
         }
         if (wsp_ggml_cpu_has_vxe()) {
             features.push_back({ "VXE", "1" });
-        }
-        if (wsp_ggml_cpu_has_nnpa()) {
-            features.push_back({ "NNPA", "1" });
         }
         if (wsp_ggml_cpu_has_wasm_simd()) {
             features.push_back({ "WASM_SIMD", "1" });

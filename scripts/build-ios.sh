@@ -43,9 +43,9 @@ function build_framework() {
   cp_headers $4
   # TODO: May need to re-build metallib for tvOS
   if [ "$4" == "ios-arm64_x86_64-simulator" ] || [ "$4" == "tvos-arm64_x86_64-simulator" ]; then
-    cp ../cpp/ggml-whisper-sim.metallib ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-whisper-sim.metallib
+    cp ../cpp/ggml-metal/ggml-whisper-sim.metallib ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-whisper-sim.metallib
   else
-    cp ../cpp/ggml-whisper.metallib ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-whisper.metallib
+    cp ../cpp/ggml-metal/ggml-whisper.metallib ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-whisper.metallib
   fi
 
   rm -rf ./*

@@ -19,9 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string>
-#include <vector>
 #include <algorithm>
+#include <vector>
 
 #ifdef __APPLE__
 #include <sys/types.h>
@@ -32,6 +31,7 @@
 // backend buffer type
 
 const char * wsp_ggml_backend_buft_name(wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(buft);
     return buft->iface.get_name(buft);
 }
 
@@ -41,14 +41,17 @@ wsp_ggml_backend_buffer_t wsp_ggml_backend_buft_alloc_buffer(wsp_ggml_backend_bu
         return wsp_ggml_backend_buffer_init(buft, {}, NULL, 0);
     }
 
+    WSP_GGML_ASSERT(buft);
     return buft->iface.alloc_buffer(buft, size);
 }
 
 size_t wsp_ggml_backend_buft_get_alignment(wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(buft);
     return buft->iface.get_alignment(buft);
 }
 
 size_t wsp_ggml_backend_buft_get_max_size(wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(buft);
     // get_max_size is optional, defaults to SIZE_MAX
     if (buft->iface.get_max_size) {
         return buft->iface.get_max_size(buft);
@@ -57,6 +60,7 @@ size_t wsp_ggml_backend_buft_get_max_size(wsp_ggml_backend_buffer_type_t buft) {
 }
 
 size_t wsp_ggml_backend_buft_get_alloc_size(wsp_ggml_backend_buffer_type_t buft, const struct wsp_ggml_tensor * tensor) {
+    WSP_GGML_ASSERT(buft);
     // get_alloc_size is optional, defaults to wsp_ggml_nbytes
     if (buft->iface.get_alloc_size) {
         size_t size = buft->iface.get_alloc_size(buft, tensor);
@@ -67,6 +71,7 @@ size_t wsp_ggml_backend_buft_get_alloc_size(wsp_ggml_backend_buffer_type_t buft,
 }
 
 bool wsp_ggml_backend_buft_is_host(wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(buft);
     if (buft->iface.is_host) {
         return buft->iface.is_host(buft);
     }
@@ -74,6 +79,7 @@ bool wsp_ggml_backend_buft_is_host(wsp_ggml_backend_buffer_type_t buft) {
 }
 
 wsp_ggml_backend_dev_t wsp_ggml_backend_buft_get_device(wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(buft);
     return buft->device;
 }
 
@@ -111,10 +117,12 @@ void wsp_ggml_backend_buffer_free(wsp_ggml_backend_buffer_t buffer) {
 }
 
 size_t wsp_ggml_backend_buffer_get_size(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     return buffer->size;
 }
 
 void * wsp_ggml_backend_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     // get_base is optional if the buffer is zero-sized
     if (buffer->size == 0) {
         return NULL;
@@ -128,6 +136,7 @@ void * wsp_ggml_backend_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
 }
 
 enum wsp_ggml_status wsp_ggml_backend_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor) {
+    WSP_GGML_ASSERT(buffer);
     // init_tensor is optional
     if (buffer->iface.init_tensor) {
         return buffer->iface.init_tensor(buffer, tensor);
@@ -136,6 +145,7 @@ enum wsp_ggml_status wsp_ggml_backend_buffer_init_tensor(wsp_ggml_backend_buffer
 }
 
 void wsp_ggml_backend_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
+    WSP_GGML_ASSERT(buffer);
     // clear is optional if the buffer is zero-sized
     if (buffer->size == 0) {
         return;
@@ -161,6 +171,7 @@ bool wsp_ggml_backend_buffer_is_host(wsp_ggml_backend_buffer_t buffer) {
 }
 
 void wsp_ggml_backend_buffer_set_usage(wsp_ggml_backend_buffer_t buffer, enum wsp_ggml_backend_buffer_usage usage) {
+    WSP_GGML_ASSERT(buffer);
     buffer->usage = usage;
 
     // FIXME: add a generic callback to the buffer interface
@@ -170,14 +181,17 @@ void wsp_ggml_backend_buffer_set_usage(wsp_ggml_backend_buffer_t buffer, enum ws
 }
 
 enum wsp_ggml_backend_buffer_usage wsp_ggml_backend_buffer_get_usage(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     return buffer->usage;
 }
 
 wsp_ggml_backend_buffer_type_t wsp_ggml_backend_buffer_get_type(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     return buffer->buft;
 }
 
 void wsp_ggml_backend_buffer_reset(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     if (buffer->iface.reset) {
         buffer->iface.reset(buffer);
     }
@@ -216,6 +230,7 @@ void wsp_ggml_backend_free(wsp_ggml_backend_t backend) {
 }
 
 wsp_ggml_backend_buffer_type_t wsp_ggml_backend_get_default_buffer_type(wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(backend);
     return wsp_ggml_backend_dev_buffer_type(backend->device);
 }
 
@@ -232,6 +247,8 @@ size_t wsp_ggml_backend_get_max_size(wsp_ggml_backend_t backend) {
 }
 
 void wsp_ggml_backend_tensor_set_async(wsp_ggml_backend_t backend, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(backend);
+    WSP_GGML_ASSERT(tensor);
     WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
 
@@ -243,6 +260,8 @@ void wsp_ggml_backend_tensor_set_async(wsp_ggml_backend_t backend, struct wsp_gg
 }
 
 void wsp_ggml_backend_tensor_get_async(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(backend);
+    WSP_GGML_ASSERT(tensor);
     WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor read out of bounds");
 
@@ -284,6 +303,7 @@ void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor, void * d
 }
 
 void wsp_ggml_backend_tensor_memset(struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(tensor);
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     if (size == 0) {
@@ -299,6 +319,7 @@ void wsp_ggml_backend_tensor_memset(struct wsp_ggml_tensor * tensor, uint8_t val
 }
 
 void wsp_ggml_backend_synchronize(wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(backend);
     if (backend->iface.synchronize == NULL) {
         return;
     }
@@ -307,18 +328,21 @@ void wsp_ggml_backend_synchronize(wsp_ggml_backend_t backend) {
 }
 
 wsp_ggml_backend_graph_plan_t wsp_ggml_backend_graph_plan_create(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph) {
+    WSP_GGML_ASSERT(backend);
     WSP_GGML_ASSERT(backend->iface.graph_plan_create != NULL);
 
     return backend->iface.graph_plan_create(backend, cgraph);
 }
 
 void wsp_ggml_backend_graph_plan_free(wsp_ggml_backend_t backend, wsp_ggml_backend_graph_plan_t plan) {
+    WSP_GGML_ASSERT(backend);
     WSP_GGML_ASSERT(backend->iface.graph_plan_free != NULL);
 
     backend->iface.graph_plan_free(backend, plan);
 }
 
 enum wsp_ggml_status wsp_ggml_backend_graph_plan_compute(wsp_ggml_backend_t backend, wsp_ggml_backend_graph_plan_t plan) {
+    WSP_GGML_ASSERT(backend);
     WSP_GGML_ASSERT(backend->iface.graph_plan_compute != NULL);
 
     return backend->iface.graph_plan_compute(backend, plan);
@@ -331,22 +355,27 @@ enum wsp_ggml_status wsp_ggml_backend_graph_compute(wsp_ggml_backend_t backend, 
 }
 
 enum wsp_ggml_status wsp_ggml_backend_graph_compute_async(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph) {
+    WSP_GGML_ASSERT(backend);
     return backend->iface.graph_compute(backend, cgraph);
 }
 
 bool wsp_ggml_backend_supports_op(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(backend);
     return wsp_ggml_backend_dev_supports_op(backend->device, op);
 }
 
 bool wsp_ggml_backend_supports_buft(wsp_ggml_backend_t backend, wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(backend);
     return wsp_ggml_backend_dev_supports_buft(backend->device, buft);
 }
 
 bool wsp_ggml_backend_offload_op(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(backend);
     return wsp_ggml_backend_dev_offload_op(backend->device, op);
 }
 
 wsp_ggml_backend_dev_t wsp_ggml_backend_get_device(wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(backend);
     return backend->device;
 }
 
@@ -382,6 +411,7 @@ void wsp_ggml_backend_tensor_copy_async(wsp_ggml_backend_t backend_src, wsp_ggml
         return;
     }
 
+    WSP_GGML_ASSERT(backend_dst);
     if (backend_dst->iface.cpy_tensor_async != NULL) {
         if (backend_dst->iface.cpy_tensor_async(backend_src, backend_dst, src, dst)) {
             return;
@@ -413,38 +443,52 @@ void wsp_ggml_backend_event_free(wsp_ggml_backend_event_t event) {
 }
 
 void wsp_ggml_backend_event_record(wsp_ggml_backend_event_t event, wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(backend);
     WSP_GGML_ASSERT(backend->iface.event_record != NULL);
 
     backend->iface.event_record(backend, event);
 }
 
 void wsp_ggml_backend_event_synchronize(wsp_ggml_backend_event_t event) {
+    WSP_GGML_ASSERT(event);
     WSP_GGML_ASSERT(event->device->iface.event_synchronize);
 
     event->device->iface.event_synchronize(event->device, event);
 }
 
 void wsp_ggml_backend_event_wait(wsp_ggml_backend_t backend, wsp_ggml_backend_event_t event) {
+    WSP_GGML_ASSERT(backend);
     WSP_GGML_ASSERT(backend->iface.event_wait != NULL);
 
     backend->iface.event_wait(backend, event);
 }
 
+static void wsp_ggml_backend_graph_optimize(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph) {
+    WSP_GGML_ASSERT(backend);
+    if (backend->iface.graph_optimize != NULL) {
+        backend->iface.graph_optimize(backend, cgraph);
+    }
+}
+
 // Backend device
 
 const char * wsp_ggml_backend_dev_name(wsp_ggml_backend_dev_t device) {
+    WSP_GGML_ASSERT(device);
     return device->iface.get_name(device);
 }
 
 const char * wsp_ggml_backend_dev_description(wsp_ggml_backend_dev_t device) {
+    WSP_GGML_ASSERT(device);
     return device->iface.get_description(device);
 }
 
 void wsp_ggml_backend_dev_memory(wsp_ggml_backend_dev_t device, size_t * free, size_t * total) {
+    WSP_GGML_ASSERT(device);
     device->iface.get_memory(device, free, total);
 }
 
 enum wsp_ggml_backend_dev_type wsp_ggml_backend_dev_type(wsp_ggml_backend_dev_t device) {
+    WSP_GGML_ASSERT(device);
     return device->iface.get_type(device);
 }
 
@@ -454,18 +498,22 @@ void wsp_ggml_backend_dev_get_props(wsp_ggml_backend_dev_t device, struct wsp_gg
 }
 
 wsp_ggml_backend_reg_t wsp_ggml_backend_dev_backend_reg(wsp_ggml_backend_dev_t device) {
+    WSP_GGML_ASSERT(device);
     return device->reg;
 }
 
 wsp_ggml_backend_t wsp_ggml_backend_dev_init(wsp_ggml_backend_dev_t device, const char * params) {
+    WSP_GGML_ASSERT(device);
     return device->iface.init_backend(device, params);
 }
 
 wsp_ggml_backend_buffer_type_t wsp_ggml_backend_dev_buffer_type(wsp_ggml_backend_dev_t device) {
+    WSP_GGML_ASSERT(device);
     return device->iface.get_buffer_type(device);
 }
 
 wsp_ggml_backend_buffer_type_t wsp_ggml_backend_dev_host_buffer_type(wsp_ggml_backend_dev_t device) {
+    WSP_GGML_ASSERT(device);
     if (device->iface.get_host_buffer_type == NULL) {
         return NULL;
     }
@@ -474,18 +522,22 @@ wsp_ggml_backend_buffer_type_t wsp_ggml_backend_dev_host_buffer_type(wsp_ggml_ba
 }
 
 wsp_ggml_backend_buffer_t wsp_ggml_backend_dev_buffer_from_host_ptr(wsp_ggml_backend_dev_t device, void * ptr, size_t size, size_t max_tensor_size) {
+    WSP_GGML_ASSERT(device);
     return device->iface.buffer_from_host_ptr(device, ptr, size, max_tensor_size);
 }
 
 bool wsp_ggml_backend_dev_supports_op(wsp_ggml_backend_dev_t device, const struct wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(device);
     return device->iface.supports_op(device, op);
 }
 
 bool wsp_ggml_backend_dev_supports_buft(wsp_ggml_backend_dev_t device, wsp_ggml_backend_buffer_type_t buft) {
+    WSP_GGML_ASSERT(device);
     return device->iface.supports_buft(device, buft);
 }
 
 bool wsp_ggml_backend_dev_offload_op(wsp_ggml_backend_dev_t device, const struct wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(device);
     if (device->iface.offload_op != NULL) {
         return device->iface.offload_op(device, op);
     }
@@ -496,18 +548,22 @@ bool wsp_ggml_backend_dev_offload_op(wsp_ggml_backend_dev_t device, const struct
 // Backend (reg)
 
 const char * wsp_ggml_backend_reg_name(wsp_ggml_backend_reg_t reg) {
+    WSP_GGML_ASSERT(reg);
     return reg->iface.get_name(reg);
 }
 
 size_t wsp_ggml_backend_reg_dev_count(wsp_ggml_backend_reg_t reg) {
+    WSP_GGML_ASSERT(reg);
     return reg->iface.get_device_count(reg);
 }
 
 wsp_ggml_backend_dev_t wsp_ggml_backend_reg_dev_get(wsp_ggml_backend_reg_t reg, size_t index) {
+    WSP_GGML_ASSERT(reg);
     return reg->iface.get_device(reg, index);
 }
 
 void * wsp_ggml_backend_reg_get_proc_address(wsp_ggml_backend_reg_t reg, const char * name) {
+    WSP_GGML_ASSERT(reg);
     if (!reg->iface.get_proc_address) {
         return NULL;
     }
@@ -522,6 +578,7 @@ struct wsp_ggml_backend_multi_buffer_context {
 };
 
 static void wsp_ggml_backend_multi_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     wsp_ggml_backend_multi_buffer_context * ctx = (wsp_ggml_backend_multi_buffer_context *) buffer->context;
     for (size_t i = 0; i < ctx->n_buffers; i++) {
         wsp_ggml_backend_buffer_free(ctx->buffers[i]);
@@ -532,6 +589,7 @@ static void wsp_ggml_backend_multi_buffer_free_buffer(wsp_ggml_backend_buffer_t 
 }
 
 static void wsp_ggml_backend_multi_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
+    WSP_GGML_ASSERT(buffer);
     wsp_ggml_backend_multi_buffer_context * ctx = (wsp_ggml_backend_multi_buffer_context *) buffer->context;
     for (size_t i = 0; i < ctx->n_buffers; i++) {
         wsp_ggml_backend_buffer_clear(ctx->buffers[i], value);
@@ -567,10 +625,12 @@ wsp_ggml_backend_buffer_t wsp_ggml_backend_multi_buffer_alloc_buffer(wsp_ggml_ba
 }
 
 bool wsp_ggml_backend_buffer_is_multi_buffer(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     return buffer->iface.free_buffer == wsp_ggml_backend_multi_buffer_free_buffer;
 }
 
 void wsp_ggml_backend_multi_buffer_set_usage(wsp_ggml_backend_buffer_t buffer, enum wsp_ggml_backend_buffer_usage usage) {
+    WSP_GGML_ASSERT(buffer);
     WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_multi_buffer(buffer));
     wsp_ggml_backend_multi_buffer_context * ctx = (wsp_ggml_backend_multi_buffer_context *) buffer->context;
     for (size_t i = 0; i < ctx->n_buffers; i++) {
@@ -598,7 +658,7 @@ static bool wsp_ggml_is_view_op(enum wsp_ggml_op op) {
 #endif
 
 #ifndef WSP_GGML_SCHED_MAX_SPLIT_INPUTS
-#define WSP_GGML_SCHED_MAX_SPLIT_INPUTS WSP_GGML_MAX_SRC
+#define WSP_GGML_SCHED_MAX_SPLIT_INPUTS 30
 #endif
 
 #ifndef WSP_GGML_SCHED_MAX_COPIES
@@ -849,7 +909,7 @@ static void wsp_ggml_backend_sched_set_if_supported(wsp_ggml_backend_sched_t sch
 }
 
 // assigns backends to ops and splits the graph into subgraphs that can be computed on the same backend
-static void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * graph) {
+void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * graph) {
     // reset splits
     sched->n_splits = 0;
     sched->n_graph_inputs = 0;
@@ -1245,6 +1305,10 @@ static void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, s
         struct wsp_ggml_backend_sched_split * split = &sched->splits[i];
         split->graph = wsp_ggml_graph_view(graph, split->i_start, split->i_end);
 
+        // Optimize this split of the graph. This needs to happen before we make graph_copy,
+        // so they are in sync.
+        wsp_ggml_backend_graph_optimize(sched->backends[split->backend_id], &split->graph);
+
         // add inputs to the graph copy so that they are allocated by ggml-alloc at the start of the split
         for (int j = 0; j < split->n_inputs; j++) {
             assert(graph_copy->size > (graph_copy->n_nodes + 1));
@@ -1350,17 +1414,22 @@ static bool wsp_ggml_backend_sched_alloc_splits(wsp_ggml_backend_sched_t sched) 
 }
 
 static enum wsp_ggml_status wsp_ggml_backend_sched_compute_splits(wsp_ggml_backend_sched_t sched) {
+    WSP_GGML_ASSERT(sched);
     struct wsp_ggml_backend_sched_split * splits = sched->splits;
 
-    for (int i = 0; i < sched->n_splits; i++) {
-        struct wsp_ggml_backend_sched_split * split = &splits[i];
+    wsp_ggml_tensor * prev_ids_tensor = nullptr;
+    std::vector<int32_t> ids;
+    std::vector<wsp_ggml_bitset_t> used_ids;
+
+    for (int split_id = 0; split_id < sched->n_splits; split_id++) {
+        struct wsp_ggml_backend_sched_split * split = &splits[split_id];
         int split_backend_id = split->backend_id;
         wsp_ggml_backend_t split_backend = sched->backends[split_backend_id];
 
         // copy the input tensors to the split backend
-        for (int j = 0; j < split->n_inputs; j++) {
-            wsp_ggml_backend_t input_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, split->inputs[j]);
-            struct wsp_ggml_tensor * input = split->inputs[j];
+        for (int input_id = 0; input_id < split->n_inputs; input_id++) {
+            wsp_ggml_backend_t input_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, split->inputs[input_id]);
+            struct wsp_ggml_tensor * input = split->inputs[input_id];
             struct wsp_ggml_tensor * input_cpy = tensor_copy(input, split_backend_id, sched->cur_copy);
 
             if (input->flags & WSP_GGML_TENSOR_FLAG_INPUT) {
@@ -1378,16 +1447,104 @@ static enum wsp_ggml_status wsp_ggml_backend_sched_compute_splits(wsp_ggml_backe
                 } else {
                     wsp_ggml_backend_synchronize(split_backend);
                 }
-                // try async copy, but if not possible, we can still use a sync copy without synchronizing the dst backend, since we handle the synchronization here with multiple copies and events
-                // TODO: add public function to facilitate this, since applications do not have direct access to the backend interface
-                if (!split_backend->iface.cpy_tensor_async || !split_backend->iface.cpy_tensor_async(input_backend, split_backend, input, input_cpy)) {
+
+                // when offloading MoE weights, we can reduce the amount of data copied by copying only the experts that are used
+                wsp_ggml_tensor * node = split->graph.nodes[0];
+                if (split->graph.n_nodes > 0 &&
+                    wsp_ggml_backend_buffer_get_usage(input->buffer) == WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS &&
+                    wsp_ggml_backend_buffer_is_host(input->buffer) && (
+                    (node->src[0] == input_cpy && node->op == WSP_GGML_OP_MUL_MAT_ID)
+                    //|| (node->src[1] == input_cpy && node->op == WSP_GGML_OP_ADD_ID) /* WSP_GGML_OP_ADD_ID weights are small and not worth splitting */
+                    )) {
+
+                    const int64_t n_expert   = node->op == WSP_GGML_OP_MUL_MAT_ID ? input->ne[2] : input->ne[1];
+                    const size_t expert_size = node->op == WSP_GGML_OP_MUL_MAT_ID ? input->nb[2] : input->nb[1];
+
                     wsp_ggml_backend_synchronize(input_backend);
-                    if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
-                        wsp_ggml_backend_event_synchronize(sched->events[split_backend_id][sched->cur_copy]);
-                    } else {
-                        wsp_ggml_backend_synchronize(split_backend);
+
+                    // get the ids
+                    wsp_ggml_tensor * ids_tensor = node->src[2];
+                    wsp_ggml_backend_t ids_backend = split_backend;
+
+                    // if the ids tensor is also an input of the split, it may not have been copied yet to the split backend
+                    // in that case, we use the original ids tensor
+                    for (int i = input_id + 1; i < split->n_inputs; i++) {
+                        if (ids_tensor == tensor_copy(split->inputs[i], split_backend_id, sched->cur_copy)) {
+                            ids_tensor = split->inputs[i];
+                            ids_backend = wsp_ggml_backend_sched_get_tensor_backend(sched, split->inputs[i]);
+                            break;
+                        }
                     }
-                    wsp_ggml_backend_tensor_copy(input, input_cpy);
+
+                    if (ids_tensor != prev_ids_tensor) {
+                        ids.resize(wsp_ggml_nbytes(ids_tensor) / sizeof(int32_t));
+                        wsp_ggml_backend_tensor_get_async(ids_backend, ids_tensor, ids.data(), 0, wsp_ggml_nbytes(ids_tensor));
+                        wsp_ggml_backend_synchronize(ids_backend);
+
+                        // find the used experts
+                        used_ids.clear();
+                        used_ids.resize(wsp_ggml_bitset_size(n_expert));
+                        for (int64_t i1 = 0; i1 < ids_tensor->ne[1]; i1++) {
+                            for (int64_t i0 = 0; i0 < ids_tensor->ne[0]; i0++) {
+                                int32_t id = ids[i1 * ids_tensor->nb[1]/sizeof(int32_t) + i0 * ids_tensor->nb[0]/sizeof(int32_t)];
+                                WSP_GGML_ASSERT(id >= 0 && id < n_expert);
+                                wsp_ggml_bitset_set(used_ids.data(), id);
+                            }
+                        }
+
+                        prev_ids_tensor = ids_tensor;
+                    }
+
+                    // group consecutive experts and copy them together
+                    auto copy_experts = [&](int32_t first_id, int32_t last_id) {
+                        const size_t expert_offset = first_id * expert_size;
+                        const size_t expert_size_copy =  (last_id - first_id + 1) * expert_size;
+                        const size_t padding = std::min<size_t>(expert_size, 512);
+                        const size_t padding_end = last_id < n_expert - 1 ? padding : 0;
+
+                        wsp_ggml_backend_tensor_set_async(split_backend,
+                            input_cpy,
+                            (const uint8_t *)input->data + expert_offset, expert_offset,
+                            // copy a bit extra at the to ensure there are no NaNs in the padding of the last expert
+                            // this is necessary for MMQ in the CUDA backend
+                            expert_size_copy + padding_end);
+                    };
+
+                    int id = 0;
+                    while (!wsp_ggml_bitset_get(used_ids.data(), id)) {
+                        id++;
+                    }
+                    int32_t first_id = id;
+                    int32_t last_id = first_id;
+
+                    for (++id; id < n_expert; ++id) {
+                        if (!wsp_ggml_bitset_get(used_ids.data(), id)) {
+                            continue;
+                        }
+
+                        if (id == last_id + 1) {
+                            last_id = id;
+                            continue;
+                        }
+
+                        copy_experts(first_id, last_id);
+
+                        first_id = id;
+                        last_id = id;
+                    }
+                    copy_experts(first_id, last_id);
+                } else {
+                    // try async copy, but if not possible, we can still use a sync copy without synchronizing the dst backend, since we handle the synchronization here with multiple copies and events
+                    // TODO: add public function to facilitate this, since applications do not have direct access to the backend interface
+                    if (!split_backend->iface.cpy_tensor_async || !split_backend->iface.cpy_tensor_async(input_backend, split_backend, input, input_cpy)) {
+                        wsp_ggml_backend_synchronize(input_backend);
+                        if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
+                            wsp_ggml_backend_event_synchronize(sched->events[split_backend_id][sched->cur_copy]);
+                        } else {
+                            wsp_ggml_backend_synchronize(split_backend);
+                        }
+                        wsp_ggml_backend_tensor_copy(input, input_cpy);
+                    }
                 }
             }
         }
@@ -1526,6 +1683,7 @@ void wsp_ggml_backend_sched_free(wsp_ggml_backend_sched_t sched) {
 }
 
 void wsp_ggml_backend_sched_reset(wsp_ggml_backend_sched_t sched) {
+    WSP_GGML_ASSERT(sched);
     // reset state for the next run
     if (!sched->is_reset) {
         wsp_ggml_hash_set_reset(&sched->hash_set);
@@ -1537,7 +1695,10 @@ void wsp_ggml_backend_sched_reset(wsp_ggml_backend_sched_t sched) {
 }
 
 bool wsp_ggml_backend_sched_reserve(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * measure_graph) {
+    WSP_GGML_ASSERT(sched);
     WSP_GGML_ASSERT((int)sched->hash_set.size >= measure_graph->n_nodes + measure_graph->n_leafs);
+
+    wsp_ggml_backend_sched_reset(sched);
 
     wsp_ggml_backend_sched_synchronize(sched);
 
@@ -1553,6 +1714,7 @@ bool wsp_ggml_backend_sched_reserve(wsp_ggml_backend_sched_t sched, struct wsp_g
 }
 
 bool wsp_ggml_backend_sched_alloc_graph(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * graph) {
+    WSP_GGML_ASSERT(sched);
     WSP_GGML_ASSERT((int)sched->hash_set.size >= graph->n_nodes + graph->n_leafs);
     WSP_GGML_ASSERT(!sched->is_alloc);
 
@@ -1577,6 +1739,7 @@ enum wsp_ggml_status wsp_ggml_backend_sched_graph_compute(wsp_ggml_backend_sched
 }
 
 enum wsp_ggml_status wsp_ggml_backend_sched_graph_compute_async(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * graph) {
+    WSP_GGML_ASSERT(sched);
     if (!sched->is_reset && !sched->is_alloc) {
         wsp_ggml_backend_sched_reset(sched);
     }
@@ -1591,6 +1754,7 @@ enum wsp_ggml_status wsp_ggml_backend_sched_graph_compute_async(wsp_ggml_backend
 }
 
 void wsp_ggml_backend_sched_synchronize(wsp_ggml_backend_sched_t sched) {
+    WSP_GGML_ASSERT(sched);
     for (int i = 0; i < sched->n_backends; i++) {
         wsp_ggml_backend_synchronize(sched->backends[i]);
     }
@@ -1603,28 +1767,42 @@ void wsp_ggml_backend_sched_synchronize(wsp_ggml_backend_sched_t sched) {
 }
 
 void wsp_ggml_backend_sched_set_eval_callback(wsp_ggml_backend_sched_t sched, wsp_ggml_backend_sched_eval_callback callback, void * user_data) {
+    WSP_GGML_ASSERT(sched);
     sched->callback_eval = callback;
     sched->callback_eval_user_data = user_data;
 }
 
 int wsp_ggml_backend_sched_get_n_splits(wsp_ggml_backend_sched_t sched) {
+    WSP_GGML_ASSERT(sched);
     return sched->n_splits;
 }
 
 int wsp_ggml_backend_sched_get_n_copies(wsp_ggml_backend_sched_t sched) {
+    WSP_GGML_ASSERT(sched);
     return sched->n_copies;
 }
 
 int wsp_ggml_backend_sched_get_n_backends(wsp_ggml_backend_sched_t sched) {
+    WSP_GGML_ASSERT(sched);
     return sched->n_backends;
 }
 
 wsp_ggml_backend_t wsp_ggml_backend_sched_get_backend(wsp_ggml_backend_sched_t sched, int i) {
+    WSP_GGML_ASSERT(sched);
     WSP_GGML_ASSERT(i >= 0 && i < sched->n_backends);
     return sched->backends[i];
 }
 
+wsp_ggml_backend_buffer_type_t wsp_ggml_backend_sched_get_buffer_type(wsp_ggml_backend_sched_t sched, wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(sched);
+    int backend_index = wsp_ggml_backend_sched_backend_id(sched, backend);
+    WSP_GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
+
+    return sched->bufts[backend_index];
+}
+
 size_t wsp_ggml_backend_sched_get_buffer_size(wsp_ggml_backend_sched_t sched, wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(sched);
     int backend_index = wsp_ggml_backend_sched_backend_id(sched, backend);
     WSP_GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
 
@@ -1632,6 +1810,7 @@ size_t wsp_ggml_backend_sched_get_buffer_size(wsp_ggml_backend_sched_t sched, ws
 }
 
 void wsp_ggml_backend_sched_set_tensor_backend(wsp_ggml_backend_sched_t sched, struct wsp_ggml_tensor * node, wsp_ggml_backend_t backend) {
+    WSP_GGML_ASSERT(sched);
     int backend_index = wsp_ggml_backend_sched_backend_id(sched, backend);
     WSP_GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
     tensor_backend_id(node) = backend_index;
@@ -1640,6 +1819,7 @@ void wsp_ggml_backend_sched_set_tensor_backend(wsp_ggml_backend_sched_t sched, s
 }
 
 wsp_ggml_backend_t wsp_ggml_backend_sched_get_tensor_backend(wsp_ggml_backend_sched_t sched, struct wsp_ggml_tensor * node) {
+    WSP_GGML_ASSERT(sched);
     int backend_index = tensor_backend_id(node);
     if (backend_index == -1) {
         return NULL;
@@ -1650,6 +1830,7 @@ wsp_ggml_backend_t wsp_ggml_backend_sched_get_tensor_backend(wsp_ggml_backend_sc
 // utils
 
 enum wsp_ggml_status wsp_ggml_backend_view_init(struct wsp_ggml_tensor * tensor) {
+    WSP_GGML_ASSERT(tensor);
     WSP_GGML_ASSERT(tensor->buffer == NULL);
     WSP_GGML_ASSERT(tensor->view_src != NULL);
     WSP_GGML_ASSERT(tensor->view_src->buffer != NULL);
@@ -1661,6 +1842,7 @@ enum wsp_ggml_status wsp_ggml_backend_view_init(struct wsp_ggml_tensor * tensor)
 }
 
 enum wsp_ggml_status wsp_ggml_backend_tensor_alloc(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, void * addr) {
+    WSP_GGML_ASSERT(tensor);
     WSP_GGML_ASSERT(tensor->buffer == NULL);
     WSP_GGML_ASSERT(tensor->data == NULL);
     WSP_GGML_ASSERT(tensor->view_src == NULL);
@@ -1734,6 +1916,7 @@ static void graph_copy_init_tensor(struct wsp_ggml_hash_set * hash_set, struct w
 }
 
 struct wsp_ggml_backend_graph_copy wsp_ggml_backend_graph_copy(wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * graph) {
+    WSP_GGML_ASSERT(graph);
     struct wsp_ggml_hash_set hash_set = wsp_ggml_hash_set_new(graph->visited_hash_set.size);
     struct wsp_ggml_tensor ** node_copies = (wsp_ggml_tensor **) calloc(hash_set.size, sizeof(node_copies[0])); // NOLINT
     bool * node_init = (bool *) calloc(hash_set.size, sizeof(node_init[0]));
@@ -1878,6 +2061,7 @@ bool wsp_ggml_backend_compare_graph_backend(wsp_ggml_backend_t backend1, wsp_ggm
 // CPU backend - buffer
 
 static void * wsp_ggml_backend_cpu_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     uintptr_t data = (uintptr_t)buffer->context;
 
     // align the buffer
@@ -1889,28 +2073,33 @@ static void * wsp_ggml_backend_cpu_buffer_get_base(wsp_ggml_backend_buffer_t buf
 }
 
 static void wsp_ggml_backend_cpu_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
+    WSP_GGML_ASSERT(buffer);
     wsp_ggml_aligned_free(buffer->context, buffer->size);
 }
 
 static void wsp_ggml_backend_cpu_buffer_memset_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(tensor);
     memset((char *)tensor->data + offset, value, size);
 
     WSP_GGML_UNUSED(buffer);
 }
 
 static void wsp_ggml_backend_cpu_buffer_set_tensor(wsp_ggml_backend_buffer_t buffer, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(tensor);
     memcpy((char *)tensor->data + offset, data, size);
 
     WSP_GGML_UNUSED(buffer);
 }
 
 static void wsp_ggml_backend_cpu_buffer_get_tensor(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    WSP_GGML_ASSERT(tensor);
     memcpy(data, (const char *)tensor->data + offset, size);
 
     WSP_GGML_UNUSED(buffer);
 }
 
 static bool wsp_ggml_backend_cpu_buffer_cpy_tensor(wsp_ggml_backend_buffer_t buffer, const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+    WSP_GGML_ASSERT(src);
     if (wsp_ggml_backend_buffer_is_host(src->buffer)) {
         memcpy(dst->data, src->data, wsp_ggml_nbytes(src));
         return true;
@@ -1921,6 +2110,7 @@ static bool wsp_ggml_backend_cpu_buffer_cpy_tensor(wsp_ggml_backend_buffer_t buf
 }
 
 static void wsp_ggml_backend_cpu_buffer_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
+    WSP_GGML_ASSERT(buffer);
     memset(buffer->context, value, buffer->size);
 }
 

@@ -373,6 +373,9 @@ static const struct wsp_ggml_type_traits_cpu type_traits_cpu[WSP_GGML_TYPE_COUNT
         .vec_dot_type             = WSP_GGML_TYPE_Q8_K,
         .nrows                    = 1,
     },
+    [WSP_GGML_TYPE_I32] = {
+        .from_float               = (wsp_ggml_from_float_t) wsp_ggml_cpu_fp32_to_i32,
+    },
 };
 
 const struct wsp_ggml_type_traits_cpu * wsp_ggml_get_type_traits_cpu(enum wsp_ggml_type type) {
@@ -470,10 +473,10 @@ struct wsp_ggml_threadpool {
 struct wsp_ggml_compute_state {
 #ifndef WSP_GGML_USE_OPENMP
     wsp_ggml_thread_t thrd;
-    bool cpumask[WSP_GGML_MAX_N_THREADS];
     int  last_graph;
     bool pending;
 #endif
+    bool cpumask[WSP_GGML_MAX_N_THREADS];
     struct wsp_ggml_threadpool * threadpool;
     int ith;
 };
@@ -1876,9 +1879,17 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
             {
                 wsp_ggml_compute_forward_im2col_back_f32(params, tensor);
             } break;
+        case WSP_GGML_OP_IM2COL_3D:
+            {
+                wsp_ggml_compute_forward_im2col_3d(params, tensor);
+            } break;
         case WSP_GGML_OP_CONV_2D:
             {
                 wsp_ggml_compute_forward_conv_2d(params, tensor);
+            } break;
+        case WSP_GGML_OP_CONV_3D:
+            {
+                wsp_ggml_compute_forward_conv_3d(params, tensor);
             } break;
         case WSP_GGML_OP_CONV_2D_DW:
             {
@@ -2251,7 +2262,9 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
             } break;
         case WSP_GGML_OP_IM2COL:
         case WSP_GGML_OP_IM2COL_BACK:
+        case WSP_GGML_OP_IM2COL_3D:
         case WSP_GGML_OP_CONV_2D:
+        case WSP_GGML_OP_CONV_3D:
         case WSP_GGML_OP_CONV_2D_DW:
         case WSP_GGML_OP_CONV_TRANSPOSE_1D:
         case WSP_GGML_OP_CONV_TRANSPOSE_2D:
@@ -2686,7 +2699,10 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                         if (wsp_ggml_is_quantized(node->type) ||
                             // F16 -> BF16 and BF16 -> F16 copies go through intermediate F32
                             (node->src[0]->type == WSP_GGML_TYPE_F16  && node->src[1] && node->src[1]->type == WSP_GGML_TYPE_BF16) ||
-                            (node->src[0]->type == WSP_GGML_TYPE_BF16 && node->src[1] && node->src[1]->type == WSP_GGML_TYPE_F16)) {
+                            (node->src[0]->type == WSP_GGML_TYPE_BF16 && node->src[1] && node->src[1]->type == WSP_GGML_TYPE_F16) ||
+                            // conversion between F32 and I32
+                            (node->src[0]->type == WSP_GGML_TYPE_F32 && node->src[1] && node->src[1]->type == WSP_GGML_TYPE_I32) ||
+                            (node->src[0]->type == WSP_GGML_TYPE_I32 && node->src[1] && node->src[1]->type == WSP_GGML_TYPE_F32)) {
                             cur = wsp_ggml_type_size(WSP_GGML_TYPE_F32) * node->ne[0] * n_tasks;
                         }
                     } break;
@@ -2773,6 +2789,7 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                         }
                     } break;
                 case WSP_GGML_OP_CONV_2D:
+                case WSP_GGML_OP_CONV_3D:
                     {
                         cur = WSP_GGML_IM2COL_WORK_SIZE;
                     } break;
@@ -3064,7 +3081,14 @@ static struct wsp_ggml_threadpool * wsp_ggml_threadpool_new_impl(
 
     threadpool->workers = workers;
 
-#ifndef WSP_GGML_USE_OPENMP
+#ifdef WSP_GGML_USE_OPENMP
+    int32_t cpumask_iter = 0;
+
+    // Compute CPU masks for each thread
+    for (int j = 0; j < tpp->n_threads; j++) {
+        wsp_ggml_thread_cpumask_next(tpp->cpumask, workers[j].cpumask, tpp->strict_cpu, &cpumask_iter);
+    }
+#else // WSP_GGML_USE_OPENMP
     wsp_ggml_mutex_init(&threadpool->mutex);
     wsp_ggml_cond_init(&threadpool->cond);
 
@@ -3137,7 +3161,14 @@ enum wsp_ggml_status wsp_ggml_graph_compute(struct wsp_ggml_cgraph * cgraph, str
                 atomic_store_explicit(&threadpool->n_threads_cur, n_threads, memory_order_relaxed);
             }
 
-            wsp_ggml_graph_compute_thread(&threadpool->workers[omp_get_thread_num()]);
+            // Apply thread CPU mask and priority
+            int ith = omp_get_thread_num();
+
+            wsp_ggml_thread_apply_priority(threadpool->prio);
+            if (wsp_ggml_thread_cpumask_is_valid(threadpool->workers[ith].cpumask)) {
+                wsp_ggml_thread_apply_affinity(threadpool->workers[ith].cpumask);
+            }
+            wsp_ggml_graph_compute_thread(&threadpool->workers[ith]);
         }
     } else {
         atomic_store_explicit(&threadpool->n_threads_cur, 1, memory_order_relaxed);
@@ -3200,20 +3231,12 @@ void wsp_ggml_cpu_fp32_to_fp16(const float * x, wsp_ggml_fp16_t * y, int64_t n) 
         __m128i y_vec = _mm_cvtps_ph(x_vec, _MM_FROUND_TO_NEAREST_INT);
         _mm_storel_epi64((__m128i *)(y + i), y_vec);
     }
-#elif defined(__NNPA__)
-    for (; i + 7 < n; i += 8) {
-        float32x4_t v_xh = vec_xl(0, (const float *)(x + i + 0));
-        float32x4_t v_xl = vec_xl(0, (const float *)(x + i + 4));
-        uint16x8_t v_yd = vec_round_from_fp32(v_xh, v_xl, 0);
-        uint16x8_t v_y = vec_convert_to_fp16(v_yd, 0);
-        vec_xst(v_y, 0, (wsp_ggml_fp16_t *)(y + i));
-    }
-    for (; i + 3 < n; i += 4) {
-        float32x4_t v_x = vec_xl(0, (const float *)(x + i));
-        float32x4_t v_zero = vec_splats(0.0f);
-        uint16x8_t v_yd = vec_round_from_fp32(v_x, v_zero, 0);
-        uint16x8_t v_y = vec_convert_to_fp16(v_yd, 0);
-        vec_xst(v_y, 0, (wsp_ggml_fp16_t *)(y + i));
+#elif defined(__riscv_zvfh)
+    for (int vl; i < n; i += vl) {
+        vl = __riscv_vsetvl_e32m2(n - i);
+        vfloat32m2_t vx = __riscv_vle32_v_f32m2(&x[i], vl);
+        vfloat16m1_t vy = __riscv_vfncvt_f_f_w_f16m1(vx, vl);
+        __riscv_vse16_v_f16m1((_Float16 *)&y[i], vy, vl);
     }
 #endif
     for (; i < n; ++i) {
@@ -3241,21 +3264,6 @@ void wsp_ggml_cpu_fp16_to_fp32(const wsp_ggml_fp16_t * x, float * y, int64_t n) 
         __m128 y_vec = _mm_cvtph_ps(x_vec);
         _mm_storeu_ps(y + i, y_vec);
     }
-#elif defined(__NNPA__)
-    for (; i + 7 < n; i += 8) {
-        uint16x8_t v_x = vec_xl(0, (const wsp_ggml_fp16_t *)(x + i));
-        uint16x8_t v_yd = vec_convert_from_fp16(v_x, 0);
-        float32x4_t v_yh = vec_extend_to_fp32_hi(v_yd, 0);
-        float32x4_t v_yl = vec_extend_to_fp32_lo(v_yd, 0);
-        vec_xst(v_yh, 0, (float *)(y + i + 0));
-        vec_xst(v_yl, 0, (float *)(y + i + 4));
-    }
-    for (; i + 3 < n; i += 4) {
-        uint16x8_t v_x = vec_xl(0, (const wsp_ggml_fp16_t *)(x + i));
-        uint16x8_t v_yd = vec_convert_from_fp16(v_x, 0);
-        float32x4_t v_yh = vec_extend_to_fp32_hi(v_yd, 0);
-        vec_xst(v_yh, 0, (float *)(y + i));
-    }
 #endif
 
     for (; i < n; ++i) {
@@ -3267,6 +3275,13 @@ void wsp_ggml_cpu_fp32_to_bf16(const float * x, wsp_ggml_bf16_t * y, int64_t n) 
     int64_t i = 0;
     for (; i < n; ++i) {
         y[i] = WSP_GGML_FP32_TO_BF16(x[i]);
+    }
+}
+
+void wsp_ggml_cpu_fp32_to_i32(const float * x, int32_t * y, int64_t n) {
+    int64_t i = 0;
+    for (; i < n; ++i) {
+        y[i] = x[i];
     }
 }
 
@@ -3453,14 +3468,6 @@ int wsp_ggml_cpu_has_vsx(void) {
 
 int wsp_ggml_cpu_has_vxe(void) {
 #if defined(__VXE__) || defined(__VXE2__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-int wsp_ggml_cpu_has_nnpa(void) {
-#if defined(WSP_GGML_NNPA)
     return 1;
 #else
     return 0;

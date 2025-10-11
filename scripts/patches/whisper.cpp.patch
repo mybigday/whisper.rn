@@ -1,6 +1,6 @@
---- whisper.cpp.orig	2025-07-07 11:11:30
-+++ whisper.cpp	2025-07-07 11:11:09
-@@ -3452,8 +3452,10 @@
+--- whisper.cpp.orig	2025-10-11 18:42:03
++++ whisper.cpp	2025-10-11 18:42:34
+@@ -3431,8 +3431,10 @@
          const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
          WHISPER_LOG_INFO("%s: alignment heads masks size = %ld B\n", __func__, memory_size);
      }
@@ -11,7 +11,7 @@
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
 
      WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -3468,6 +3470,7 @@
+@@ -3447,6 +3449,7 @@
  #endif
      } else {
          WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
@@ -19,20 +19,20 @@
      }
  #endif
 
-@@ -3622,6 +3625,7 @@
+@@ -3601,6 +3604,7 @@
  struct whisper_context_params whisper_context_default_params() {
      struct whisper_context_params result = {
          /*.use_gpu              =*/ true,
 +        /*.use_coreml           =*/ false,
-         /*.flash_attn           =*/ false,
+         /*.flash_attn           =*/ true,
          /*.gpu_device           =*/ 0,
 
-@@ -8939,7 +8943,7 @@
+@@ -8963,7 +8967,7 @@
  }
 
  const char * whisper_version(void) {
 -    return WHISPER_VERSION;
-+    return "1.7.6";
++    return "1.8.0";
  }
 
  WSP_GGML_ATTRIBUTE_FORMAT(2, 3)
