@@ -61,6 +61,6 @@ Pod::Spec.new do |s|
 
   s.subspec "no-require-arc" do |ss|
     ss.requires_arc = false
-    ss.source_files = "cpp/*.m"
+    ss.source_files = "cpp/ggml-metal/*.m"
   end
 end
