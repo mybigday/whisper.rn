@@ -51,7 +51,7 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS" => base_ld_flags,
     "OTHER_CFLAGS" => base_optimizer_flags,
-    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags + " -std=c++17"
+    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags + " -std=c++20"
   }
 
   s.dependency "React-callinvoker"

@@ -17,6 +17,8 @@ using namespace facebook::jsi;
 
 namespace rnwhisper_jsi {
 
+using namespace facebook::jsi;
+
 // Consolidated logging function
 enum class LogLevel { LOG_DEBUG, LOG_INFO, LOG_ERROR };
 
