@@ -209,9 +209,6 @@ extern "C" {
         void * context;
     };
 
-    // Internal backend registry API
-    WSP_GGML_API void wsp_ggml_backend_register(wsp_ggml_backend_reg_t reg);
-
     // Add backend dynamic loading support to the backend
 
     // Initialize the backend

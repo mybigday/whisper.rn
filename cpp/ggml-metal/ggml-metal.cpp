@@ -193,9 +193,9 @@ static size_t wsp_ggml_backend_metal_buffer_type_get_alloc_size(wsp_ggml_backend
             } break;
         case WSP_GGML_OP_FLASH_ATTN_EXT:
             {
-                if (wsp_ggml_metal_op_flash_attn_ext_use_vec(tensor)) {
-                    res += wsp_ggml_metal_op_flash_attn_ext_extra_tmp(tensor);
-                }
+                res += wsp_ggml_metal_op_flash_attn_ext_extra_pad(tensor);
+                res += wsp_ggml_metal_op_flash_attn_ext_extra_blk(tensor);
+                res += wsp_ggml_metal_op_flash_attn_ext_extra_tmp(tensor);
             } break;
         default:
             break;

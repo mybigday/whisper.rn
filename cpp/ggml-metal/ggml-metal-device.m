@@ -7,6 +7,8 @@
 
 #include <Metal/Metal.h>
 
+#include <stdatomic.h>
+
 #ifndef TARGET_OS_VISION
 #define TARGET_OS_VISION 0
 #endif
@@ -21,6 +23,9 @@
 
 // overload of MTLGPUFamilyMetal3 (not available in some environments)
 static const NSInteger MTLGPUFamilyMetal3_GGML = 5001;
+
+// virtual address for GPU memory allocations
+static atomic_uintptr_t g_addr_device = 0x000000400ULL;
 
 #if !WSP_GGML_METAL_EMBED_LIBRARY
 // Here to assist with NSBundle Path Hack
@@ -652,6 +657,11 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
         case WSP_GGML_OP_SCALE:
         case WSP_GGML_OP_CONV_TRANSPOSE_1D:
             return true;
+        case WSP_GGML_OP_CONV_TRANSPOSE_2D:
+            return wsp_ggml_is_contiguous(op->src[0]) && wsp_ggml_is_contiguous(op->src[1]) &&
+                (op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32) &&
+                op->src[1]->type == WSP_GGML_TYPE_F32 &&
+                op->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_CLAMP:
             return op->src[0]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_SQR:
@@ -660,6 +670,8 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
         case WSP_GGML_OP_COS:
         case WSP_GGML_OP_LOG:
             return wsp_ggml_is_contiguous(op->src[0]) && op->src[0]->type == WSP_GGML_TYPE_F32;
+        case WSP_GGML_OP_SUM:
+            return has_simdgroup_reduction && wsp_ggml_is_contiguous(op->src[0]);
         case WSP_GGML_OP_SUM_ROWS:
         case WSP_GGML_OP_MEAN:
         case WSP_GGML_OP_SOFT_MAX:
@@ -696,7 +708,8 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
             return true;
         case WSP_GGML_OP_FLASH_ATTN_EXT:
             // for new head sizes, add checks here
-            if (op->src[0]->ne[0] != 40 &&
+            if (op->src[0]->ne[0] != 32 &&
+                op->src[0]->ne[0] != 40 &&
                 op->src[0]->ne[0] != 64 &&
                 op->src[0]->ne[0] != 80 &&
                 op->src[0]->ne[0] != 96 &&
@@ -780,9 +793,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 };
             }
         case WSP_GGML_OP_GET_ROWS:
-            {
-                return op->ne[3] == 1;
-            }
+            return true;
         case WSP_GGML_OP_SET_ROWS:
             {
                 if (op->src[0]->type != WSP_GGML_TYPE_F32) {
@@ -804,6 +815,9 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                         return false;
                 };
             }
+        case WSP_GGML_OP_OPT_STEP_ADAMW:
+        case WSP_GGML_OP_OPT_STEP_SGD:
+            return has_simdgroup_reduction;
         default:
             return false;
     }
@@ -828,7 +842,7 @@ struct wsp_ggml_metal_buffer_wrapper {
 };
 
 struct wsp_ggml_metal_buffer {
-    void * all_data; // TODO: https://github.com/ggml-org/llama.cpp/pull/15985
+    void * all_data;
     size_t all_size;
 
     // if false, the Metal buffer data is allocated in private GPU memory and is not shared with the host
@@ -966,13 +980,14 @@ wsp_ggml_metal_buffer_t wsp_ggml_metal_buffer_init(wsp_ggml_metal_device_t dev, 
     if (shared) {
         res->all_data = wsp_ggml_metal_host_malloc(size_aligned);
         res->is_shared = true;
-        res->owned = true;
     } else {
-        // dummy, non-NULL value - we'll populate this after creating the Metal buffer below
-        res->all_data = (void *) 0x000000400ULL;
+        // use virtual address from g_addr_device counter
+        res->all_data = (void *) atomic_fetch_add_explicit(&g_addr_device, size_aligned, memory_order_relaxed);
         res->is_shared = false;
     }
     res->all_size = size_aligned;
+
+    res->owned = true;
 
     res->device = wsp_ggml_metal_device_get_obj(dev);
     res->queue  = wsp_ggml_metal_device_get_queue(dev);
@@ -984,15 +999,13 @@ wsp_ggml_metal_buffer_t wsp_ggml_metal_buffer_init(wsp_ggml_metal_device_t dev, 
         res->buffers[0].metal = nil;
 
         if (size_aligned > 0) {
-            if (props_dev->use_shared_buffers &&shared) {
+            if (props_dev->use_shared_buffers && shared) {
                 res->buffers[0].metal = [res->device newBufferWithBytesNoCopy:res->all_data
                                                                   length:size_aligned
                                                                  options:MTLResourceStorageModeShared
                                                              deallocator:nil];
             } else {
                 res->buffers[0].metal = [res->device newBufferWithLength:size_aligned options:MTLResourceStorageModePrivate];
-
-                res->all_data = (void *) (res->buffers[0].metal.gpuAddress);
             }
         }
 
@@ -1140,7 +1153,7 @@ bool wsp_ggml_metal_buffer_is_shared(wsp_ggml_metal_buffer_t buf) {
 
 void wsp_ggml_metal_buffer_memset_tensor(wsp_ggml_metal_buffer_t buf, struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
     if (buf->is_shared) {
-        memset((char *)tensor->data + offset, value, size);
+        memset((char *) tensor->data + offset, value, size);
         return;
     }
 
@@ -1169,7 +1182,7 @@ void wsp_ggml_metal_buffer_memset_tensor(wsp_ggml_metal_buffer_t buf, struct wsp
 
 void wsp_ggml_metal_buffer_set_tensor(wsp_ggml_metal_buffer_t buf, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     if (buf->is_shared) {
-        memcpy((char *)tensor->data + offset, data, size);
+        memcpy((char *) tensor->data + offset, data, size);
         return;
     }
 
@@ -1224,7 +1237,7 @@ void wsp_ggml_metal_buffer_set_tensor(wsp_ggml_metal_buffer_t buf, struct wsp_gg
 
 void wsp_ggml_metal_buffer_get_tensor(wsp_ggml_metal_buffer_t buf, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     if (buf->is_shared) {
-        memcpy(data, (const char *)tensor->data + offset, size);
+        memcpy(data, (const char *) tensor->data + offset, size);
         return;
     }
 

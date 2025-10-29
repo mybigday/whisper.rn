@@ -1151,10 +1151,14 @@ static const char * WSP_GGML_UNARY_OP_NAME[WSP_GGML_UNARY_OP_COUNT] = {
     "HARDSIGMOID",
     "EXP",
     "GELU_ERF",
+    "XIELU",
+    "FLOOR",
+    "CEIL",
+    "ROUND",
+    "TRUNC",
 };
 
-static_assert(WSP_GGML_UNARY_OP_COUNT == 15, "WSP_GGML_UNARY_OP_COUNT != 15");
-
+static_assert(WSP_GGML_UNARY_OP_COUNT == 20, "WSP_GGML_UNARY_OP_COUNT != 20");
 
 static const char * WSP_GGML_GLU_OP_NAME[WSP_GGML_GLU_OP_COUNT] = {
     "REGLU",
@@ -2660,6 +2664,29 @@ struct wsp_ggml_tensor * wsp_ggml_silu_inplace(
     return wsp_ggml_unary_inplace(ctx, a, WSP_GGML_UNARY_OP_SILU);
 }
 
+// wsp_ggml_xielu
+
+struct wsp_ggml_tensor * wsp_ggml_xielu(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        float alpha_n,
+        float alpha_p,
+        float beta,
+        float eps) {
+    struct wsp_ggml_tensor * result = wsp_ggml_dup_tensor(ctx, a);
+
+    wsp_ggml_set_op_params_i32(result, 0, (int32_t) WSP_GGML_UNARY_OP_XIELU);
+    wsp_ggml_set_op_params_f32(result, 1, beta + wsp_ggml_softplus(alpha_n));
+    wsp_ggml_set_op_params_f32(result, 2, wsp_ggml_softplus(alpha_p));
+    wsp_ggml_set_op_params_f32(result, 3, beta);
+    wsp_ggml_set_op_params_f32(result, 4, eps);
+
+    result->op     = WSP_GGML_OP_UNARY;
+    result->src[0] = a;
+
+    return result;
+}
+
 // wsp_ggml_silu_back
 
 struct wsp_ggml_tensor * wsp_ggml_silu_back(
@@ -2732,6 +2759,62 @@ static struct wsp_ggml_tensor * wsp_ggml_glu_impl(
     result->src[1] = b;
 
     return result;
+}
+
+// wsp_ggml_floor
+
+struct wsp_ggml_tensor * wsp_ggml_floor(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary(ctx, a, WSP_GGML_UNARY_OP_FLOOR);
+}
+
+struct wsp_ggml_tensor * wsp_ggml_floor_inplace(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary_inplace(ctx, a, WSP_GGML_UNARY_OP_FLOOR);
+}
+
+// wsp_ggml_ceil
+
+struct wsp_ggml_tensor * wsp_ggml_ceil(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary(ctx, a, WSP_GGML_UNARY_OP_CEIL);
+}
+
+struct wsp_ggml_tensor * wsp_ggml_ceil_inplace(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary_inplace(ctx, a, WSP_GGML_UNARY_OP_CEIL);
+}
+
+//wsp_ggml_round
+
+struct wsp_ggml_tensor * wsp_ggml_round(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary(ctx, a, WSP_GGML_UNARY_OP_ROUND);
+}
+
+struct wsp_ggml_tensor * wsp_ggml_round_inplace(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary_inplace(ctx, a, WSP_GGML_UNARY_OP_ROUND);
+}
+
+//wsp_ggml_trunc
+
+struct wsp_ggml_tensor * wsp_ggml_trunc(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary(ctx, a, WSP_GGML_UNARY_OP_TRUNC);
+}
+
+struct wsp_ggml_tensor * wsp_ggml_trunc_inplace(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a) {
+    return wsp_ggml_unary_inplace(ctx, a, WSP_GGML_UNARY_OP_TRUNC);
 }
 
 struct wsp_ggml_tensor * wsp_ggml_glu(
@@ -3835,6 +3918,15 @@ struct wsp_ggml_tensor * wsp_ggml_soft_max_ext(
         float                 scale,
         float                 max_bias) {
     return wsp_ggml_soft_max_impl(ctx, a, mask, scale, max_bias, false);
+}
+
+struct wsp_ggml_tensor * wsp_ggml_soft_max_ext_inplace(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        struct wsp_ggml_tensor  * mask,
+        float                 scale,
+        float                 max_bias) {
+    return wsp_ggml_soft_max_impl(ctx, a, mask, scale, max_bias, true);
 }
 
 void wsp_ggml_soft_max_add_sinks(
@@ -6878,6 +6970,78 @@ void wsp_ggml_graph_print(const struct wsp_ggml_cgraph * cgraph) {
     }
 
     WSP_GGML_LOG_INFO("========================================\n");
+}
+
+static int wsp_ggml_node_list_find_tensor(const struct wsp_ggml_cgraph * cgraph,
+                                      const int *                idxs,
+                                      int                        count,
+                                      const struct wsp_ggml_tensor * tensor) {
+    WSP_GGML_ASSERT(cgraph && idxs);
+    for (int i = 0; i < count; ++i) {
+        const int node_idx = idxs[i];
+
+        if (node_idx >= cgraph->n_nodes) {
+            return -1;
+        }
+        if (cgraph->nodes[node_idx] == tensor) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool wsp_ggml_can_fuse_subgraph_ext(const struct wsp_ggml_cgraph * cgraph,
+                                const int *                node_idxs,
+                                int                        count,
+                                const enum wsp_ggml_op *       ops,
+                                const int *                outputs,
+                                int                        num_outputs) {
+    WSP_GGML_ASSERT(outputs && num_outputs > 0);
+
+    for (int i = 0; i < count; ++i) {
+        if (node_idxs[i] >= cgraph->n_nodes) {
+            return false;
+        }
+
+        const struct wsp_ggml_tensor * node = cgraph->nodes[node_idxs[i]];
+
+        if (node->op != ops[i]) {
+            return false;
+        }
+
+        if (wsp_ggml_node_list_find_tensor(cgraph, outputs, num_outputs, node) != -1) {
+            continue;
+        }
+
+        if (node->flags & WSP_GGML_TENSOR_FLAG_OUTPUT) {
+            return false;
+        }
+
+        int subgraph_uses = 0;
+        for (int j = i + 1; j < count; ++j) {
+            const struct wsp_ggml_tensor * other_node = cgraph->nodes[node_idxs[j]];
+            for (int src_idx = 0; src_idx < WSP_GGML_MAX_SRC; src_idx++) {
+                if (other_node->src[src_idx] == node) {
+                    subgraph_uses++;
+                }
+            }
+        }
+
+        if (subgraph_uses != wsp_ggml_node_get_use_count(cgraph, node_idxs[i])) {
+            return false;
+        }
+
+        // if node is a view, check if the view_src and all it's parent view_srcs are within the subgraph
+        struct wsp_ggml_tensor * view_src = node->view_src;
+        while (view_src) {
+            if (wsp_ggml_node_list_find_tensor(cgraph, node_idxs, count, view_src) == -1) {
+                return false;
+            }
+            view_src = view_src->view_src;
+        }
+    }
+
+    return true;
 }
 
 // check if node is part of the graph

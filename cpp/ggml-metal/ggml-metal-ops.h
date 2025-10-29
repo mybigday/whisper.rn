@@ -39,6 +39,8 @@ size_t wsp_ggml_metal_op_mul_mat_id_extra_ids(const struct wsp_ggml_tensor * op)
 // return true if we should use the FA vector kernel for this op
 bool wsp_ggml_metal_op_flash_attn_ext_use_vec(const struct wsp_ggml_tensor * op);
 
+size_t wsp_ggml_metal_op_flash_attn_ext_extra_pad(const struct wsp_ggml_tensor * op);
+size_t wsp_ggml_metal_op_flash_attn_ext_extra_blk(const struct wsp_ggml_tensor * op);
 size_t wsp_ggml_metal_op_flash_attn_ext_extra_tmp(const struct wsp_ggml_tensor * op);
 
 int wsp_ggml_metal_op_concat            (wsp_ggml_metal_op_t ctx, int idx);
@@ -48,6 +50,7 @@ int wsp_ggml_metal_op_scale             (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_clamp             (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_unary             (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_glu               (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_sum               (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_sum_rows          (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_get_rows          (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_set_rows          (wsp_ggml_metal_op_t ctx, int idx);
@@ -68,6 +71,7 @@ int wsp_ggml_metal_op_norm              (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_rope              (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_im2col            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_conv_transpose_1d (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_conv_transpose_2d (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_upscale           (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_pad               (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_pad_reflect_1d    (wsp_ggml_metal_op_t ctx, int idx);
@@ -76,6 +80,8 @@ int wsp_ggml_metal_op_timestep_embedding(wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_argmax            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_argsort           (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_leaky_relu        (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_opt_step_adamw    (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_opt_step_sgd      (wsp_ggml_metal_op_t ctx, int idx);
 
 #ifdef __cplusplus
 }
