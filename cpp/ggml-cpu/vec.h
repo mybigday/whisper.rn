@@ -44,6 +44,7 @@ void wsp_ggml_vec_dot_bf16(int n, float * WSP_GGML_RESTRICT s, size_t bs, wsp_gg
 void wsp_ggml_vec_dot_f16(int n, float * WSP_GGML_RESTRICT s, size_t bs, wsp_ggml_fp16_t * WSP_GGML_RESTRICT x, size_t bx, wsp_ggml_fp16_t * WSP_GGML_RESTRICT y, size_t by, int nrc);
 
 void wsp_ggml_vec_silu_f32(const int n, float * y, const float * x);
+wsp_ggml_float wsp_ggml_vec_cvar_f32(const int n, float * y, const float * x, const float mean); //it will also center y ( y = y - mean )
 wsp_ggml_float wsp_ggml_vec_soft_max_f32(const int n, float * y, const float * x, float max);
 wsp_ggml_float wsp_ggml_vec_log_soft_max_f32(const int n, float * y, const float * x, float max);
 
@@ -143,14 +144,14 @@ inline static void wsp_ggml_vec_dot_f16_unroll(const int n, const int xs, float 
         for (int i = 0; i < np; i += wsp_ggml_f16_step) {
             ay1 = WSP_GGML_F16x_VEC_LOAD(y + i + 0 * wsp_ggml_f16_epr, 0); // 8 elements
 
-            ax1 = WSP_GGML_F16x_VEC_LOAD(x[0] + i + 0*wsp_ggml_f16_epr, 0); // 8 elemnst
+            ax1 = WSP_GGML_F16x_VEC_LOAD(x[0] + i + 0*wsp_ggml_f16_epr, 0); // 8 elements
             sum_00 = WSP_GGML_F16x_VEC_FMA(sum_00, ax1, ay1);     // sum_00 = sum_00+ax1*ay1
             ax1 = WSP_GGML_F16x_VEC_LOAD(x[1] + i + 0*wsp_ggml_f16_epr, 0); // 8 elements
             sum_10 = WSP_GGML_F16x_VEC_FMA(sum_10, ax1, ay1);
 
             ay2 = WSP_GGML_F16x_VEC_LOAD(y + i + 1 * wsp_ggml_f16_epr, 1); // next 8 elements
 
-            ax2 = WSP_GGML_F16x_VEC_LOAD(x[0] + i + 1*wsp_ggml_f16_epr, 1); // next 8 ekements
+            ax2 = WSP_GGML_F16x_VEC_LOAD(x[0] + i + 1*wsp_ggml_f16_epr, 1); // next 8 elements
             sum_01 = WSP_GGML_F16x_VEC_FMA(sum_01, ax2, ay2);
             ax2 = WSP_GGML_F16x_VEC_LOAD(x[1] + i + 1*wsp_ggml_f16_epr, 1);
             sum_11 = WSP_GGML_F16x_VEC_FMA(sum_11, ax2, ay2);
@@ -159,7 +160,7 @@ inline static void wsp_ggml_vec_dot_f16_unroll(const int n, const int xs, float 
 
             ax3 = WSP_GGML_F16x_VEC_LOAD(x[0] + i + 2*wsp_ggml_f16_epr, 2);
             sum_02 = WSP_GGML_F16x_VEC_FMA(sum_02, ax3, ay3);
-            ax1 = WSP_GGML_F16x_VEC_LOAD(x[1] + i + 2*wsp_ggml_f16_epr, 2);
+            ax3 = WSP_GGML_F16x_VEC_LOAD(x[1] + i + 2*wsp_ggml_f16_epr, 2);
             sum_12 = WSP_GGML_F16x_VEC_FMA(sum_12, ax3, ay3);
 
             ay4 = WSP_GGML_F16x_VEC_LOAD(y + i + 3 * wsp_ggml_f16_epr, 3);
@@ -654,11 +655,11 @@ inline static void wsp_ggml_vec_scale_f32(const int n, float * y, const float   
         }
         // leftovers
         // maximum number of leftover elements will be less that wsp_ggml_f32_epr. Apply predicated svmad on available elements only
-        if (np < n) {
-            svbool_t pg = svwhilelt_b32(np, n);
-            ay1 = svld1_f32(pg, y + np);
+        for (int i = np; i < n; i += wsp_ggml_f32_epr) {
+            svbool_t pg = svwhilelt_b32(i, n);
+            ay1 = svld1_f32(pg, y + i);
             ay1 = svmul_f32_m(pg, ay1, vx);
-            svst1_f32(pg, y + np, ay1);
+            svst1_f32(pg, y + i, ay1);
         }
     #elif defined(__riscv_v_intrinsic)
         for (int i = 0, avl; i < n; i += avl) {
@@ -819,7 +820,8 @@ inline static void wsp_ggml_vec_tanh_f16 (const int n, wsp_ggml_fp16_t * y, cons
 inline static void wsp_ggml_vec_elu_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : expm1f(x[i]); }
 inline static void wsp_ggml_vec_elu_f16 (const int n, wsp_ggml_fp16_t * y, const wsp_ggml_fp16_t * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = WSP_GGML_CPU_FP32_TO_FP16(expm1f(WSP_GGML_CPU_FP16_TO_FP32(x[i])));
+        const float v = WSP_GGML_CPU_FP16_TO_FP32(x[i]);
+        y[i] = WSP_GGML_CPU_FP32_TO_FP16((v > 0.f) ? v : expm1f(v));
     }
 }
 inline static void wsp_ggml_vec_relu_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.f; }

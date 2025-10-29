@@ -22,6 +22,11 @@ void wsp_ggml_compute_forward_sqrt(const struct wsp_ggml_compute_params * params
 void wsp_ggml_compute_forward_sin(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_cos(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_log(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_floor(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_ceil(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_round(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_trunc(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_xielu(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 
 #ifdef __cplusplus
 }

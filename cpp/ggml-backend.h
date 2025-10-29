@@ -215,6 +215,8 @@ extern "C" {
     // Backend registry
     //
 
+    WSP_GGML_API void wsp_ggml_backend_register(wsp_ggml_backend_reg_t reg);
+
     WSP_GGML_API void wsp_ggml_backend_device_register(wsp_ggml_backend_dev_t device);
 
     // Backend (reg) enumeration

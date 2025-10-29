@@ -112,7 +112,7 @@ static bool wsp_ggml_mem_ranges_add_dst(wsp_ggml_mem_ranges_t mrs, const wsp_ggm
 }
 
 bool wsp_ggml_mem_ranges_add(wsp_ggml_mem_ranges_t mrs, const wsp_ggml_tensor * tensor) {
-    for (int i = 0; i < WSP_GGML_MAX_DIMS; i++) {
+    for (int i = 0; i < WSP_GGML_MAX_SRC; i++) {
         if (tensor->src[i]) {
             wsp_ggml_mem_ranges_add_src(mrs, tensor->src[i]);
         }
@@ -173,7 +173,7 @@ static bool wsp_ggml_mem_ranges_check_dst(wsp_ggml_mem_ranges_t mrs, const wsp_g
 }
 
 bool wsp_ggml_mem_ranges_check(wsp_ggml_mem_ranges_t mrs, const wsp_ggml_tensor * tensor) {
-    for (int i = 0; i < WSP_GGML_MAX_DIMS; i++) {
+    for (int i = 0; i < WSP_GGML_MAX_SRC; i++) {
         if (tensor->src[i]) {
             if (!wsp_ggml_mem_ranges_check_src(mrs, tensor->src[i])) {
                 return false;

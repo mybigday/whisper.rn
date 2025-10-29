@@ -237,6 +237,8 @@
 #define WSP_GGML_EXIT_SUCCESS 0
 #define WSP_GGML_EXIT_ABORTED 1
 
+// TODO: convert to enum https://github.com/ggml-org/llama.cpp/pull/16187#discussion_r2388538726
+#define WSP_GGML_ROPE_TYPE_NORMAL 0
 #define WSP_GGML_ROPE_TYPE_NEOX   2
 #define WSP_GGML_ROPE_TYPE_MROPE  8
 #define WSP_GGML_ROPE_TYPE_VISION 24
@@ -574,6 +576,11 @@ extern "C" {
         WSP_GGML_UNARY_OP_HARDSIGMOID,
         WSP_GGML_UNARY_OP_EXP,
         WSP_GGML_UNARY_OP_GELU_ERF,
+        WSP_GGML_UNARY_OP_XIELU,
+        WSP_GGML_UNARY_OP_FLOOR,
+        WSP_GGML_UNARY_OP_CEIL,
+        WSP_GGML_UNARY_OP_ROUND,
+        WSP_GGML_UNARY_OP_TRUNC,
 
         WSP_GGML_UNARY_OP_COUNT,
     };
@@ -1148,6 +1155,58 @@ extern "C" {
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
 
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_floor(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_floor_inplace(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_ceil(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_ceil_inplace(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_round(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_round_inplace(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+     /**
+     * Truncates the fractional part of each element in the tensor (towards zero).
+     * For example: trunc(3.7) = 3.0, trunc(-2.9) = -2.0
+     * Similar to std::trunc in C/C++.
+     */
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_trunc(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_trunc_inplace(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a);
+
+
+
+    // xIELU activation function
+    // x = x * (c_a(alpha_n) + c_b(alpha_p, beta) * sigmoid(beta * x)) + eps * (x > 0)
+    // where c_a = softplus and c_b(a, b) = softplus(a) + b are constraining functions
+    // that constrain the positive and negative source alpha values respectively
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_xielu(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            float alpha_n,
+            float alpha_p,
+            float beta,
+            float eps);
+
     // gated linear unit ops
     // A: n columns, r rows,
     // result is n / 2 columns, r rows,
@@ -1609,6 +1668,13 @@ extern "C" {
     // fused soft_max(a*scale + mask*(ALiBi slope))
     // max_bias = 0.0f for no ALiBi
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_ext(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            struct wsp_ggml_tensor  * mask,
+            float                 scale,
+            float                 max_bias);
+
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_ext_inplace(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
             struct wsp_ggml_tensor  * mask,

@@ -1296,7 +1296,7 @@ static wsp_ggml_backend_t whisper_backend_init_gpu(const whisper_context_params 
     if (params.use_gpu) {
         for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
             wsp_ggml_backend_dev_t dev_cur = wsp_ggml_backend_dev_get(i);
-            if (wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
+            if (wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU || wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU) {
                 if (cnt == params.gpu_device) {
                     dev = dev_cur;
                 }
@@ -1365,7 +1365,7 @@ static buft_list_t make_buft_list(whisper_context_params & params) {
         int cnt = 0;
         for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
             wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_get(i);
-            if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU) {
+            if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU || wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU) {
                 if (cnt == params.gpu_device) {
                     auto * buft = wsp_ggml_backend_dev_buffer_type(dev);
                     if (buft) {
@@ -1403,6 +1403,7 @@ static bool weight_buft_supported(const whisper_hparams & hparams, wsp_ggml_tens
     bool op_supported = true;
 
     if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU ||
+        wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU ||
         (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_CPU && buft == wsp_ggml_backend_cpu_buffer_type())) {
         // GPU and default CPU backend support all operators
         op_supported = true;
@@ -4459,6 +4460,7 @@ static bool weight_buft_supported(const whisper_vad_hparams & hparams, wsp_ggml_
     bool op_supported = true;
 
     if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU ||
+        wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU ||
         (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_CPU && buft == wsp_ggml_backend_cpu_buffer_type())) {
         // GPU and default CPU backend support all operators
         op_supported = true;
