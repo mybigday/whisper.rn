@@ -425,8 +425,9 @@ Java_com_rnwhisper_WhisperContext_fullWithNewJob(
     LOGI("About to reset timings");
     whisper_reset_timings(context);
 
-    LOGI("About to run whisper_full");
-    int code = whisper_full(context, params, audio_data_arr, audio_data_len);
+    int n_processors = readablemap::getInt(env, options, "nProcessors", 1);
+    LOGI("About to run whisper_full_parallel with n_processors=%d", n_processors);
+    int code = whisper_full_parallel(context, params, audio_data_arr, audio_data_len, n_processors);
     if (code == 0) {
         // whisper_print_timings(context);
     }
@@ -445,8 +446,11 @@ Java_com_rnwhisper_WhisperContext_createRealtimeTranscribeJob(
     jlong context_ptr,
     jobject options
 ) {
+    UNUSED(thiz);
+    UNUSED(context_ptr);
     whisper_full_params params = createFullParams(env, options);
     rnwhisper::job* job = rnwhisper::job_new(job_id, params);
+    job->n_processors = readablemap::getInt(env, options, "nProcessors", 1);
     rnwhisper::vad_params vad;
     vad.use_vad = readablemap::getBool(env, options, "useVad", false);
     vad.vad_ms = readablemap::getInt(env, options, "vadMs", 2000);
@@ -538,11 +542,12 @@ Java_com_rnwhisper_WhisperContext_fullWithJob(
     jint n_samples
 ) {
     UNUSED(thiz);
+    UNUSED(env);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
 
     rnwhisper::job* job = rnwhisper::job_get(job_id);
     float* pcmf32 = job->pcm_slice_to_f32(slice_index, n_samples);
-    int code = whisper_full(context, job->params, pcmf32, n_samples);
+    int code = whisper_full_parallel(context, job->params, pcmf32, n_samples, job->n_processors);
     free(pcmf32);
     if (code == 0) {
         // whisper_print_timings(context);

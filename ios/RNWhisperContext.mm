@@ -168,6 +168,7 @@ static void* retained_log_block = nullptr;
     self->recordState.sliceNSamples.push_back(0);
 
     self->recordState.job = rnwhisper::job_new(jobId, [self createParams:options jobId:jobId]);
+    self->recordState.job->n_processors = options[@"nProcessors"] != nil ? [options[@"nProcessors"] intValue] : 1;
     self->recordState.job->set_realtime_params(
         {
             .use_vad = options[@"useVad"] != nil ? [options[@"useVad"] boolValue] : false,
@@ -471,6 +472,7 @@ struct rnwhisper_segments_callback_data {
         }
 
         rnwhisper::job* job = rnwhisper::job_new(jobId, params);
+        job->n_processors = options[@"nProcessors"] != nil ? [options[@"nProcessors"] intValue] : 1;
         self->recordState.job = job;
         int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
         rnwhisper::job_remove(jobId);
@@ -572,7 +574,7 @@ struct rnwhisper_segments_callback_data {
   audioDataCount:(int)audioDataCount
 {
     whisper_reset_timings(self->ctx);
-    int code = whisper_full(self->ctx, job->params, audioData, audioDataCount);
+    int code = whisper_full_parallel(self->ctx, job->params, audioData, audioDataCount, job->n_processors);
     if (job && job->is_aborted()) code = -999;
     // if (code == 0) {
     //     whisper_print_timings(self->ctx);

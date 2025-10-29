@@ -24,6 +24,7 @@ struct job {
     int job_id;
     bool aborted = false;
     whisper_full_params params;
+    int n_processors = 1;
 
     ~job();
     bool is_aborted();
