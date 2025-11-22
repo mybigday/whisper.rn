@@ -190,6 +190,10 @@ export interface RealtimeOptions {
   autoSliceOnSpeechEnd?: boolean // default: false - automatically slice when speech ends and duration thresholds are met
   autoSliceThreshold?: number // default: 0.85 - percentage of audioSliceSec to trigger auto-slice
 
+  // VAD optimization options for low-end CPU
+  vadThrottleMs?: number // default: 1500 - Minimum time between VAD calls (ms)
+  vadSkipRatio?: number // default: 0 - Skip every Nth slice (0 = no skipping)
+
   // Transcription settings
   transcribeOptions?: TranscribeOptions
 
