@@ -506,7 +506,25 @@ export class RealtimeTranscriber {
         return
       }
 
-      // Convert base64 back to Uint8Array for VAD processing
+      // Check if user callback allows VAD processing
+      if (this.callbacks.onBeginVad) {
+        const {
+          sampleRate = 16000,
+          channels = 1,
+        } = this.options.audioStreamConfig || {}
+        const duration = audioData.length / sampleRate / channels * 1000 // Convert to milliseconds
+        const shouldProcessVad =
+          (await this.callbacks.onBeginVad({
+            sliceIndex: slice.index,
+            audioData,
+            duration,
+          })) ?? true
+
+        if (!shouldProcessVad) {
+          this.log(`User callback declined VAD processing for slice ${slice.index}`)
+          return
+        }
+      }
 
       // Detect speech in the slice
       const vadEvent = await this.detectSpeech(audioData, slice.index)
