@@ -18,7 +18,7 @@ import type {
 } from './types'
 import { VAD_PRESETS } from './types'
 
-const SILENCE_SEGMENT_REGEX = /\[(\s*silence\s*|BLANK\w*)\]/i
+const SILENCE_SEGMENT_REGEX = /\[(\s*silence\s*|blank\w*)]/i
 
 /**
  * RealtimeTranscriber provides real-time audio transcription with VAD support.
