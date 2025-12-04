@@ -197,6 +197,11 @@ static size_t wsp_ggml_backend_metal_buffer_type_get_alloc_size(wsp_ggml_backend
                 res += wsp_ggml_metal_op_flash_attn_ext_extra_blk(tensor);
                 res += wsp_ggml_metal_op_flash_attn_ext_extra_tmp(tensor);
             } break;
+        case WSP_GGML_OP_CUMSUM:
+        case WSP_GGML_OP_ARGSORT:
+            {
+                res *= 2;
+            } break;
         default:
             break;
     }

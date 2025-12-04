@@ -102,7 +102,7 @@ static bool wsp_ggml_op_is_empty(enum wsp_ggml_op op) {
     }
 }
 
-static inline float wsp_ggml_softplus(float input) {
+static inline float wsp_ggml_compute_softplus_f32(float input) {
     return (input > 20.0f) ? input : logf(1 + expf(input));
 }
 //
@@ -682,6 +682,7 @@ static inline bool wsp_ggml_can_fuse_subgraph(const struct wsp_ggml_cgraph * cgr
 #endif
 
 #ifdef __cplusplus
+#include <array>
 #include <initializer_list>
 #include <vector>
 
@@ -695,6 +696,21 @@ inline bool wsp_ggml_can_fuse_subgraph(const struct wsp_ggml_cgraph *          c
                                    std::initializer_list<enum wsp_ggml_op> ops,
                                    std::initializer_list<int>          outputs = {}) {
     return wsp_ggml_can_fuse_subgraph(cgraph, start_idx, ops.size(), ops.begin(), outputs.begin(), outputs.size());
+}
+
+// Return true if the edges in the graph match expectations.
+inline bool wsp_ggml_check_edges(const struct wsp_ggml_cgraph *                cgraph,
+                             int                                       start_idx,
+                             std::initializer_list<std::array<int, 3>> edges) {
+    for (const auto & edge : edges) {
+        int dst_node = edge[0];
+        int src_idx  = edge[1];
+        int src_node = edge[2];
+        if (cgraph->nodes[start_idx + dst_node]->src[src_idx] != cgraph->nodes[start_idx + src_node]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // expose GGUF internals for test code

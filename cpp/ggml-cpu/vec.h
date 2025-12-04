@@ -1416,6 +1416,16 @@ inline static void wsp_ggml_vec_sum_f32(const int n, float * s, const float * x)
 #endif
 }
 
+inline static void wsp_ggml_vec_cumsum_f32(const int n, float * y, const float * x) {
+    for (int i = 0; i < n; ++i) {
+        if (i == 0) {
+            y[i] = x[i];
+        } else {
+            y[i] = y[i - 1] + x[i];
+        }
+    }
+}
+
 inline static void wsp_ggml_vec_sum_f32_ggf(const int n, wsp_ggml_float * s, const float * x) {
     wsp_ggml_float sum = 0.0;
     for (int i = 0; i < n; ++i) {

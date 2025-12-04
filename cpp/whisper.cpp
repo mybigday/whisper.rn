@@ -1296,7 +1296,11 @@ static wsp_ggml_backend_t whisper_backend_init_gpu(const whisper_context_params 
     if (params.use_gpu) {
         for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
             wsp_ggml_backend_dev_t dev_cur = wsp_ggml_backend_dev_get(i);
-            if (wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU || wsp_ggml_backend_dev_type(dev_cur) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU) {
+            enum wsp_ggml_backend_dev_type dev_type = wsp_ggml_backend_dev_type(dev_cur);
+            const char * dev_name = wsp_ggml_backend_dev_name(dev_cur);
+            WHISPER_LOG_INFO("%s: device %zu: %s (type: %d)\n", __func__, i, dev_name, dev_type);
+            if (dev_type == WSP_GGML_BACKEND_DEVICE_TYPE_GPU || dev_type == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU) {
+                WHISPER_LOG_INFO("%s: found GPU device %zu: %s (type: %d, cnt: %d)\n", __func__, i, dev_name, dev_type, cnt);
                 if (cnt == params.gpu_device) {
                     dev = dev_cur;
                 }

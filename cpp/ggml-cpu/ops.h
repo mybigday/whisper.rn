@@ -34,6 +34,7 @@ void wsp_ggml_compute_forward_add1(const struct wsp_ggml_compute_params * params
 void wsp_ggml_compute_forward_acc(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_sum(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_sum_rows(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_cumsum(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_mean(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_argmax(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_count_equal(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -51,10 +52,6 @@ void wsp_ggml_compute_forward_scale(const struct wsp_ggml_compute_params * param
 void wsp_ggml_compute_forward_set(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_cpy(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_cont(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
-void wsp_ggml_compute_forward_reshape(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
-void wsp_ggml_compute_forward_view(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
-void wsp_ggml_compute_forward_permute(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
-void wsp_ggml_compute_forward_transpose(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_get_rows(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_get_rows_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_set_rows(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -85,6 +82,8 @@ void wsp_ggml_compute_forward_arange(const struct wsp_ggml_compute_params * para
 void wsp_ggml_compute_forward_timestep_embedding(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_argsort(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_leaky_relu(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_tri(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_fill(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_flash_attn_ext(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_flash_attn_back(
         const struct wsp_ggml_compute_params * params,
@@ -100,6 +99,7 @@ void wsp_ggml_compute_forward_get_rel_pos(const struct wsp_ggml_compute_params *
 void wsp_ggml_compute_forward_add_rel_pos(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_rwkv_wkv6(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_rwkv_wkv7(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_solve_tri(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_gla(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_map_custom1(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_map_custom2(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);

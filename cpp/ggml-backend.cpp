@@ -1698,8 +1698,6 @@ bool wsp_ggml_backend_sched_reserve(wsp_ggml_backend_sched_t sched, struct wsp_g
     WSP_GGML_ASSERT(sched);
     WSP_GGML_ASSERT((int)sched->hash_set.size >= measure_graph->n_nodes + measure_graph->n_leafs);
 
-    wsp_ggml_backend_sched_reset(sched);
-
     wsp_ggml_backend_sched_synchronize(sched);
 
     wsp_ggml_backend_sched_split_graph(sched, measure_graph);

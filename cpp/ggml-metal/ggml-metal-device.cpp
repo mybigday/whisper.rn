@@ -318,6 +318,44 @@ wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_sum_rows(wsp_ggml_
     return res;
 }
 
+wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_cumsum_blk(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(op->op == WSP_GGML_OP_CUMSUM);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_cumsum_blk_%s", wsp_ggml_type_name(op->src[0]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (res) {
+        return res;
+    }
+
+    res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_cumsum_add(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(op->op == WSP_GGML_OP_CUMSUM);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_cumsum_add_%s", wsp_ggml_type_name(op->src[0]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (res) {
+        return res;
+    }
+
+    res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+
+    return res;
+}
+
 wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_soft_max(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
     WSP_GGML_ASSERT(!op->src[1] || op->src[1]->type == WSP_GGML_TYPE_F16 || op->src[1]->type == WSP_GGML_TYPE_F32);
 
@@ -677,7 +715,7 @@ wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_mul_mm_id_map0(wsp
     char name[256];
 
     snprintf(base, 256, "kernel_mul_mm_id_map0_ne20_%d", ne20);
-    snprintf(name, 256, "%s", base);
+    snprintf(name, 256, "%s_ne02=%d", base, ne02);
 
     wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
     if (res) {
@@ -931,6 +969,34 @@ wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_argsort(wsp_ggml_m
     };
 
     snprintf(base, 256, "kernel_argsort_%s_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->type), order_str);
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (res) {
+        return res;
+    }
+
+    res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_argsort_merge(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    assert(op->op == WSP_GGML_OP_ARGSORT);
+
+    char base[256];
+    char name[256];
+
+    wsp_ggml_sort_order order = (wsp_ggml_sort_order) op->op_params[0];
+
+    const char * order_str = "undefined";
+    switch (order) {
+        case WSP_GGML_SORT_ORDER_ASC:  order_str = "asc";  break;
+        case WSP_GGML_SORT_ORDER_DESC: order_str = "desc"; break;
+        default: WSP_GGML_ABORT("fatal error");
+    };
+
+    snprintf(base, 256, "kernel_argsort_merge_%s_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->type), order_str);
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
@@ -1332,11 +1398,12 @@ wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_rope(wsp_ggml_meta
 
     const bool is_neox   = mode & WSP_GGML_ROPE_TYPE_NEOX;
     const bool is_mrope  = mode & WSP_GGML_ROPE_TYPE_MROPE;
+    const bool is_imrope = mode == WSP_GGML_ROPE_TYPE_IMROPE;
     const bool is_vision = mode == WSP_GGML_ROPE_TYPE_VISION;
 
     if (is_neox) {
         snprintf(base, 256, "kernel_rope_neox_%s", wsp_ggml_type_name(op->src[0]->type));
-    } else if (is_mrope && !is_vision) {
+    } else if ((is_mrope || is_imrope) && !is_vision) {
         WSP_GGML_ASSERT(op->src[1]->ne[0]*4 >= op->src[0]->ne[2]); // need at least 4 pos per token
         snprintf(base, 256, "kernel_rope_multi_%s", wsp_ggml_type_name(op->src[0]->type));
     } else if (is_vision) {
@@ -1346,14 +1413,20 @@ wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_rope(wsp_ggml_meta
         snprintf(base, 256, "kernel_rope_norm_%s", wsp_ggml_type_name(op->src[0]->type));
     }
 
-    snprintf(name, 256, "%s", base);
+    snprintf(name, 256, "%s_imrope=%d", base, is_imrope ? 1 : 0);
 
     wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
     if (res) {
         return res;
     }
 
-    res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    wsp_ggml_metal_cv_t cv = wsp_ggml_metal_cv_init();
+
+    wsp_ggml_metal_cv_set_bool(cv, is_imrope, FC_ROPE + 0);
+
+    res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, cv);
+
+    wsp_ggml_metal_cv_free(cv);
 
     return res;
 }
@@ -1419,6 +1492,30 @@ wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_conv_transpose_2d(
     char name[256];
 
     snprintf(base, 256, "kernel_conv_transpose_2d_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->src[1]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (res) {
+        return res;
+    }
+
+    res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_t wsp_ggml_metal_library_get_pipeline_conv_2d(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    assert(op->op == WSP_GGML_OP_CONV_2D);
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(op->src[0]));
+    WSP_GGML_ASSERT(op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(op->src[1]->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(op->type         == WSP_GGML_TYPE_F32);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_conv_2d_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->src[1]->type));
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_t res = wsp_ggml_metal_library_get_pipeline(lib, name);
