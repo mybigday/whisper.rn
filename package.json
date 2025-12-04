@@ -1,6 +1,6 @@
 {
   "name": "whisper.rn",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "React Native binding of whisper.cpp",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
