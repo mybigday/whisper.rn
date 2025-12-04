@@ -35,7 +35,7 @@ Pod::Spec.new do |s|
 
   if ENV["RNWHISPER_BUILD_FROM_SOURCE"] == "1"
     s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,hpp,c,m,mm}"
-    s.resources = "cpp/**/*.{metallib}"
+    s.resources = "cpp/ggml-metal/ggml-metal.metal"
     base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE"
 
     s.subspec "no-require-arc" do |ss|

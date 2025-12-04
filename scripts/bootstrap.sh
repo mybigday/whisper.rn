@@ -15,7 +15,30 @@ cp ./whisper.cpp/ggml/include/gguf.h ./cpp/gguf.h
 
 cp -r ./whisper.cpp/ggml/src/ggml-metal ./cpp/
 rm ./cpp/ggml-metal/CMakeLists.txt
-rm ./cpp/ggml-metal/ggml-metal.metal
+
+# Embed headers into ggml-metal.metal for runtime compilation
+# This allows the .metal file to be compiled at runtime without needing external header files
+METAL_SOURCE="./cpp/ggml-metal/ggml-metal.metal"
+METAL_TMP="./cpp/ggml-metal/ggml-metal.metal.tmp"
+COMMON_HEADER="./whisper.cpp/ggml/src/ggml-common.h"
+IMPL_HEADER="./cpp/ggml-metal/ggml-metal-impl.h"
+
+# Step 1: Replace the __embed_ggml-common.h__ placeholder with the actual header content
+awk '
+/^#if defined\(GGML_METAL_EMBED_LIBRARY\)/ { skip=1; next }
+/__embed_ggml-common.h__/ {
+    system("cat '"$COMMON_HEADER"'")
+    next
+}
+/^#else/ && skip { skip_else=1; next }
+/^#endif/ && skip_else { skip=0; skip_else=0; next }
+!skip { print }
+' < "$METAL_SOURCE" > "$METAL_TMP"
+
+# Step 2: Replace the #include "ggml-metal-impl.h" with the actual header content
+sed -e '/#include "ggml-metal-impl.h"/r '"$IMPL_HEADER" \
+    -e '/#include "ggml-metal-impl.h"/d' < "$METAL_TMP" > "$METAL_SOURCE"
+rm "$METAL_TMP"
 
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c ./cpp/ggml-cpu/ggml-cpu.c
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp ./cpp/ggml-cpu/ggml-cpu.cpp
@@ -90,6 +113,7 @@ files=(
   "./cpp/ggml-metal/ggml-metal-device.m"
   "./cpp/ggml-metal/ggml-metal-ops.h"
   "./cpp/ggml-metal/ggml-metal-ops.cpp"
+  "./cpp/ggml-metal/ggml-metal.metal"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
@@ -197,31 +221,7 @@ patch -p0 -d ./cpp < ./scripts/patches/ggml-quants.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
-patch -p0 -d ./cpp/ggml-metal < ./scripts/patches/ggml-metal-device.m.patch
 rm -rf ./cpp/*.orig
-
-if [ "$OS" = "Darwin" ]; then
-  # Build metallib (~2.6MB)
-  cd whisper.cpp/ggml/src/ggml-metal
-
-  # Create a symbolic link to ggml-common.h in the current directory
-  ln -sf ../ggml-common.h .
-
-  xcrun --sdk iphoneos metal -O3 -std=metal3.2 -mios-version-min=16.0 -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_HAS_BF16=1
-  xcrun --sdk iphoneos metallib ggml-metal.air -o ggml-whisper.metallib
-  rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-metal/ggml-whisper.metallib
-
-  xcrun --sdk iphonesimulator metal -O3 -std=metal3.2 -mios-version-min=16.0 -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_HAS_BF16=1
-  xcrun --sdk iphonesimulator metallib ggml-metal.air -o ggml-whisper.metallib
-  rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-metal/ggml-whisper-sim.metallib
-
-  # Remove the symbolic link
-  rm ggml-common.h
-
-  cd -
-fi
 
 # Download model for example
 cd whisper.cpp/models
