@@ -85,3 +85,9 @@ ios/rnwhisper.xcframework/**/*.framework
 
 local-plan/
 local-plan-done/
+
+# Hexagon HTP build artifacts
+build-hexagon-htp/
+bin/arm64-v8a/libggml-htp-*.so
+cpp/ggml-hexagon/htp/v73/htp_iface_stub.c
+cpp/ggml-hexagon/htp/v73/htp_iface.h

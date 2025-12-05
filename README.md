@@ -40,6 +40,11 @@ Add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
 
 It's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
+##### Hexagon (NPU acceleration) (Experimental)
+
+- Confirm the target device has HTP (Hexagon Tensor Processor), Qualcomm SM8550+ (Snapdragon 8 Gen 2 or newer) devices are currently supported & tested.
+- Add `<uses-native-library android:name="libcdsprpc.so" android:required="false" />` to your app manifest so the loader can be loaded at runtime.
+
 #### Expo
 
 You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.

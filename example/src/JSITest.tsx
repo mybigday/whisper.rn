@@ -77,7 +77,9 @@ const styles = StyleSheet.create({
 
 const JSITest: React.FC = () => {
   const [testResults, setTestResults] = useState<string[]>([])
-  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(null)
+  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
+    null,
+  )
   const [vadContext, setVadContext] = useState<WhisperVadContext | null>(null)
   const [contextsInitialized, setContextsInitialized] = useState(false)
 
@@ -148,34 +150,43 @@ const JSITest: React.FC = () => {
       }
 
       // Test 2: Transcription with ArrayBuffer and callbacks
-      addTestResult('🧪 Testing transcribeData with ArrayBuffer and callbacks...')
+      addTestResult(
+        '🧪 Testing transcribeData with ArrayBuffer and callbacks...',
+      )
 
       try {
         let progressCount = 0
         let segmentsCount = 0
 
         const t0 = Date.now()
-        const { promise: transcribePromise } = whisperContext.transcribeData(arrayBuffer, {
-          language: 'en',
-          maxThreads: 4,
-          translate: false,
-          tokenTimestamps: false,
-          tdrzEnable: false,
-          onProgress: (progress: number) => {
-            progressCount += 1
-            addTestResult(`📊 Progress callback #${progressCount}: ${progress}%`)
+        const { promise: transcribePromise } = whisperContext.transcribeData(
+          arrayBuffer,
+          {
+            language: 'en',
+            maxThreads: 6,
+            translate: false,
+            tokenTimestamps: false,
+            tdrzEnable: false,
+            onProgress: (progress: number) => {
+              progressCount += 1
+              addTestResult(
+                `📊 Progress callback #${progressCount}: ${progress}%`,
+              )
+            },
+            onNewSegments: (result: any) => {
+              segmentsCount += 1
+              addTestResult(`🆕 New segments callback #${segmentsCount}:`)
+              addTestResult(`  New segments: ${result.nNew}`)
+              addTestResult(`  Total segments: ${result.totalNNew}`)
+              addTestResult(`  Text: "${result.result}"`)
+              result.segments.forEach((segment: any) => {
+                addTestResult(
+                  `    Segment ${segment.text} ${segment.t0} ${segment.t1}`,
+                )
+              })
+            },
           },
-          onNewSegments: (result: any) => {
-            segmentsCount += 1
-            addTestResult(`🆕 New segments callback #${segmentsCount}:`)
-            addTestResult(`  New segments: ${result.nNew}`)
-            addTestResult(`  Total segments: ${result.totalNNew}`)
-            addTestResult(`  Text: "${result.result}"`)
-            result.segments.forEach((segment: any) => {
-              addTestResult(`    Segment ${segment.text} ${segment.t0} ${segment.t1}`)
-            })
-          },
-        })
+        )
         const transcribeResult = await transcribePromise
         const t1 = Date.now()
         addTestResult(`🕒 Time taken: ${t1 - t0}ms`)
@@ -183,12 +194,12 @@ const JSITest: React.FC = () => {
         addTestResult(`📝 Final result: "${transcribeResult.result}"`)
         addTestResult(`📊 Total progress callbacks: ${progressCount}`)
         addTestResult(`🆕 Total segment callbacks: ${segmentsCount}`)
-        addTestResult(`🔢 Final segments count: ${transcribeResult.segments?.length || 0}`)
-
+        addTestResult(
+          `🔢 Final segments count: ${transcribeResult.segments?.length || 0}`,
+        )
       } catch (error) {
         addTestResult(`❌ Transcription error: ${error}`)
       }
-
     } catch (error) {
       addTestResult(`❌ Test error: ${error}`)
     }
