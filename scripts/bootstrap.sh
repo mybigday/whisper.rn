@@ -1,7 +1,91 @@
 #!/bin/bash -e
 
+ROOT_DIR=$(pwd)
+OS=$(uname)
+
 git submodule init
 git submodule update --recursive
+
+# Hexagon SDK setup for Android builds
+echo ""
+echo "=========================================="
+echo "Hexagon SDK Setup"
+echo "=========================================="
+echo ""
+
+# Check if Docker is available and recommend it
+if command -v docker &> /dev/null && docker info &> /dev/null 2>&1; then
+  echo "Docker is available!"
+  echo ""
+  echo "For Hexagon builds, we recommend using Docker for consistent builds."
+  echo "Docker provides a pre-configured environment with all dependencies."
+  echo ""
+  echo "Build commands:"
+  echo "  ./scripts/build-hexagon-htp.sh       - Build HTP libraries (auto-detects Docker)"
+  echo ""
+
+  # Pull Docker image in background
+  DOCKER_IMAGE="ghcr.io/snapdragon-toolchain/arm64-android:v0.3"
+  if ! docker image inspect "$DOCKER_IMAGE" &> /dev/null; then
+    echo "Pulling Docker image in background..."
+    echo "  Image: $DOCKER_IMAGE"
+    docker pull "$DOCKER_IMAGE" &
+    DOCKER_PULL_PID=$!
+    echo "  (Pull process running in background, PID: $DOCKER_PULL_PID)"
+  else
+    echo "Docker image already present: $DOCKER_IMAGE"
+  fi
+  echo ""
+else
+  echo "Docker not available. You can:"
+  echo "  1. Install Docker for consistent builds (recommended)"
+  echo "  2. Install Hexagon SDK manually for native Linux builds"
+  echo ""
+fi
+
+# Download and setup Hexagon SDK (for all platforms)
+# On macOS: Needed for libcdsprpc.so linking when building Android libraries
+# On Linux: Can be used for native builds without Docker
+HEXAGON_SDK_VERSION="6.4.0.2"
+HEXAGON_TOOLS_VERSION="19.0.04"
+HEXAGON_INSTALL_DIR="${HEXAGON_INSTALL_DIR:-$HOME/.hexagon-sdk}"
+
+if [ ! -d "$HEXAGON_INSTALL_DIR/$HEXAGON_SDK_VERSION" ]; then
+  echo "Downloading Hexagon SDK v${HEXAGON_SDK_VERSION}..."
+  echo ""
+
+  if [ "$OS" = "Darwin" ]; then
+    echo "Note: SDK tools won't run on macOS, but libcdsprpc.so is needed for linking"
+  fi
+  echo ""
+
+  TEMP_DIR=$(mktemp -d)
+  cd "$TEMP_DIR"
+
+  curl -L -o hex-sdk.tar.gz \
+    "https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v${HEXAGON_SDK_VERSION}/hexagon-sdk-v${HEXAGON_SDK_VERSION}-amd64-lnx.tar.xz"
+
+  echo "Extracting Hexagon SDK..."
+  mkdir -p "$HEXAGON_INSTALL_DIR"
+  tar -xaf hex-sdk.tar.gz -C "$HEXAGON_INSTALL_DIR"
+
+  cd "$ROOT_DIR"
+  rm -rf "$TEMP_DIR"
+
+  echo "Hexagon SDK installed to: $HEXAGON_INSTALL_DIR/$HEXAGON_SDK_VERSION"
+  echo ""
+  echo "The build scripts will automatically detect and use the SDK."
+  echo ""
+  echo "To build HTP libraries:"
+  echo "  ./scripts/build-hexagon-htp.sh"
+  echo ""
+else
+  echo "Hexagon SDK installed: $HEXAGON_INSTALL_DIR/$HEXAGON_SDK_VERSION"
+  echo ""
+fi
+
+echo "=========================================="
+echo ""
 
 # ggml api
 cp ./whisper.cpp/ggml/include/ggml.h ./cpp/ggml.h
@@ -15,6 +99,11 @@ cp ./whisper.cpp/ggml/include/gguf.h ./cpp/gguf.h
 
 cp -r ./whisper.cpp/ggml/src/ggml-metal ./cpp/
 rm ./cpp/ggml-metal/CMakeLists.txt
+
+# ggml-hexagon (Qualcomm Hexagon DSP backend)
+cp ./whisper.cpp/ggml/include/ggml-hexagon.h ./cpp/ggml-hexagon.h
+cp -r ./whisper.cpp/ggml/src/ggml-hexagon ./cpp/
+# Keep CMakeLists.txt for hexagon as it's needed for building HTP components
 
 # Embed headers into ggml-metal.metal for runtime compilation
 # This allows the .metal file to be compiled at runtime without needing external header files
@@ -114,6 +203,31 @@ files=(
   "./cpp/ggml-metal/ggml-metal-ops.h"
   "./cpp/ggml-metal/ggml-metal-ops.cpp"
   "./cpp/ggml-metal/ggml-metal.metal"
+  # ggml-hexagon (Qualcomm Hexagon DSP backend)
+  "./cpp/ggml-hexagon.h"
+  "./cpp/ggml-hexagon/ggml-hexagon.cpp"
+  "./cpp/ggml-hexagon/htp-utils.c"
+  "./cpp/ggml-hexagon/htp-utils.h"
+  "./cpp/ggml-hexagon/htp/main.c"
+  "./cpp/ggml-hexagon/htp/htp-ctx.h"
+  "./cpp/ggml-hexagon/htp/htp-dma.c"
+  "./cpp/ggml-hexagon/htp/htp-dma.h"
+  "./cpp/ggml-hexagon/htp/htp-msg.h"
+  "./cpp/ggml-hexagon/htp/htp-ops.h"
+  "./cpp/ggml-hexagon/htp/worker-pool.c"
+  "./cpp/ggml-hexagon/htp/worker-pool.h"
+  "./cpp/ggml-hexagon/htp/matmul-ops.c"
+  "./cpp/ggml-hexagon/htp/act-ops.c"
+  "./cpp/ggml-hexagon/htp/binary-ops.c"
+  "./cpp/ggml-hexagon/htp/unary-ops.c"
+  "./cpp/ggml-hexagon/htp/rope-ops.c"
+  "./cpp/ggml-hexagon/htp/softmax-ops.c"
+  "./cpp/ggml-hexagon/htp/ops-utils.h"
+  "./cpp/ggml-hexagon/htp/hvx-utils.c"
+  "./cpp/ggml-hexagon/htp/hvx-utils.h"
+  "./cpp/ggml-hexagon/htp/hvx-exp.c"
+  "./cpp/ggml-hexagon/htp/hvx-inverse.c"
+  "./cpp/ggml-hexagon/htp/hvx-sigmoid.c"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
@@ -221,6 +335,7 @@ patch -p0 -d ./cpp < ./scripts/patches/ggml-quants.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
+patch -p0 -d ./cpp < ./scripts/patches/ggml-hexagon.cpp.patch
 rm -rf ./cpp/*.orig
 
 # Download model for example
