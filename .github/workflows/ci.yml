@@ -129,6 +129,10 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Build Hexagon HTP libraries
+        run: |
+          USE_DOCKER=yes ./scripts/build-hexagon-htp.sh
+
       - name: Build example for Android
         env:
           HEXAGON_SDK_VERSION: 6.4.0.2
