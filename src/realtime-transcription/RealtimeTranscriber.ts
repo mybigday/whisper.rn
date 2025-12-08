@@ -18,6 +18,8 @@ import type {
 } from './types'
 import { VAD_PRESETS } from './types'
 
+const SILENCE_SEGMENT_REGEX = /\[(\s*\w+\s*)]/i
+
 /**
  * RealtimeTranscriber provides real-time audio transcription with VAD support.
  *
@@ -55,6 +57,9 @@ export class RealtimeTranscriber {
     audioOutputPath?: string
     audioStreamConfig?: AudioStreamConfig
     logger: (message: string) => void
+    // VAD optimization options for low-end CPU
+    vadThrottleMs: number // Minimum time between VAD calls (ms)
+    vadSkipRatio: number // Skip every Nth slice (0 = no skipping)
   }
 
   private isActive = false
@@ -80,6 +85,15 @@ export class RealtimeTranscriber {
 
   // Track last stats to emit only when changed
   private lastStatsSnapshot: any = null
+
+  // VAD throttling for low-end CPU optimization
+  private isProcessingVAD = false
+
+  private lastVadProcessTime = 0
+
+  private vadProcessingQueue: any[] = []
+
+  private skippedVadCount = 0
 
   // Store transcription results by slice index
   private transcriptionResults: Map<
@@ -115,6 +129,9 @@ export class RealtimeTranscriber {
       promptPreviousSlices: options.promptPreviousSlices ?? true,
       audioOutputPath: options.audioOutputPath,
       logger: options.logger || (() => {}),
+      // VAD optimization options for low-end CPU
+      vadThrottleMs: options.vadThrottleMs ?? 1500, // Minimum time between VAD calls (ms)
+      vadSkipRatio: options.vadSkipRatio ?? 0, // Skip every Nth slice (0 = no skipping)
     }
 
     // Apply VAD preset if specified
@@ -291,11 +308,9 @@ export class RealtimeTranscriber {
         `Slice ${result.slice.index} ready (${result.slice.data.length} bytes)`,
       )
 
-      // Process VAD for the slice if enabled
+      // Process VAD for the slice if enabled (with throttling for low-end CPU)
       if (!this.isTranscribing && this.vadEnabled) {
-        this.processSliceVAD(result.slice).catch((error: any) => {
-          this.handleError(`VAD processing error: ${error}`)
-        })
+        this.queueVADProcessing(result.slice)
       } else if (!this.isTranscribing) {
         // If VAD is disabled, transcribe slices as they become ready
         this.queueSliceForTranscription(result.slice).catch((error: any) => {
@@ -375,6 +390,106 @@ export class RealtimeTranscriber {
   }
 
   /**
+   * Queue VAD processing with throttling for low-end CPU systems
+   * This prevents VAD from blocking the audio pipeline
+   */
+  private queueVADProcessing(slice: any): void {
+    // Check if we should skip this slice based on skip ratio
+    if (this.options.vadSkipRatio > 0) {
+      const shouldSkip = slice.index % (this.options.vadSkipRatio + 1) !== 0
+      if (shouldSkip) {
+        this.skippedVadCount += 1
+        this.log(
+          `Skipping VAD for slice ${slice.index} (skip ratio: ${this.options.vadSkipRatio})`,
+        )
+        // Still queue for transcription if VAD would have approved
+        this.queueSliceForTranscription(slice).catch((error: any) => {
+          this.handleError(`Failed to queue skipped slice for transcription: ${error}`)
+        })
+        return
+      }
+    }
+
+    // Check throttling - don't process if we recently processed VAD
+    const now = Date.now()
+    const timeSinceLastVad = now - this.lastVadProcessTime
+
+    if (this.isProcessingVAD) {
+      // VAD is already running, queue this slice
+      this.vadProcessingQueue.push(slice)
+      this.log(
+        `VAD busy, queued slice ${slice.index} (queue size: ${this.vadProcessingQueue.length})`,
+      )
+      return
+    }
+
+    if (timeSinceLastVad < this.options.vadThrottleMs) {
+      // Too soon since last VAD, queue it
+      this.vadProcessingQueue.push(slice)
+      this.log(
+        `VAD throttled, queued slice ${slice.index} (will process in ${
+          this.options.vadThrottleMs - timeSinceLastVad
+        }ms)`,
+      )
+      // Schedule processing after throttle period
+      setTimeout(() => {
+        this.processVADQueue()
+      }, this.options.vadThrottleMs - timeSinceLastVad)
+      return
+    }
+
+    this.processSliceVADThrottled(slice)
+  }
+
+  /**
+   * Process the VAD queue
+   */
+  private processVADQueue(): void {
+    if (this.isProcessingVAD || this.vadProcessingQueue.length === 0) {
+      return
+    }
+
+    // Get the most recent slice from queue (discard older ones for real-time performance)
+    const slice = this.vadProcessingQueue.pop()
+    this.vadProcessingQueue = [] // Clear queue, we only care about latest
+
+    if (slice) {
+      this.log(`Processing queued VAD for slice ${slice.index}`)
+      this.processSliceVADThrottled(slice)
+    }
+  }
+
+  /**
+   * Throttled wrapper for processSliceVAD
+   */
+  private async processSliceVADThrottled(slice: any): Promise<void> {
+    if (this.isProcessingVAD) {
+      // Already processing, re-queue
+      this.vadProcessingQueue.push(slice)
+      return
+    }
+
+    this.isProcessingVAD = true
+    this.lastVadProcessTime = Date.now()
+
+    try {
+      await this.processSliceVAD(slice)
+    } catch (error) {
+      this.handleError(`VAD processing error: ${error}`)
+    } finally {
+      this.isProcessingVAD = false
+
+      // Process next item in queue if available
+      if (this.vadProcessingQueue.length > 0) {
+        // Schedule next processing with a small delay to yield to event loop
+        setTimeout(() => {
+          this.processVADQueue()
+        }, 50) // 50ms delay between VAD processings
+      }
+    }
+  }
+
+  /**
    * Process VAD for a completed slice
    */
   private async processSliceVAD(slice: any): Promise<void> {
@@ -391,7 +506,25 @@ export class RealtimeTranscriber {
         return
       }
 
-      // Convert base64 back to Uint8Array for VAD processing
+      // Check if user callback allows VAD processing
+      if (this.callbacks.onBeginVad) {
+        const {
+          sampleRate = 16000,
+          channels = 1,
+        } = this.options.audioStreamConfig || {}
+        const duration = audioData.length / sampleRate / channels * 1000 // Convert to milliseconds
+        const shouldProcessVad =
+          (await this.callbacks.onBeginVad({
+            sliceIndex: slice.index,
+            audioData,
+            duration,
+          })) ?? true
+
+        if (!shouldProcessVad) {
+          this.log(`User callback declined VAD processing for slice ${slice.index}`)
+          return
+        }
+      }
 
       // Detect speech in the slice
       const vadEvent = await this.detectSpeech(audioData, slice.index)
@@ -694,6 +827,9 @@ export class RealtimeTranscriber {
       const result = await promise
       const endTime = Date.now()
 
+      // Normalize result and segments, remove "[ silence ]" or "[BLANK]"
+      result.result = result.result.replace(SILENCE_SEGMENT_REGEX, '').trim()
+
       // Create transcribe event
       const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
       const transcribeEvent: RealtimeTranscribeEvent = {
@@ -705,6 +841,13 @@ export class RealtimeTranscriber {
         recordingTime: item.audioData.length / (sampleRate / 1000) / 2, // ms,
         memoryUsage: this.sliceManager.getMemoryUsage(),
         vadEvent: this.vadEvents.get(item.sliceIndex),
+      }
+
+      // if the current result is invalid, use the previous result
+      const previousTranscribe = this.transcriptionResults.get(item.sliceIndex)
+        ?.transcribeEvent
+      if (previousTranscribe && result.result.trim() === '.') {
+        transcribeEvent.data = previousTranscribe.data
       }
 
       // Save transcription results
@@ -813,6 +956,24 @@ export class RealtimeTranscriber {
   }
 
   /**
+   * Update VAD throttling options dynamically for low-end CPU optimization
+   */
+  updateVadThrottleOptions(options: {
+    vadThrottleMs?: number
+    vadSkipRatio?: number
+  }): void {
+    if (options.vadThrottleMs !== undefined) {
+      this.options.vadThrottleMs = options.vadThrottleMs
+    }
+    if (options.vadSkipRatio !== undefined) {
+      this.options.vadSkipRatio = options.vadSkipRatio
+    }
+    this.log(
+      `VAD throttle options updated: throttleMs=${this.options.vadThrottleMs}, skipRatio=${this.options.vadSkipRatio}`,
+    )
+  }
+
+  /**
    * Get current statistics
    */
   getStatistics() {
@@ -829,6 +990,11 @@ export class RealtimeTranscriber {
             enabled: true,
             contextAvailable: !!this.vadContext,
             lastSpeechDetectedTime: this.lastSpeechDetectedTime,
+            isProcessing: this.isProcessingVAD,
+            queueSize: this.vadProcessingQueue.length,
+            skippedCount: this.skippedVadCount,
+            throttleMs: this.options.vadThrottleMs,
+            skipRatio: this.options.vadSkipRatio,
           }
         : null,
       sliceStats: this.sliceManager.getCurrentSliceInfo(),
@@ -890,11 +1056,9 @@ export class RealtimeTranscriber {
         `Forced slice ${result.slice.index} ready (${result.slice.data.length} bytes)`,
       )
 
-      // Process VAD for the slice if enabled
+      // Process VAD for the slice if enabled (with throttling for low-end CPU)
       if (!this.isTranscribing && this.vadEnabled) {
-        this.processSliceVAD(result.slice).catch((error: any) => {
-          this.handleError(`VAD processing error: ${error}`)
-        })
+        this.queueVADProcessing(result.slice)
       } else if (!this.isTranscribing) {
         // If VAD is disabled, transcribe slices as they become ready
         this.queueSliceForTranscription(result.slice).catch((error: any) => {
@@ -922,6 +1086,12 @@ export class RealtimeTranscriber {
     // Reset simplified VAD state
     this.lastSpeechDetectedTime = -1
     this.lastVadState = 'silence'
+
+    // Reset VAD throttling state
+    this.isProcessingVAD = false
+    this.lastVadProcessTime = 0
+    this.vadProcessingQueue = []
+    this.skippedVadCount = 0
 
     // Reset stats snapshot for clean start
     this.lastStatsSnapshot = null
