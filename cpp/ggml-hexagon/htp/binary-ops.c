@@ -81,6 +81,7 @@ static void binary_job_f32_per_thread(struct htp_ops_context * octx,
     const size_t src0_row_size = nb01;
     const size_t src1_row_size = nb11;
     const size_t dst_row_size  = nb1;
+    const size_t src1_spad_stride = octx->src1_spad.size_per_thread;
 
     const uint32_t src0_nrows = ne01 * ne02 * ne03;  // src0 rows
     const uint32_t src1_nrows = ne11 * ne12 * ne13;  // src1 rows
@@ -109,7 +110,7 @@ static void binary_job_f32_per_thread(struct htp_ops_context * octx,
 
     hvx_elemwise_f32_func func_HVX = (1 == opt_path) ? func_table_HVX_opt[op] : func_table_HVX[op];
 
-    uint8_t * restrict spad_data_th = spad_data + (ith * src0_row_size);
+    uint8_t * restrict spad_data_th = spad_data + (ith * src1_spad_stride);
 
     const uint8_t * restrict src0_ptr = (const uint8_t *) src0->data + (src0_start_row * src0_row_size);
     uint8_t * restrict dst_ptr        = (uint8_t *) dst->data + (src0_start_row * dst_row_size);
@@ -171,6 +172,7 @@ static void binary_add_id_job_f32_per_thread(struct htp_ops_context * octx,
     const size_t src0_row_size = nb01;
     const size_t src1_row_size = nb11;
     const size_t dst_row_size  = nb1;
+    const size_t src0_spad_stride = octx->src0_spad.size_per_thread;
 
     const uint32_t src0_nrows = ne01 * ne02 * ne03;  // src0 rows
 
@@ -193,6 +195,7 @@ static void binary_add_id_job_f32_per_thread(struct htp_ops_context * octx,
     const uint8_t * restrict data_src0 = (const uint8_t *) src0->data;
     const uint8_t * restrict data_src1 = (const uint8_t *) src1->data;
     uint8_t * restrict data_dst        = (uint8_t *) dst->data;
+    uint8_t * restrict spad_data_th    = spad_data + ith * src0_spad_stride;
 
     const uint32_t ne02_ne01  = ne02 * ne01;
     for (uint32_t ir = src0_start_row; ir < src0_end_row; ir++) {
@@ -219,9 +222,9 @@ static void binary_add_id_job_f32_per_thread(struct htp_ops_context * octx,
         const uint32_t nr0 = ne00 / ne10;
         if (nr0 > 1) {
             for (uint32_t r = 0; r < nr0; r++) {
-                memcpy(spad_data + r * nb10, (const uint8_t *) src1_ptr, nb10);
+                memcpy(spad_data_th + r * nb10, (const uint8_t *) src1_ptr, nb10);
             }
-            func_HVX((const uint8_t *) src0_ptr, (const uint8_t *) spad_data, (uint8_t *) dst_ptr, ne00);
+            func_HVX((const uint8_t *) src0_ptr, (const uint8_t *) spad_data_th, (uint8_t *) dst_ptr, ne00);
         } else {
             func_HVX((const uint8_t *) src0_ptr, (const uint8_t *) src1_ptr, (uint8_t *) dst_ptr, ne00);
         }
@@ -298,10 +301,20 @@ static int execute_op_binary_f32(struct htp_ops_context * octx) {
     const size_t src1_row_size = src1->nb[1];
     const size_t dst_row_size  = dst->nb[1];
 
+    const size_t dst_spad_stride  = htp_round_up(dst_row_size, 128);
+    const size_t src0_spad_stride = htp_round_up(src0_row_size, 128);
+    // src1 scratchpad must be large enough to hold a full src0 row only when broadcasting
+    const bool   broadcast_row    = src0->ne[0] != src1->ne[0];
+    const size_t src1_spad_stride = htp_round_up(broadcast_row ? src0_row_size : src1_row_size, 128);
+
     // VTCM scratchpads for all tensors
-    octx->dst_spad.size  = htp_round_up(dst_row_size, 128) * n_threads;
-    octx->src0_spad.size = htp_round_up(src0_row_size, 128) * n_threads;
-    octx->src1_spad.size = htp_round_up(src1_row_size, 128) * n_threads;
+    octx->dst_spad.size_per_thread  = dst_spad_stride;
+    octx->src0_spad.size_per_thread = src0_spad_stride;
+    octx->src1_spad.size_per_thread = src1_spad_stride;
+
+    octx->dst_spad.size  = dst_spad_stride * n_threads;
+    octx->src0_spad.size = src0_spad_stride * n_threads;
+    octx->src1_spad.size = src1_spad_stride * n_threads;
 
     size_t spad_size = octx->src0_spad.size + octx->src1_spad.size + octx->dst_spad.size;
 

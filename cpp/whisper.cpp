@@ -191,7 +191,8 @@ static bool wsp_ggml_graph_compute_helper(
       wsp_ggml_backend_sched_t   sched,
         struct wsp_ggml_cgraph * graph,
                        int   n_threads,
-                      bool   sched_reset = true) {
+                      bool   sched_reset = true,
+         wsp_ggml_threadpool_t   threadpool = nullptr) {
     for (int i = 0; i < wsp_ggml_backend_sched_get_n_backends(sched); ++i) {
         wsp_ggml_backend_t backend = wsp_ggml_backend_sched_get_backend(sched, i);
         wsp_ggml_backend_dev_t dev = wsp_ggml_backend_get_device(backend);
@@ -200,6 +201,14 @@ static bool wsp_ggml_graph_compute_helper(
         auto * fn_set_n_threads = (wsp_ggml_backend_set_n_threads_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_set_n_threads");
         if (fn_set_n_threads) {
             fn_set_n_threads(backend, n_threads);
+        }
+
+        // set threadpool if provided (for CPU backend)
+        if (threadpool && wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_CPU) {
+            auto * fn_set_threadpool = (decltype(wsp_ggml_backend_cpu_set_threadpool) *) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_cpu_set_threadpool");
+            if (fn_set_threadpool) {
+                fn_set_threadpool(backend, threadpool);
+            }
         }
     }
 
@@ -932,6 +941,10 @@ struct whisper_state {
     bool has_vad_segments = false;
 
     std::vector<vad_time_mapping> vad_mapping_table;
+
+    // threadpool for CPU backend
+    wsp_ggml_threadpool_t threadpool       = nullptr;
+    wsp_ggml_threadpool_t threadpool_batch = nullptr;
 };
 
 struct whisper_context {
@@ -2403,8 +2416,17 @@ static bool whisper_encode_internal(
         }
 
         if (!whisper_encode_external(wstate)) {
-            if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+            if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads, true, wstate.threadpool)) {
                 return false;
+            }
+            // Debug: check conv output
+            if (wstate.embd_conv) {
+                std::vector<float> data(std::min((size_t)100, (size_t)wsp_ggml_nelements(wstate.embd_conv)));
+                wsp_ggml_backend_tensor_get(wstate.embd_conv, data.data(), 0, data.size() * sizeof(float));
+                int n_nan = 0;
+                for (size_t i = 0; i < data.size(); i++) if (std::isnan(data[i])) n_nan++;
+                WHISPER_LOG_WARN("%s: CONV output: checked %zu, nan=%d, vals: %.4f %.4f %.4f %.4f\n",
+                    __func__, data.size(), n_nan, data[0], data[1], data[2], data[3]);
             }
         } else {
             wsp_ggml_backend_sched_reset(sched);
@@ -2428,8 +2450,17 @@ static bool whisper_encode_internal(
             return false;
         }
 
-        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads, true, wstate.threadpool)) {
             return false;
+        }
+        // Debug: check encoder output (before cross)
+        if (wstate.embd_enc) {
+            std::vector<float> data(std::min((size_t)100, (size_t)wsp_ggml_nelements(wstate.embd_enc)));
+            wsp_ggml_backend_tensor_get(wstate.embd_enc, data.data(), 0, data.size() * sizeof(float));
+            int n_nan = 0;
+            for (size_t i = 0; i < data.size(); i++) if (std::isnan(data[i])) n_nan++;
+            WHISPER_LOG_WARN("%s: ENCODER output: checked %zu, nan=%d, vals: %.4f %.4f %.4f %.4f\n",
+                __func__, data.size(), n_nan, data[0], data[1], data[2], data[3]);
         }
     }
 
@@ -2444,13 +2475,36 @@ static bool whisper_encode_internal(
             return false;
         }
 
-        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads, true, wstate.threadpool)) {
             return false;
         }
     }
 
     wstate.t_encode_us += wsp_ggml_time_us() - t_start_us;
     wstate.n_encode++;
+
+    // Debug: check encoder output for NaN/inf values
+    if (wstate.embd_enc && wstate.embd_enc->data) {
+        std::vector<float> embd_data(wsp_ggml_nelements(wstate.embd_enc));
+        wsp_ggml_backend_tensor_get(wstate.embd_enc, embd_data.data(), 0, wsp_ggml_nbytes(wstate.embd_enc));
+
+        int n_nan = 0, n_inf = 0, n_zero = 0;
+        float min_val = FLT_MAX, max_val = -FLT_MAX, sum = 0.0f;
+        for (size_t i = 0; i < embd_data.size(); i++) {
+            float v = embd_data[i];
+            if (std::isnan(v)) n_nan++;
+            else if (std::isinf(v)) n_inf++;
+            else {
+                if (v == 0.0f) n_zero++;
+                if (v < min_val) min_val = v;
+                if (v > max_val) max_val = v;
+                sum += v;
+            }
+        }
+        float mean = sum / (embd_data.size() - n_nan - n_inf);
+        WHISPER_LOG_WARN("%s: embd_enc stats: n=%zu nan=%d inf=%d zero=%d min=%.4f max=%.4f mean=%.4f\n",
+                         __func__, embd_data.size(), n_nan, n_inf, n_zero, min_val, max_val, mean);
+    }
 
     return !(abort_callback && abort_callback(abort_callback_data));
 }
@@ -2941,7 +2995,7 @@ static bool whisper_decode_internal(
 
         logits = wsp_ggml_graph_node(gf, -1);
 
-        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads, true, wstate.threadpool)) {
             return false;
         }
     }
@@ -3873,6 +3927,23 @@ void whisper_free_context_params(struct whisper_context_params * params) {
 void whisper_free_params(struct whisper_full_params * params) {
     if (params) {
         delete params;
+    }
+}
+
+void whisper_attach_threadpool(
+        struct whisper_context * ctx,
+        wsp_ggml_threadpool_t        threadpool,
+        wsp_ggml_threadpool_t        threadpool_batch) {
+    if (ctx && ctx->state) {
+        ctx->state->threadpool       = threadpool;
+        ctx->state->threadpool_batch = threadpool_batch ? threadpool_batch : threadpool;
+    }
+}
+
+void whisper_detach_threadpool(struct whisper_context * ctx) {
+    if (ctx && ctx->state) {
+        ctx->state->threadpool       = nullptr;
+        ctx->state->threadpool_batch = nullptr;
     }
 }
 
@@ -6697,7 +6768,7 @@ static bool whisper_vad(
             }
 
             segment_start_samples = std::min(segment_start_samples, n_samples - 1);
-            segment_end_samples = std::min(segment_end_samples, n_samples);
+            segment_end_samples = std::min(segment_end_samples, n_samples - 1);
             int segment_length = segment_end_samples - segment_start_samples;
             if (segment_length > 0) {
                 whisper_state::vad_segment_info segment;
