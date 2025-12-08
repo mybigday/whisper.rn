@@ -18,64 +18,44 @@ include_directories(
     ${RNWHISPER_LIB_DIR}/jsi
 )
 
+# Include core library builds
+add_subdirectory(rnwhisper)
+
+# JNI source files
 set(
-    SOURCE_FILES
-    ${RNWHISPER_LIB_DIR}/ggml.c
-    ${RNWHISPER_LIB_DIR}/ggml-alloc.c
-    ${RNWHISPER_LIB_DIR}/ggml-backend.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-backend-reg.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/amx.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/mmq.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/ggml-cpu.c
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/ggml-cpu.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/quants.c
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/traits.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/repack.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/unary-ops.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/binary-ops.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/vec.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/ops.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-opt.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-threading.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-quants.c
-    ${RNWHISPER_LIB_DIR}/gguf.cpp
-    ${RNWHISPER_LIB_DIR}/whisper.cpp
-    ${RNWHISPER_LIB_DIR}/rn-audioutils.cpp
-    ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
+    JNI_SOURCE_FILES
     ${RNWHISPER_LIB_DIR}/jsi/RNWhisperJSI.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp
 )
 
 find_library(LOG_LIB log)
 
-function(build_library target_name arch cpu_flags)
-    if (NOT ${arch} STREQUAL "generic")
-        set(SOURCE_FILES_ARCH
-            ${RNWHISPER_LIB_DIR}/ggml-cpu/arch/${arch}/quants.c
-            ${RNWHISPER_LIB_DIR}/ggml-cpu/arch/${arch}/repack.cpp
-        )
-    endif ()
+# Build JNI wrapper library function
+function(build_rnwhisper_jni jni_name rnwhisper_name cpu_flags)
+    # Check if Hexagon is enabled (name contains "_hexagon")
+    string(REGEX MATCH ".*_hexagon.*" ENABLE_HEXAGON ${rnwhisper_name})
 
     add_library(
-        ${target_name}
+        ${jni_name}
         SHARED
-        ${SOURCE_FILES}
-        ${SOURCE_FILES_ARCH}
+        ${JNI_SOURCE_FILES}
     )
 
-    # Link JSI libraries
+    # JNI wrapper links to core library and ReactAndroid
     if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 76)
-        target_link_libraries(${target_name}
+        target_link_libraries(${jni_name}
             ${LOG_LIB}
             android
+            ${rnwhisper_name}
             fbjni::fbjni
             ReactAndroid::jsi
             ReactAndroid::reactnative
         )
     else ()
-        target_link_libraries(${target_name}
+        target_link_libraries(${jni_name}
             ${LOG_LIB}
             android
+            ${rnwhisper_name}
             fbjni::fbjni
             ReactAndroid::jsi
             ReactAndroid::turbomodulejsijni
@@ -83,40 +63,37 @@ function(build_library target_name arch cpu_flags)
         )
     endif ()
 
-    if (${arch} STREQUAL "generic")
-        target_compile_options(${target_name} PRIVATE -DWSP_GGML_CPU_GENERIC)
-    endif ()
+    target_compile_options(${jni_name} PRIVATE -pthread ${cpu_flags})
 
-    target_compile_options(${target_name} PRIVATE -DWSP_GGML_USE_CPU -DWSP_GGML_USE_CPU_REPACK -pthread ${cpu_flags})
+    if (ENABLE_HEXAGON)
+        target_compile_options(${jni_name} PRIVATE -DWSP_GGML_USE_HEXAGON)
+    endif ()
 
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        target_compile_options(${target_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
+        target_compile_options(${jni_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
     endif ()
 
-    # NOTE: If you want to debug the native code, you can uncomment if and endif
-    # Note that it will be extremely slow
-    # if (NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        target_compile_options(${target_name} PRIVATE -O3 -DNDEBUG)
-        target_compile_options(${target_name} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
-        target_compile_options(${target_name} PRIVATE -ffunction-sections -fdata-sections)
+    target_compile_options(${jni_name} PRIVATE -O3 -DNDEBUG)
+    target_compile_options(${jni_name} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+    target_compile_options(${jni_name} PRIVATE -ffunction-sections -fdata-sections)
 
-        target_link_options(${target_name} PRIVATE -Wl,--gc-sections)
-        target_link_options(${target_name} PRIVATE -Wl,--exclude-libs,ALL)
-        target_link_options(${target_name} PRIVATE -flto)
-    # endif ()
+    target_link_options(${jni_name} PRIVATE -Wl,--gc-sections)
+    target_link_options(${jni_name} PRIVATE -Wl,--exclude-libs,ALL)
+    target_link_options(${jni_name} PRIVATE -flto)
 endfunction()
 
-build_library("rnwhisper" "generic" "")
+# Build JNI wrapper variants
+build_rnwhisper_jni("rnwhisper_jni" "rnwhisper" "")
 
 if (${ANDROID_ABI} STREQUAL "arm64-v8a")
-    build_library("rnwhisper_v8fp16_va_2" "arm" "-march=armv8.2-a+fp16")
-    build_library("rnwhisper_v8" "arm" "-march=armv8-a")
+    build_rnwhisper_jni("rnwhisper_jni_v8fp16_va_2" "rnwhisper_v8fp16_va_2" "-march=armv8.2-a+fp16")
+    build_rnwhisper_jni("rnwhisper_jni_v8" "rnwhisper_v8" "-march=armv8-a")
+    # Hexagon HTP variant (experimental)
+    build_rnwhisper_jni("rnwhisper_jni_v8_2_hexagon" "rnwhisper_v8_2_hexagon" "-march=armv8.2-a+fp16+dotprod")
 elseif (${ANDROID_ABI} STREQUAL "armeabi-v7a")
-    build_library("rnwhisper_vfpv4" "arm" "-mfpu=neon-vfpv4")
+    build_rnwhisper_jni("rnwhisper_jni_vfpv4" "rnwhisper_vfpv4" "-mfpu=neon-vfpv4")
 elseif (${ANDROID_ABI} STREQUAL "x86_64")
-    # x86_64 target
-    build_library("rnwhisper_x86_64" "x86" "-march=x86-64" "-mtune=intel" "-msse4.2" "-mpopcnt")
+    build_rnwhisper_jni("rnwhisper_jni_x86_64" "rnwhisper_x86_64" "-march=x86-64" "-mtune=intel" "-msse4.2" "-mpopcnt")
 endif ()
-
 
 include_directories(${RNWHISPER_LIB_DIR})

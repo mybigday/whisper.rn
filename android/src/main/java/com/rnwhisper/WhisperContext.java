@@ -1,39 +1,52 @@
 package com.rnwhisper;
 
-import com.facebook.react.bridge.Arguments;
-import com.facebook.react.bridge.WritableArray;
-import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.modules.core.DeviceEventManagerModule;
-
-import android.util.Log;
-import android.os.Build;
 import android.content.res.AssetManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder.AudioSource;
-
-import java.util.ArrayList;
-import java.lang.StringBuilder;
+import android.os.Build;
+import android.util.Log;
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableArray;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.FileReader;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.lang.StringBuilder;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 public class WhisperContext {
+
   public static final String NAME = "RNWhisperContext";
 
   private static String loadedLibrary = "";
+  private static final int HTP_DIR_MODE = 0755;
+  private static final int HTP_FILE_MODE = 0755;
+  private static final String HTP_DIR_NAME = "rnwhisper-htp";
+  private static final String[] HTP_LIBS = {
+    "libggml-htp-v73.so",
+    "libggml-htp-v75.so",
+    "libggml-htp-v79.so",
+    "libggml-htp-v81.so",
+  };
 
   private static class NativeLogCallback {
+
     DeviceEventManagerModule.RCTDeviceEventEmitter eventEmitter;
 
     public NativeLogCallback(ReactApplicationContext reactContext) {
-      this.eventEmitter = reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class);
+      this.eventEmitter = reactContext.getJSModule(
+        DeviceEventManagerModule.RCTDeviceEventEmitter.class
+      );
     }
 
     void emitNativeLog(String level, String text) {
@@ -44,7 +57,10 @@ public class WhisperContext {
     }
   }
 
-  static void toggleNativeLog(ReactApplicationContext reactContext, boolean enabled) {
+  static void toggleNativeLog(
+    ReactApplicationContext reactContext,
+    boolean enabled
+  ) {
     if (enabled) {
       setupLog(new NativeLogCallback(reactContext));
     } else {
@@ -82,12 +98,22 @@ public class WhisperContext {
   private Thread rootFullHandler = null;
   private Thread fullHandler = null;
 
-  public WhisperContext(int id, ReactApplicationContext reactContext, long context) {
+  public WhisperContext(
+    int id,
+    ReactApplicationContext reactContext,
+    long context
+  ) {
     this.id = id;
     this.context = context;
     this.reactContext = reactContext;
-    eventEmitter = reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class);
-    bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
+    eventEmitter = reactContext.getJSModule(
+      DeviceEventManagerModule.RCTDeviceEventEmitter.class
+    );
+    bufferSize = AudioRecord.getMinBufferSize(
+      SAMPLE_RATE,
+      CHANNEL_CONFIG,
+      AUDIO_FORMAT
+    );
   }
 
   private void rewind() {
@@ -118,8 +144,18 @@ public class WhisperContext {
   }
 
   private void finishRealtimeTranscribe(WritableMap result) {
-    emitTranscribeEvent("@RNWhisper_onRealtimeTranscribeEnd", Arguments.createMap());
-    finishRealtimeTranscribeJob(jobId, context, sliceNSamples.stream().mapToInt(i -> i).toArray());
+    emitTranscribeEvent(
+      "@RNWhisper_onRealtimeTranscribeEnd",
+      Arguments.createMap()
+    );
+    finishRealtimeTranscribeJob(
+      jobId,
+      context,
+      sliceNSamples
+        .stream()
+        .mapToInt(i -> i)
+        .toArray()
+    );
   }
 
   public int startRealtimeTranscribe(int jobId, ReadableMap options) {
@@ -127,7 +163,13 @@ public class WhisperContext {
       return -100;
     }
 
-    recorder = new AudioRecord(AUDIO_SOURCE, SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize);
+    recorder = new AudioRecord(
+      AUDIO_SOURCE,
+      SAMPLE_RATE,
+      CHANNEL_CONFIG,
+      AUDIO_FORMAT,
+      bufferSize
+    );
 
     int state = recorder.getState();
     if (state != AudioRecord.STATE_INITIALIZED) {
@@ -139,16 +181,31 @@ public class WhisperContext {
 
     this.jobId = jobId;
 
-    int realtimeAudioSec = options.hasKey("realtimeAudioSec") ? options.getInt("realtimeAudioSec") : 0;
-    final int audioSec = realtimeAudioSec > 0 ? realtimeAudioSec : DEFAULT_MAX_AUDIO_SEC;
-    int realtimeAudioSliceSec = options.hasKey("realtimeAudioSliceSec") ? options.getInt("realtimeAudioSliceSec") : 0;
-    final int audioSliceSec = realtimeAudioSliceSec > 0 && realtimeAudioSliceSec < audioSec ? realtimeAudioSliceSec : audioSec;
+    int realtimeAudioSec = options.hasKey("realtimeAudioSec")
+      ? options.getInt("realtimeAudioSec")
+      : 0;
+    final int audioSec = realtimeAudioSec > 0
+      ? realtimeAudioSec
+      : DEFAULT_MAX_AUDIO_SEC;
+    int realtimeAudioSliceSec = options.hasKey("realtimeAudioSliceSec")
+      ? options.getInt("realtimeAudioSliceSec")
+      : 0;
+    final int audioSliceSec = realtimeAudioSliceSec > 0 &&
+      realtimeAudioSliceSec < audioSec
+      ? realtimeAudioSliceSec
+      : audioSec;
     isUseSlices = audioSliceSec < audioSec;
 
-    double realtimeAudioMinSec = options.hasKey("realtimeAudioMinSec") ? options.getDouble("realtimeAudioMinSec") : 0;
-    final double audioMinSec = realtimeAudioMinSec > 0.5 && realtimeAudioMinSec <= audioSliceSec ? realtimeAudioMinSec : 1;
+    double realtimeAudioMinSec = options.hasKey("realtimeAudioMinSec")
+      ? options.getDouble("realtimeAudioMinSec")
+      : 0;
+    final double audioMinSec = realtimeAudioMinSec > 0.5 &&
+      realtimeAudioMinSec <= audioSliceSec
+      ? realtimeAudioMinSec
+      : 1;
 
-    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
+    this.isTdrzEnable =
+      options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
     createRealtimeTranscribeJob(jobId, context, options);
 
@@ -158,91 +215,96 @@ public class WhisperContext {
     isCapturing = true;
     recorder.startRecording();
 
-    rootFullHandler = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          short[] buffer = new short[bufferSize];
-          while (isCapturing) {
-            try {
-              int n = recorder.read(buffer, 0, bufferSize);
-              if (n == 0) continue;
+    rootFullHandler = new Thread(
+      new Runnable() {
+        @Override
+        public void run() {
+          try {
+            short[] buffer = new short[bufferSize];
+            while (isCapturing) {
+              try {
+                int n = recorder.read(buffer, 0, bufferSize);
+                if (n == 0) continue;
 
-              int totalNSamples = 0;
-              for (int i = 0; i < sliceNSamples.size(); i++) {
-                totalNSamples += sliceNSamples.get(i);
-              }
-
-              int nSamples = sliceNSamples.get(sliceIndex);
-              if (totalNSamples + n > audioSec * SAMPLE_RATE) {
-                // Full, stop capturing
-                isCapturing = false;
-                if (
-                  !isTranscribing &&
-                  nSamples == nSamplesTranscribing &&
-                  sliceIndex == transcribeSliceIndex
-                ) {
-                  finishRealtimeTranscribe(Arguments.createMap());
-                } else if (!isTranscribing) {
-                  boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
-                  if (!isSamplesEnough || !vad(sliceIndex, nSamples, 0)) {
-                    finishRealtimeTranscribe(Arguments.createMap());
-                    break;
-                  }
-                  isTranscribing = true;
-                  fullTranscribeSamples(true);
+                int totalNSamples = 0;
+                for (int i = 0; i < sliceNSamples.size(); i++) {
+                  totalNSamples += sliceNSamples.get(i);
                 }
-                break;
-              }
 
-              // Append to buffer
-              if (nSamples + n > audioSliceSec * SAMPLE_RATE) {
-                Log.d(NAME, "next slice");
-
-                sliceIndex++;
-                nSamples = 0;
-                sliceNSamples.add(0);
-              }
-              putPcmData(jobId, buffer, sliceIndex, nSamples, n);
-
-              boolean isSpeech = vad(sliceIndex, nSamples, n);
-
-              nSamples += n;
-              sliceNSamples.set(sliceIndex, nSamples);
-
-              boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
-              if (!isSamplesEnough || !isSpeech) continue;
-
-              if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
-                isTranscribing = true;
-                fullHandler = new Thread(new Runnable() {
-                  @Override
-                  public void run() {
-                    fullTranscribeSamples(false);
+                int nSamples = sliceNSamples.get(sliceIndex);
+                if (totalNSamples + n > audioSec * SAMPLE_RATE) {
+                  // Full, stop capturing
+                  isCapturing = false;
+                  if (
+                    !isTranscribing &&
+                    nSamples == nSamplesTranscribing &&
+                    sliceIndex == transcribeSliceIndex
+                  ) {
+                    finishRealtimeTranscribe(Arguments.createMap());
+                  } else if (!isTranscribing) {
+                    boolean isSamplesEnough =
+                      nSamples / SAMPLE_RATE >= audioMinSec;
+                    if (!isSamplesEnough || !vad(sliceIndex, nSamples, 0)) {
+                      finishRealtimeTranscribe(Arguments.createMap());
+                      break;
+                    }
+                    isTranscribing = true;
+                    fullTranscribeSamples(true);
                   }
-                });
-                fullHandler.start();
-              }
-            } catch (Exception e) {
-              Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
-            }
-          }
+                  break;
+                }
 
-          if (!isTranscribing) {
-            finishRealtimeTranscribe(Arguments.createMap());
+                // Append to buffer
+                if (nSamples + n > audioSliceSec * SAMPLE_RATE) {
+                  Log.d(NAME, "next slice");
+
+                  sliceIndex++;
+                  nSamples = 0;
+                  sliceNSamples.add(0);
+                }
+                putPcmData(jobId, buffer, sliceIndex, nSamples, n);
+
+                boolean isSpeech = vad(sliceIndex, nSamples, n);
+
+                nSamples += n;
+                sliceNSamples.set(sliceIndex, nSamples);
+
+                boolean isSamplesEnough = nSamples / SAMPLE_RATE >= audioMinSec;
+                if (!isSamplesEnough || !isSpeech) continue;
+
+                if (!isTranscribing && nSamples > SAMPLE_RATE / 2) {
+                  isTranscribing = true;
+                  fullHandler = new Thread(
+                    new Runnable() {
+                      @Override
+                      public void run() {
+                        fullTranscribeSamples(false);
+                      }
+                    }
+                  );
+                  fullHandler.start();
+                }
+              } catch (Exception e) {
+                Log.e(NAME, "Error transcribing realtime: " + e.getMessage());
+              }
+            }
+
+            if (!isTranscribing) {
+              finishRealtimeTranscribe(Arguments.createMap());
+            }
+            if (fullHandler != null) {
+              fullHandler.join(); // Wait for full transcribe to finish
+            }
+            recorder.stop();
+          } catch (Exception e) {
+            e.printStackTrace();
+          } finally {
+            recorder.release();
+            recorder = null;
           }
-          if (fullHandler != null) {
-            fullHandler.join(); // Wait for full transcribe to finish
-          }
-          recorder.stop();
-        } catch (Exception e) {
-          e.printStackTrace();
-        } finally {
-          recorder.release();
-          recorder = null;
         }
       }
-    });
+    );
     rootFullHandler.start();
     return state;
   }
@@ -256,9 +318,14 @@ public class WhisperContext {
     Log.d(NAME, "Start transcribing realtime: " + nSamplesTranscribing);
 
     int timeStart = (int) System.currentTimeMillis();
-    int code = fullWithJob(jobId, context, transcribeSliceIndex, nSamplesTranscribing);
+    int code = fullWithJob(
+      jobId,
+      context,
+      transcribeSliceIndex,
+      nSamplesTranscribing
+    );
     int timeEnd = (int) System.currentTimeMillis();
-    int timeRecording = (int) (nSamplesTranscribing / SAMPLE_RATE * 1000);
+    int timeRecording = (int) ((nSamplesTranscribing / SAMPLE_RATE) * 1000);
 
     WritableMap payload = Arguments.createMap();
     payload.putInt("code", code);
@@ -269,15 +336,17 @@ public class WhisperContext {
 
     if (code == 0) {
       payload.putMap("data", getTextSegments(0, getTextSegmentCount(context)));
-    } else if (code != -999) { // Not aborted
+    } else if (code != -999) {
+      // Not aborted
       payload.putString("error", "Transcribe failed with code " + code);
     }
 
     nSamplesOfIndex = sliceNSamples.get(transcribeSliceIndex);
-    boolean isStopped = isStoppedByAction ||
-      !isCapturing &&
-      nSamplesTranscribing == nSamplesOfIndex &&
-      sliceIndex == transcribeSliceIndex;
+    boolean isStopped =
+      isStoppedByAction ||
+      (!isCapturing &&
+        nSamplesTranscribing == nSamplesOfIndex &&
+        sliceIndex == transcribeSliceIndex);
 
     if (
       // If no more samples on current slice, move to next slice
@@ -288,7 +357,8 @@ public class WhisperContext {
       nSamplesTranscribing = 0;
     }
 
-    boolean continueNeeded = !isCapturing && nSamplesTranscribing != nSamplesOfIndex && code != -999;
+    boolean continueNeeded =
+      !isCapturing && nSamplesTranscribing != nSamplesOfIndex && code != -999;
 
     if (isStopped && !continueNeeded) {
       payload.putBoolean("isCapturing", false);
@@ -312,7 +382,10 @@ public class WhisperContext {
     isTranscribing = false;
   }
 
-  private void emitTranscribeEvent(final String eventName, final WritableMap payload) {
+  private void emitTranscribeEvent(
+    final String eventName,
+    final WritableMap payload
+  ) {
     WritableMap event = Arguments.createMap();
     event.putInt("contextId", WhisperContext.this.id);
     event.putInt("jobId", jobId);
@@ -337,12 +410,17 @@ public class WhisperContext {
   }
 
   private static class Callback {
+
     WhisperContext context;
     boolean emitProgressNeeded = false;
     boolean emitNewSegmentsNeeded = false;
     int totalNNew = 0;
 
-    public Callback(WhisperContext context, boolean emitProgressNeeded, boolean emitNewSegmentsNeeded) {
+    public Callback(
+      WhisperContext context,
+      boolean emitProgressNeeded,
+      boolean emitNewSegmentsNeeded
+    ) {
       this.context = context;
       this.emitProgressNeeded = emitProgressNeeded;
       this.emitNewSegmentsNeeded = emitNewSegmentsNeeded;
@@ -365,18 +443,25 @@ public class WhisperContext {
     }
   }
 
-  public WritableMap transcribe(int jobId, float[] audioData, ReadableMap options) throws IOException, Exception {
+  public WritableMap transcribe(
+    int jobId,
+    float[] audioData,
+    ReadableMap options
+  ) throws IOException, Exception {
     if (isCapturing || isTranscribing) {
       throw new Exception("Context is already in capturing or transcribing");
     }
     rewind();
     this.jobId = jobId;
-    this.isTdrzEnable = options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
+    this.isTdrzEnable =
+      options.hasKey("tdrzEnable") && options.getBoolean("tdrzEnable");
 
     isTranscribing = true;
 
-    boolean hasProgressCallback = options.hasKey("onProgress") && options.getBoolean("onProgress");
-    boolean hasNewSegmentsCallback = options.hasKey("onNewSegments") && options.getBoolean("onNewSegments");
+    boolean hasProgressCallback =
+      options.hasKey("onProgress") && options.getBoolean("onProgress");
+    boolean hasNewSegmentsCallback =
+      options.hasKey("onNewSegments") && options.getBoolean("onNewSegments");
     int code = fullWithNewJob(
       jobId,
       context,
@@ -387,7 +472,9 @@ public class WhisperContext {
       // ReadableMap options,
       options,
       // Callback callback
-      hasProgressCallback || hasNewSegmentsCallback ? new Callback(this, hasProgressCallback, hasNewSegmentsCallback) : null
+      hasProgressCallback || hasNewSegmentsCallback
+        ? new Callback(this, hasProgressCallback, hasNewSegmentsCallback)
+        : null
     );
 
     isTranscribing = false;
@@ -411,7 +498,7 @@ public class WhisperContext {
 
       // If tdrzEnable is enabled and speaker turn is detected
       if (this.isTdrzEnable && getTextSegmentSpeakerTurnNext(context, i)) {
-          text += " [SPEAKER_TURN]";
+        text += " [SPEAKER_TURN]";
       }
 
       builder.append(text);
@@ -427,7 +514,6 @@ public class WhisperContext {
     data.putArray("segments", segments);
     return data;
   }
-
 
   public boolean isCapturing() {
     return isCapturing;
@@ -465,31 +551,60 @@ public class WhisperContext {
   }
 
   static {
+    // Extract HTP libraries from assets before loading native library
+    try {
+      Class<?> activityThread = Class.forName("android.app.ActivityThread");
+      Object currentActivityThread = activityThread
+        .getMethod("currentActivityThread")
+        .invoke(null);
+      Object app = activityThread
+        .getMethod("getApplication")
+        .invoke(currentActivityThread);
+      android.content.Context appContext = (android.content.Context) app;
+
+      if (appContext != null) {
+        extractHtpLibrariesFromAssets(appContext);
+      }
+    } catch (Exception e) {
+      Log.w(NAME, "Failed to extract HTP libraries", e);
+    }
+
     Log.d(NAME, "Primary ABI: " + Build.SUPPORTED_ABIS[0]);
 
     String cpuFeatures = WhisperContext.getCpuFeatures();
     Log.d(NAME, "CPU features: " + cpuFeatures);
-    boolean hasFp16 = cpuFeatures.contains("fp16") || cpuFeatures.contains("fphp");
+    boolean hasFp16 =
+      cpuFeatures.contains("fp16") || cpuFeatures.contains("fphp");
+    boolean hasDotProd = cpuFeatures.contains("asimddp");
     Log.d(NAME, "- hasFp16: " + hasFp16);
+    Log.d(NAME, "- hasDotProd: " + hasDotProd);
+
+    // Check for Hexagon support
+    boolean hasHexagon = isHexagonSupported();
+    Log.d(NAME, "- hasHexagon: " + hasHexagon);
 
     if (WhisperContext.isArm64V8a()) {
-      if (hasFp16) {
-        Log.d(NAME, "Loading librnwhisper_v8fp16_va_2.so");
-        System.loadLibrary("rnwhisper_v8fp16_va_2");
-        loadedLibrary = "rnwhisper_v8fp16_va_2";
+      if (hasFp16 && hasDotProd && hasHexagon) {
+        Log.d(NAME, "Loading librnwhisper_jni_v8_2_hexagon.so");
+        System.loadLibrary("rnwhisper_jni_v8_2_hexagon");
+        loadedLibrary = "rnwhisper_jni_v8_2_hexagon";
+      } else if (hasFp16) {
+        Log.d(NAME, "Loading librnwhisper_jni_v8fp16_va_2.so");
+        System.loadLibrary("rnwhisper_jni_v8fp16_va_2");
+        loadedLibrary = "rnwhisper_jni_v8fp16_va_2";
       } else {
-        Log.d(NAME, "Loading librnwhisper_v8.so");
-        System.loadLibrary("rnwhisper_v8");
-        loadedLibrary = "rnwhisper_v8";
+        Log.d(NAME, "Loading librnwhisper_jni_v8.so");
+        System.loadLibrary("rnwhisper_jni_v8");
+        loadedLibrary = "rnwhisper_jni_v8";
       }
     } else if (WhisperContext.isArmeabiV7a()) {
-      Log.d(NAME, "Loading librnwhisper_vfpv4.so");
-      System.loadLibrary("rnwhisper_vfpv4");
-      loadedLibrary = "rnwhisper_vfpv4";
+      Log.d(NAME, "Loading librnwhisper_jni_vfpv4.so");
+      System.loadLibrary("rnwhisper_jni_vfpv4");
+      loadedLibrary = "rnwhisper_jni_vfpv4";
     } else if (WhisperContext.isX86_64()) {
-      Log.d(NAME, "Loading librnwhisper_x86_64.so");
-      System.loadLibrary("rnwhisper_x86_64");
-      loadedLibrary = "rnwhisper_x86_64";
+      Log.d(NAME, "Loading librnwhisper_jni_x86_64.so");
+      System.loadLibrary("rnwhisper_jni_x86_64");
+      loadedLibrary = "rnwhisper_jni_x86_64";
     } else {
       Log.d(NAME, "ARM32 is not supported, skipping loading library");
     }
@@ -509,6 +624,202 @@ public class WhisperContext {
 
   public static boolean isX86_64() {
     return Build.SUPPORTED_ABIS[0].equals("x86_64");
+  }
+
+  private static boolean isHexagonSupported() {
+    // Check SOC_MODEL on Android 12+
+    if (Build.VERSION.SDK_INT >= 31) {
+      String socModel = Build.SOC_MODEL;
+      Log.d(NAME, "SOC Model: " + socModel);
+      if (socModel != null) {
+        socModel = socModel.toUpperCase();
+        // SM8550 (8 Gen 2), SM8650 (8 Gen 3), SM8635 (8s Gen 3), SM8750 (8 Elite)
+        if (socModel.matches(".*(SM8550|SM8650|SM8635|SM8750).*")) {
+          return true;
+        }
+      }
+    }
+
+    // Check for supported Qualcomm platforms (Snapdragon 8 Gen 2 and newer)
+    // Boards: kalama (8 Gen 2), pineapple (8 Gen 3), sun (8 Elite), lanai (8s Gen 3)
+    String hardware = Build.HARDWARE.toLowerCase();
+    Log.d(NAME, "Hardware: " + hardware);
+    String board = Build.BOARD.toLowerCase();
+    Log.d(NAME, "Board: " + board);
+    if (
+      hardware.matches(".*(kalama|pineapple|sun|lanai).*") ||
+      board.matches(".*(kalama|pineapple|sun|lanai).*")
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private static boolean prepareHtpDirectory(java.io.File dir, String label) {
+    if (dir == null) {
+      return false;
+    }
+    try {
+      if (dir.exists()) {
+        if (!dir.isDirectory()) {
+          Log.w(
+            NAME,
+            label + " exists but is not a directory: " + dir.getAbsolutePath()
+          );
+          return false;
+        }
+      } else {
+        if (!dir.mkdirs()) {
+          Log.w(
+            NAME,
+            "Unable to create " + label + " at " + dir.getAbsolutePath()
+          );
+          return false;
+        }
+        java.io.File sanity = java.io.File.createTempFile("htp", ".tmp", dir);
+        sanity.delete();
+      }
+    } catch (Exception e) {
+      Log.w(
+        NAME,
+        "Unable to prepare " + label + " at " + dir.getAbsolutePath(),
+        e
+      );
+      return false;
+    }
+
+    dir.setReadable(true, false);
+    dir.setExecutable(true, false);
+    dir.setWritable(true, true);
+
+    try {
+      android.system.Os.chmod(dir.getAbsolutePath(), HTP_DIR_MODE);
+    } catch (Exception e) {
+      Log.w(NAME, "Failed to chmod HTP directory " + dir.getAbsolutePath(), e);
+    }
+
+    return true;
+  }
+
+  private static java.io.File getPrivateHtpDir(
+    android.content.Context context
+  ) {
+    try {
+      return context.getDir(HTP_DIR_NAME, android.content.Context.MODE_PRIVATE);
+    } catch (Exception e) {
+      Log.w(NAME, "Unable to access private HTP directory", e);
+      return null;
+    }
+  }
+
+  private static java.io.File resolveHtpDirectory(
+    android.content.Context context
+  ) {
+    java.io.File[] candidates = new java.io.File[] {
+      getPrivateHtpDir(context),
+      new java.io.File(context.getFilesDir(), HTP_DIR_NAME),
+      context.getCodeCacheDir() != null
+        ? new java.io.File(context.getCodeCacheDir(), HTP_DIR_NAME)
+        : null,
+      context.getCacheDir() != null
+        ? new java.io.File(context.getCacheDir(), HTP_DIR_NAME)
+        : null,
+      context.getExternalFilesDir(null) != null
+        ? new java.io.File(context.getExternalFilesDir(null), HTP_DIR_NAME)
+        : null,
+    };
+
+    for (java.io.File candidate : candidates) {
+      if (candidate == null) continue;
+      if (prepareHtpDirectory(candidate, "HTP directory candidate")) {
+        return candidate;
+      }
+    }
+
+    Log.w(
+      NAME,
+      "Unable to provision directory for Hexagon libraries; Hexagon backend will be disabled"
+    );
+    return null;
+  }
+
+  private static void setHtpFilePermissions(java.io.File file) {
+    file.setReadable(true, false);
+    file.setExecutable(true, false);
+    try {
+      android.system.Os.chmod(file.getAbsolutePath(), HTP_FILE_MODE);
+    } catch (Exception e) {
+      Log.w(NAME, "Failed to chmod HTP library " + file.getAbsolutePath(), e);
+    }
+  }
+
+  private static boolean ensureHtpLibraries(
+    android.content.Context context,
+    java.io.File htpDir
+  ) {
+    for (String libName : HTP_LIBS) {
+      java.io.File outFile = new java.io.File(htpDir, libName);
+
+      if (outFile.exists()) {
+        continue;
+      }
+
+      try {
+        try (
+          InputStream in = context.getAssets().open("ggml-hexagon/" + libName);
+          FileOutputStream out = new FileOutputStream(outFile)
+        ) {
+          byte[] buffer = new byte[8192];
+          int read;
+          while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+          }
+          out.flush();
+        }
+
+        setHtpFilePermissions(outFile);
+        Log.d(
+          NAME,
+          "Installed HTP library: " +
+            libName +
+            " to " +
+            outFile.getAbsolutePath()
+        );
+      } catch (Exception e) {
+        Log.w(NAME, "Could not install " + libName + " from assets", e);
+        outFile.delete();
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  static void extractHtpLibrariesFromAssets(android.content.Context context) {
+    java.io.File htpDir = resolveHtpDirectory(context);
+    if (htpDir == null) {
+      return;
+    }
+
+    Log.d(NAME, "Using " + htpDir.getAbsolutePath() + " for HTP libraries");
+
+    if (!ensureHtpLibraries(context, htpDir)) {
+      Log.w(
+        NAME,
+        "Could not install Hexagon libraries; Hexagon backend will be disabled"
+      );
+      return;
+    }
+
+    try {
+      String htpLibPath = htpDir.getAbsolutePath();
+      android.system.Os.setenv("ADSP_LIBRARY_PATH", htpLibPath, true);
+      android.system.Os.setenv("WSP_GGML_HEXAGON_NDEV", "16", true);
+      Log.d(NAME, "Set ADSP_LIBRARY_PATH=" + htpLibPath);
+    } catch (Exception e) {
+      Log.w(NAME, "Failed to set ADSP_LIBRARY_PATH", e);
+    }
   }
 
   public static String getCpuFeatures() {
@@ -537,8 +848,18 @@ public class WhisperContext {
 
   // JNI methods
   protected static native long initContext(int contextId, String modelPath);
-  protected static native long initContextWithAsset(int contextId, AssetManager assetManager, String modelPath);
-  protected static native long initContextWithInputStream(int contextId, PushbackInputStream inputStream);
+
+  protected static native long initContextWithAsset(
+    int contextId,
+    AssetManager assetManager,
+    String modelPath
+  );
+
+  protected static native long initContextWithInputStream(
+    int contextId,
+    PushbackInputStream inputStream
+  );
+
   protected static native void freeContext(int contextId, long contextPtr);
 
   protected static native int fullWithNewJob(
@@ -549,49 +870,109 @@ public class WhisperContext {
     ReadableMap options,
     Callback Callback
   );
+
   protected static native void abortTranscribe(int jobId);
+
   protected static native void abortAllTranscribe();
+
   protected static native int getTextSegmentCount(long context);
+
   protected static native String getTextSegment(long context, int index);
+
   protected static native int getTextSegmentT0(long context, int index);
+
   protected static native int getTextSegmentT1(long context, int index);
-  protected static native boolean getTextSegmentSpeakerTurnNext(long context, int index);
+
+  protected static native boolean getTextSegmentSpeakerTurnNext(
+    long context,
+    int index
+  );
 
   protected static native void createRealtimeTranscribeJob(
     int job_id,
     long context,
     ReadableMap options
   );
-  protected static native void finishRealtimeTranscribeJob(int job_id, long context, int[] sliceNSamples);
-  protected static native boolean vadSimple(int job_id, int slice_index, int n_samples, int n);
-  protected static native void putPcmData(int job_id, short[] buffer, int slice_index, int n_samples, int n);
+
+  protected static native void finishRealtimeTranscribeJob(
+    int job_id,
+    long context,
+    int[] sliceNSamples
+  );
+
+  protected static native boolean vadSimple(
+    int job_id,
+    int slice_index,
+    int n_samples,
+    int n
+  );
+
+  protected static native void putPcmData(
+    int job_id,
+    short[] buffer,
+    int slice_index,
+    int n_samples,
+    int n
+  );
+
   protected static native int fullWithJob(
     int job_id,
     long context,
     int slice_index,
     int n_samples
   );
+
   protected static native String bench(long context, int n_threads);
 
   // VAD JNI methods
   protected static native long initVadContext(int contextId, String modelPath);
-  protected static native long initVadContextWithAsset(int contextId, AssetManager assetManager, String modelPath);
-  protected static native long initVadContextWithInputStream(int contextId, PushbackInputStream inputStream);
-  protected static native void freeVadContext(int contextId, long vadContextPtr);
-  protected static native boolean vadDetectSpeech(long vadContextPtr, float[] audioData, int nSamples);
-  protected static native long vadGetSegmentsFromProbs(long vadContextPtr, float threshold,
-                                                       int minSpeechDurationMs, int minSilenceDurationMs,
-                                                       float maxSpeechDurationS, int speechPadMs,
-                                                       float samplesOverlap);
+
+  protected static native long initVadContextWithAsset(
+    int contextId,
+    AssetManager assetManager,
+    String modelPath
+  );
+
+  protected static native long initVadContextWithInputStream(
+    int contextId,
+    PushbackInputStream inputStream
+  );
+
+  protected static native void freeVadContext(
+    int contextId,
+    long vadContextPtr
+  );
+
+  protected static native boolean vadDetectSpeech(
+    long vadContextPtr,
+    float[] audioData,
+    int nSamples
+  );
+
+  protected static native long vadGetSegmentsFromProbs(
+    long vadContextPtr,
+    float threshold,
+    int minSpeechDurationMs,
+    int minSilenceDurationMs,
+    float maxSpeechDurationS,
+    int speechPadMs,
+    float samplesOverlap
+  );
+
   protected static native int vadGetNSegments(long segmentsPtr);
+
   protected static native float vadGetSegmentT0(long segmentsPtr, int index);
+
   protected static native float vadGetSegmentT1(long segmentsPtr, int index);
+
   protected static native void vadFreeSegments(long segmentsPtr);
 
   // Audio file loading utility for VAD
   public static float[] loadAudioFileAsFloat32(String filePath) {
     try {
-      java.io.FileInputStream fis = new java.io.FileInputStream(new java.io.File(filePath));
+      java.io.FileInputStream fis = new java.io.FileInputStream(
+        new java.io.File(filePath)
+      );
       return AudioUtils.decodeWaveFile(fis);
     } catch (Exception e) {
       Log.e(NAME, "Failed to load audio file: " + filePath, e);
@@ -600,8 +981,14 @@ public class WhisperContext {
   }
 
   // JSI Installation
-  protected static native void installJSIBindings(long runtimePtr, Object callInvokerHolder);
+  protected static native void installJSIBindings(
+    long runtimePtr,
+    Object callInvokerHolder
+  );
+
   protected static native void cleanupJSIBindings();
+
   protected static native void setupLog(NativeLogCallback logCallback);
+
   protected static native void unsetLog();
 }

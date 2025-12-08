@@ -5,11 +5,13 @@
 #include <cstdlib>
 #include <sys/sysinfo.h>
 #include <string>
+#include <cstring>
 #include <thread>
 #include <vector>
 #include "whisper.h"
 #include "rn-whisper.h"
 #include "ggml.h"
+#include "ggml-backend.h"
 #include "jni-utils.h"
 #include "RNWhisperJSI.h"
 
@@ -326,7 +328,16 @@ struct whisper_full_params createFullParams(JNIEnv *env, jobject options) {
 
     int max_threads = std::thread::hardware_concurrency();
     // Use 2 threads by default on 4-core devices, 4 threads on more cores
+#if defined(WSP_GGML_USE_HEXAGON)
+    // Hexagon path: prefer 6 host threads unless overridden
+    int hex_default = 6;
+    if (max_threads > 0) {
+        hex_default = min(hex_default, max_threads);
+    }
+    int default_n_threads = hex_default;
+#else
     int default_n_threads = max_threads == 4 ? 2 : min(4, max_threads);
+#endif
     int n_threads = readablemap::getInt(env, options, "maxThreads", default_n_threads);
     params.n_threads = n_threads > 0 ? n_threads : default_n_threads;
     params.translate = readablemap::getBool(env, options, "translate", false);
