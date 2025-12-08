@@ -229,7 +229,7 @@ cd whisper.cpp/models
 # If CI env is `true`, use dummy model
 if [ "$CI" = "true" ]; then
   cp for-tests-ggml-base.bin ggml-base.bin
-  cp for-tests-silero-v5.1.2-ggml.bin ggml-silero-v5.1.2.bin
+  cp for-tests-silero-v6.2.0-ggml.bin ggml-silero-v6.2.0.bin
   echo "CI: Copied for-tests-ggml-base.bin to ggml-base.bin"
 else
   ./download-ggml-model.sh base
