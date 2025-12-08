@@ -1835,7 +1835,7 @@ wsp_ggml_hexagon_session::wsp_ggml_hexagon_session(int dev_id, wsp_ggml_backend_
 
         repack_buffer_type.iface   = wsp_ggml_backend_hexagon_repack_buffer_type_interface;
         repack_buffer_type.context = new wsp_ggml_backend_hexagon_buffer_type_context(this->name + "-REPACK", this);
-    } catch (...) {
+    } catch (std::exception const &exc) {
         release();
         throw;
     }

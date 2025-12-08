@@ -8,15 +8,6 @@
  #include <string>
 
  #ifdef _WIN32
-@@ -1835,7 +1836,7 @@
-
-         repack_buffer_type.iface   = wsp_ggml_backend_hexagon_repack_buffer_type_interface;
-         repack_buffer_type.context = new wsp_ggml_backend_hexagon_buffer_type_context(this->name + "-REPACK", this);
--    } catch (std::exception const &exc) {
-+    } catch (...) {
-         release();
-         throw;
-     }
 @@ -3681,8 +3682,10 @@
          try {
              devices[i].context = new wsp_ggml_hexagon_session(i, &devices[i]);

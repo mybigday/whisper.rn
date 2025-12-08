@@ -337,6 +337,7 @@ patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml-hexagon.cpp.patch
 rm -rf ./cpp/*.orig
+rm -rf ./cpp/**/*.orig
 
 # Download model for example
 cd whisper.cpp/models
