@@ -98,7 +98,7 @@ Voice Activity Detection allows you to detect speech segments in audio data usin
 import { initWhisperVad } from 'whisper.rn'
 
 const vadContext = await initWhisperVad({
-  filePath: require('./assets/ggml-silero-v5.1.2.bin'), // VAD model file
+  filePath: require('./assets/ggml-silero-v6.2.0.bin'), // VAD model file
   useGpu: true, // Use GPU acceleration (iOS only)
   nThreads: 4, // Number of threads for processing
 })

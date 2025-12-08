@@ -259,7 +259,7 @@ export default function RealtimeTranscriberDemo() {
       log('Initializing VAD context...')
       const vadStartTime = Date.now()
       const vadCtx = await initWhisperVad({
-        filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+        filePath: require('../assets/ggml-silero-v6.2.0.bin'),
         useGpu: true,
         nThreads: 4,
       })
@@ -316,7 +316,7 @@ export default function RealtimeTranscriberDemo() {
       log('Initializing VAD context...')
       const vadStartTime = Date.now()
       const vadCtx = await initWhisperVad({
-        filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+        filePath: require('../assets/ggml-silero-v6.2.0.bin'),
         useGpu: true,
         nThreads: 4,
       })

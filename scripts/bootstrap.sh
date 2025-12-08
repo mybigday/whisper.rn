@@ -233,15 +233,15 @@ if [ "$CI" = "true" ]; then
   echo "CI: Copied for-tests-ggml-base.bin to ggml-base.bin"
 else
   ./download-ggml-model.sh base
-  ./download-vad-model.sh silero-v5.1.2
+  ./download-vad-model.sh silero-v6.2.0
 fi
 
 # Copy to assets
 cp ../samples/jfk.wav ../../example/assets
 cp ggml-base.bin ../../example/assets
 echo "Copied ggml-base.bin to example/assets"
-cp ggml-silero-v5.1.2.bin ../../example/assets
-echo "Copied ggml-silero-v5.1.2.bin to example/assets"
+cp ggml-silero-v6.2.0.bin ../../example/assets
+echo "Copied ggml-silero-v6.2.0.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-base-encoder.mlmodelc exist
 if [ ! -d ./ggml-base-encoder.mlmodelc ]; then
