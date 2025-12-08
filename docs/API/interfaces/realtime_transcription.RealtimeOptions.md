@@ -21,6 +21,8 @@
 - [transcribeOptions](realtime_transcription.RealtimeOptions.md#transcribeoptions)
 - [vadOptions](realtime_transcription.RealtimeOptions.md#vadoptions)
 - [vadPreset](realtime_transcription.RealtimeOptions.md#vadpreset)
+- [vadSkipRatio](realtime_transcription.RealtimeOptions.md#vadskipratio)
+- [vadThrottleMs](realtime_transcription.RealtimeOptions.md#vadthrottlems)
 
 ## Properties
 
@@ -30,7 +32,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L182)
+[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L182)
 
 ___
 
@@ -40,7 +42,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:201](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L201)
+[realtime-transcription/types.ts:205](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L205)
 
 ___
 
@@ -50,7 +52,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L181)
+[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L181)
 
 ___
 
@@ -60,7 +62,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L204)
+[realtime-transcription/types.ts:208](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L208)
 
 ___
 
@@ -70,7 +72,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L190)
+[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L190)
 
 ___
 
@@ -80,7 +82,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L191)
+[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L191)
 
 ___
 
@@ -90,7 +92,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L197)
+[realtime-transcription/types.ts:201](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L201)
 
 ___
 
@@ -114,7 +116,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:207](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L207)
+[realtime-transcription/types.ts:211](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L211)
 
 ___
 
@@ -124,7 +126,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L183)
+[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L183)
 
 ___
 
@@ -134,7 +136,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:198](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L198)
+[realtime-transcription/types.ts:202](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L202)
 
 ___
 
@@ -144,7 +146,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L194)
+[realtime-transcription/types.ts:198](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L198)
 
 ___
 
@@ -154,7 +156,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:186](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L186)
+[realtime-transcription/types.ts:186](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L186)
 
 ___
 
@@ -164,4 +166,24 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/e931dfc/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L187)
+
+___
+
+### vadSkipRatio
+
+• `Optional` **vadSkipRatio**: `number`
+
+#### Defined in
+
+[realtime-transcription/types.ts:195](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L195)
+
+___
+
+### vadThrottleMs
+
+• `Optional` **vadThrottleMs**: `number`
+
+#### Defined in
+
+[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/42bb2d5/src/realtime-transcription/types.ts#L194)
