@@ -16,6 +16,8 @@ add_definitions(
     -DWSP_GGML_USE_ACCELERATE
     -DWSP_GGML_USE_METAL
     -DWSP_GGML_METAL_USE_BF16
+    -DWHISPER_USE_COREML
+    -DWHISPER_COREML_ALLOW_FALLBACK
 )
 
 if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64;x86_64")
@@ -30,6 +32,14 @@ if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
         ${SOURCE_DIR}/ggml-cpu/arch/arm/repack.cpp
     )
 endif ()
+
+# CoreML source files
+set(SOURCE_FILES_COREML
+    ${SOURCE_DIR}/coreml/whisper-encoder.mm
+    ${SOURCE_DIR}/coreml/whisper-encoder-impl.m
+    ${SOURCE_DIR}/coreml/whisper-decoder-impl.m
+    ${SOURCE_DIR}/coreml/whisper-compat.m
+)
 
 # Define public headers
 set(PUBLIC_HEADERS
@@ -69,6 +79,7 @@ add_library(rnwhisper SHARED
     ${SOURCE_DIR}/rn-whisper.cpp
     ${SOURCE_DIR}/rn-audioutils.cpp
     ${SOURCE_FILES_ARCH}
+    ${SOURCE_FILES_COREML}
 )
 
 # Setup include directories
@@ -76,6 +87,7 @@ target_include_directories(rnwhisper
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp/ggml-cpu>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp/coreml>
         $<INSTALL_INTERFACE:include>
 )
 
@@ -85,6 +97,7 @@ target_link_libraries(rnwhisper PRIVATE
     "-framework Foundation"
     "-framework Metal"
     "-framework MetalKit"
+    "-framework CoreML"
 )
 
 # Set properties for framework
@@ -96,5 +109,12 @@ set_target_properties(rnwhisper PROPERTIES
     FRAMEWORK_VERSION 1.0.0
     VERSION 1.0.0
     PUBLIC_HEADER "${PUBLIC_HEADERS}"
-    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC NO
+    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+)
+
+# Disable ARC for Metal Objective-C files (they don't support ARC)
+set_source_files_properties(
+    ${SOURCE_DIR}/ggml-metal/ggml-metal-context.m
+    ${SOURCE_DIR}/ggml-metal/ggml-metal-device.m
+    PROPERTIES COMPILE_FLAGS "-fno-objc-arc"
 )

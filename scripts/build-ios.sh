@@ -28,8 +28,7 @@ function build_framework() {
     -DCMAKE_OSX_SYSROOT=$3 \
     -DCMAKE_INSTALL_PREFIX=`pwd`/install \
     -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
-    -DCMAKE_IOS_INSTALL_COMBINED=YES
-
+    -DCMAKE_IOS_INSTALL_COMBINED=YES 
   # Build
   cmake --build . --config Release -j $(sysctl -n hw.logicalcpu)
 
