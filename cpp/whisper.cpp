@@ -2505,7 +2505,7 @@ static struct wsp_ggml_cgraph * whisper_build_graph_decoder(
 
     const float KQscale = pow(float(n_state_head), -0.25);
 
-    struct wsp_ggml_tensor * KQ_mask = wsp_ggml_new_tensor_3d(ctx0, WSP_GGML_TYPE_F32, n_kv, WSP_GGML_PAD(n_tokens, WSP_GGML_KQ_MASK_PAD), 1);
+    struct wsp_ggml_tensor * KQ_mask = wsp_ggml_new_tensor_3d(ctx0, WSP_GGML_TYPE_F32, n_kv, n_tokens, 1);
     wsp_ggml_set_name(KQ_mask, "KQ_mask");
     wsp_ggml_set_input(KQ_mask);
 
@@ -2929,7 +2929,7 @@ static bool whisper_decode_internal(
                     }
                 }
 
-                for (int i = n_tokens; i < WSP_GGML_PAD(n_tokens, WSP_GGML_KQ_MASK_PAD); ++i) {
+                for (int i = n_tokens; i < n_tokens; ++i) {
                     for (int j = 0; j < n_kv; ++j) {
                         data[h*(n_kv*n_tokens) + i*n_kv + j] = -INFINITY;
                     }

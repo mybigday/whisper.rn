@@ -81,6 +81,7 @@ void wsp_ggml_compute_forward_roll(const struct wsp_ggml_compute_params * params
 void wsp_ggml_compute_forward_arange(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_timestep_embedding(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_argsort(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_top_k(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_leaky_relu(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_tri(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_fill(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);

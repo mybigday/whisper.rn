@@ -14,10 +14,6 @@
 #include <arm_neon.h>
 #endif
 
-#if defined(__F16C__)
-#include <immintrin.h>
-#endif
-
 #if defined(__riscv_v_intrinsic)
 #include <riscv_vector.h>
 #endif
@@ -160,18 +156,18 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
 #define WSP_GGML_F32xt                        svfloat32_t
 #define WSP_GGML_F32xt_ZERO                   svdup_n_f32(0.0f)
 #define WSP_GGML_F32xt_SET1(x)                svdup_n_f32(x)
-#define WSP_GGML_F32xt_LOAD_IMPL(pg, a, ...)  svld1_f32(pg, a)
-#define WSP_GGML_F32xt_LOAD(...)              WSP_GGML_F32xt_LOAD_IMPL(DEFAULT_PG, __VA_ARGS__)
-#define WSP_GGML_F32xt_STORE_IMPL(pg,a,b)     svst1_f32(pg, a, b)
-#define WSP_GGML_F32xt_STORE(...)             WSP_GGML_F32xt_STORE_IMPL(DEFAULT_PG, __VA_ARGS__)
+#define WSP_GGML_F32xt_LOAD_IMPL(pg, a)       svld1_f32(pg, a)
+#define WSP_GGML_F32xt_LOAD(a)                WSP_GGML_F32xt_LOAD_IMPL(DEFAULT_PG, a)
+#define WSP_GGML_F32xt_STORE_IMPL(pg, a, b)   svst1_f32(pg, a, b)
+#define WSP_GGML_F32xt_STORE(a, b)            WSP_GGML_F32xt_STORE_IMPL(DEFAULT_PG, a, b)
 #define WSP_GGML_F32xt_FMA_IMPL(pg, a, b, c)  svmad_f32_m(pg, b, c, a)
-#define WSP_GGML_F32xt_FMA(...)               WSP_GGML_F32xt_FMA_IMPL(DEFAULT_PG, __VA_ARGS__)
+#define WSP_GGML_F32xt_FMA(a, b, c)           WSP_GGML_F32xt_FMA_IMPL(DEFAULT_PG, a, b, c)
 #define WSP_GGML_F32xt_ADD_IMPL(pg, a, b)     svadd_f32_m(pg, a, b)
-#define WSP_GGML_F32xt_ADD(...)               WSP_GGML_F32xt_ADD_IMPL(DEFAULT_PG, __VA_ARGS__)
+#define WSP_GGML_F32xt_ADD(a, b)              WSP_GGML_F32xt_ADD_IMPL(DEFAULT_PG, a, b)
 #define WSP_GGML_F32xt_MUL_IMPL(pg, a, b)     svmul_f32_m(pg, a, b)
-#define WSP_GGML_F32xt_MUL(...)               WSP_GGML_F32xt_MUL_IMPL(DEFAULT_PG, __VA_ARGS__)
+#define WSP_GGML_F32xt_MUL(a, b)              WSP_GGML_F32xt_MUL_IMPL(DEFAULT_PG, a, b)
 #define WSP_GGML_F32xt_REDUCE_ONE_IMPL(pg, a) svaddv(pg, a)
-#define WSP_GGML_F32xt_REDUCE_ONE(...)        WSP_GGML_F32xt_REDUCE_ONE_IMPL(DEFAULT_PG, __VA_ARGS__)
+#define WSP_GGML_F32xt_REDUCE_ONE(a)          WSP_GGML_F32xt_REDUCE_ONE_IMPL(DEFAULT_PG, a)
 #define WSP_GGML_F32xt_REDUCE_IMPL(pg, res, sum1, sum2, sum3, sum4, sum5, sum6, sum7, sum8)  \
 {                                                      \
     sum1 = svadd_f32_m(DEFAULT_PG, sum1, sum2);        \
@@ -183,7 +179,8 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
     sum1 = svadd_f32_m(DEFAULT_PG, sum1, sum5);        \
     (res) = (wsp_ggml_float) WSP_GGML_F32xt_REDUCE_ONE(sum1);  \
 }
-#define WSP_GGML_F32xt_REDUCE(...) WSP_GGML_F32xt_REDUCE_IMPL(DEFAULT_PG, __VA_ARGS__)
+#define WSP_GGML_F32xt_REDUCE(res, sum1, sum2, sum3, sum4, sum5, sum6, sum7, sum8)  \
+        WSP_GGML_F32xt_REDUCE_IMPL(DEFAULT_PG, res, sum1, sum2, sum3, sum4, sum5, sum6, sum7, sum8)
 
 #define WSP_GGML_F32_VEC        WSP_GGML_F32xt
 #define WSP_GGML_F32_VEC_ZERO   WSP_GGML_F32xt_ZERO
@@ -206,11 +203,11 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
 #define WSP_GGML_F32Cxt_STORE(dst_ptr, src_vec) svst1_f16(DEFAULT_PG16, (__fp16 *)(dst_ptr), (src_vec))
 
 #define WSP_GGML_F32Cxt_FMA_IMPL(pg, a, b, c)   svmad_f16_x(pg, b, c, a)
-#define WSP_GGML_F32Cxt_FMA(...)                WSP_GGML_F32Cxt_FMA_IMPL(DEFAULT_PG16, __VA_ARGS__)
+#define WSP_GGML_F32Cxt_FMA(a, b, c)            WSP_GGML_F32Cxt_FMA_IMPL(DEFAULT_PG16, a, b, c)
 #define WSP_GGML_F32Cxt_ADD_IMPL(pg, a, b)      svadd_f16_x(pg, a, b)
-#define WSP_GGML_F32Cxt_ADD(...)                WSP_GGML_F32Cxt_ADD_IMPL(DEFAULT_PG16, __VA_ARGS__)
+#define WSP_GGML_F32Cxt_ADD(a, b)               WSP_GGML_F32Cxt_ADD_IMPL(DEFAULT_PG16, a, b)
 #define WSP_GGML_F32Cxt_MUL_IMPL(pg, a, b)      svmul_f16_x(pg, a, b)
-#define WSP_GGML_F32Cxt_MUL(...)                WSP_GGML_F32Cxt_MUL_IMPL(DEFAULT_PG16, __VA_ARGS__)
+#define WSP_GGML_F32Cxt_MUL(a, b)               WSP_GGML_F32Cxt_MUL_IMPL(DEFAULT_PG16, a, b)
 #define WSP_GGML_F32Cxt_REDUCE                  WSP_GGML_F16xt_REDUCE_MIXED
 
 #define WSP_GGML_F16x_VEC                WSP_GGML_F32Cxt
@@ -224,7 +221,7 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
 #define WSP_GGML_F16x_VEC_REDUCE         WSP_GGML_F32Cxt_REDUCE
 
 #define WSP_GGML_F16xt_REDUCE_ONE_IMPL(pg, a) svaddv_f16(pg, a)
-#define WSP_GGML_F16xt_REDUCE_ONE(...)        WSP_GGML_F16xt_REDUCE_ONE_IMPL(DEFAULT_PG16, __VA_ARGS__)
+#define WSP_GGML_F16xt_REDUCE_ONE(a)          WSP_GGML_F16xt_REDUCE_ONE_IMPL(DEFAULT_PG16, a)
 
 #define WSP_GGML_F16xt_REDUCE_MIXED_IMPL(pg16, res, sum1, sum2, sum3, sum4)  \
 {                                                      \
@@ -234,7 +231,8 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
     __fp16 sum_f16 = svaddv_f16(pg16, sum1);           \
     (res) = (wsp_ggml_float) sum_f16;                      \
 }
-#define WSP_GGML_F16xt_REDUCE_MIXED(...) WSP_GGML_F16xt_REDUCE_MIXED_IMPL(DEFAULT_PG16, __VA_ARGS__)
+#define WSP_GGML_F16xt_REDUCE_MIXED(res, sum1, sum2, sum3, sum4)  \
+        WSP_GGML_F16xt_REDUCE_MIXED_IMPL(DEFAULT_PG16, res, sum1, sum2, sum3, sum4)
 
 // F16 NEON
 

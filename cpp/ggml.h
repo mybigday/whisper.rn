@@ -204,6 +204,10 @@
 #    define WSP_GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(printf, __VA_ARGS__)))
 #endif
 
+#if defined(_WIN32) && !defined(_WIN32_WINNT)
+#    define _WIN32_WINNT 0x0A00
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -530,6 +534,7 @@ extern "C" {
         WSP_GGML_OP_ARANGE,
         WSP_GGML_OP_TIMESTEP_EMBEDDING,
         WSP_GGML_OP_ARGSORT,
+        WSP_GGML_OP_TOP_K,
         WSP_GGML_OP_LEAKY_RELU,
         WSP_GGML_OP_TRI,
         WSP_GGML_OP_FILL,
@@ -2147,7 +2152,8 @@ extern "C" {
     };
 
     enum wsp_ggml_scale_flag {
-        WSP_GGML_SCALE_FLAG_ALIGN_CORNERS = (1 << 8)
+        WSP_GGML_SCALE_FLAG_ALIGN_CORNERS = (1 << 8),
+        WSP_GGML_SCALE_FLAG_ANTIALIAS     = (1 << 9),
     };
 
     // interpolate
@@ -2190,6 +2196,15 @@ extern "C" {
             int                  p2,
             int                  p3);
 
+    // pad each dimension with values on the other side of the torus (looping around)
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_circular(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            int                   p0,
+            int                   p1,
+            int                   p2,
+            int                   p3);
+
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_ext(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
@@ -2202,6 +2217,19 @@ extern "C" {
             int                  lp3,
             int                  rp3
             );
+
+    // pad each dimension with values on the other side of the torus (looping around)
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_ext_circular(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            int                   lp0,
+            int                   rp0,
+            int                   lp1,
+            int                   rp1,
+            int                   lp2,
+            int                   rp2,
+            int                   lp3,
+            int                   rp3);
 
     // pad each dimension with reflection: [a, b, c, d] -> [b, a, b, c, d, c]
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_reflect_1d(
@@ -2258,25 +2286,30 @@ extern "C" {
             struct wsp_ggml_tensor  * a,
             enum wsp_ggml_sort_order  order);
 
+    // similar to wsp_ggml_top_k but implemented as `argsort` + `view`
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_argsort_top_k(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            int                   k);
+
+    // top k elements per row
+    // note: the resulting top k indices are in no particular order
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_top_k(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            int                   k);
+
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_arange(
             struct wsp_ggml_context * ctx,
             float                 start,
             float                 stop,
             float                 step);
 
-    // top k elements per row
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_top_k(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            int                   k);
-
-#define WSP_GGML_KQ_MASK_PAD 64
-
-    // q:    [n_embd_k, n_batch,     n_head,    ne3 ]
-    // k:    [n_embd_k, n_kv,        n_head_kv, ne3 ]
-    // v:    [n_embd_v, n_kv,        n_head_kv, ne3 ] !! not transposed !!
-    // mask: [n_kv,     n_batch_pad, ne32,      ne33] !! n_batch_pad = WSP_GGML_PAD(n_batch, WSP_GGML_KQ_MASK_PAD) !!
-    // res:  [n_embd_v, n_head,      n_batch,   ne3 ] !! permuted !!
+    // q:    [n_embd_k, n_batch, n_head,    ne3 ]
+    // k:    [n_embd_k, n_kv,    n_head_kv, ne3 ]
+    // v:    [n_embd_v, n_kv,    n_head_kv, ne3 ] !! not transposed !!
+    // mask: [n_kv,     n_batch, ne32,      ne33]
+    // res:  [n_embd_v, n_head,  n_batch,   ne3 ] !! permuted !!
     //
     // broadcast:
     //   n_head % n_head_kv == 0
@@ -2582,7 +2615,8 @@ extern "C" {
 
     // Set callback for all future logging events.
     // If this is not called, or NULL is supplied, everything is output on stderr.
-    WSP_GGML_API void wsp_ggml_log_set(wsp_ggml_log_callback log_callback, void * user_data);
+    WSP_GGML_API void wsp_ggml_log_get(wsp_ggml_log_callback * log_callback, void ** user_data);
+    WSP_GGML_API void wsp_ggml_log_set(wsp_ggml_log_callback   log_callback, void *  user_data);
 
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_zero(struct wsp_ggml_tensor * tensor);
 

@@ -132,6 +132,13 @@ static void wsp_ggml_print_backtrace_symbols(void) {
     int nptrs = backtrace(trace, sizeof(trace)/sizeof(trace[0]));
     backtrace_symbols_fd(trace, nptrs, STDERR_FILENO);
 }
+#elif defined(__APPLE__)
+#include <execinfo.h>
+static void wsp_ggml_print_backtrace_symbols(void) {
+    void * trace[100];
+    int nptrs = backtrace(trace, sizeof(trace)/sizeof(trace[0]));
+    backtrace_symbols_fd(trace, nptrs, STDERR_FILENO);
+}
 #else
 static void wsp_ggml_print_backtrace_symbols(void) {
     // platform not supported
@@ -143,6 +150,20 @@ void wsp_ggml_print_backtrace(void) {
     if (WSP_GGML_NO_BACKTRACE) {
         return;
     }
+#if defined(__APPLE__)
+    // On macOS, fork+debugger attachment is problematic due to:
+    // 1. libdispatch "poisons" forked child processes
+    // 2. lldb has issues attaching to parent from forked child
+    // Use simple backtrace() instead to avoid Terminal.app crashes
+    const char * WSP_GGML_BACKTRACE_LLDB = getenv("WSP_GGML_BACKTRACE_LLDB");
+    if (!WSP_GGML_BACKTRACE_LLDB) {
+        fprintf(stderr, "WARNING: Using native backtrace. Set WSP_GGML_BACKTRACE_LLDB for more info.\n");
+        fprintf(stderr, "WARNING: WSP_GGML_BACKTRACE_LLDB may cause native MacOS Terminal.app to crash.\n");
+        fprintf(stderr, "See: https://github.com/ggml-org/llama.cpp/pull/17869\n");
+        wsp_ggml_print_backtrace_symbols();
+        return;
+    }
+#endif
 #if defined(__linux__)
     FILE * f = fopen("/proc/self/status", "r");
     size_t size = 0;
@@ -998,6 +1019,7 @@ static const char * WSP_GGML_OP_NAME[WSP_GGML_OP_COUNT] = {
     "ARANGE",
     "TIMESTEP_EMBEDDING",
     "ARGSORT",
+    "TOP_K",
     "LEAKY_RELU",
     "TRI",
     "FILL",
@@ -1031,7 +1053,7 @@ static const char * WSP_GGML_OP_NAME[WSP_GGML_OP_COUNT] = {
     "GLU",
 };
 
-static_assert(WSP_GGML_OP_COUNT == 94, "WSP_GGML_OP_COUNT != 94");
+static_assert(WSP_GGML_OP_COUNT == 95, "WSP_GGML_OP_COUNT != 95");
 
 static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "none",
@@ -1106,6 +1128,7 @@ static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "arange(start, stop, step)",
     "timestep_embedding(timesteps, dim, max_period)",
     "argsort(x)",
+    "top_k(x)",
     "leaky_relu(x)",
     "tri(x)",
     "fill(x, c)",
@@ -1139,7 +1162,7 @@ static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "glu(x)",
 };
 
-static_assert(WSP_GGML_OP_COUNT == 94, "WSP_GGML_OP_COUNT != 94");
+static_assert(WSP_GGML_OP_COUNT == 95, "WSP_GGML_OP_COUNT != 95");
 
 static_assert(WSP_GGML_OP_POOL_COUNT == 2, "WSP_GGML_OP_POOL_COUNT != 2");
 
@@ -4897,6 +4920,8 @@ static struct wsp_ggml_tensor * wsp_ggml_interpolate_impl(
         int64_t               ne3,
         uint32_t              mode) {
     WSP_GGML_ASSERT((mode & 0xFF) < WSP_GGML_SCALE_MODE_COUNT);
+    // TODO: implement antialias for modes other than bilinear
+    WSP_GGML_ASSERT(!(mode & WSP_GGML_SCALE_FLAG_ANTIALIAS) || (mode & 0xFF) == WSP_GGML_SCALE_MODE_BILINEAR);
 
     struct wsp_ggml_tensor * result = wsp_ggml_new_tensor_4d(ctx, a->type, ne0, ne1, ne2, ne3);
 
@@ -4951,6 +4976,18 @@ struct wsp_ggml_tensor * wsp_ggml_pad(
     return wsp_ggml_pad_ext(ctx, a, 0, p0, 0, p1, 0, p2, 0, p3);
 }
 
+// wsp_ggml_pad_circular
+
+struct wsp_ggml_tensor * wsp_ggml_pad_circular(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        int                   p0,
+        int                   p1,
+        int                   p2,
+        int                   p3) {
+    return wsp_ggml_pad_ext_circular(ctx, a, 0, p0, 0, p1, 0, p2, 0, p3);
+}
+
 struct wsp_ggml_tensor * wsp_ggml_pad_ext(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
@@ -4977,11 +5014,31 @@ struct wsp_ggml_tensor * wsp_ggml_pad_ext(
     wsp_ggml_set_op_params_i32(result, 5, rp2);
     wsp_ggml_set_op_params_i32(result, 6, lp3);
     wsp_ggml_set_op_params_i32(result, 7, rp3);
+    wsp_ggml_set_op_params_i32(result, 8, 0); // not circular by default
 
 
     result->op     = WSP_GGML_OP_PAD;
     result->src[0] = a;
 
+    return result;
+}
+
+// wsp_ggml_pad_ext_circular
+
+struct wsp_ggml_tensor * wsp_ggml_pad_ext_circular(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        int                  lp0,
+        int                  rp0,
+        int                  lp1,
+        int                  rp1,
+        int                  lp2,
+        int                  rp2,
+        int                  lp3,
+        int                  rp3
+        ) {
+    struct wsp_ggml_tensor * result = wsp_ggml_pad_ext(ctx, a, lp0, rp0, lp1, rp1, lp2, rp2, lp3, rp3);
+    wsp_ggml_set_op_params_i32(result, 8, 1); // circular
     return result;
 }
 
@@ -5040,28 +5097,6 @@ struct wsp_ggml_tensor * wsp_ggml_roll(
 
     result->op     = WSP_GGML_OP_ROLL;
     result->src[0] = a;
-
-    return result;
-}
-
-// wsp_ggml_arange
-
-struct wsp_ggml_tensor * wsp_ggml_arange(
-        struct wsp_ggml_context * ctx,
-        float                 start,
-        float                 stop,
-        float                 step) {
-    WSP_GGML_ASSERT(stop > start);
-
-    const int64_t steps = (int64_t) ceilf((stop - start) / step);
-
-    struct wsp_ggml_tensor * result = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, steps);
-
-    wsp_ggml_set_op_params_f32(result, 0, start);
-    wsp_ggml_set_op_params_f32(result, 1, stop);
-    wsp_ggml_set_op_params_f32(result, 2, step);
-
-    result->op = WSP_GGML_OP_ARANGE;
 
     return result;
 }
@@ -5147,12 +5182,31 @@ struct wsp_ggml_tensor * wsp_ggml_argsort(
         struct wsp_ggml_tensor   * a,
         enum wsp_ggml_sort_order   order) {
     WSP_GGML_ASSERT(a->ne[0] <= INT32_MAX);
+
     struct wsp_ggml_tensor * result = wsp_ggml_new_tensor(ctx, WSP_GGML_TYPE_I32, WSP_GGML_MAX_DIMS, a->ne);
 
     wsp_ggml_set_op_params_i32(result, 0, (int32_t) order);
 
     result->op     = WSP_GGML_OP_ARGSORT;
     result->src[0] = a;
+
+    return result;
+}
+
+// wsp_ggml_argsort_top_k
+
+struct wsp_ggml_tensor * wsp_ggml_argsort_top_k(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        int                   k) {
+    WSP_GGML_ASSERT(a->ne[0] >= k);
+
+    struct wsp_ggml_tensor * result = wsp_ggml_argsort(ctx, a, WSP_GGML_SORT_ORDER_DESC);
+
+    result = wsp_ggml_view_4d(ctx, result,
+                k, result->ne[1], result->ne[2], result->ne[3],
+                   result->nb[1], result->nb[2], result->nb[3],
+                0);
 
     return result;
 }
@@ -5165,12 +5219,32 @@ struct wsp_ggml_tensor * wsp_ggml_top_k(
         int                   k) {
     WSP_GGML_ASSERT(a->ne[0] >= k);
 
-    struct wsp_ggml_tensor * result = wsp_ggml_argsort(ctx, a, WSP_GGML_SORT_ORDER_DESC);
+    struct wsp_ggml_tensor * result = wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_I32, k, a->ne[1], a->ne[2], a->ne[3]);
 
-    result = wsp_ggml_view_4d(ctx, result,
-                k, result->ne[1], result->ne[2], result->ne[3],
-                   result->nb[1], result->nb[2], result->nb[3],
-                0);
+    result->op     = WSP_GGML_OP_TOP_K;
+    result->src[0] = a;
+
+    return result;
+}
+
+// wsp_ggml_arange
+
+struct wsp_ggml_tensor * wsp_ggml_arange(
+        struct wsp_ggml_context * ctx,
+        float                 start,
+        float                 stop,
+        float                 step) {
+    WSP_GGML_ASSERT(stop > start);
+
+    const int64_t steps = (int64_t) ceilf((stop - start) / step);
+
+    struct wsp_ggml_tensor * result = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, steps);
+
+    wsp_ggml_set_op_params_f32(result, 0, start);
+    wsp_ggml_set_op_params_f32(result, 1, stop);
+    wsp_ggml_set_op_params_f32(result, 2, step);
+
+    result->op = WSP_GGML_OP_ARANGE;
 
     return result;
 }
@@ -5194,8 +5268,6 @@ struct wsp_ggml_tensor * wsp_ggml_flash_attn_ext(
 
     if (mask) {
         WSP_GGML_ASSERT(wsp_ggml_is_contiguous(mask));
-        WSP_GGML_ASSERT(mask->ne[1] >= WSP_GGML_PAD(q->ne[1], WSP_GGML_KQ_MASK_PAD) &&
-                "the Flash-Attention kernel requires the mask to be padded to WSP_GGML_KQ_MASK_PAD and at least n_queries big");
         //WSP_GGML_ASSERT(wsp_ggml_can_repeat_rows(mask, qk));
 
         WSP_GGML_ASSERT(q->ne[2] % mask->ne[2] == 0);
@@ -7501,6 +7573,11 @@ size_t wsp_ggml_wsp_quantize_chunk(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+void wsp_ggml_log_get(wsp_ggml_log_callback * log_callback, void ** user_data) {
+    *log_callback = g_logger_state.log_callback;
+    *user_data    = g_logger_state.log_callback_user_data;
+}
 
 void wsp_ggml_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
     g_logger_state.log_callback = log_callback ? log_callback : wsp_ggml_log_callback_default;
