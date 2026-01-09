@@ -202,6 +202,10 @@ static size_t wsp_ggml_backend_metal_buffer_type_get_alloc_size(wsp_ggml_backend
             {
                 res *= 2;
             } break;
+        case WSP_GGML_OP_TOP_K:
+            {
+                res = 2*sizeof(int32_t)*wsp_ggml_nelements(tensor->src[0]);
+            } break;
         default:
             break;
     }

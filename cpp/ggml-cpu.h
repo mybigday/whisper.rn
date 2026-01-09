@@ -99,6 +99,7 @@ extern "C" {
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_sme        (void);
     // other
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_riscv_v    (void);
+    WSP_GGML_BACKEND_API int wsp_ggml_cpu_get_rvv_vlen   (void);  // risc-v vector length in bytes
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_vsx        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_vxe        (void);
     WSP_GGML_BACKEND_API int wsp_ggml_cpu_has_wasm_simd  (void);

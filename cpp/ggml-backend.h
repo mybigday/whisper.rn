@@ -307,6 +307,7 @@ extern "C" {
     WSP_GGML_API void                 wsp_ggml_backend_sched_free(wsp_ggml_backend_sched_t sched);
 
     // Initialize backend buffers from a measure graph
+    WSP_GGML_API void                 wsp_ggml_backend_sched_reserve_size(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * measure_graph, size_t * sizes);
     WSP_GGML_API bool                 wsp_ggml_backend_sched_reserve(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * measure_graph); // returns success
 
     WSP_GGML_API int                  wsp_ggml_backend_sched_get_n_backends(wsp_ggml_backend_sched_t sched);

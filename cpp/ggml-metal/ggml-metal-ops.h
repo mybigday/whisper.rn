@@ -47,6 +47,7 @@ int wsp_ggml_metal_op_concat            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_repeat            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_acc               (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_scale             (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_fill              (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_clamp             (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_unary             (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_glu               (wsp_ggml_metal_op_t ctx, int idx);
@@ -81,9 +82,12 @@ int wsp_ggml_metal_op_arange            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_timestep_embedding(wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_argmax            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_argsort           (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_top_k             (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_leaky_relu        (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_tri               (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_opt_step_adamw    (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_opt_step_sgd      (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_count_equal       (wsp_ggml_metal_op_t ctx, int idx);
 
 #ifdef __cplusplus
 }

@@ -36,12 +36,11 @@ const char * wsp_ggml_backend_buft_name(wsp_ggml_backend_buffer_type_t buft) {
 }
 
 wsp_ggml_backend_buffer_t wsp_ggml_backend_buft_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
+    WSP_GGML_ASSERT(buft);
     if (size == 0) {
         // return a dummy buffer for zero-sized allocations
         return wsp_ggml_backend_buffer_init(buft, {}, NULL, 0);
     }
-
-    WSP_GGML_ASSERT(buft);
     return buft->iface.alloc_buffer(buft, size);
 }
 
@@ -125,6 +124,12 @@ void * wsp_ggml_backend_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
     WSP_GGML_ASSERT(buffer);
     // get_base is optional if the buffer is zero-sized
     if (buffer->size == 0) {
+        return NULL;
+    }
+
+    // FIXME JG: a multi_buffer has a non-zero size, according to the above comment get_base is not optional,
+    //     I don't know whether the above comment is correct
+    if (!buffer->iface.get_base) {
         return NULL;
     }
 
@@ -723,6 +728,12 @@ struct wsp_ggml_backend_sched {
     bool op_offload;
 
     int debug;
+
+    // used for debugging graph reallocations [WSP_GGML_SCHED_DEBUG_REALLOC]
+    // ref: https://github.com/ggml-org/llama.cpp/pull/17617
+    int debug_realloc;
+    int debug_graph_size;
+    int debug_prev_graph_size;
 };
 
 #define hash_id(tensor) wsp_ggml_hash_find_or_insert(&sched->hash_set, tensor)
@@ -1234,10 +1245,8 @@ void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, struct w
                                 tensor_copy = wsp_ggml_dup_tensor_layout(sched->ctx, src);
                                 wsp_ggml_format_name(tensor_copy, "%s#%s#%d", wsp_ggml_backend_name(backend), src->name, c);
                             }
-                            if (sched->n_copies > 1) {
-                                wsp_ggml_set_input(tensor_copy);
-                                wsp_ggml_set_output(tensor_copy); // prevent ggml-alloc from overwriting the tensor
-                            }
+                            wsp_ggml_set_input(tensor_copy);
+                            wsp_ggml_set_output(tensor_copy); // prevent ggml-alloc from overwriting the tensor
                             tensor_id_copy(src_id, src_backend_id, c) = tensor_copy;
                             SET_CAUSE(tensor_copy, "4.cpy");
                         }
@@ -1289,6 +1298,11 @@ void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, struct w
     }
 
     int graph_size = std::max(graph->n_nodes, graph->n_leafs) + sched->n_splits*WSP_GGML_SCHED_MAX_SPLIT_INPUTS*2*sched->n_copies;
+
+    // remember the actual graph_size for performing reallocation checks later [WSP_GGML_SCHED_DEBUG_REALLOC]
+    sched->debug_prev_graph_size = sched->debug_graph_size;
+    sched->debug_graph_size = graph_size;
+
     if (sched->graph.size < graph_size) {
         sched->graph.size = graph_size;
         sched->graph.nodes = (wsp_ggml_tensor **) realloc(sched->graph.nodes, graph_size * sizeof(struct wsp_ggml_tensor *));
@@ -1395,14 +1409,27 @@ static bool wsp_ggml_backend_sched_alloc_splits(wsp_ggml_backend_sched_t sched) 
 
     // allocate graph
     if (backend_ids_changed || !wsp_ggml_gallocr_alloc_graph(sched->galloc, &sched->graph)) {
+#ifndef NDEBUG
+        WSP_GGML_LOG_DEBUG("%s: failed to allocate graph, reserving (backend_ids_changed = %d)\n", __func__, backend_ids_changed);
+#endif
+
+        if (sched->debug_realloc > 0) {
+            // we are interested only in situations where the graph was reallocated even though its size remained the same [WSP_GGML_SCHED_DEBUG_REALLOC]
+            // example: https://github.com/ggml-org/llama.cpp/pull/17143
+            const bool unexpected = !backend_ids_changed && sched->debug_prev_graph_size == sched->debug_graph_size;
+
+            if (unexpected || sched->debug_realloc > 1) {
+                WSP_GGML_ABORT("%s: unexpected graph reallocation (graph size = %d, nodes = %d, leafs = %d), debug_realloc = %d\n", __func__,
+                        sched->debug_graph_size, sched->graph.n_nodes, sched->graph.n_leafs, sched->debug_realloc);
+            }
+        }
+
         // the re-allocation may cause the split inputs to be moved to a different address
         // synchronize without wsp_ggml_backend_sched_synchronize to avoid changing cur_copy
         for (int i = 0; i < sched->n_backends; i++) {
             wsp_ggml_backend_synchronize(sched->backends[i]);
         }
-#ifndef NDEBUG
-        WSP_GGML_LOG_DEBUG("%s: failed to allocate graph, reserving (backend_ids_changed = %d)\n", __func__, backend_ids_changed);
-#endif
+
         wsp_ggml_gallocr_reserve_n(sched->galloc, &sched->graph, sched->node_backend_ids, sched->leaf_backend_ids);
         if (!wsp_ggml_gallocr_alloc_graph(sched->galloc, &sched->graph)) {
             WSP_GGML_LOG_ERROR("%s: failed to allocate graph\n", __func__);
@@ -1614,6 +1641,14 @@ wsp_ggml_backend_sched_t wsp_ggml_backend_sched_new(
 
     const char * WSP_GGML_SCHED_DEBUG = getenv("WSP_GGML_SCHED_DEBUG");
     sched->debug = WSP_GGML_SCHED_DEBUG ? atoi(WSP_GGML_SCHED_DEBUG) : 0;
+
+    sched->debug_realloc = 0;
+#ifdef WSP_GGML_SCHED_NO_REALLOC
+    sched->debug_realloc = 1;
+#endif
+    const char * WSP_GGML_SCHED_DEBUG_REALLOC = getenv("WSP_GGML_SCHED_DEBUG_REALLOC");
+    sched->debug_realloc = WSP_GGML_SCHED_DEBUG_REALLOC ? atoi(WSP_GGML_SCHED_DEBUG_REALLOC) : sched->debug_realloc;
+
     sched->n_backends = n_backends;
     sched->n_copies = parallel ? WSP_GGML_SCHED_MAX_COPIES : 1;
 
@@ -1629,6 +1664,9 @@ wsp_ggml_backend_sched_t wsp_ggml_backend_sched_new(
     sched->leaf_backend_ids = (int *) calloc(nodes_size, sizeof(sched->leaf_backend_ids[0]));
     sched->prev_node_backend_ids = (int *) calloc(nodes_size, sizeof(sched->prev_node_backend_ids[0]));
     sched->prev_leaf_backend_ids = (int *) calloc(nodes_size, sizeof(sched->prev_leaf_backend_ids[0]));
+
+    sched->debug_graph_size = 0;
+    sched->debug_prev_graph_size = 0;
 
     sched->context_buffer_size = wsp_ggml_sched_max_splits*WSP_GGML_SCHED_MAX_SPLIT_INPUTS*2*sizeof(struct wsp_ggml_tensor) + wsp_ggml_graph_overhead_custom(graph_size, false);
     sched->context_buffer = (char *) malloc(sched->context_buffer_size);
@@ -1692,6 +1730,20 @@ void wsp_ggml_backend_sched_reset(wsp_ggml_backend_sched_t sched) {
         sched->is_reset = true;
     }
     sched->is_alloc = false;
+}
+
+void wsp_ggml_backend_sched_reserve_size(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * measure_graph, size_t * sizes) {
+    WSP_GGML_ASSERT(sched);
+    WSP_GGML_ASSERT((int)sched->hash_set.size >= measure_graph->n_nodes + measure_graph->n_leafs);
+    WSP_GGML_ASSERT(sizes);
+
+    wsp_ggml_backend_sched_reset(sched);
+
+    wsp_ggml_backend_sched_synchronize(sched);
+
+    wsp_ggml_backend_sched_split_graph(sched, measure_graph);
+
+    wsp_ggml_gallocr_reserve_n_size(sched->galloc, &sched->graph, sched->node_backend_ids, sched->leaf_backend_ids, sizes);
 }
 
 bool wsp_ggml_backend_sched_reserve(wsp_ggml_backend_sched_t sched, struct wsp_ggml_cgraph * measure_graph) {
