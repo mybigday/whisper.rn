@@ -574,6 +574,7 @@ void installJSIBindings(
                                     if (code == 0) {
                                         auto resultObj = Object(runtime);
                                         resultObj.setProperty(runtime, "code", Value(code));
+                                        resultObj.setProperty(runtime, "language", String::createFromUtf8(runtime, whisper_lang_str(whisper_full_lang_id(context))));
                                         resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(context, 0)));
                                         resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, context, 0));
                                         resolvePtr->call(runtime, resultObj);

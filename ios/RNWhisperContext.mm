@@ -612,6 +612,11 @@ struct rnwhisper_segments_callback_data {
     NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
     result[@"result"] = text;
     result[@"segments"] = segments;
+    int lang_id = whisper_full_lang_id(self->ctx);
+    const char *lang_str = whisper_lang_str(lang_id);
+    if (lang_str != nullptr) {
+        result[@"language"] = [NSString stringWithUTF8String:lang_str];
+    }
     return result;
 }
 

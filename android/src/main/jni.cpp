@@ -633,6 +633,19 @@ Java_com_rnwhisper_WhisperContext_getTextSegmentSpeakerTurnNext(
 }
 
 JNIEXPORT jstring JNICALL
+Java_com_rnwhisper_WhisperContext_getDetectedLanguage(
+        JNIEnv *env, jobject thiz, jlong context_ptr) {
+    UNUSED(thiz);
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    int lang_id = whisper_full_lang_id(context);
+    const char *lang_str = whisper_lang_str(lang_id);
+    if (lang_str == nullptr) {
+        return nullptr;
+    }
+    return env->NewStringUTF(lang_str);
+}
+
+JNIEXPORT jstring JNICALL
 Java_com_rnwhisper_WhisperContext_bench(
     JNIEnv *env,
     jobject thiz,

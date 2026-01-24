@@ -5,11 +5,13 @@ if (!NativeModules.RNWhisper) {
     installJSIBindings: jest.fn(() => Promise.resolve()),
     initContext: jest.fn(() => Promise.resolve({ contextId: 1 })),
     transcribeFile: jest.fn(() => Promise.resolve({
+      language: 'en',
       result: ' Test',
       segments: [{ text: ' Test', t0: 0, t1: 33 }],
       isAborted: false,
     })),
     transcribeData: jest.fn(() => Promise.resolve({
+      language: 'en',
       result: ' Test',
       segments: [{ text: ' Test', t0: 0, t1: 33 }],
       isAborted: false,

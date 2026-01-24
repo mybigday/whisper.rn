@@ -38,6 +38,7 @@ export type TranscribeOptions = {
 
 export type TranscribeResult = {
   result: string,
+  language: string,
   segments: Array<{
     text: string,
     t0: number,
