@@ -1726,7 +1726,7 @@ PODS:
     - SSZipArchive (~> 2.5.5)
   - SocketRocket (0.7.1)
   - SSZipArchive (2.5.5)
-  - whisper-rn (0.5.5):
+  - whisper-rn (0.6.0-rc.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1748,9 +1748,9 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - whisper-rn/no-require-arc (= 0.5.5)
+    - whisper-rn/no-require-arc (= 0.6.0-rc.0)
     - Yoga
-  - whisper-rn/no-require-arc (0.5.5):
+  - whisper-rn/no-require-arc (0.6.0-rc.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2080,7 +2080,7 @@ SPEC CHECKSUMS:
   RNZipArchive: f4a5af907d1581e995c879e34799be35c6bc3e21
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   SSZipArchive: c69881e8ac5521f0e622291387add5f60f30f3c4
-  whisper-rn: d564135cd182ca8e2ea72791d41c5ee3c1633d9b
+  whisper-rn: 8952b7b6d9cd7ecd742bcf62da4c5e12dec5de66
   Yoga: feb4910aba9742cfedc059e2b2902e22ffe9954a
 
 PODFILE CHECKSUM: 65fffc3317dab43f36ae97fe05a71a7462bc6a02

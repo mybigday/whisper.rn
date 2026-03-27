@@ -125,6 +125,7 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_s
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_ssm_conv_batched  (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op, int ssm_conv_bs);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_ssm_scan          (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_rwkv              (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_gated_delta_net   (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_solve_tri         (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_mul_mv_ext        (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tsrc0, enum wsp_ggml_type tsrc1, int nsg, int nxpsg, int r1ptg);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_mul_mm            (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);

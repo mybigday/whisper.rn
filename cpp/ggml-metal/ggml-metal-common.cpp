@@ -264,15 +264,26 @@ static std::vector<int> wsp_ggml_metal_graph_optimize_reorder(const std::vector<
             case WSP_GGML_OP_NORM:
             case WSP_GGML_OP_RMS_NORM:
             case WSP_GGML_OP_GROUP_NORM:
+            case WSP_GGML_OP_L2_NORM:
             case WSP_GGML_OP_SUM_ROWS:
+            case WSP_GGML_OP_SSM_CONV:
+            case WSP_GGML_OP_SSM_SCAN:
+            case WSP_GGML_OP_CLAMP:
+            case WSP_GGML_OP_TRI:
+            case WSP_GGML_OP_DIAG:
             case WSP_GGML_OP_MUL:
             case WSP_GGML_OP_ADD:
+            case WSP_GGML_OP_SUB:
             case WSP_GGML_OP_DIV:
             case WSP_GGML_OP_GLU:
             case WSP_GGML_OP_SCALE:
+            case WSP_GGML_OP_UNARY:
             case WSP_GGML_OP_GET_ROWS:
-            case WSP_GGML_OP_CPY:
             case WSP_GGML_OP_SET_ROWS:
+            case WSP_GGML_OP_SET:
+            case WSP_GGML_OP_CPY:
+            case WSP_GGML_OP_CONT:
+            case WSP_GGML_OP_REPEAT:
                 return true;
             default:
                 return wsp_ggml_op_is_empty(op);
@@ -312,7 +323,7 @@ static std::vector<int> wsp_ggml_metal_graph_optimize_reorder(const std::vector<
             h_add(mrs1, node0);
 
             // that many nodes forward to search for a concurrent node
-            constexpr int N_FORWARD = 8;
+            constexpr int N_FORWARD = 64;
 
             for (int i1 = i0 + 1; i1 < i0 + N_FORWARD && i1 < n; i1++) {
                 if (used[i1]) {

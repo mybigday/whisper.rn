@@ -14,7 +14,7 @@
 #define WSP_GGML_METAL_MAX_DEVICES 16
 
 // number of Metal devices
-// note: can be overriden with WSP_GGML_METAL_DEVICES env to simulate virtual devices
+// note: can be overridden with WSP_GGML_METAL_DEVICES env to simulate virtual devices
 static int g_devices = 1;
 
 ////////////////////////////////////////////////////////////////////////////////

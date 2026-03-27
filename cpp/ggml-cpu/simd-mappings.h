@@ -479,12 +479,50 @@ do {                                                                  \
 
 // F16 AVX512
 
-// F16 AVX
+#if defined(__AVX512FP16__)
+
+#define WSP_GGML_F16_STEP 128
+#define WSP_GGML_F16_EPR  32
+
+#define WSP_GGML_F16x32              __m512h
+#define WSP_GGML_F16x32_ZERO         _mm512_setzero_ph()
+#define WSP_GGML_F16x32_SET1(x)      _mm512_set1_ph(__extension__(_Float16)(x))
+#define WSP_GGML_F16x32_LOAD(x)      _mm512_loadu_ph(x)
+#define WSP_GGML_F16x32_STORE(x, y)  _mm512_storeu_ph(x, y)
+#define WSP_GGML_F16x32_FMA(a, b, c) _mm512_fmadd_ph(b, c, a)
+#define WSP_GGML_F16x32_ADD          _mm512_add_ph
+#define WSP_GGML_F16x32_MUL          _mm512_mul_ph
+#define WSP_GGML_F16x32_REDUCE(res, x)                                     \
+do {                                                                   \
+    int offset = WSP_GGML_F16_ARR >> 1;                                    \
+    for (int i = 0; i < offset; ++i) {                                 \
+        x[i] = _mm512_add_ph(x[i], x[offset+i]);                       \
+    }                                                                  \
+    offset >>= 1;                                                      \
+    for (int i = 0; i < offset; ++i) {                                 \
+        x[i] = _mm512_add_ph(x[i], x[offset+i]);                       \
+    }                                                                  \
+    offset >>= 1;                                                      \
+    for (int i = 0; i < offset; ++i) {                                 \
+        x[i] = _mm512_add_ph(x[i], x[offset+i]);                       \
+    }                                                                  \
+    res = (wsp_ggml_float) _mm512_reduce_add_ph(x[0]);                     \
+} while (0)
+
+#define WSP_GGML_F16_VEC                WSP_GGML_F16x32
+#define WSP_GGML_F16_VEC_ZERO           WSP_GGML_F16x32_ZERO
+#define WSP_GGML_F16_VEC_SET1           WSP_GGML_F16x32_SET1
+#define WSP_GGML_F16_VEC_LOAD(p, i)     WSP_GGML_F16x32_LOAD(p)
+#define WSP_GGML_F16_VEC_STORE(p, r, i) WSP_GGML_F16x32_STORE(p, r[i])
+#define WSP_GGML_F16_VEC_FMA            WSP_GGML_F16x32_FMA
+#define WSP_GGML_F16_VEC_ADD            WSP_GGML_F16x32_ADD
+#define WSP_GGML_F16_VEC_MUL            WSP_GGML_F16x32_MUL
+#define WSP_GGML_F16_VEC_REDUCE         WSP_GGML_F16x32_REDUCE
+
+#else // Fallback FP16 <-> FP32
 
 #define WSP_GGML_F16_STEP 64
 #define WSP_GGML_F16_EPR  16
-
-// AVX512 has FP16 extension (AVX512_FP16) but I don't have it on my machine so I use FP32 instead
 
 #define WSP_GGML_F32Cx16             __m512
 #define WSP_GGML_F32Cx16_ZERO        _mm512_setzero_ps()
@@ -525,6 +563,8 @@ do {                                                              \
 #define WSP_GGML_F16_VEC_MUL            WSP_GGML_F32Cx16_MUL
 
 #define WSP_GGML_F16_VEC_REDUCE         WSP_GGML_F32Cx16_REDUCE
+
+#endif // __AVX512FP16__
 #elif defined(__AVX__)
 
 #define WSP_GGML_SIMD
@@ -1160,6 +1200,14 @@ static inline void __lsx_f16x4_store(wsp_ggml_fp16_t * x, __m128 y) {
     float32x4_t tmp = x[0] + vec_reve(x[0]);        \
     res = tmp[0] + tmp[1];                          \
 }
+#define WSP_GGML_F32x4_REDUCE_4(res, s0, s1, s2, s3) \
+{                                                \
+    float32x4_t v = vec_add(vec_add(s0, s1),     \
+                            vec_add(s2, s3));    \
+    v = vec_add(v, vec_sld(v, v, 8));            \
+    v = vec_add(v, vec_sld(v, v, 4));            \
+    res += (wsp_ggml_float)vec_extract(v, 0);        \
+}
 
 #define WSP_GGML_F32_VEC        WSP_GGML_F32x4
 #define WSP_GGML_F32_VEC_ZERO   WSP_GGML_F32x4_ZERO
@@ -1208,6 +1256,24 @@ static inline void __lzs_f16cx4_store(wsp_ggml_fp16_t * x, float32x4_t v_y) {
 #define WSP_GGML_F16_VEC_ADD            WSP_GGML_F32x4_ADD
 #define WSP_GGML_F16_VEC_MUL            WSP_GGML_F32x4_MUL
 #define WSP_GGML_F16_VEC_REDUCE         WSP_GGML_F32x4_REDUCE
+
+// BF16 s390x
+#define WSP_GGML_BF16_STEP 16
+#define WSP_GGML_BF16_EPR  8
+
+#define WSP_GGML_BF16x8         __vector unsigned short
+#define WSP_GGML_BF16x8_ZERO    vec_splats((unsigned short)0)
+#define WSP_GGML_BF16x8_LOAD(p) vec_xl(0, (const unsigned short *)(p))
+
+#define WSP_GGML_BF16_VEC      WSP_GGML_BF16x8
+#define WSP_GGML_BF16_VEC_ZERO WSP_GGML_BF16x8_ZERO
+#define WSP_GGML_BF16_VEC_LOAD WSP_GGML_BF16x8_LOAD
+#define WSP_GGML_BF16_TO_F32_LO(v) ((float32x4_t) vec_mergel((v), WSP_GGML_BF16_VEC_ZERO))
+#define WSP_GGML_BF16_TO_F32_HI(v) ((float32x4_t) vec_mergeh((v), WSP_GGML_BF16_VEC_ZERO))
+#define WSP_GGML_BF16_FMA_LO(acc, x, y) \
+    (acc) = WSP_GGML_F32x4_FMA((acc), WSP_GGML_BF16_TO_F32_LO(x), WSP_GGML_BF16_TO_F32_LO(y))
+#define WSP_GGML_BF16_FMA_HI(acc, x, y) \
+    (acc) = WSP_GGML_F32x4_FMA((acc), WSP_GGML_BF16_TO_F32_HI(x), WSP_GGML_BF16_TO_F32_HI(y))
 
 #elif defined(__riscv_v_intrinsic)
 
