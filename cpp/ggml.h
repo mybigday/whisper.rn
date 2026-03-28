@@ -427,7 +427,8 @@ extern "C" {
         // WSP_GGML_TYPE_IQ4_NL_4_8 = 37,
         // WSP_GGML_TYPE_IQ4_NL_8_8 = 38,
         WSP_GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
-        WSP_GGML_TYPE_COUNT   = 40,
+        WSP_GGML_TYPE_NVFP4   = 40, // NVFP4 (4 blocks, E4M3 scale)
+        WSP_GGML_TYPE_COUNT   = 41,
     };
 
     // precision
@@ -463,6 +464,7 @@ extern "C" {
         WSP_GGML_FTYPE_MOSTLY_IQ1_M   = 23, // except 1d tensors
         WSP_GGML_FTYPE_MOSTLY_BF16    = 24, // except 1d tensors
         WSP_GGML_FTYPE_MOSTLY_MXFP4   = 25, // except 1d tensors
+        WSP_GGML_FTYPE_MOSTLY_NVFP4   = 26, // except 1d tensors
     };
 
     // available tensor operations:
@@ -556,6 +558,7 @@ extern "C" {
         WSP_GGML_OP_GATED_LINEAR_ATTN,
         WSP_GGML_OP_RWKV_WKV7,
         WSP_GGML_OP_SOLVE_TRI,
+        WSP_GGML_OP_GATED_DELTA_NET,
 
         WSP_GGML_OP_UNARY,
 
@@ -752,6 +755,7 @@ extern "C" {
     WSP_GGML_API bool wsp_ggml_is_transposed(const struct wsp_ggml_tensor * tensor);
     WSP_GGML_API bool wsp_ggml_is_permuted  (const struct wsp_ggml_tensor * tensor);
     WSP_GGML_API bool wsp_ggml_is_empty     (const struct wsp_ggml_tensor * tensor);
+    WSP_GGML_API bool wsp_ggml_is_view      (const struct wsp_ggml_tensor * tensor);
     WSP_GGML_API bool wsp_ggml_is_scalar    (const struct wsp_ggml_tensor * tensor);
     WSP_GGML_API bool wsp_ggml_is_vector    (const struct wsp_ggml_tensor * tensor);
     WSP_GGML_API bool wsp_ggml_is_matrix    (const struct wsp_ggml_tensor * tensor);
@@ -2466,6 +2470,17 @@ extern "C" {
         bool                  lower,
         bool                  uni);
 
+    // TODO: add wsp_ggml_gated_delta_net_set_bcast() to be able to configure Q, K broadcast type: tiled vs interleaved [TAG_WSP_GGML_GDN_BCAST]
+    // ref: https://github.com/ggml-org/llama.cpp/pull/19468#discussion_r2786394306
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gated_delta_net(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * q,
+            struct wsp_ggml_tensor  * k,
+            struct wsp_ggml_tensor  * v,
+            struct wsp_ggml_tensor  * g,
+            struct wsp_ggml_tensor  * beta,
+            struct wsp_ggml_tensor  * state);
+
     // custom operators
 
     typedef void (*wsp_ggml_custom1_op_t)(struct wsp_ggml_tensor * dst , const struct wsp_ggml_tensor * a, int ith, int nth, void * userdata);
@@ -2578,7 +2593,7 @@ extern "C" {
         struct wsp_ggml_tensor *  grad,
         struct wsp_ggml_tensor *  sgd_params); // alpha, weight decay
 
-    // build forward mutiple tensors and select one of them for computing
+    // build forward multiple tensors and select one of them for computing
     // this is useful for creating graphs that have constant topology but compute different things based on the input
     // ref: https://github.com/ggml-org/llama.cpp/pull/18550
     //

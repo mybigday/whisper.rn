@@ -1011,6 +1011,15 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
     }
 
     switch (op->op) {
+        case WSP_GGML_OP_SCALE:
+        case WSP_GGML_OP_FILL:
+        case WSP_GGML_OP_CLAMP:
+        case WSP_GGML_OP_SQR:
+        case WSP_GGML_OP_SQRT:
+        case WSP_GGML_OP_SIN:
+        case WSP_GGML_OP_COS:
+        case WSP_GGML_OP_LOG:
+            return wsp_ggml_is_contiguous_rows(op->src[0]) && (op->src[0]->type == WSP_GGML_TYPE_F32 || op->src[0]->type == WSP_GGML_TYPE_F16);
         case WSP_GGML_OP_UNARY:
             switch (wsp_ggml_get_unary_op(op)) {
                 case WSP_GGML_UNARY_OP_TANH:
@@ -1030,7 +1039,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 case WSP_GGML_UNARY_OP_EXP:
                 case WSP_GGML_UNARY_OP_SOFTPLUS:
                 case WSP_GGML_UNARY_OP_EXPM1:
-                    return wsp_ggml_is_contiguous(op->src[0]) && op->src[0]->type == WSP_GGML_TYPE_F32;
+                    return wsp_ggml_is_contiguous_rows(op->src[0]) && (op->src[0]->type == WSP_GGML_TYPE_F32 || op->src[0]->type == WSP_GGML_TYPE_F16);
                 default:
                     return false;
             }
@@ -1058,11 +1067,9 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
         case WSP_GGML_OP_MUL:
         case WSP_GGML_OP_DIV:
         case WSP_GGML_OP_ADD_ID:
-            return wsp_ggml_is_contiguous_rows(op->src[0]) && wsp_ggml_is_contiguous_rows(op->src[1]) && op->src[0]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_ACC:
+            return wsp_ggml_is_contiguous_rows(op->src[0]) && wsp_ggml_is_contiguous_rows(op->src[1]) && op->src[0]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_REPEAT:
-        case WSP_GGML_OP_SCALE:
-        case WSP_GGML_OP_FILL:
         case WSP_GGML_OP_CONV_TRANSPOSE_1D:
             return true;
         case WSP_GGML_OP_CONV_TRANSPOSE_2D:
@@ -1070,14 +1077,6 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 (op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32) &&
                 op->src[1]->type == WSP_GGML_TYPE_F32 &&
                 op->type == WSP_GGML_TYPE_F32;
-        case WSP_GGML_OP_CLAMP:
-            return op->src[0]->type == WSP_GGML_TYPE_F32;
-        case WSP_GGML_OP_SQR:
-        case WSP_GGML_OP_SQRT:
-        case WSP_GGML_OP_SIN:
-        case WSP_GGML_OP_COS:
-        case WSP_GGML_OP_LOG:
-            return wsp_ggml_is_contiguous(op->src[0]) && op->src[0]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_SUM:
             return has_simdgroup_reduction && wsp_ggml_is_contiguous(op->src[0]);
         case WSP_GGML_OP_TRI:
@@ -1087,9 +1086,8 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
         case WSP_GGML_OP_MEAN:
         case WSP_GGML_OP_SOFT_MAX:
         case WSP_GGML_OP_GROUP_NORM:
-            return has_simdgroup_reduction && wsp_ggml_is_contiguous_rows(op->src[0]);
         case WSP_GGML_OP_L2_NORM:
-            return has_simdgroup_reduction && (op->ne[0] % 4 == 0 && wsp_ggml_is_contiguous_1(op->src[0]));
+            return has_simdgroup_reduction && wsp_ggml_is_contiguous_rows(op->src[0]);
         case WSP_GGML_OP_COUNT_EQUAL:
             return has_simdgroup_reduction &&
                 op->src[0]->type == WSP_GGML_TYPE_I32 &&
@@ -1110,7 +1108,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                    op->type == WSP_GGML_TYPE_F32 &&
                    (op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32);
         case WSP_GGML_OP_UPSCALE:
-            return op->src[0]->type == WSP_GGML_TYPE_F32 && op->op_params[0] == WSP_GGML_SCALE_MODE_NEAREST && !(op->op_params[0] & WSP_GGML_SCALE_FLAG_ANTIALIAS);
+            return op->src[0]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_POOL_1D:
             return wsp_ggml_is_contiguous(op->src[0]) && op->src[0]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_POOL_2D:
@@ -1144,6 +1142,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 op->src[0]->ne[0] != 128 &&
                 op->src[0]->ne[0] != 192 &&
                 op->src[0]->ne[0] != 256 &&
+                op->src[0]->ne[0] != 320 &&
                 op->src[0]->ne[0] != 576) {
                 return false;
             }
@@ -1157,10 +1156,13 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
         case WSP_GGML_OP_RWKV_WKV6:
         case WSP_GGML_OP_RWKV_WKV7:
             return true;
+        case WSP_GGML_OP_GATED_DELTA_NET:
+            return has_simdgroup_reduction && op->src[2]->ne[0] % 32 == 0;
         case WSP_GGML_OP_SOLVE_TRI:
         case WSP_GGML_OP_MUL_MAT:
         case WSP_GGML_OP_MUL_MAT_ID:
-            return has_simdgroup_reduction;
+            return has_simdgroup_reduction && op->src[0]->type != WSP_GGML_TYPE_NVFP4;
+        case WSP_GGML_OP_SET:
         case WSP_GGML_OP_CPY:
         case WSP_GGML_OP_DUP:
         case WSP_GGML_OP_CONT:
@@ -1217,7 +1219,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 };
             }
         case WSP_GGML_OP_GET_ROWS:
-            return true;
+            return op->src[0]->type != WSP_GGML_TYPE_NVFP4;
         case WSP_GGML_OP_SET_ROWS:
             {
                 if (op->src[0]->type != WSP_GGML_TYPE_F32) {
@@ -1282,7 +1284,7 @@ struct wsp_ggml_metal_buffer {
     bool use_residency_sets;
 
     // optional MTLResidencySet
-    // note: cannot use explicity "id<MTLResidencySet>" here because it is not available on certain OSes
+    // note: cannot use explicitly "id<MTLResidencySet>" here because it is not available on certain OSes
     id rset;
 
     // pointers to global device

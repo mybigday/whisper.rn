@@ -270,6 +270,12 @@ static const struct wsp_ggml_type_traits_cpu type_traits_cpu[WSP_GGML_TYPE_COUNT
         .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
         .nrows                    = 1,
     },
+    [WSP_GGML_TYPE_NVFP4] = {
+        .from_float               = wsp_quantize_row_nvfp4,
+        .vec_dot                  = wsp_ggml_vec_dot_nvfp4_q8_0,
+        .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
+        .nrows                    = 1,
+    },
     [WSP_GGML_TYPE_Q2_K] = {
         .from_float               = wsp_quantize_row_q2_K,
         .vec_dot                  = wsp_ggml_vec_dot_q2_K_q8_K,
@@ -2021,6 +2027,10 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
             {
                 wsp_ggml_compute_forward_solve_tri(params, tensor);
             } break;
+        case WSP_GGML_OP_GATED_DELTA_NET:
+            {
+                wsp_ggml_compute_forward_gated_delta_net(params, tensor);
+            } break;
         case WSP_GGML_OP_MAP_CUSTOM1:
             {
                 wsp_ggml_compute_forward_map_custom1(params, tensor);
@@ -2200,6 +2210,7 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
             } break;
         case WSP_GGML_OP_COUNT_EQUAL:
         case WSP_GGML_OP_SOLVE_TRI:
+        case WSP_GGML_OP_GATED_DELTA_NET:
             {
                 n_tasks = n_threads;
             } break;
@@ -2477,7 +2488,7 @@ static bool wsp_ggml_thread_apply_priority(int32_t prio) {
 
     if (prio != WSP_GGML_SCHED_PRIO_LOW) {
         // Tell Windows that this thread should not be throttled (needs its own CPU core).
-        // Newer Windows 11 versions aggresively park (offline) CPU cores and often place
+        // Newer Windows 11 versions aggressively park (offline) CPU cores and often place
         // all our threads onto the first 4 cores which results in terrible performance with
         // n_threads > 4
         #if _WIN32_WINNT >= 0x0602
@@ -2874,8 +2885,8 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                         const int64_t DV = node->src[2]->ne[0];
 
                         // Tiled flash attention scratch (tile sizes defined in common.h)
-                        // Per-thread: Q_q + KQ + mask + VKQ32 + V32 + padding
-                        size_t prefill  = sizeof(float)*(WSP_GGML_FA_TILE_Q*DK + 2*WSP_GGML_FA_TILE_Q*WSP_GGML_FA_TILE_KV + WSP_GGML_FA_TILE_Q*DV + WSP_GGML_FA_TILE_KV*DV)*n_tasks;
+                        // Per-thread: Q_q + KQ + mask + VKQ32 + V32 + K_f32 + padding
+                        size_t prefill  = sizeof(float)*(WSP_GGML_FA_TILE_Q*DK + 2*WSP_GGML_FA_TILE_Q*WSP_GGML_FA_TILE_KV + WSP_GGML_FA_TILE_Q*DV + WSP_GGML_FA_TILE_KV*DV + WSP_GGML_FA_TILE_KV*DK)*n_tasks;
 
                         // Decode path: n_kv_chunks = n_tasks (one chunk per thread)
                         // Per-thread: VKQ accmulator (DV), partial M, partial S + intra-thread scratch for V, Q and VKQ
@@ -2904,6 +2915,11 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                 case WSP_GGML_OP_CROSS_ENTROPY_LOSS:
                     {
                         cur = wsp_ggml_type_size(node->type)*(n_tasks + node->src[0]->ne[0]*n_tasks);
+                    } break;
+                case WSP_GGML_OP_GATED_DELTA_NET:
+                    {
+                        const int64_t S_v = node->src[2]->ne[0];
+                        cur = S_v * sizeof(float) * n_tasks;
                     } break;
                 case WSP_GGML_OP_COUNT:
                     {
@@ -2947,7 +2963,11 @@ static thread_ret_t wsp_ggml_graph_compute_thread(void * data) {
         /*.use_ref    =*/ cplan->use_ref,
     };
 
-    WSP_GGML_PRINT_DEBUG("thread #%d compute-start cplan %p last-graph %d \n", state->ith, cplan, state->last_graph);
+#ifdef WSP_GGML_USE_OPENMP
+    WSP_GGML_PRINT_DEBUG("thread #%d compute-start cplan %p\n", state->ith, (const void *)cplan);
+#else
+    WSP_GGML_PRINT_DEBUG("thread #%d compute-start cplan %p last-graph %d\n", state->ith, (const void *)cplan, state->last_graph);
+#endif
 
     for (int node_n = 0; node_n < cgraph->n_nodes && atomic_load_explicit(&tp->abort, memory_order_relaxed) != node_n; node_n++) {
         struct wsp_ggml_tensor * node = cgraph->nodes[node_n];
@@ -2974,7 +2994,11 @@ static thread_ret_t wsp_ggml_graph_compute_thread(void * data) {
         }
     }
 
-    WSP_GGML_PRINT_DEBUG("thread #%d compute-done cplan %p last-graph %d \n", state->ith, cplan, state->last_graph);
+#ifdef WSP_GGML_USE_OPENMP
+    WSP_GGML_PRINT_DEBUG("thread #%d compute-done cplan %p\n", state->ith, (const void *)cplan);
+#else
+    WSP_GGML_PRINT_DEBUG("thread #%d compute-done cplan %p last-graph %d\n", state->ith, (const void *)cplan, state->last_graph);
+#endif
 
     wsp_ggml_barrier(state->threadpool);
 

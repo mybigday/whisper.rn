@@ -726,6 +726,14 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_mxfp4,
         .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_mxfp4_ref,
     },
+    [WSP_GGML_TYPE_NVFP4] = {
+        .type_name                = "nvfp4",
+        .blck_size                = QK_NVFP4,
+        .type_size                = sizeof(block_nvfp4),
+        .is_quantized             = true,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_nvfp4,
+        .from_float_ref           = (wsp_ggml_from_float_t)wsp_quantize_row_nvfp4_ref,
+    },
     [WSP_GGML_TYPE_Q2_K] = {
         .type_name                = "q2_K",
         .blck_size                = QK_K,
@@ -907,7 +915,8 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
 };
 
 const struct wsp_ggml_type_traits * wsp_ggml_get_type_traits(enum wsp_ggml_type type) {
-    WSP_GGML_ASSERT(type < WSP_GGML_TYPE_COUNT);
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
     return &type_traits[type];
 }
 
@@ -1038,6 +1047,7 @@ static const char * WSP_GGML_OP_NAME[WSP_GGML_OP_COUNT] = {
     "GATED_LINEAR_ATTN",
     "RWKV_WKV7",
     "SOLVE_TRI",
+    "GATED_DELTA_NET",
 
     "UNARY",
 
@@ -1055,7 +1065,7 @@ static const char * WSP_GGML_OP_NAME[WSP_GGML_OP_COUNT] = {
     "GLU",
 };
 
-static_assert(WSP_GGML_OP_COUNT == 95, "WSP_GGML_OP_COUNT != 95");
+static_assert(WSP_GGML_OP_COUNT == 96, "WSP_GGML_OP_COUNT != 96");
 
 static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "none",
@@ -1147,6 +1157,7 @@ static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "gated_linear_attn(k, v, q, gate, s)",
     "rwkv_wkv7(r, w, k, v, a, b, s)",
     "A X = B, A triangular, solve X",
+    "gated_delta_net(q, k, v, g, beta, s)",
 
     "unary(x)",
 
@@ -1164,7 +1175,7 @@ static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "glu(x)",
 };
 
-static_assert(WSP_GGML_OP_COUNT == 95, "WSP_GGML_OP_COUNT != 95");
+static_assert(WSP_GGML_OP_COUNT == 96, "WSP_GGML_OP_COUNT != 96");
 
 static_assert(WSP_GGML_OP_POOL_COUNT == 2, "WSP_GGML_OP_POOL_COUNT != 2");
 
@@ -1273,27 +1284,39 @@ size_t wsp_ggml_nbytes_pad(const struct wsp_ggml_tensor * tensor) {
 }
 
 int64_t wsp_ggml_blck_size(enum wsp_ggml_type type) {
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
     return type_traits[type].blck_size;
 }
 
 size_t wsp_ggml_type_size(enum wsp_ggml_type type) {
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
     return type_traits[type].type_size;
 }
 
 size_t wsp_ggml_row_size(enum wsp_ggml_type type, int64_t ne) {
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
     assert(ne % wsp_ggml_blck_size(type) == 0);
     return wsp_ggml_type_size(type)*ne/wsp_ggml_blck_size(type);
 }
 
 double wsp_ggml_type_sizef(enum wsp_ggml_type type) {
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
     return ((double)(type_traits[type].type_size))/type_traits[type].blck_size;
 }
 
 const char * wsp_ggml_type_name(enum wsp_ggml_type type) {
-    return type < WSP_GGML_TYPE_COUNT ? type_traits[type].type_name : "NONE";
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
+    return type_traits[type].type_name;
 }
 
 bool wsp_ggml_is_quantized(enum wsp_ggml_type type) {
+    assert(type >= 0);
+    assert(type < WSP_GGML_TYPE_COUNT);
     return type_traits[type].is_quantized;
 }
 
@@ -1373,6 +1396,7 @@ enum wsp_ggml_type wsp_ggml_ftype_to_wsp_ggml_type(enum wsp_ggml_ftype ftype) {
         case WSP_GGML_FTYPE_MOSTLY_Q5_1:          wtype = WSP_GGML_TYPE_Q5_1;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q8_0:          wtype = WSP_GGML_TYPE_Q8_0;  break;
         case WSP_GGML_FTYPE_MOSTLY_MXFP4:         wtype = WSP_GGML_TYPE_MXFP4; break;
+        case WSP_GGML_FTYPE_MOSTLY_NVFP4:         wtype = WSP_GGML_TYPE_NVFP4; break;
         case WSP_GGML_FTYPE_MOSTLY_Q2_K:          wtype = WSP_GGML_TYPE_Q2_K;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q3_K:          wtype = WSP_GGML_TYPE_Q3_K;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q4_K:          wtype = WSP_GGML_TYPE_Q4_K;  break;
@@ -1411,16 +1435,14 @@ static bool wsp_ggml_is_contiguous_n(const struct wsp_ggml_tensor * tensor, int 
     }
     next_nb *= tensor->ne[0]/wsp_ggml_blck_size(tensor->type);
     for (int i = 1; i < WSP_GGML_MAX_DIMS; i++) {
-        if (tensor->ne[i] != 1) {
-            if (i > n) {
-                if (tensor->nb[i] != next_nb) {
-                    return false;
-                }
-                next_nb *= tensor->ne[i];
-            } else {
-                // this dimension does not need to be contiguous
-                next_nb = tensor->ne[i]*tensor->nb[i];
+        if (i > n) {
+            if (tensor->ne[i] != 1 && tensor->nb[i] != next_nb) {
+                return false;
             }
+            next_nb *= tensor->ne[i];
+        } else {
+            // this dimension does not need to be contiguous
+            next_nb = tensor->ne[i]*tensor->nb[i];
         }
     }
     return true;
@@ -1502,6 +1524,10 @@ bool wsp_ggml_are_same_stride(const struct wsp_ggml_tensor * t0, const struct ws
         (t0->nb[1] == t1->nb[1]) &&
         (t0->nb[2] == t1->nb[2]) &&
         (t0->nb[3] == t1->nb[3]);
+}
+
+bool wsp_ggml_is_view(const struct wsp_ggml_tensor * t) {
+    return wsp_ggml_impl_is_view(t);
 }
 
 // check if t1 can be represented as a repetition of t0
@@ -1633,10 +1659,22 @@ static struct wsp_ggml_object * wsp_ggml_new_object(struct wsp_ggml_context * ct
     const size_t cur_end  = cur_offs + cur_size;
 
     // align to WSP_GGML_MEM_ALIGN
+    WSP_GGML_ASSERT(size <= SIZE_MAX - (WSP_GGML_MEM_ALIGN - 1));
     size_t size_needed = WSP_GGML_PAD(size, WSP_GGML_MEM_ALIGN);
 
     char * const mem_buffer = ctx->mem_buffer;
     struct wsp_ggml_object * const obj_new = (struct wsp_ggml_object *)(mem_buffer + cur_end);
+
+    // integer overflow checks
+    if (cur_end > SIZE_MAX - size_needed) {
+        WSP_GGML_LOG_WARN("%s: overflow detected in cur_end (%zu) + size_needed (%zu)\n", __func__, cur_end, size_needed);
+        return NULL;
+    }
+    if (cur_end + size_needed > SIZE_MAX - WSP_GGML_OBJECT_SIZE) {
+        WSP_GGML_LOG_WARN("%s: overflow detected in cur_end (%zu) + size_needed (%zu) + WSP_GGML_OBJECT_SIZE (%zu)\n", __func__,
+                cur_end, size_needed, (size_t) WSP_GGML_OBJECT_SIZE);
+        return NULL;
+    }
 
     if (cur_end + size_needed + WSP_GGML_OBJECT_SIZE > ctx->mem_size) {
         WSP_GGML_LOG_WARN("%s: not enough space in the context's memory pool (needed %zu, available %zu)\n",
@@ -1705,6 +1743,8 @@ static struct wsp_ggml_tensor * wsp_ggml_new_tensor_impl(
         // allocate tensor data in the context's memory pool
         obj_alloc_size = data_size;
     }
+
+    WSP_GGML_ASSERT(WSP_GGML_TENSOR_SIZE <= SIZE_MAX - obj_alloc_size);
 
     struct wsp_ggml_object * const obj_new = wsp_ggml_new_object(ctx, WSP_GGML_OBJECT_TYPE_TENSOR, WSP_GGML_TENSOR_SIZE + obj_alloc_size);
     WSP_GGML_ASSERT(obj_new);
@@ -5757,7 +5797,7 @@ static struct wsp_ggml_tensor * wsp_ggml_unary_impl(
         struct wsp_ggml_tensor  * a,
         enum wsp_ggml_unary_op    op,
         bool                  inplace) {
-    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(a));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(a));
 
     struct wsp_ggml_tensor * result = inplace ? wsp_ggml_view_tensor(ctx, a) : wsp_ggml_dup_tensor(ctx, a);
 
@@ -6105,6 +6145,57 @@ struct wsp_ggml_tensor * wsp_ggml_solve_tri(
     result->op     = WSP_GGML_OP_SOLVE_TRI;
     result->src[0] = a;
     result->src[1] = b;
+
+    return result;
+}
+
+// wsp_ggml_gated_delta_net
+
+struct wsp_ggml_tensor * wsp_ggml_gated_delta_net(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * q,
+        struct wsp_ggml_tensor  * k,
+        struct wsp_ggml_tensor  * v,
+        struct wsp_ggml_tensor  * g,
+        struct wsp_ggml_tensor  * beta,
+        struct wsp_ggml_tensor  * state) {
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(q));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(k));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(v));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(g));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(beta));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(state));
+
+    WSP_GGML_ASSERT(q->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(k->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(v->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(g->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(beta->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(state->type == WSP_GGML_TYPE_F32);
+
+    const int64_t S_v      = v->ne[0];
+    const int64_t H        = v->ne[1];
+    const int64_t n_tokens = v->ne[2];
+    const int64_t n_seqs   = v->ne[3];
+
+    // gate: scalar [1, H, T, B] or vector [S_v, H, T, B] (KDA)
+    WSP_GGML_ASSERT(g->ne[0] == 1 || g->ne[0] == S_v);
+    WSP_GGML_ASSERT(beta->ne[0] == 1);
+
+    WSP_GGML_ASSERT(wsp_ggml_nelements(state) == S_v * S_v * H * n_seqs);
+
+    // concat output and new_state into a single tensor
+    // output: S_v * H * n_tokens * n_seqs, state: S_v * S_v * H * n_seqs
+    const int64_t ne[4] = { S_v * H, n_tokens * n_seqs + S_v * n_seqs, 1, 1 };
+    struct wsp_ggml_tensor * result = wsp_ggml_new_tensor(ctx, WSP_GGML_TYPE_F32, 4, ne);
+
+    result->op     = WSP_GGML_OP_GATED_DELTA_NET;
+    result->src[0] = q;
+    result->src[1] = k;
+    result->src[2] = v;
+    result->src[3] = g;
+    result->src[4] = beta;
+    result->src[5] = state;
 
     return result;
 }
@@ -7573,6 +7664,7 @@ size_t wsp_ggml_wsp_quantize_chunk(
         case WSP_GGML_TYPE_Q5_1:    result = wsp_quantize_q5_1(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_Q8_0:    result = wsp_quantize_q8_0(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_MXFP4:   result = wsp_quantize_mxfp4(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_NVFP4:   result = wsp_quantize_nvfp4(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_Q2_K:    result = wsp_quantize_q2_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_Q3_K:    result = wsp_quantize_q3_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_Q4_K:    result = wsp_quantize_q4_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;

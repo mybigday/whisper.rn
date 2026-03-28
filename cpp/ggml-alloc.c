@@ -17,11 +17,6 @@
 //#define AT_PRINTF(...) WSP_GGML_LOG_DEBUG(__VA_ARGS__)
 #define AT_PRINTF(...)
 
-
-static bool wsp_ggml_is_view(const struct wsp_ggml_tensor * t) {
-    return t->view_src != NULL;
-}
-
 // ops that return true for this function must not use restrict pointers for their backend implementations
 bool wsp_ggml_op_can_inplace(enum wsp_ggml_op op) {
     switch (op) {
@@ -627,7 +622,7 @@ static void wsp_ggml_gallocr_allocate_node(wsp_ggml_gallocr_t galloc, struct wsp
     WSP_GGML_ASSERT(buffer_id >= 0);
     struct hash_node * hn = wsp_ggml_gallocr_hash_get(galloc, node);
 
-    if (!wsp_ggml_gallocr_is_allocated(galloc, node) && !wsp_ggml_is_view(node)) {
+    if (!wsp_ggml_gallocr_is_allocated(galloc, node) && !wsp_ggml_impl_is_view(node)) {
         hn->allocated = true;
         assert(hn->addr.offset == 0);
 
@@ -658,7 +653,7 @@ static void wsp_ggml_gallocr_allocate_node(wsp_ggml_gallocr_t galloc, struct wsp
 
                 struct hash_node * p_hn = wsp_ggml_gallocr_hash_get(galloc, parent);
                 if (p_hn->n_children == 1 && p_hn->n_views == 0) {
-                    if (wsp_ggml_is_view(parent)) {
+                    if (wsp_ggml_impl_is_view(parent)) {
                         struct wsp_ggml_tensor * view_src = parent->view_src;
                         struct hash_node * view_src_hn = wsp_ggml_gallocr_hash_get(galloc, view_src);
                         if (view_src_hn->n_views == 1 && view_src_hn->n_children == 0 && view_src->data == parent->data) {
@@ -739,7 +734,7 @@ static void wsp_ggml_gallocr_alloc_graph_impl(wsp_ggml_gallocr_t galloc, struct 
         // WSP_GGML_OP_NONE does not appear normally in the graph nodes, but is used by ggml-backend to add dependencies to
         // control when some tensors are allocated and freed. in this case, the dependencies are in `src`, but the node
         // itself is never used and should not be considered a dependency
-        if (wsp_ggml_is_view(node) && node->op != WSP_GGML_OP_NONE) {
+        if (wsp_ggml_impl_is_view(node) && node->op != WSP_GGML_OP_NONE) {
             struct wsp_ggml_tensor * view_src = node->view_src;
             wsp_ggml_gallocr_hash_get(galloc, view_src)->n_views += 1;
         }
@@ -806,7 +801,7 @@ static void wsp_ggml_gallocr_alloc_graph_impl(wsp_ggml_gallocr_t galloc, struct 
                 parent->name, p_hn->n_children, p_hn->n_views, p_hn->allocated);
 
             if (p_hn->n_children == 0 && p_hn->n_views == 0) {
-                if (wsp_ggml_is_view(parent)) {
+                if (wsp_ggml_impl_is_view(parent)) {
                     struct wsp_ggml_tensor * view_src = parent->view_src;
                     struct hash_node * view_src_hn = wsp_ggml_gallocr_hash_get(galloc, view_src);
                     view_src_hn->n_views -= 1;

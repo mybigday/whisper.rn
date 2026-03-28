@@ -15,6 +15,17 @@
 #include <string>
 #include <vector>
 
+#define WSP_GGUF_MAX_STRING_LENGTH  (1024*1024*1024)
+#define WSP_GGUF_MAX_ARRAY_ELEMENTS (1024*1024*1024)
+
+#ifdef _WIN32
+#    define wsp_gguf_ftell _ftelli64
+#    define wsp_gguf_fseek _fseeki64
+#else
+#    define wsp_gguf_ftell ftello
+#    define wsp_gguf_fseek fseeko
+#endif
+
 template <typename T>
 struct type_to_wsp_gguf_type;
 
@@ -217,17 +228,64 @@ struct wsp_gguf_context {
 };
 
 struct wsp_gguf_reader {
-    FILE * file;
+    wsp_gguf_reader(FILE * file) : file(file) {
+        // read the remaining bytes once and update on each read
+        nbytes_remain = file_remain(file);
+    }
 
-    wsp_gguf_reader(FILE * file) : file(file) {}
+    // helper for remaining bytes in a file
+    static uint64_t file_remain(FILE * file) {
+        const int64_t cur = wsp_gguf_ftell(file);
+        if (cur < 0) {
+            return 0;
+        }
+        if (wsp_gguf_fseek(file, 0, SEEK_END) != 0) {
+            wsp_gguf_fseek(file, cur, SEEK_SET);
+
+            return 0;
+        }
+        const int64_t end = wsp_gguf_ftell(file);
+        if (end < 0) {
+            wsp_gguf_fseek(file, cur, SEEK_SET);
+
+            return 0;
+        }
+        wsp_gguf_fseek(file, cur, SEEK_SET);
+        return static_cast<uint64_t>(end - cur);
+    }
 
     template <typename T>
     bool read(T & dst) const {
-        return fread(&dst, 1, sizeof(dst), file) == sizeof(dst);
+        const size_t size = sizeof(dst);
+        if (nbytes_remain < size) {
+            return false;
+        }
+        const size_t nread = fread(&dst, 1, size, file);
+        nbytes_remain -= nread;
+        return nread == size;
     }
 
     template <typename T>
     bool read(std::vector<T> & dst, const size_t n) const {
+        if (n > WSP_GGUF_MAX_ARRAY_ELEMENTS) {
+            return false;
+        }
+        if constexpr (std::is_same<T, std::string>::value) {
+            // strings are prefixed with their length, so we need to account for that
+            if (n > SIZE_MAX / sizeof(uint64_t)) {
+                return false;
+            }
+            if (nbytes_remain < n * sizeof(uint64_t)) {
+                return false;
+            }
+        } else {
+            if (n > SIZE_MAX / sizeof(T)) {
+                return false;
+            }
+            if (nbytes_remain < n * sizeof(T)) {
+                return false;
+            }
+        }
         dst.resize(n);
         for (size_t i = 0; i < dst.size(); ++i) {
             if constexpr (std::is_same<T, bool>::value) {
@@ -273,17 +331,37 @@ struct wsp_gguf_reader {
     }
 
     bool read(std::string & dst) const {
-        uint64_t size = -1;
+        uint64_t size = 0;
         if (!read(size)) {
             return false;
         }
-        dst.resize(size);
-        return fread(dst.data(), 1, dst.length(), file) == dst.length();
+        if (size > WSP_GGUF_MAX_STRING_LENGTH) {
+            WSP_GGML_LOG_ERROR("%s: string length %" PRIu64 " exceeds maximum %" PRIu64 "\n", __func__, size, (uint64_t) WSP_GGUF_MAX_STRING_LENGTH);
+            return false;
+        }
+        if (size > nbytes_remain) {
+            WSP_GGML_LOG_ERROR("%s: string length %" PRIu64 " exceeds remaining file size %" PRIu64 " bytes\n", __func__, size, nbytes_remain);
+            return false;
+        }
+        dst.resize(static_cast<size_t>(size));
+        const size_t nread = fread(dst.data(), 1, size, file);
+        nbytes_remain -= nread;
+        return nread == size;
     }
 
     bool read(void * dst, const size_t size) const {
-        return fread(dst, 1, size, file) == size;
+        if (size > nbytes_remain) {
+            return false;
+        }
+        const size_t nread = fread(dst, 1, size, file);
+        nbytes_remain -= nread;
+        return nread == size;
     }
+
+private:
+    FILE * file;
+
+    mutable uint64_t nbytes_remain;
 };
 
 struct wsp_gguf_context * wsp_gguf_init_empty(void) {
@@ -523,7 +601,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
         // tensor shape
         {
-            uint32_t n_dims = -1;
+            uint32_t n_dims = 0;
             ok = ok && gr.read(n_dims);
             if (n_dims > WSP_GGML_MAX_DIMS) {
                 WSP_GGML_LOG_ERROR("%s: tensor '%s' has invalid number of dimensions: %" PRIu32 " > %" PRIu32 "\n",
@@ -568,8 +646,8 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
 
             // check that tensor type is within defined range
             if (info.t.type < 0 || info.t.type >= WSP_GGML_TYPE_COUNT) {
-                WSP_GGML_LOG_ERROR("%s: tensor '%s' has invalid ggml type %d (%s)\n",
-                    __func__, info.t.name, info.t.type, wsp_ggml_type_name(info.t.type));
+                WSP_GGML_LOG_ERROR("%s: tensor '%s' has invalid ggml type %d. should be in [0, %d)\n",
+                    __func__, info.t.name, info.t.type, WSP_GGML_TYPE_COUNT);
                 ok = false;
                 break;
             }
@@ -581,6 +659,14 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
                 WSP_GGML_LOG_ERROR("%s: tensor '%s' of type %d (%s) has %" PRId64 " elements per row, "
                     "not a multiple of block size (%" PRId64 ")\n",
                     __func__, info.t.name, (int) info.t.type, wsp_ggml_type_name(info.t.type), info.t.ne[0], blck_size);
+                ok = false;
+                break;
+            }
+
+            // check that the size of the tensor in bytes is representable
+            if (ok && uint64_t(wsp_ggml_nelements(&info.t)/wsp_ggml_blck_size(info.t.type)) > SIZE_MAX/wsp_ggml_type_size(info.t.type)) {
+                WSP_GGML_LOG_ERROR("%s: tensor '%s' with shape (%" PRIi64 ", %" PRIi64 ", %" PRIi64 ", %" PRIi64 ") has a size in bytes > %zu\n",
+                    __func__, info.t.name, info.t.ne[0], info.t.ne[1], info.t.ne[2], info.t.ne[3], SIZE_MAX);
                 ok = false;
                 break;
             }
@@ -610,14 +696,14 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
     WSP_GGML_ASSERT(int64_t(ctx->info.size()) == n_tensors);
 
     // we require the data section to be aligned, so take into account any padding
-    if (fseek(file, WSP_GGML_PAD(ftell(file), ctx->alignment), SEEK_SET) != 0) {
+    if (wsp_gguf_fseek(file, WSP_GGML_PAD(wsp_gguf_ftell(file), ctx->alignment), SEEK_SET) != 0) {
         WSP_GGML_LOG_ERROR("%s: failed to seek to beginning of data section\n", __func__);
         wsp_gguf_free(ctx);
         return nullptr;
     }
 
     // store the current file offset - this is where the data section starts
-    ctx->offset = ftell(file);
+    ctx->offset = wsp_gguf_ftell(file);
 
     // compute the total size of the data section, taking into account the alignment
     {
@@ -649,10 +735,34 @@ struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_g
         //   the wsp_ggml_tensor structs to the appropriate locations in the binary blob
 
         // compute the exact size needed for the new wsp_ggml_context
-        const size_t mem_size =
-            params.no_alloc ?
-            (n_tensors    )*wsp_ggml_tensor_overhead() :
-            (n_tensors + 1)*wsp_ggml_tensor_overhead() + ctx->size;
+        size_t mem_size = 0;
+        if (params.no_alloc) {
+            if (n_tensors != 0 && SIZE_MAX / n_tensors < wsp_ggml_tensor_overhead()) {
+                WSP_GGML_LOG_ERROR("%s: memory size overflow while allocating ggml context\n", __func__);
+                wsp_gguf_free(ctx);
+                return nullptr;
+            }
+
+            const size_t overhead = n_tensors * wsp_ggml_tensor_overhead();
+
+            mem_size = overhead;
+        } else {
+            if ((n_tensors + 1) != 0 && SIZE_MAX / (n_tensors + 1) < wsp_ggml_tensor_overhead()) {
+                WSP_GGML_LOG_ERROR("%s: memory size overflow while allocating ggml context\n", __func__);
+                wsp_gguf_free(ctx);
+                return nullptr;
+            }
+
+            const size_t overhead = (n_tensors + 1) * wsp_ggml_tensor_overhead();
+
+            if (SIZE_MAX - overhead < ctx->size) {
+                WSP_GGML_LOG_ERROR("%s: memory size overflow while allocating ggml context\n", __func__);
+                wsp_gguf_free(ctx);
+                return nullptr;
+            }
+
+            mem_size = overhead + ctx->size;
+        }
 
         struct wsp_ggml_init_params pdata = {
             /*mem_size   =*/ mem_size,
@@ -734,7 +844,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file(const char * fname, struct wsp
     FILE * file = wsp_ggml_fopen(fname, "rb");
 
     if (!file) {
-        WSP_GGML_LOG_ERROR("%s: failed to open GGUF file '%s'\n", __func__, fname);
+        WSP_GGML_LOG_ERROR("%s: failed to open GGUF file '%s' (%s)\n", __func__, fname, strerror(errno));
         return nullptr;
     }
 
@@ -1166,50 +1276,51 @@ void wsp_gguf_set_tensor_data(struct wsp_gguf_context * ctx, const char * name, 
     ctx->info[tensor_id].t.data = (void *)(uintptr_t)data; // double cast suppresses warning about casting away const
 }
 
-struct wsp_gguf_writer {
-    std::vector<int8_t> & buf;
+struct wsp_gguf_writer_base {
+    size_t written_bytes {0u};
 
-    wsp_gguf_writer(std::vector<int8_t> & buf) : buf(buf) {}
+    ~wsp_gguf_writer_base(void) = default;
+
+    // we bet on devirtualization
+    virtual void write(int8_t val) = 0;
+    virtual void write(const std::vector<int8_t> & val) = 0;
+    virtual void write_tensor_data(const struct wsp_gguf_tensor_info & info, size_t offset_data, size_t alignment) = 0;
 
     template <typename T>
-    void write(const T & val) const {
+    void write(const T & val) {
         for (size_t i = 0; i < sizeof(val); ++i) {
-            buf.push_back(reinterpret_cast<const int8_t *>(&val)[i]);
+            write(reinterpret_cast<const int8_t *>(&val)[i]);
         }
     }
 
-    void write(const std::vector<int8_t> & val) const {
-        buf.insert(buf.end(), val.begin(), val.end());
-    }
-
-    void write(const bool & val) const {
+    void write(const bool & val) {
         const int8_t val8 = val ? 1 : 0;
         write(val8);
     }
 
-    void write(const std::string & val) const {
+    void write(const std::string & val) {
         {
             const uint64_t n = val.length();
             write(n);
         }
         for (size_t i = 0; i < val.length(); ++i) {
-            buf.push_back(reinterpret_cast<const int8_t *>(val.data())[i]);
+            write((val.data())[i]);
         }
     }
 
-    void write(const char * val) const {
+    void write(const char * val) {
         write(std::string(val));
     }
 
-    void write(const enum wsp_ggml_type & val) const {
+    void write(const enum wsp_ggml_type & val) {
         write(int32_t(val));
     }
 
-    void write(const enum wsp_gguf_type & val) const {
+    void write(const enum wsp_gguf_type & val) {
         write(int32_t(val));
     }
 
-    void write(const struct wsp_gguf_kv & kv) const {
+    void write(const struct wsp_gguf_kv & kv) {
         const uint64_t ne = kv.get_ne();
 
         write(kv.get_key());
@@ -1250,7 +1361,7 @@ struct wsp_gguf_writer {
         }
     }
 
-    void write_tensor_meta(const struct wsp_gguf_tensor_info & info) const {
+    void write_tensor_meta(const struct wsp_gguf_tensor_info & info) {
         write(info.t.name);
 
         const uint32_t n_dims = wsp_ggml_n_dims(&info.t);
@@ -1263,14 +1374,33 @@ struct wsp_gguf_writer {
         write(info.offset);
     }
 
-    void pad(const size_t alignment) const {
-        while (buf.size() % alignment != 0) {
+    void pad(const size_t alignment) {
+        while (written_bytes % alignment != 0) {
             const int8_t zero = 0;
             write(zero);
         }
     }
+};
 
-    void write_tensor_data(const struct wsp_gguf_tensor_info & info, const size_t offset_data, const size_t alignment) const {
+// vector buffer based writer
+struct wsp_gguf_writer_buf final : public wsp_gguf_writer_base {
+    std::vector<int8_t> & buf;
+
+    wsp_gguf_writer_buf(std::vector<int8_t> & buf) : buf(buf) {}
+
+    using wsp_gguf_writer_base::write;
+
+    void write(const int8_t val) override {
+        buf.push_back(val);
+        written_bytes++;
+    }
+
+    void write(const std::vector<int8_t> & val) override {
+        buf.insert(buf.end(), val.begin(), val.end());
+        written_bytes += val.size();
+    }
+
+    void write_tensor_data(const struct wsp_gguf_tensor_info & info, const size_t offset_data, const size_t alignment) override {
         WSP_GGML_ASSERT(buf.size() - offset_data == info.offset);
 
         WSP_GGML_ASSERT(wsp_ggml_is_contiguous(&info.t));
@@ -1284,14 +1414,58 @@ struct wsp_gguf_writer {
             WSP_GGML_ASSERT(info.t.data);
             memcpy(buf.data() + offset, info.t.data, nbytes);
         }
+        written_bytes += nbytes;
 
         pad(alignment);
     }
 };
 
-void wsp_gguf_write_to_buf(const struct wsp_gguf_context * ctx, std::vector<int8_t> & buf, bool only_meta) {
-    const struct wsp_gguf_writer gw(buf);
+// file based writer
+struct wsp_gguf_writer_file final : public wsp_gguf_writer_base {
+    FILE * file;
 
+    wsp_gguf_writer_file(FILE* file) : file(file) {}
+
+    using wsp_gguf_writer_base::write;
+
+    void write(const int8_t val) override {
+        const auto real_val = static_cast<uint8_t>(val);
+        const auto ret = fputc(real_val, file);
+        written_bytes++;
+        if (ret != real_val) {
+            throw std::runtime_error("unexpected fputc result '" + std::to_string(ret) + "' instead of '" + std::to_string((int)real_val) + "'");
+        }
+    }
+
+    void write(const std::vector<int8_t> & val) override {
+        const auto ret = fwrite(val.data(), 1, val.size(), file);
+        written_bytes += val.size();
+        if (ret != val.size()) {
+            throw std::runtime_error("unexpected fwrite number of bytes written, '" + std::to_string(ret) + "' instead of '" + std::to_string(val.size()) + "'");
+        }
+    }
+
+    void write_tensor_data(const struct wsp_gguf_tensor_info & info, const size_t offset_data, const size_t alignment) override {
+        WSP_GGML_ASSERT(written_bytes - offset_data == info.offset);
+
+        WSP_GGML_ASSERT(wsp_ggml_is_contiguous(&info.t));
+        const size_t nbytes = wsp_ggml_nbytes(&info.t);
+
+        std::vector<int8_t> buf(nbytes);
+        if (info.t.buffer) {
+            wsp_ggml_backend_tensor_get(&info.t, buf.data(), 0, nbytes);
+        } else {
+            WSP_GGML_ASSERT(info.t.data);
+            memcpy(buf.data(), info.t.data, nbytes);
+        }
+        write(buf);
+
+        pad(alignment);
+    }
+};
+
+template <typename writer_t>
+static void wsp_gguf_write_out(const struct wsp_gguf_context * ctx, writer_t & gw, bool only_meta) {
     const int64_t n_kv      = wsp_gguf_get_n_kv(ctx);
     const int64_t n_tensors = wsp_gguf_get_n_tensors(ctx);
 
@@ -1321,12 +1495,17 @@ void wsp_gguf_write_to_buf(const struct wsp_gguf_context * ctx, std::vector<int8
         return;
     }
 
-    const size_t offset_data = gw.buf.size();
+    const size_t offset_data = gw.written_bytes;
 
     // write tensor data
     for (int64_t i = 0; i < n_tensors; ++i) {
         gw.write_tensor_data(ctx->info[i], offset_data, ctx->alignment);
     }
+}
+
+void wsp_gguf_write_to_buf(const struct wsp_gguf_context * ctx, std::vector<int8_t> & buf, bool only_meta) {
+    wsp_gguf_writer_buf gw(buf);
+    wsp_gguf_write_out(ctx, gw, only_meta);
 }
 
 bool wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fname, bool only_meta) {
@@ -1337,11 +1516,17 @@ bool wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fn
         return false;
     }
 
-    std::vector<int8_t> buf;
-    wsp_gguf_write_to_buf(ctx, buf, only_meta);
-    const bool ok = fwrite(buf.data(), 1, buf.size(), file) == buf.size();
+    try {
+        wsp_gguf_writer_file gw(file);
+        wsp_gguf_write_out(ctx, gw, only_meta);
+    } catch (const std::runtime_error& ex) {
+        WSP_GGML_LOG_ERROR("%s: failed to write GGUF data into '%s': %s\n", __func__, fname, ex.what());
+        fclose(file);
+        return false;
+    }
+
     fclose(file);
-    return ok;
+    return true;
 }
 
 size_t wsp_gguf_get_meta_size(const struct wsp_gguf_context * ctx) {

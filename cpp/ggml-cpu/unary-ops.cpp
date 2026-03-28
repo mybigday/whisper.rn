@@ -111,7 +111,7 @@ template <float (*op)(float), typename src0_t, typename dst_t>
 static void apply_unary_op(const wsp_ggml_compute_params * params, wsp_ggml_tensor * dst) {
     const wsp_ggml_tensor * src0 = dst->src[0];
 
-    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_1(src0) && wsp_ggml_is_contiguous_1(dst) && wsp_ggml_are_same_shape(src0, dst));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(src0) && wsp_ggml_is_contiguous_rows(dst) && wsp_ggml_are_same_shape(src0, dst));
 
     WSP_GGML_TENSOR_UNARY_OP_LOCALS
 
