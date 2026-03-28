@@ -24,6 +24,7 @@ set(
     ${RNWHISPER_LIB_DIR}/ggml-alloc.c
     ${RNWHISPER_LIB_DIR}/ggml-backend.cpp
     ${RNWHISPER_LIB_DIR}/ggml-backend-reg.cpp
+    ${RNWHISPER_LIB_DIR}/ggml-backend-dl.cpp
     ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/amx.cpp
     ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/mmq.cpp
     ${RNWHISPER_LIB_DIR}/ggml-cpu/ggml-cpu.c

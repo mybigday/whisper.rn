@@ -218,6 +218,7 @@ struct rnwhisper_segments_callback_data {
         }
 
         rnwhisper::job* job = rnwhisper::job_new(jobId, params);
+        job->n_processors = options[@"nProcessors"] != nil ? [options[@"nProcessors"] intValue] : 1;
         self->job = job;
         int code = [self fullTranscribe:job audioData:audioData audioDataCount:audioDataCount];
         rnwhisper::job_remove(jobId);

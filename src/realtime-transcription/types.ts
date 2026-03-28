@@ -26,6 +26,7 @@ export interface AudioStreamInterface {
   onData(callback: (data: AudioStreamData) => void): void
   onError(callback: (error: string) => void): void
   onStatusChange(callback: (isRecording: boolean) => void): void
+  onEnd?(callback: () => void): void
   release(): Promise<void>
 }
 
@@ -182,14 +183,6 @@ export interface RealtimeOptions {
   audioMinSec?: number // default: 1
   maxSlicesInMemory?: number // default: 3
 
-  // VAD settings - now using extended options
-  vadOptions?: VadOptions
-  vadPreset?: keyof typeof VAD_PRESETS // Quick preset selection
-
-  // Auto-slice settings
-  autoSliceOnSpeechEnd?: boolean // default: false - automatically slice when speech ends and duration thresholds are met
-  autoSliceThreshold?: number // default: 0.85 - percentage of audioSliceSec to trigger auto-slice
-
   // Transcription settings
   transcribeOptions?: TranscribeOptions
 
@@ -205,6 +198,10 @@ export interface RealtimeOptions {
 
   // Logger settings
   logger?: (message: string) => void // default: noop - custom logger function
+
+  // Realtime transcription settings
+  realtimeProcessingPauseMs?: number // default: 200 - interval between realtime updates
+  initRealtimeAfterMs?: number // default: 200 - wait before first realtime transcription
 }
 
 export interface AudioSlice {
@@ -217,7 +214,7 @@ export interface AudioSlice {
   isReleased: boolean
 }
 
-export interface AudioSliceNoData extends Omit<AudioSlice, 'data'> {}
+export interface AudioSliceNoData extends Omit<AudioSlice, 'data'> { }
 
 export interface MemoryUsage {
   slicesInMemory: number
@@ -228,10 +225,10 @@ export interface MemoryUsage {
 export interface RealtimeStatsEvent {
   timestamp: number
   type:
-    | 'slice_processed'
-    | 'vad_change'
-    | 'memory_change'
-    | 'status_change'
+  | 'slice_processed'
+  | 'vad_change'
+  | 'memory_change'
+  | 'status_change'
   data: {
     isActive: boolean
     isTranscribing: boolean
@@ -250,10 +247,16 @@ export interface RealtimeTranscriberCallbacks {
     vadEvent?: RealtimeVadEvent
   }) => Promise<boolean>
   onTranscribe?: (event: RealtimeTranscribeEvent) => void
+  onBeginVad?: (sliceInfo: {
+    audioData: Uint8Array
+    sliceIndex: number
+    duration: number
+  }) => Promise<boolean>
   onVad?: (event: RealtimeVadEvent) => void
   onError?: (error: string) => void
   onStatusChange?: (isActive: boolean) => void
   onStatsUpdate?: (event: RealtimeStatsEvent) => void
+  onSliceTranscriptionStabilized?: (text: string) => void
 }
 
 // === Context Interfaces ===
@@ -268,6 +271,7 @@ export type WhisperContextLike = {
   }
 }
 
+// VAD context interface
 export type WhisperVadContextLike = {
   detectSpeechData: (
     data: ArrayBuffer,
@@ -275,9 +279,28 @@ export type WhisperVadContextLike = {
   ) => Promise<Array<{ t0: number; t1: number }>>
 }
 
+export interface RealtimeVadContextLike {
+  // Push audio data to the VAD context
+  processAudio(data: Uint8Array): void
+  // Callback for when speech is detected
+  onSpeechStart: (callback: (confidence: number, data: Uint8Array) => void) => void
+  // Callback for when speech is detected and continues
+  onSpeechContinue: (callback: (confidence: number, data: Uint8Array) => void) => void
+  // Callback for when speech ends
+  onSpeechEnd: (callback: (confidence: number) => void) => void
+  // Callback for when VAD encounters an error
+  onError: (callback: (error: string) => void) => void
+  // Update VAD options
+  updateOptions(options: Partial<VadOptions>): void
+  // Force flush remaining audio data in the VAD context
+  flush(): Promise<void>
+  // Reset the VAD context
+  reset(): Promise<void>
+}
+
 export interface RealtimeTranscriberDependencies {
   whisperContext: WhisperContextLike
-  vadContext?: WhisperVadContextLike
+  vadContext?: RealtimeVadContextLike
   audioStream: AudioStreamInterface
   fs?: WavFileWriterFs
 }

@@ -1,5 +1,5 @@
-#ifndef WSP_GGML_METAL_IMPL
-#define WSP_GGML_METAL_IMPL
+#ifndef WSP_WSP_WSP_GGML_METAL_IMPL
+#define WSP_WSP_WSP_GGML_METAL_IMPL
 
 // kernel parameters for mat-vec threadgroups
 //
@@ -101,7 +101,7 @@ typedef struct {
     uint64_t nb2;
     uint64_t nb3;
     int32_t  dim;
-} wsp_ggml_metal_kargs_concat;
+} wsp_wsp_wsp_ggml_metal_kargs_concat;
 
 typedef struct {
     int32_t  ne00;
@@ -130,7 +130,7 @@ typedef struct {
     uint64_t nb3;
     uint64_t offs;
     uint64_t o1[8];
-} wsp_ggml_metal_kargs_bin;
+} wsp_wsp_wsp_ggml_metal_kargs_bin;
 
 typedef struct {
     int64_t ne0;
@@ -139,7 +139,7 @@ typedef struct {
     size_t nb02;
     size_t nb11;
     size_t nb21;
-} wsp_ggml_metal_kargs_add_id;
+} wsp_wsp_wsp_ggml_metal_kargs_add_id;
 
 typedef struct {
     int32_t  ne00;
@@ -158,7 +158,7 @@ typedef struct {
     uint64_t nb1;
     uint64_t nb2;
     uint64_t nb3;
-} wsp_ggml_metal_kargs_repeat;
+} wsp_wsp_wsp_ggml_metal_kargs_repeat;
 
 typedef struct {
     int64_t  ne00;
@@ -177,7 +177,7 @@ typedef struct {
     uint64_t nb1;
     uint64_t nb2;
     uint64_t nb3;
-} wsp_ggml_metal_kargs_cpy;
+} wsp_wsp_wsp_ggml_metal_kargs_cpy;
 
 typedef struct {
     int64_t  ne10;
@@ -192,7 +192,7 @@ typedef struct {
     uint64_t nb3;
     uint64_t offs;
     bool     inplace;
-} wsp_ggml_metal_kargs_set;
+} wsp_wsp_wsp_ggml_metal_kargs_set;
 
 typedef struct {
     int32_t  ne00;
@@ -224,7 +224,7 @@ typedef struct {
     int32_t  sect_1;
     int32_t  sect_2;
     int32_t  sect_3;
-} wsp_ggml_metal_kargs_rope;
+} wsp_wsp_wsp_ggml_metal_kargs_rope;
 
 typedef struct {
     int32_t  ne01;
@@ -255,7 +255,7 @@ typedef struct {
     float    m1;
     int32_t  n_head_log2;
     float    logit_softcap;
-} wsp_ggml_metal_kargs_flash_attn_ext;
+} wsp_wsp_wsp_ggml_metal_kargs_flash_attn_ext;
 
 typedef struct {
     int32_t  ne00;
@@ -272,7 +272,7 @@ typedef struct {
     int32_t  ne1;
     int16_t  r2;
     int16_t  r3;
-} wsp_ggml_metal_kargs_mul_mm;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mm;
 
 typedef struct {
     int32_t  ne00;
@@ -293,7 +293,7 @@ typedef struct {
     int32_t  ne1;
     int16_t  r2;
     int16_t  r3;
-} wsp_ggml_metal_kargs_mul_mv;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mv;
 
 typedef struct {
     int32_t  ne00;
@@ -317,7 +317,7 @@ typedef struct {
     int16_t  nsg;
     int16_t  nxpsg;
     int16_t  r1ptg;
-} wsp_ggml_metal_kargs_mul_mv_ext;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mv_ext;
 
 typedef struct {
     int32_t  ne10;
@@ -328,7 +328,7 @@ typedef struct {
     uint64_t nbh11;
     int32_t  ne20;  // n_expert_used
     uint64_t nb21;
-} wsp_ggml_metal_kargs_mul_mm_id_map0;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mm_id_map0;
 
 typedef struct {
     int32_t  ne20; // n_expert_used
@@ -339,7 +339,7 @@ typedef struct {
     int32_t  ne0;
     uint64_t nb1;
     uint64_t nb2;
-} wsp_ggml_metal_kargs_mul_mm_id_map1;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mm_id_map1;
 
 typedef struct {
     int32_t  ne00;
@@ -356,7 +356,7 @@ typedef struct {
     int32_t  neh1;
     int16_t  r2;
     int16_t  r3;
-} wsp_ggml_metal_kargs_mul_mm_id;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mm_id;
 
 typedef struct {
     int32_t  nei0;
@@ -378,14 +378,14 @@ typedef struct {
     int32_t  ne0;
     int32_t  ne1;
     uint64_t nb1;
-} wsp_ggml_metal_kargs_mul_mv_id;
+} wsp_wsp_wsp_ggml_metal_kargs_mul_mv_id;
 
 typedef struct {
     int32_t  ne00;
     int32_t  ne00_4;
     uint64_t nb01;
     float    eps;
-} wsp_ggml_metal_kargs_norm;
+} wsp_wsp_wsp_ggml_metal_kargs_norm;
 
 typedef struct {
     int32_t  ne00;
@@ -400,14 +400,14 @@ typedef struct {
     uint64_t nbf1[3];
     uint64_t nbf2[3];
     uint64_t nbf3[3];
-} wsp_ggml_metal_kargs_rms_norm;
+} wsp_wsp_wsp_ggml_metal_kargs_rms_norm;
 
 typedef struct {
     int32_t  ne00;
     int32_t  ne00_4;
     uint64_t nb01;
     float    eps;
-} wsp_ggml_metal_kargs_l2_norm;
+} wsp_wsp_wsp_ggml_metal_kargs_l2_norm;
 
 typedef struct {
     int64_t  ne00;
@@ -418,7 +418,7 @@ typedef struct {
     uint64_t nb02;
     int32_t  n_groups;
     float    eps;
-} wsp_ggml_metal_kargs_group_norm;
+} wsp_wsp_wsp_ggml_metal_kargs_group_norm;
 
 typedef struct {
     int32_t  IC;
@@ -427,7 +427,7 @@ typedef struct {
     int32_t  s0;
     uint64_t nb0;
     uint64_t nb1;
-} wsp_ggml_metal_kargs_conv_transpose_1d;
+} wsp_wsp_wsp_ggml_metal_kargs_conv_transpose_1d;
 
 typedef struct {
     uint64_t  ofs0;
@@ -445,7 +445,7 @@ typedef struct {
     int32_t  KH;
     int32_t  KW;
     int32_t  KHW; // KH * KW, pre-computed on CPU to save GPU resources
-} wsp_ggml_metal_kargs_im2col;
+} wsp_wsp_wsp_ggml_metal_kargs_im2col;
 
 typedef struct{
     int32_t  ne00;
@@ -458,7 +458,7 @@ typedef struct{
     int32_t  i10;
     float    alpha;
     float    limit;
-} wsp_ggml_metal_kargs_glu;
+} wsp_wsp_wsp_ggml_metal_kargs_glu;
 
 typedef struct {
     int64_t  ne00;
@@ -485,7 +485,7 @@ typedef struct {
     uint64_t nb1;
     uint64_t nb2;
     uint64_t nb3;
-} wsp_ggml_metal_kargs_sum_rows;
+} wsp_wsp_wsp_ggml_metal_kargs_sum_rows;
 
 typedef struct {
     int32_t  ne00;
@@ -508,13 +508,13 @@ typedef struct {
     float    m0;
     float    m1;
     int32_t  n_head_log2;
-} wsp_ggml_metal_kargs_soft_max;
+} wsp_wsp_wsp_ggml_metal_kargs_soft_max;
 
 typedef struct {
     int64_t  ne00;
     int64_t  ne01;
     int      n_past;
-} wsp_ggml_metal_kargs_diag_mask_inf;
+} wsp_wsp_wsp_ggml_metal_kargs_diag_mask_inf;
 
 typedef struct {
     int64_t  ne00;
@@ -533,7 +533,7 @@ typedef struct {
     uint64_t nb0;
     uint64_t nb1;
     uint64_t nb2;
-} wsp_ggml_metal_kargs_ssm_conv;
+} wsp_wsp_wsp_ggml_metal_kargs_ssm_conv;
 
 typedef struct {
     int64_t  d_state;
@@ -558,7 +558,7 @@ typedef struct {
     uint64_t nb51;
     uint64_t nb52;
     uint64_t nb53;
-} wsp_ggml_metal_kargs_ssm_scan;
+} wsp_wsp_wsp_ggml_metal_kargs_ssm_scan;
 
 typedef struct {
     int64_t  ne00;
@@ -569,7 +569,7 @@ typedef struct {
     uint64_t nb11;
     uint64_t nb1;
     uint64_t nb2;
-} wsp_ggml_metal_kargs_get_rows;
+} wsp_wsp_wsp_ggml_metal_kargs_get_rows;
 
 typedef struct {
     int32_t  nk0;
@@ -585,7 +585,7 @@ typedef struct {
     uint64_t nb1;
     uint64_t nb2;
     uint64_t nb3;
-} wsp_ggml_metal_kargs_set_rows;
+} wsp_wsp_wsp_ggml_metal_kargs_set_rows;
 
 typedef struct {
     int64_t  ne00;
@@ -608,7 +608,7 @@ typedef struct {
     float    sf1;
     float    sf2;
     float    sf3;
-} wsp_ggml_metal_kargs_upscale;
+} wsp_wsp_wsp_ggml_metal_kargs_upscale;
 
 typedef struct {
     int64_t  ne00;
@@ -627,7 +627,7 @@ typedef struct {
     uint64_t nb1;
     uint64_t nb2;
     uint64_t nb3;
-} wsp_ggml_metal_kargs_pad;
+} wsp_wsp_wsp_ggml_metal_kargs_pad;
 
 typedef struct {
     int64_t  ne00;
@@ -648,28 +648,28 @@ typedef struct {
     uint64_t nb3;
     int32_t  p0;
     int32_t  p1;
-} wsp_ggml_metal_kargs_pad_reflect_1d;
+} wsp_wsp_wsp_ggml_metal_kargs_pad_reflect_1d;
 
 typedef struct {
     uint64_t nb1;
     int      dim;
     int      max_period;
-} wsp_ggml_metal_kargs_timestep_embedding;
+} wsp_wsp_wsp_ggml_metal_kargs_timestep_embedding;
 
 typedef struct {
     float    slope;
-} wsp_ggml_metal_kargs_leaky_relu;
+} wsp_wsp_wsp_ggml_metal_kargs_leaky_relu;
 
 typedef struct {
     int64_t  ncols;
     int64_t  ncols_pad;
-} wsp_ggml_metal_kargs_argsort;
+} wsp_wsp_wsp_ggml_metal_kargs_argsort;
 
 typedef struct {
     int64_t  ne0;
     float    start;
     float    step;
-} wsp_ggml_metal_kargs_arange;
+} wsp_wsp_wsp_ggml_metal_kargs_arange;
 
 typedef struct {
     int32_t  k0;
@@ -683,6 +683,6 @@ typedef struct {
     int64_t  OH;
     int64_t  OW;
     int64_t  parallel_elements;
-} wsp_ggml_metal_kargs_pool_2d;
+} wsp_wsp_wsp_ggml_metal_kargs_pool_2d;
 
-#endif // WSP_GGML_METAL_IMPL
+#endif // WSP_WSP_WSP_GGML_METAL_IMPL

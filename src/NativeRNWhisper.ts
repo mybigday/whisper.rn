@@ -9,6 +9,8 @@ export type TranscribeOptions = {
   translate?: boolean,
   /** Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) */
   maxThreads?: number,
+  /** Number of processors to use for parallel processing with whisper_full_parallel (Default: 1 to use whisper_full) */
+  nProcessors?: number,
   /** Maximum number of text context tokens to store */
   maxContext?: number,
   /** Maximum segment length in characters */
@@ -36,6 +38,7 @@ export type TranscribeOptions = {
 
 export type TranscribeResult = {
   result: string,
+  language: string,
   segments: Array<{
     text: string,
     t0: number,

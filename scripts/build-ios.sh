@@ -28,8 +28,7 @@ function build_framework() {
     -DCMAKE_OSX_SYSROOT=$3 \
     -DCMAKE_INSTALL_PREFIX=`pwd`/install \
     -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
-    -DCMAKE_IOS_INSTALL_COMBINED=YES
-
+    -DCMAKE_IOS_INSTALL_COMBINED=YES 
   # Build
   cmake --build . --config Release -j $(sysctl -n hw.logicalcpu)
 
@@ -39,14 +38,9 @@ function build_framework() {
   mv Release-$3/rnwhisper.framework ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
   mkdir -p ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/Headers
 
-  # Copy headers and metallib
+  # Copy headers and metal shader
   cp_headers $4
-  # TODO: May need to re-build metallib for tvOS
-  if [ "$4" == "ios-arm64_x86_64-simulator" ] || [ "$4" == "tvos-arm64_x86_64-simulator" ]; then
-    cp ../cpp/ggml-whisper-sim.metallib ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-whisper-sim.metallib
-  else
-    cp ../cpp/ggml-whisper.metallib ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-whisper.metallib
-  fi
+  cp ../cpp/ggml-metal/ggml-metal.metal ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-metal.metal
 
   rm -rf ./*
   cd ..

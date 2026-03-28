@@ -20,27 +20,28 @@
 
 #ifdef WSP_GGML_USE_METAL
     if (ctx_params.use_gpu) {
-        ctx_params.gpu_device = 0;
+        // TODO: GPU VAD is forced disabled until the performance is improved (ref: whisper.cpp/whisper_vad_init_context)
+        ctx_params.use_gpu = false;
+        // ctx_params.gpu_device = 0;
 
-        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        // id<MTLDevice> device = MTLCreateSystemDefaultDevice();
 
-        // Check ggml-metal availability
-        BOOL supportsGgmlMetal = [device supportsFamily:MTLGPUFamilyApple7];
-        if (@available(iOS 16.0, tvOS 16.0, *)) {
-            supportsGgmlMetal = supportsGgmlMetal && [device supportsFamily:MTLGPUFamilyMetal3];
-        }
-        if (!supportsGgmlMetal) {
-          ctx_params.use_gpu = false;
-            reasonNoMetal = @"Metal is not supported in this device";
-        }
+        // // Check ggml-metal availability
+        // BOOL supportsGgmlMetal = [device supportsFamily:MTLGPUFamilyApple7];
+        // if (@available(iOS 16.0, tvOS 16.0, *)) {
+        //     supportsGgmlMetal = supportsGgmlMetal && [device supportsFamily:MTLGPUFamilyMetal3];
+        // }
+        // if (!supportsGgmlMetal) {
+        //   ctx_params.use_gpu = false;
+        //     reasonNoMetal = @"Metal is not supported in this device";
+        // }
+        // device = nil;
 
 #if TARGET_OS_SIMULATOR
         // Use the backend, but no layers because not supported fully on simulator
         ctx_params.use_gpu = false;
         reasonNoMetal = @"Metal is not supported in simulator";
 #endif
-
-        device = nil;
     }
 #endif // WSP_GGML_USE_METAL
 

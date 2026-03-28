@@ -139,12 +139,16 @@ export default function App() {
               const modelFilePath = await downloadModel(
                 selectedModel,
                 (downloadProgressValue) => {
-                  setDownloadProgress(downloadProgressValue)
-                  log(
-                    `Download progress: ${Math.round(
-                      downloadProgressValue * 100,
-                    )}%`,
+                  const prevDownloadProgress = Math.round(
+                    downloadProgress * 100,
                   )
+                  const currentDownloadProgress = Math.round(
+                    downloadProgressValue * 100,
+                  )
+                  if (currentDownloadProgress > prevDownloadProgress) {
+                    setDownloadProgress(downloadProgressValue)
+                    log(`Download progress: ${currentDownloadProgress}%`)
+                  }
                 },
                 log,
               )

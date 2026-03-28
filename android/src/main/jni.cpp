@@ -276,6 +276,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initContextWithAsset(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject asset_manager,
     jstring model_path_str
 ) {
@@ -290,6 +291,7 @@ Java_com_rnwhisper_WhisperContext_initContextWithAsset(
     const char *model_path_chars = env->GetStringUTFChars(model_path_str, nullptr);
     context = whisper_init_from_asset(env, asset_manager, model_path_chars, cparams);
     env->ReleaseStringUTFChars(model_path_str, model_path_chars);
+    rnwhisper_jsi::addContext(context_id, reinterpret_cast<jlong>(context));
     return reinterpret_cast<jlong>(context);
 }
 
@@ -297,6 +299,7 @@ JNIEXPORT jlong JNICALL
 Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
     JNIEnv *env,
     jobject thiz,
+    jint context_id,
     jobject input_stream
 ) {
     UNUSED(thiz);
@@ -308,6 +311,7 @@ Java_com_rnwhisper_WhisperContext_initContextWithInputStream(
 
     struct whisper_context *context = nullptr;
     context = whisper_init_from_input_stream(env, input_stream, cparams);
+    rnwhisper_jsi::addContext(context_id, reinterpret_cast<jlong>(context));
     return reinterpret_cast<jlong>(context);
 }
 
@@ -421,8 +425,9 @@ Java_com_rnwhisper_WhisperContext_fullWithNewJob(
     LOGI("About to reset timings");
     whisper_reset_timings(context);
 
-    LOGI("About to run whisper_full");
-    int code = whisper_full(context, params, audio_data_arr, audio_data_len);
+    int n_processors = readablemap::getInt(env, options, "nProcessors", 1);
+    LOGI("About to run whisper_full_parallel with n_processors=%d", n_processors);
+    int code = whisper_full_parallel(context, params, audio_data_arr, audio_data_len, n_processors);
     if (code == 0) {
         // whisper_print_timings(context);
     }
@@ -507,6 +512,19 @@ Java_com_rnwhisper_WhisperContext_getTextSegmentSpeakerTurnNext(
     UNUSED(thiz);
     struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
     return whisper_full_get_segment_speaker_turn_next(context, index);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_rnwhisper_WhisperContext_getDetectedLanguage(
+        JNIEnv *env, jobject thiz, jlong context_ptr) {
+    UNUSED(thiz);
+    struct whisper_context *context = reinterpret_cast<struct whisper_context *>(context_ptr);
+    int lang_id = whisper_full_lang_id(context);
+    const char *lang_str = whisper_lang_str(lang_id);
+    if (lang_str == nullptr) {
+        return nullptr;
+    }
+    return env->NewStringUTF(lang_str);
 }
 
 JNIEXPORT jstring JNICALL

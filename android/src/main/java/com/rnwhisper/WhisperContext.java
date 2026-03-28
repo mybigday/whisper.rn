@@ -182,6 +182,10 @@ public class WhisperContext {
     }
     data.putString("result", builder.toString());
     data.putArray("segments", segments);
+    String language = getDetectedLanguage(context);
+    if (language != null) {
+      data.putString("language", language);
+    }
     return data;
   }
 
@@ -300,6 +304,7 @@ public class WhisperContext {
   protected static native int getTextSegmentT0(long context, int index);
   protected static native int getTextSegmentT1(long context, int index);
   protected static native boolean getTextSegmentSpeakerTurnNext(long context, int index);
+  protected static native String getDetectedLanguage(long context);
 
   protected static native String bench(long context, int n_threads);
 

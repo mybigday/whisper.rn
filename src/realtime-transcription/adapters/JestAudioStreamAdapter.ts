@@ -170,7 +170,7 @@ export class JestAudioStreamAdapter implements AudioStreamInterface {
     return this.recording ? Date.now() - this.startTime : 0
   }
 
-    private startStreaming(): void {
+  private startStreaming(): void {
     if (!this.dataCallback || !this.config) {
       return
     }
@@ -231,7 +231,7 @@ export class JestAudioStreamAdapter implements AudioStreamInterface {
       const samplesPerChunk = chunkSize / 2 // 16-bit samples
       const timeOffset = (this.chunksSent * samplesPerChunk) / sampleRate
 
-            for (let i = 0; i < samplesPerChunk; i += 1) {
+      for (let i = 0; i < samplesPerChunk; i += 1) {
         const time = timeOffset + i / sampleRate
         const amplitude = Math.sin(2 * Math.PI * frequency * time) * 0.5
         const sample = Math.round(amplitude * 32767) // 16-bit signed sample

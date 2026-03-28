@@ -218,7 +218,7 @@ const JSITest: React.FC = () => {
       try {
         addTestResult('🎤 Initializing VAD context...')
         const newVadContext = await initWhisperVad({
-          filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+          filePath: require('../assets/ggml-silero-v6.2.0.bin'),
         })
         setVadContext(newVadContext)
         addTestResult(`✅ VAD context initialized with ID: ${newVadContext.id}`)

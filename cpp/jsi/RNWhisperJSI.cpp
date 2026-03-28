@@ -17,6 +17,8 @@ using namespace facebook::jsi;
 
 namespace rnwhisper_jsi {
 
+using namespace facebook::jsi;
+
 // Consolidated logging function
 enum class LogLevel { LOG_DEBUG, LOG_INFO, LOG_ERROR };
 
@@ -267,11 +269,13 @@ struct CallbackInfo {
     std::shared_ptr<Function> onProgressCallback;
     std::shared_ptr<Function> onNewSegmentsCallback;
     int jobId;
+    int nProcessors;
 };
 
 CallbackInfo extractCallbacks(Runtime& runtime, const Object& optionsObj) {
     CallbackInfo info;
     info.jobId = rand(); // Default fallback jobId
+    info.nProcessors = 1; // Default to 1 processor
 
     try {
         auto propNames = optionsObj.getPropertyNames(runtime);
@@ -286,6 +290,8 @@ CallbackInfo extractCallbacks(Runtime& runtime, const Object& optionsObj) {
                 info.onNewSegmentsCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
             } else if (propName == "jobId" && propValue.isNumber()) {
                 info.jobId = (int)propValue.getNumber();
+            } else if (propName == "nProcessors" && propValue.isNumber()) {
+                info.nProcessors = (int)propValue.getNumber();
             }
         }
     } catch (...) {
@@ -549,12 +555,13 @@ void installJSIBindings(
                                 code = -2;
                             } else {
                                 try {
-                                    code = whisper_full(context, job->params, audioResult.data.data(), audioResult.count);
+                                    job->n_processors = callbackInfo.nProcessors;
+                                    code = whisper_full_parallel(context, job->params, audioResult.data.data(), audioResult.count, job->n_processors);
                                     if (job->is_aborted()) {
                                         code = -999;
                                     }
                                 } catch (...) {
-                                    logError("Exception during whisper_full transcription");
+                                    logError("Exception during whisper_full_parallel transcription");
                                     code = -3;
                                 }
                                 rnwhisper::job_remove(callbackInfo.jobId);
@@ -567,6 +574,7 @@ void installJSIBindings(
                                     if (code == 0) {
                                         auto resultObj = Object(runtime);
                                         resultObj.setProperty(runtime, "code", Value(code));
+                                        resultObj.setProperty(runtime, "language", String::createFromUtf8(runtime, whisper_lang_str(whisper_full_lang_id(context))));
                                         resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(context, 0)));
                                         resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, context, 0));
                                         resolvePtr->call(runtime, resultObj);

@@ -21,7 +21,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:281](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/realtime-transcription/types.ts#L281)
+[realtime-transcription/types.ts:304](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L304)
 
 ___
 
@@ -31,17 +31,17 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:282](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/realtime-transcription/types.ts#L282)
+[realtime-transcription/types.ts:305](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L305)
 
 ___
 
 ### vadContext
 
-• `Optional` **vadContext**: `WhisperVadContextLike`
+• `Optional` **vadContext**: `RealtimeVadContextLike`
 
 #### Defined in
 
-[realtime-transcription/types.ts:280](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/realtime-transcription/types.ts#L280)
+[realtime-transcription/types.ts:303](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L303)
 
 ___
 
@@ -51,4 +51,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:279](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/realtime-transcription/types.ts#L279)
+[realtime-transcription/types.ts:302](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L302)

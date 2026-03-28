@@ -138,7 +138,7 @@ extern "C" {
     WSP_GGML_API wsp_ggml_opt_context_t wsp_ggml_opt_init(struct wsp_ggml_opt_params params);
     WSP_GGML_API void wsp_ggml_opt_free(wsp_ggml_opt_context_t opt_ctx);
 
-    // set gradients to zero, initilize loss, and optionally reset the optimizer
+    // set gradients to zero, initialize loss, and optionally reset the optimizer
     WSP_GGML_API void wsp_ggml_opt_reset(wsp_ggml_opt_context_t opt_ctx, bool optimizer);
 
     WSP_GGML_API bool wsp_ggml_opt_static_graphs(wsp_ggml_opt_context_t opt_ctx); // whether the graphs are allocated_statically

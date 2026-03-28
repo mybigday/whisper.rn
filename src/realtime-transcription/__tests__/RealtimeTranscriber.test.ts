@@ -1,13 +1,14 @@
 import { RealtimeTranscriber } from '../RealtimeTranscriber'
+import { RingBufferVad } from '../RingBufferVad'
 import { JestAudioStreamAdapter } from '../adapters/JestAudioStreamAdapter'
 import { VAD_PRESETS } from '../types'
 
 // Mock WavFileWriter
 const mockWavFileWriter = {
-  initialize: jest.fn(),
-  appendAudioData: jest.fn(),
-  finalize: jest.fn(),
-  cancel: jest.fn(),
+  initialize: jest.fn().mockResolvedValue(undefined),
+  appendAudioData: jest.fn().mockResolvedValue(undefined),
+  finalize: jest.fn().mockResolvedValue(undefined),
+  cancel: jest.fn().mockResolvedValue(undefined),
 }
 
 jest.mock('../../utils/WavFileWriter', () => ({
@@ -17,7 +18,8 @@ jest.mock('../../utils/WavFileWriter', () => ({
 describe('RealtimeTranscriber', () => {
   let transcriber: RealtimeTranscriber
   let mockWhisperContext: any
-  let mockVadContext: any
+  let mockWhisperVadContext: any
+  let realVadContext: RingBufferVad
   let mockAudioStream: JestAudioStreamAdapter
   let mockFs: any
   let mockCallbacks: any
@@ -46,12 +48,18 @@ describe('RealtimeTranscriber', () => {
       })),
     }
 
-    // Mock VAD context
-    mockVadContext = {
+    // Mock Whisper VAD context (low level)
+    mockWhisperVadContext = {
       detectSpeechData: jest.fn(() =>
         Promise.resolve([{ t0: 0, t1: 1000 }])
       ),
     }
+
+    // Initialize real RingBufferVad with mocked low-level context
+    realVadContext = new RingBufferVad(mockWhisperVadContext, {
+      vadOptions: VAD_PRESETS.default,
+      vadPreset: 'default',
+    })
 
     // Mock audio stream - disable automatic streaming by setting maxChunks to 0 explicitly
     mockAudioStream = new JestAudioStreamAdapter({
@@ -82,7 +90,7 @@ describe('RealtimeTranscriber', () => {
     transcriber = new RealtimeTranscriber(
       {
         whisperContext: mockWhisperContext,
-        vadContext: mockVadContext,
+        vadContext: realVadContext,
         audioStream: mockAudioStream,
         fs: mockFs,
       },
@@ -90,8 +98,6 @@ describe('RealtimeTranscriber', () => {
         audioSliceSec: 2,
         audioMinSec: 0.5,
         maxSlicesInMemory: 3,
-        vadOptions: VAD_PRESETS.default,
-        autoSliceOnSpeechEnd: true,
       },
       mockCallbacks
     )
@@ -115,7 +121,6 @@ describe('RealtimeTranscriber', () => {
         audioStats: expect.any(Object),
         vadStats: expect.any(Object),
         sliceStats: expect.any(Object),
-        autoSliceConfig: expect.any(Object),
       })
     })
 
@@ -123,32 +128,27 @@ describe('RealtimeTranscriber', () => {
       const customTranscriber = new RealtimeTranscriber(
         {
           whisperContext: mockWhisperContext,
-          vadContext: mockVadContext,
+          vadContext: realVadContext,
           audioStream: mockAudioStream,
         },
         {
           audioSliceSec: 5,
           audioMinSec: 2,
           maxSlicesInMemory: 5,
-          vadPreset: 'sensitive',
-          autoSliceOnSpeechEnd: false,
         }
       )
 
       expect(customTranscriber.getStatistics().vadEnabled).toBe(true)
     })
 
-    it('should apply VAD presets correctly', () => {
+    it('should enable VAD when vadContext is provided', () => {
       const presetTranscriber = new RealtimeTranscriber(
         {
           whisperContext: mockWhisperContext,
-          vadContext: mockVadContext,
+          vadContext: realVadContext,
           audioStream: mockAudioStream,
         },
-        {
-          vadPreset: 'very-sensitive',
-          vadOptions: { threshold: 0.8 }, // Should be overridden by preset
-        }
+        {}
       )
 
       // The preset should be applied
@@ -207,18 +207,44 @@ describe('RealtimeTranscriber', () => {
   })
 
   describe('audio processing', () => {
+    let audioTranscriber: RealtimeTranscriber
+    let testAudioStream: JestAudioStreamAdapter
+
     beforeEach(async () => {
-      await transcriber.start()
+      // Use clean audio stream
+      testAudioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+
+      // Initialize without VAD to test raw audio accumulation
+      audioTranscriber = new RealtimeTranscriber(
+        {
+          whisperContext: mockWhisperContext,
+          audioStream: testAudioStream,
+          fs: mockFs,
+        },
+        {
+          logger: console.log,
+        },
+        mockCallbacks
+      )
+      await audioTranscriber.start()
+    })
+
+    afterEach(async () => {
+      await audioTranscriber.release()
     })
 
     it('should process audio data from stream', async () => {
       const testData = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])
-      mockAudioStream.simulateDataChunk(testData)
+      testAudioStream.simulateDataChunk(testData)
 
       // Fast forward to allow processing
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const stats = transcriber.getStatistics()
+      const stats = audioTranscriber.getStatistics()
       expect(stats.audioStats.accumulatedSamples).toBeGreaterThan(0)
     })
 
@@ -226,18 +252,18 @@ describe('RealtimeTranscriber', () => {
       const chunk1 = new Uint8Array([1, 2, 3, 4])
       const chunk2 = new Uint8Array([5, 6, 7, 8])
 
-      mockAudioStream.simulateDataChunk(chunk1)
-      mockAudioStream.simulateDataChunk(chunk2)
+      testAudioStream.simulateDataChunk(chunk1)
+      testAudioStream.simulateDataChunk(chunk2)
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const stats = transcriber.getStatistics()
-      expect(stats.audioStats.accumulatedSamples).toBeGreaterThan(0) // Should have accumulated some audio data
+      const stats = audioTranscriber.getStatistics()
+      expect(stats.audioStats.accumulatedSamples).toBeGreaterThan(0)
     })
 
-        it('should write to WAV file when configured', async () => {
+    it('should write to WAV file when configured', async () => {
       // Create a new audio stream instance for this test to avoid interference
-      const testAudioStream = new JestAudioStreamAdapter({
+      const audioStream = new JestAudioStreamAdapter({
         chunkSize: 3200,
         chunkInterval: 100,
         generateSilence: false,
@@ -246,7 +272,7 @@ describe('RealtimeTranscriber', () => {
       const wavTranscriber = new RealtimeTranscriber(
         {
           whisperContext: mockWhisperContext,
-          audioStream: testAudioStream,
+          audioStream,
           fs: mockFs,
         },
         {
@@ -262,7 +288,7 @@ describe('RealtimeTranscriber', () => {
       // Use any data size - the WAV writer should be called for any audio data
       const testData = new Uint8Array(100)
       testData.fill(1)
-      testAudioStream.simulateDataChunk(testData)
+      audioStream.simulateDataChunk(testData)
 
       expect(mockWavFileWriter.initialize).toHaveBeenCalled()
       expect(mockWavFileWriter.appendAudioData).toHaveBeenCalled()
@@ -278,7 +304,7 @@ describe('RealtimeTranscriber', () => {
     })
 
     it('should detect speech when VAD is enabled', async () => {
-      mockVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
+      mockWhisperVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
 
       // Use larger data to trigger processing (at least 3200 bytes)
       const audioData = createAudioData(16000)
@@ -287,12 +313,12 @@ describe('RealtimeTranscriber', () => {
       // Allow processing to complete
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      expect(mockVadContext.detectSpeechData).toHaveBeenCalled()
+      expect(mockWhisperVadContext.detectSpeechData).toHaveBeenCalled()
       expect(mockCallbacks.onVad).toHaveBeenCalled()
     })
 
     it('should trigger transcription on speech detection', async () => {
-      mockVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
+      mockWhisperVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
 
       const audioData = createAudioData(16000)
       mockAudioStream.simulateDataChunk(audioData)
@@ -305,7 +331,7 @@ describe('RealtimeTranscriber', () => {
     })
 
     it('should include VAD event in transcribe events', async () => {
-      mockVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
+      mockWhisperVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
 
       const audioData = createAudioData(16000)
       mockAudioStream.simulateDataChunk(audioData)
@@ -326,8 +352,29 @@ describe('RealtimeTranscriber', () => {
       )
     })
 
+    it('should emit speech_continue events', async () => {
+      mockWhisperVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
+
+      // First chunk - Start
+      const audioData1 = createAudioData(16000)
+      mockAudioStream.simulateDataChunk(audioData1)
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Second chunk - Continue
+      const audioData2 = createAudioData(16000)
+      mockAudioStream.simulateDataChunk(audioData2)
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(mockCallbacks.onVad).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'speech_continue'
+        })
+      )
+    })
+
     it('should handle VAD processing errors', async () => {
-      mockVadContext.detectSpeechData.mockRejectedValue(new Error('VAD error'))
+      // Mock the underlying VAD context to throw an error
+      mockWhisperVadContext.detectSpeechData.mockRejectedValueOnce(new Error('VAD error'))
 
       const audioData = createAudioData(16000)
       mockAudioStream.simulateDataChunk(audioData)
@@ -400,7 +447,7 @@ describe('RealtimeTranscriber', () => {
       // Create a promise that will be rejected
       const rejectedPromise = Promise.reject(new Error('Transcription error'))
       // Catch the promise to prevent unhandled rejection
-      rejectedPromise.catch(() => {})
+      rejectedPromise.catch(() => { })
 
       mockWhisperContext.transcribeData.mockReturnValue({
         stop: jest.fn(),
@@ -413,10 +460,8 @@ describe('RealtimeTranscriber', () => {
       // Allow processing to complete
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      expect(mockCallbacks.onTranscribe).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-        })
+      expect(mockCallbacks.onError).toHaveBeenCalledWith(
+        expect.stringContaining('Transcription error')
       )
     })
 
@@ -466,14 +511,22 @@ describe('RealtimeTranscriber', () => {
     })
 
     it('should auto-slice on speech end', async () => {
-      mockVadContext.detectSpeechData.mockResolvedValue([])
+      // 1. Simulate Speech Start
+      mockWhisperVadContext.detectSpeechData.mockResolvedValueOnce([{ t0: 0, t1: 1000 }]) // Speech
 
-      const audioData = new Uint8Array(16000)
-      audioData.fill(1)
+      const audioData = createAudioData(16000)
       mockAudioStream.simulateDataChunk(audioData)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // 2. Simulate Silence to trigger Speech End
+      mockWhisperVadContext.detectSpeechData.mockResolvedValueOnce([]) // Silence
+
+      const silenceData = new Uint8Array(16000)
+      silenceData.fill(0)
+      mockAudioStream.simulateDataChunk(silenceData)
 
       // Allow processing to complete
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150)) // Wait for minSilenceDuration(100ms)
 
       // Should trigger auto-slice if conditions are met
       expect(mockCallbacks.onVad).toHaveBeenCalled()
@@ -483,12 +536,11 @@ describe('RealtimeTranscriber', () => {
       const shortTranscriber = new RealtimeTranscriber(
         {
           whisperContext: mockWhisperContext,
-          vadContext: mockVadContext,
+          vadContext: realVadContext,
           audioStream: mockAudioStream,
         },
         {
           audioMinSec: 2.0,
-          autoSliceOnSpeechEnd: true,
         }
       )
 
@@ -545,20 +597,9 @@ describe('RealtimeTranscriber', () => {
 
       transcriber.updateVadOptions(newVadOptions)
 
-      // Should update options without throwing
-      expect(() => transcriber.updateVadOptions(newVadOptions)).not.toThrow()
-    })
-
-    it('should update auto-slice options', () => {
-      const newAutoSliceOptions = {
-        autoSliceOnSpeechEnd: false,
-        autoSliceThreshold: 0.9,
-      }
-
-      transcriber.updateAutoSliceOptions(newAutoSliceOptions)
-
-      // Should update options without throwing
-      expect(() => transcriber.updateAutoSliceOptions(newAutoSliceOptions)).not.toThrow()
+      // Verify options updated in RingBufferVad
+      // We can check by spying on detectSpeechData later, or just access private property if we cast
+      expect((realVadContext as any).options.vadOptions.threshold).toBe(0.8)
     })
   })
 
@@ -573,18 +614,17 @@ describe('RealtimeTranscriber', () => {
         audioStats: expect.any(Object),
         vadStats: expect.any(Object),
         sliceStats: expect.any(Object),
-        autoSliceConfig: expect.any(Object),
       })
     })
 
     it('should update statistics during operation', async () => {
       await transcriber.start()
 
-      const beforeStats = transcriber.getStatistics()
-      expect(beforeStats.isActive).toBe(true)
+      // Simulate active speech so that samples are accumulated
+      mockWhisperVadContext.detectSpeechData.mockResolvedValueOnce([{ t0: 0, t1: 1000 }])
 
-      const audioData = new Uint8Array(1000)
-      audioData.fill(1)
+      // Use larger data to enable VAD detection
+      const audioData = createAudioData(16000)
       mockAudioStream.simulateDataChunk(audioData)
 
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -655,7 +695,7 @@ describe('RealtimeTranscriber', () => {
       const testTranscriber = new RealtimeTranscriber(
         {
           whisperContext: mockWhisperContext,
-          vadContext: mockVadContext,
+          vadContext: realVadContext,
           audioStream: testAudioStream,
           fs: mockFs,
         },
@@ -663,8 +703,6 @@ describe('RealtimeTranscriber', () => {
           audioSliceSec: 2,
           audioMinSec: 0.5,
           maxSlicesInMemory: 3,
-          vadOptions: VAD_PRESETS.default,
-          autoSliceOnSpeechEnd: true,
         },
         mockCallbacks
       )

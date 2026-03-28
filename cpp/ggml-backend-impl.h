@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-    #define WSP_GGML_BACKEND_API_VERSION 1
+    #define WSP_GGML_BACKEND_API_VERSION 2
 
     //
     // Backend buffer type
@@ -114,6 +114,9 @@ extern "C" {
         void (*event_record)(wsp_ggml_backend_t backend, wsp_ggml_backend_event_t event);
         // wait for an event on on a different stream
         void (*event_wait)  (wsp_ggml_backend_t backend, wsp_ggml_backend_event_t event);
+
+        // (optional) sort/optimize the nodes in the graph
+        void                      (*graph_optimize)    (wsp_ggml_backend_t backend, struct wsp_ggml_cgraph * cgraph);
     };
 
     struct wsp_ggml_backend {
@@ -141,7 +144,7 @@ extern "C" {
         // device description: short informative description of the device, could be the model name
         const char * (*get_description)(wsp_ggml_backend_dev_t dev);
 
-        // device memory in bytes
+        // device memory in bytes: 0 bytes to indicate no memory to report
         void         (*get_memory)(wsp_ggml_backend_dev_t dev, size_t * free, size_t * total);
 
         // device type
@@ -205,9 +208,6 @@ extern "C" {
         struct wsp_ggml_backend_reg_i iface;
         void * context;
     };
-
-    // Internal backend registry API
-    WSP_GGML_API void wsp_ggml_backend_register(wsp_ggml_backend_reg_t reg);
 
     // Add backend dynamic loading support to the backend
 

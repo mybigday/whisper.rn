@@ -18,6 +18,10 @@
 #    include "kleidiai/kleidiai.h"
 #endif
 
+#ifdef WSP_GGML_USE_CPU_RISCV64_SPACEMIT
+#    include "spacemit/ime.h"
+#endif
+
 #if defined(_WIN32)
 #    define WIN32_LEAN_AND_MEAN
 #    ifndef NOMINMAX
@@ -42,6 +46,12 @@ std::vector<wsp_ggml_backend_buffer_type_t> & wsp_ggml_backend_cpu_get_extra_buf
 #if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
         if (wsp_ggml_backend_amx_buffer_type()) {
             bufts.push_back(wsp_ggml_backend_amx_buffer_type());
+        }
+#endif
+
+#ifdef WSP_GGML_USE_CPU_RISCV64_SPACEMIT
+        if (wsp_ggml_backend_cpu_riscv64_spacemit_buffer_type()) {
+            bufts.push_back(wsp_ggml_backend_cpu_riscv64_spacemit_buffer_type());
         }
 #endif
 
@@ -95,6 +105,8 @@ struct wsp_ggml_backend_cpu_context {
 
     wsp_ggml_abort_callback abort_callback;
     void *              abort_callback_data;
+
+    bool                use_ref;  // use reference implementation
 };
 
 static const char * wsp_ggml_backend_cpu_get_name(wsp_ggml_backend_t backend) {
@@ -133,6 +145,7 @@ static wsp_ggml_backend_graph_plan_t wsp_ggml_backend_cpu_graph_plan_create(wsp_
 
     cpu_plan->cplan.abort_callback      = cpu_ctx->abort_callback;
     cpu_plan->cplan.abort_callback_data = cpu_ctx->abort_callback_data;
+    cpu_plan->cplan.use_ref             = cpu_ctx->use_ref;
 
     return cpu_plan;
 }
@@ -172,6 +185,7 @@ static enum wsp_ggml_status wsp_ggml_backend_cpu_graph_compute(wsp_ggml_backend_
 
     cplan.abort_callback      = cpu_ctx->abort_callback;
     cplan.abort_callback_data = cpu_ctx->abort_callback_data;
+    cplan.use_ref             = cpu_ctx->use_ref;
 
     return wsp_ggml_graph_compute(cgraph, &cplan);
 }
@@ -190,6 +204,7 @@ static const struct wsp_ggml_backend_i wsp_ggml_backend_cpu_i = {
     /* .graph_compute           = */ wsp_ggml_backend_cpu_graph_compute,
     /* .event_record            = */ NULL,
     /* .event_wait              = */ NULL,
+    /* .graph_optimize          = */ NULL,
 };
 
 static wsp_ggml_guid_t wsp_ggml_backend_cpu_guid(void) {
@@ -212,6 +227,7 @@ wsp_ggml_backend_t wsp_ggml_backend_cpu_init(void) {
     ctx->work_size           = 0;
     ctx->abort_callback      = NULL;
     ctx->abort_callback_data = NULL;
+    ctx->use_ref             = false;
 
     wsp_ggml_backend_t cpu_backend = new wsp_ggml_backend {
         /* .guid    = */ wsp_ggml_backend_cpu_guid(),
@@ -257,6 +273,13 @@ void wsp_ggml_backend_cpu_set_abort_callback(wsp_ggml_backend_t backend_cpu, wsp
     struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
     ctx->abort_callback = abort_callback;
     ctx->abort_callback_data = abort_callback_data;
+}
+
+void wsp_ggml_backend_cpu_set_use_ref(wsp_ggml_backend_t backend_cpu, bool use_ref) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_is_cpu(backend_cpu));
+
+    struct wsp_ggml_backend_cpu_context * ctx = (struct wsp_ggml_backend_cpu_context *)backend_cpu->context;
+    ctx->use_ref = use_ref;
 }
 
 // CPU backend - device
@@ -348,8 +371,10 @@ static void wsp_ggml_backend_cpu_device_get_memory(wsp_ggml_backend_dev_t dev, s
     long pages = sysconf(_SC_PHYS_PAGES);
     long page_size = sysconf(_SC_PAGE_SIZE);
     *total = pages * page_size;
+
+    // "free" system memory is ill-defined, for practical purposes assume that all of it is free:
     *free = *total;
-#endif
+#endif // _WIN32
 
     WSP_GGML_UNUSED(dev);
 }
@@ -570,14 +595,15 @@ static wsp_ggml_backend_feature * wsp_ggml_backend_cpu_get_features(wsp_ggml_bac
         if (wsp_ggml_cpu_has_riscv_v()) {
             features.push_back({ "RISCV_V", "1" });
         }
+        if (wsp_ggml_cpu_get_rvv_vlen() > 0) {
+            static std::string rvv_vlen = std::to_string(wsp_ggml_cpu_get_rvv_vlen());
+            features.push_back({ "RVV_VLEN", rvv_vlen.c_str() });
+        }
         if (wsp_ggml_cpu_has_vsx()) {
             features.push_back({ "VSX", "1" });
         }
         if (wsp_ggml_cpu_has_vxe()) {
             features.push_back({ "VXE", "1" });
-        }
-        if (wsp_ggml_cpu_has_nnpa()) {
-            features.push_back({ "NNPA", "1" });
         }
         if (wsp_ggml_cpu_has_wasm_simd()) {
             features.push_back({ "WASM_SIMD", "1" });
@@ -631,6 +657,9 @@ static void * wsp_ggml_backend_cpu_get_proc_address(wsp_ggml_backend_reg_t reg, 
     }
     if (strcmp(name, "wsp_ggml_backend_cpu_is_numa") == 0) {
         return (void *)wsp_ggml_is_numa;
+    }
+    if (strcmp(name, "wsp_ggml_backend_cpu_set_use_ref") == 0) {
+        return (void *)wsp_ggml_backend_cpu_set_use_ref;
     }
 
     // threadpool - TODO:  move to ggml-base

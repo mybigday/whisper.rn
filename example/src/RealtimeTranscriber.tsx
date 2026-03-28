@@ -19,6 +19,7 @@ import contextOpts from './context-opts'
 import { createDir, fileDir, toTimestamp, downloadModel, whisperModels, WhisperModel } from './util'
 import {
   RealtimeTranscriber,
+  RingBufferVad,
   VAD_PRESETS,
   type RealtimeTranscribeEvent,
   type RealtimeVadEvent,
@@ -133,10 +134,7 @@ export default function RealtimeTranscriberDemo() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
   const [vadEvents, setVadEvents] = useState<RealtimeVadEvent[]>([])
-
-  // Auto-slice configuration
-  const [autoSliceOnSpeechEnd, setAutoSliceOnSpeechEnd] = useState(true)
-  const autoSliceThreshold = 0.5 // Fixed 85% threshold
+  const [stabilizedText, setStabilizedText] = useState<string>('')
 
   // File simulation specific state
   const [useFileSimulation, setUseFileSimulation] = useState(false)
@@ -259,7 +257,7 @@ export default function RealtimeTranscriberDemo() {
       log('Initializing VAD context...')
       const vadStartTime = Date.now()
       const vadCtx = await initWhisperVad({
-        filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+        filePath: require('../assets/ggml-silero-v6.2.0.bin'),
         useGpu: true,
         nThreads: 4,
       })
@@ -316,7 +314,7 @@ export default function RealtimeTranscriberDemo() {
       log('Initializing VAD context...')
       const vadStartTime = Date.now()
       const vadCtx = await initWhisperVad({
-        filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+        filePath: require('../assets/ggml-silero-v6.2.0.bin'),
         useGpu: true,
         nThreads: 4,
       })
@@ -389,12 +387,19 @@ export default function RealtimeTranscriberDemo() {
         realtimeTranscriberRef.current.release()
       }
 
+      // Create RingBufferVad wrapper
+      const vadContext = new RingBufferVad(vadContextRef.current, {
+        vadOptions: VAD_PRESETS[currentVadPreset],
+        vadPreset: currentVadPreset,
+        logger: (message) => log(message),
+      })
+
       // Create RealtimeTranscriber if not exists
       const transcriber = new RealtimeTranscriber(
         // Dependencies
         {
           whisperContext: whisperContextRef.current,
-          vadContext: vadContextRef.current,
+          vadContext,
           audioStream,
           fs: RNFS,
         },
@@ -404,10 +409,6 @@ export default function RealtimeTranscriberDemo() {
           audioSliceSec: 30,
           audioMinSec: 0.5,
           maxSlicesInMemory: 1,
-          vadPreset: currentVadPreset,
-          vadOptions: VAD_PRESETS[currentVadPreset],
-          autoSliceOnSpeechEnd,
-          autoSliceThreshold,
           transcribeOptions: {
             language: 'en',
             maxLen: 1,
@@ -421,6 +422,10 @@ export default function RealtimeTranscriberDemo() {
           onError: handleError,
           onStatusChange: handleStatusChange,
           onStatsUpdate: handleStatsUpdate,
+          onSliceTranscriptionStabilized: (text: string) => {
+            setStabilizedText(text)
+            log(`Stabilized: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`)
+          },
         },
       )
 
@@ -429,8 +434,7 @@ export default function RealtimeTranscriberDemo() {
       // Start transcription
       await realtimeTranscriberRef.current.start()
       log(
-        `Realtime transcription started (${
-          useFileSimulation ? 'File Simulation - JFK Speech' : 'Live Audio'
+        `Realtime transcription started (${useFileSimulation ? 'File Simulation - JFK Speech' : 'Live Audio'
         })`,
       )
     } catch (error) {
@@ -475,8 +479,7 @@ export default function RealtimeTranscriberDemo() {
                 (slice.endTime - slice.startTime) /
                 1000
               ).toFixed(1)}s\n` +
-              `Memory: ${
-                transcribeEvent.memoryUsage?.slicesInMemory || 0
+              `Memory: ${transcribeEvent.memoryUsage?.slicesInMemory || 0
               } slices, ${transcribeEvent.memoryUsage?.estimatedMB || 0}MB\n` +
               `Segments:\n${resultData.segments
                 .map(
@@ -519,8 +522,7 @@ export default function RealtimeTranscriberDemo() {
     // Log significant changes
     if (statsEvent.type === 'status_change') {
       log(
-        `Status changed: ${
-          statsEvent.data.isActive ? 'ACTIVE' : 'INACTIVE'
+        `Status changed: ${statsEvent.data.isActive ? 'ACTIVE' : 'INACTIVE'
         }, transcribing: ${statsEvent.data.isTranscribing}`,
       )
     } else if (statsEvent.type === 'memory_change') {
@@ -569,7 +571,7 @@ export default function RealtimeTranscriberDemo() {
       audioStreamRef.current &&
       'setPlaybackSpeed' in audioStreamRef.current
     ) {
-      ;(audioStreamRef.current as any).setPlaybackSpeed(nextSpeed)
+      ; (audioStreamRef.current as any).setPlaybackSpeed(nextSpeed)
     }
   }
 
@@ -584,7 +586,7 @@ export default function RealtimeTranscriberDemo() {
     }
 
     const targetTime = simulationStats.totalDuration * (percentage / 100)
-    ;(audioStreamRef.current as any).seekToTime(targetTime)
+      ; (audioStreamRef.current as any).seekToTime(targetTime)
     log(`Seeked to ${targetTime.toFixed(1)}s (${percentage}%)`)
   }
 
@@ -596,6 +598,7 @@ export default function RealtimeTranscriberDemo() {
     setVadEvents([])
     setRealtimeStats(null)
     setSimulationStats(null)
+    setStabilizedText('')
     log('Reset all components')
   }
 
@@ -810,47 +813,6 @@ export default function RealtimeTranscriberDemo() {
           />
         </View>
 
-        {/* Auto-Slice Configuration */}
-        <View style={styles.configContainer}>
-          <Text style={styles.configTitle}>Auto-Slice Configuration</Text>
-          <Text style={styles.configLabel}>
-            Automatically slice when speech ends and duration ≥{' '}
-            {(autoSliceThreshold * 100).toFixed(0)}% of target
-          </Text>
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>Auto-Slice on Speech End:</Text>
-            <Switch
-              value={autoSliceOnSpeechEnd}
-              onValueChange={(value) => {
-                setAutoSliceOnSpeechEnd(value)
-                log(
-                  `Auto-slice on speech end: ${value ? 'ENABLED' : 'DISABLED'}`,
-                )
-
-                // Update transcriber if active
-                if (realtimeTranscriberRef.current) {
-                  realtimeTranscriberRef.current.updateAutoSliceOptions({
-                    autoSliceOnSpeechEnd: value,
-                  })
-                }
-              }}
-              disabled={isTranscribing}
-            />
-          </View>
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>Threshold:</Text>
-            <Text style={styles.configValue}>
-              {(autoSliceThreshold * 100).toFixed(0)}%
-            </Text>
-          </View>
-          {autoSliceOnSpeechEnd && (
-            <Text style={styles.configLabel}>
-              Will auto-slice when speech ends and slice duration ≥{' '}
-              {(30 * autoSliceThreshold).toFixed(1)}s
-            </Text>
-          )}
-        </View>
-
         {/* Realtime Controls */}
         <View style={styles.buttons}>
           <Button
@@ -953,15 +915,8 @@ export default function RealtimeTranscriberDemo() {
               {useFileSimulation && ` @ ${playbackSpeed}x`}
             </Text>
             <Text style={styles.statusText}>
-              Auto-Slice:{' '}
-              {realtimeStats.autoSliceConfig?.enabled ? 'ENABLED' : 'DISABLED'}
-              {realtimeStats.autoSliceConfig?.enabled &&
-                ` (≥${(realtimeStats.autoSliceConfig.threshold * 100).toFixed(
-                  0,
-                )}% = ${(
-                  realtimeStats.autoSliceConfig.targetDuration *
-                  realtimeStats.autoSliceConfig.threshold
-                ).toFixed(1)}s)`}
+              Stabilized Transcription:{' '}
+              {stabilizedText}
             </Text>
           </View>
         )}

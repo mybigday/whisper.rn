@@ -38,7 +38,7 @@
 
 #### Defined in
 
-[index.ts:147](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L147)
+[index.ts:147](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L147)
 
 ## Properties
 
@@ -48,7 +48,7 @@
 
 #### Defined in
 
-[index.ts:143](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L143)
+[index.ts:143](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L143)
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-[index.ts:141](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L141)
+[index.ts:141](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L141)
 
 ___
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-[index.ts:139](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L139)
+[index.ts:139](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L139)
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[index.ts:145](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L145)
+[index.ts:145](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L145)
 
 ## Methods
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-[index.ts:340](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L340)
+[index.ts:340](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L340)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[index.ts:354](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L354)
+[index.ts:354](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L354)
 
 ___
 
@@ -141,7 +141,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:241](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L241)
+[index.ts:241](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L241)
 
 ___
 
@@ -169,4 +169,4 @@ Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
 
 #### Defined in
 
-[index.ts:272](https://github.com/mybigday/whisper.rn/blob/ee85d12/src/index.ts#L272)
+[index.ts:272](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L272)

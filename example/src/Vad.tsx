@@ -156,7 +156,7 @@ export default function VadExample() {
               log('Initialize VAD context...')
               const startTime = Date.now()
               const ctx = await initWhisperVad({
-                filePath: require('../assets/ggml-silero-v5.1.2.bin'),
+                filePath: require('../assets/ggml-silero-v6.2.0.bin'),
                 useGpu: true,
                 nThreads: 4,
               })
@@ -178,7 +178,7 @@ export default function VadExample() {
                 log('Released previous VAD context')
               }
               await createDir(log)
-              const modelFilePath = `${fileDir}/ggml-silero-v5.1.2.bin`
+              const modelFilePath = `${fileDir}/ggml-silero-v6.2.0.bin`
               if (await RNFS.exists(modelFilePath)) {
                 log('Model already exists:')
                 log(filterPath(modelFilePath))
@@ -186,7 +186,7 @@ export default function VadExample() {
                 log('Start Download Model for VAD to:')
                 log(filterPath(modelFilePath))
                 await RNFS.downloadFile({
-                  fromUrl: `${vadModelHost}/ggml-silero-v5.1.2.bin`,
+                  fromUrl: `${vadModelHost}/ggml-silero-v6.2.0.bin`,
                   toFile: modelFilePath,
                   progressInterval: 1000,
                   begin: () => {},

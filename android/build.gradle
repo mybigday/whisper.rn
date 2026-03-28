@@ -79,7 +79,8 @@ android {
         abiFilters (*reactNativeArchitectures())
         // Configure STL to be compatible with ReactAndroid JSI libraries
         arguments "-DANDROID_STL=c++_shared",
-                  "-DREACT_NATIVE_MINOR_VERSION=${REACT_NATIVE_MINOR_VERSION}"
+                  "-DREACT_NATIVE_MINOR_VERSION=${REACT_NATIVE_MINOR_VERSION}",
+                  "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
       }
     }
     ndk {

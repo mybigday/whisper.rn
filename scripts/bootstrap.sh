@@ -13,8 +13,32 @@ cp ./whisper.cpp/ggml/include/ggml-opt.h ./cpp/ggml-opt.h
 cp ./whisper.cpp/ggml/include/ggml-metal.h ./cpp/ggml-metal.h
 cp ./whisper.cpp/ggml/include/gguf.h ./cpp/gguf.h
 
-cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal.m ./cpp/ggml-metal.m
-cp ./whisper.cpp/ggml/src/ggml-metal/ggml-metal-impl.h ./cpp/ggml-metal-impl.h
+cp -r ./whisper.cpp/ggml/src/ggml-metal ./cpp/
+rm ./cpp/ggml-metal/CMakeLists.txt
+
+# Embed headers into ggml-metal.metal for runtime compilation
+# This allows the .metal file to be compiled at runtime without needing external header files
+METAL_SOURCE="./cpp/ggml-metal/ggml-metal.metal"
+METAL_TMP="./cpp/ggml-metal/ggml-metal.metal.tmp"
+COMMON_HEADER="./whisper.cpp/ggml/src/ggml-common.h"
+IMPL_HEADER="./cpp/ggml-metal/ggml-metal-impl.h"
+
+# Step 1: Replace the __embed_ggml-common.h__ placeholder with the actual header content
+awk '
+/^#if defined\(GGML_METAL_EMBED_LIBRARY\)/ { skip=1; next }
+/__embed_ggml-common.h__/ {
+    system("cat '"$COMMON_HEADER"'")
+    next
+}
+/^#else/ && skip { skip_else=1; next }
+/^#endif/ && skip_else { skip=0; skip_else=0; next }
+!skip { print }
+' < "$METAL_SOURCE" > "$METAL_TMP"
+
+# Step 2: Replace the #include "ggml-metal-impl.h" with the actual header content
+sed -e '/#include "ggml-metal-impl.h"/r '"$IMPL_HEADER" \
+    -e '/#include "ggml-metal-impl.h"/d' < "$METAL_TMP" > "$METAL_SOURCE"
+rm "$METAL_TMP"
 
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.c ./cpp/ggml-cpu/ggml-cpu.c
 cp ./whisper.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp ./cpp/ggml-cpu/ggml-cpu.cpp
@@ -35,6 +59,7 @@ cp ./whisper.cpp/ggml/src/ggml-cpu/binary-ops.cpp ./cpp/ggml-cpu/binary-ops.cpp
 cp ./whisper.cpp/ggml/src/ggml-cpu/vec.h ./cpp/ggml-cpu/vec.h
 cp ./whisper.cpp/ggml/src/ggml-cpu/vec.cpp ./cpp/ggml-cpu/vec.cpp
 cp ./whisper.cpp/ggml/src/ggml-cpu/simd-mappings.h ./cpp/ggml-cpu/simd-mappings.h
+cp ./whisper.cpp/ggml/src/ggml-cpu/simd-gemm.h ./cpp/ggml-cpu/simd-gemm.h
 cp ./whisper.cpp/ggml/src/ggml-cpu/ops.h ./cpp/ggml-cpu/ops.h
 cp ./whisper.cpp/ggml/src/ggml-cpu/ops.cpp ./cpp/ggml-cpu/ops.cpp
 
@@ -47,6 +72,8 @@ cp ./whisper.cpp/ggml/src/ggml.c ./cpp/ggml.c
 cp ./whisper.cpp/ggml/src/ggml-impl.h ./cpp/ggml-impl.h
 cp ./whisper.cpp/ggml/src/ggml-alloc.c ./cpp/ggml-alloc.c
 cp ./whisper.cpp/ggml/src/ggml-backend.cpp ./cpp/ggml-backend.cpp
+cp ./whisper.cpp/ggml/src/ggml-backend-dl.h ./cpp/ggml-backend-dl.h
+cp ./whisper.cpp/ggml/src/ggml-backend-dl.cpp ./cpp/ggml-backend-dl.cpp
 cp ./whisper.cpp/ggml/src/ggml-backend-impl.h ./cpp/ggml-backend-impl.h
 cp ./whisper.cpp/ggml/src/ggml-backend-reg.cpp ./cpp/ggml-backend-reg.cpp
 cp ./whisper.cpp/ggml/src/ggml-common.h ./cpp/ggml-common.h
@@ -78,14 +105,25 @@ files=(
   "./cpp/ggml-opt.h"
   "./cpp/ggml-opt.cpp"
   "./cpp/ggml-metal.h"
-  "./cpp/ggml-metal.m"
-  "./cpp/ggml-metal-impl.h"
+  "./cpp/ggml-metal/ggml-metal.cpp"
+  "./cpp/ggml-metal/ggml-metal-impl.h"
+  "./cpp/ggml-metal/ggml-metal-common.h"
+  "./cpp/ggml-metal/ggml-metal-common.cpp"
+  "./cpp/ggml-metal/ggml-metal-context.h"
+  "./cpp/ggml-metal/ggml-metal-context.m"
+  "./cpp/ggml-metal/ggml-metal-device.h"
+  "./cpp/ggml-metal/ggml-metal-device.cpp"
+  "./cpp/ggml-metal/ggml-metal-device.m"
+  "./cpp/ggml-metal/ggml-metal-ops.h"
+  "./cpp/ggml-metal/ggml-metal-ops.cpp"
+  "./cpp/ggml-metal/ggml-metal.metal"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
   "./cpp/ggml-alloc.c"
   "./cpp/ggml-backend.h"
   "./cpp/ggml-backend.cpp"
+  "./cpp/ggml-backend-dl.cpp"
   "./cpp/ggml-backend-impl.h"
   "./cpp/ggml-backend-reg.cpp"
   "./cpp/ggml-cpu.h"
@@ -114,6 +152,7 @@ files=(
   "./cpp/ggml-cpu/vec.h"
   "./cpp/ggml-cpu/vec.cpp"
   "./cpp/ggml-cpu/simd-mappings.h"
+  "./cpp/ggml-cpu/simd-gemm.h"
   "./cpp/ggml-cpu/ops.h"
   "./cpp/ggml-cpu/ops.cpp"
   "./cpp/ggml-cpu/arch/arm/cpu-feats.cpp"
@@ -183,35 +222,11 @@ cd ../../../
 yarn example
 
 # Apply patch
-patch -p0 -d ./cpp < ./scripts/patches/ggml-metal.m.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml-quants.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
 rm -rf ./cpp/*.orig
-
-if [ "$OS" = "Darwin" ]; then
-  # Build metallib (~2.6MB)
-  cd whisper.cpp/ggml/src/ggml-metal
-
-  # Create a symbolic link to ggml-common.h in the current directory
-  ln -sf ../ggml-common.h .
-
-  xcrun --sdk iphoneos metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
-  xcrun --sdk iphoneos metallib ggml-metal.air   -o ggml-whisper.metallib
-  rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper.metallib
-
-  xcrun --sdk iphonesimulator metal -c ggml-metal.metal -o ggml-metal.air -DGGML_METAL_USE_BF16=1
-  xcrun --sdk iphonesimulator metallib ggml-metal.air   -o ggml-whisper.metallib
-  rm ggml-metal.air
-  mv ./ggml-whisper.metallib ../../../../cpp/ggml-whisper-sim.metallib
-
-  # Remove the symbolic link
-  rm ggml-common.h
-
-  cd -
-fi
 
 # Download model for example
 cd whisper.cpp/models
@@ -219,19 +234,19 @@ cd whisper.cpp/models
 # If CI env is `true`, use dummy model
 if [ "$CI" = "true" ]; then
   cp for-tests-ggml-base.bin ggml-base.bin
-  cp for-tests-silero-v5.1.2-ggml.bin ggml-silero-v5.1.2.bin
+  cp for-tests-silero-v6.2.0-ggml.bin ggml-silero-v6.2.0.bin
   echo "CI: Copied for-tests-ggml-base.bin to ggml-base.bin"
 else
   ./download-ggml-model.sh base
-  ./download-vad-model.sh silero-v5.1.2
+  ./download-vad-model.sh silero-v6.2.0
 fi
 
 # Copy to assets
 cp ../samples/jfk.wav ../../example/assets
 cp ggml-base.bin ../../example/assets
 echo "Copied ggml-base.bin to example/assets"
-cp ggml-silero-v5.1.2.bin ../../example/assets
-echo "Copied ggml-silero-v5.1.2.bin to example/assets"
+cp ggml-silero-v6.2.0.bin ../../example/assets
+echo "Copied ggml-silero-v6.2.0.bin to example/assets"
 
 # Check whisper.cpp/models/ggml-base-encoder.mlmodelc exist
 if [ ! -d ./ggml-base-encoder.mlmodelc ]; then

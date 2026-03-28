@@ -53,7 +53,14 @@ WSP_GGML_API void           wsp_ggml_gallocr_free(wsp_ggml_gallocr_t galloc);
 // call with a worst-case graph to avoid buffer reallocations
 // not strictly required for single buffer usage: wsp_ggml_gallocr_alloc_graph will reallocate the buffers automatically if needed
 // returns false if the buffer allocation failed
+// wsp_ggml_gallocr_resrve_n_size writes the buffer sizes per galloc buffer that would be allocated by wsp_ggml_gallocr_reserve_n to sizes
 WSP_GGML_API bool wsp_ggml_gallocr_reserve(wsp_ggml_gallocr_t galloc, struct wsp_ggml_cgraph * graph);
+WSP_GGML_API void wsp_ggml_gallocr_reserve_n_size(
+    wsp_ggml_gallocr_t galloc,
+    struct wsp_ggml_cgraph * graph,
+    const int * node_buffer_ids,
+    const int * leaf_buffer_ids,
+    size_t * sizes);
 WSP_GGML_API bool wsp_ggml_gallocr_reserve_n(
     wsp_ggml_gallocr_t galloc,
     struct wsp_ggml_cgraph * graph,
@@ -68,6 +75,8 @@ WSP_GGML_API size_t wsp_ggml_gallocr_get_buffer_size(wsp_ggml_gallocr_t galloc, 
 
 // Utils
 // Create a buffer and allocate all the tensors in a wsp_ggml_context
+// wsp_ggml_backend_alloc_ctx_tensors_from_buft_size returns the size of the buffer that would be allocated by wsp_ggml_backend_alloc_ctx_tensors_from_buft
+WSP_GGML_API size_t                       wsp_ggml_backend_alloc_ctx_tensors_from_buft_size(struct wsp_ggml_context * ctx, wsp_ggml_backend_buffer_type_t buft);
 WSP_GGML_API struct wsp_ggml_backend_buffer * wsp_ggml_backend_alloc_ctx_tensors_from_buft(struct wsp_ggml_context * ctx, wsp_ggml_backend_buffer_type_t buft);
 WSP_GGML_API struct wsp_ggml_backend_buffer * wsp_ggml_backend_alloc_ctx_tensors(struct wsp_ggml_context * ctx, wsp_ggml_backend_t backend);
 

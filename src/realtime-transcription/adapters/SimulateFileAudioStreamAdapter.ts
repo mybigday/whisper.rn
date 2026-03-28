@@ -174,6 +174,10 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
     this.statusCallback = callback
   }
 
+  onEnd(callback: () => void): void {
+    this.options.onEndOfFile = callback
+  }
+
   async release(): Promise<void> {
     await this.stop()
     this.isInitialized = false
