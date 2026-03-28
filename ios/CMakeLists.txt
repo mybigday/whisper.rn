@@ -78,7 +78,6 @@ add_library(rnwhisper SHARED
     ${SOURCE_DIR}/gguf.cpp
     ${SOURCE_DIR}/whisper.cpp
     ${SOURCE_DIR}/rn-whisper.cpp
-    ${SOURCE_DIR}/rn-audioutils.cpp
     ${SOURCE_FILES_ARCH}
     ${SOURCE_FILES_COREML}
 )

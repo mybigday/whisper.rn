@@ -3,7 +3,6 @@
 #import "RNWhisperVadContext.h"
 #import "RNWhisperDownloader.h"
 #import "RNWhisperAudioUtils.h"
-#import "RNWhisperAudioSessionUtils.h"
 #import "RNWhisperJSI.h"
 #include <stdlib.h>
 #include <string>
@@ -115,8 +114,6 @@ RCT_REMAP_METHOD(initContext,
   return@[
     @"@RNWhisper_onTranscribeProgress",
     @"@RNWhisper_onTranscribeNewSegments",
-    @"@RNWhisper_onRealtimeTranscribe",
-    @"@RNWhisper_onRealtimeTranscribeEnd",
     @"@RNWhisper_onNativeLog",
   ];
 }
@@ -167,8 +164,7 @@ RCT_REMAP_METHOD(initContext,
                 reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
                 return;
             }
-            NSMutableDictionary *result = [context getTextSegments];
-            result[@"isAborted"] = @([context isStoppedByAction]);
+            NSMutableDictionary *result = [context getTextSegments:options];
             resolve(result);
         }
     ];
@@ -186,10 +182,6 @@ RCT_REMAP_METHOD(transcribeFile,
 
     if (context == nil) {
         reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    if ([context isCapturing]) {
-        reject(@"whisper_error", @"The context is in realtime transcribe mode", nil);
         return;
     }
     if ([context isTranscribing]) {
@@ -238,10 +230,6 @@ RCT_REMAP_METHOD(transcribeData,
       reject(@"whisper_error", @"Context not found", nil);
       return;
   }
-  if ([context isCapturing]) {
-      reject(@"whisper_error", @"The context is in realtime transcribe mode", nil);
-      return;
-  }
   if ([context isTranscribing]) {
       reject(@"whisper_error", @"Context is already transcribing", nil);
       return;
@@ -265,52 +253,6 @@ RCT_REMAP_METHOD(transcribeData,
       withResolver:resolve
       withRejecter:reject
   ];
-}
-
-RCT_REMAP_METHOD(startRealtimeTranscribe,
-                 withContextId:(int)contextId
-                 withJobId:(int)jobId
-                 withOptions:(NSDictionary *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-
-    if (context == nil) {
-        reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    if ([context isCapturing]) {
-        reject(@"whisper_error", @"The context is already capturing", nil);
-        return;
-    }
-
-    OSStatus status = [context transcribeRealtime:jobId
-        options:options
-        onTranscribe:^(int _jobId, NSString *type, NSDictionary *payload) {
-            NSString *eventName = nil;
-            if ([type isEqual:@"transcribe"]) {
-                eventName = @"@RNWhisper_onRealtimeTranscribe";
-            } else if ([type isEqual:@"end"]) {
-                eventName = @"@RNWhisper_onRealtimeTranscribeEnd";
-            }
-            if (eventName == nil) {
-                return;
-            }
-            [self sendEventWithName:eventName
-                body:@{
-                    @"contextId": [NSNumber numberWithInt:contextId],
-                    @"jobId": [NSNumber numberWithInt:jobId],
-                    @"payload": payload
-                }
-            ];
-        }
-    ];
-    if (status == 0) {
-        resolve(nil);
-        return;
-    }
-    reject(@"whisper_error", [NSString stringWithFormat:@"Failed to start realtime transcribe. Status: %d", status], nil);
 }
 
 RCT_REMAP_METHOD(abortTranscribe,
@@ -368,69 +310,6 @@ RCT_REMAP_METHOD(releaseAllContexts,
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
     [self releaseAllContexts];
-    resolve(nil);
-}
-
-// MARK: - AudioSessionUtils
-
-RCT_EXPORT_METHOD(getAudioSessionCurrentCategory:(RCTPromiseResolveBlock)resolve
-                  withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    NSString *category = [RNWhisperAudioSessionUtils getCurrentCategory];
-    NSArray *options = [RNWhisperAudioSessionUtils getCurrentOptions];
-    resolve(@{
-        @"category": category,
-        @"options": options
-    });
-}
-
-RCT_EXPORT_METHOD(getAudioSessionCurrentMode:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    NSString *mode = [RNWhisperAudioSessionUtils getCurrentMode];
-    resolve(mode);
-}
-
-RCT_REMAP_METHOD(setAudioSessionCategory,
-                 withCategory:(NSString *)category
-                 withOptions:(NSArray *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    NSError *error = nil;
-    [RNWhisperAudioSessionUtils setCategory:category options:options error:&error];
-    if (error != nil) {
-        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set category. Error: %@", error], nil);
-        return;
-    }
-    resolve(nil);
-}
-
-RCT_REMAP_METHOD(setAudioSessionMode,
-                 withMode:(NSString *)mode
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    NSError *error = nil;
-    [RNWhisperAudioSessionUtils setMode:mode error:&error];
-    if (error != nil) {
-        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set mode. Error: %@", error], nil);
-        return;
-    }
-    resolve(nil);
-}
-
-RCT_REMAP_METHOD(setAudioSessionActive,
-                 withActive:(BOOL)active
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    NSError *error = nil;
-    [RNWhisperAudioSessionUtils setActive:active error:&error];
-    if (error != nil) {
-        reject(@"whisper_error", [NSString stringWithFormat:@"Failed to set active. Error: %@", error], nil);
-        return;
-    }
     resolve(nil);
 }
 
