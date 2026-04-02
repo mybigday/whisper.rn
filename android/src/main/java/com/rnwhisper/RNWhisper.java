@@ -31,8 +31,8 @@ public class RNWhisper {
       return true;
     }
 
-    if (Build.SUPPORTED_64_BIT_ABIS.length == 0) {
-      Log.w(TAG, "Only 64-bit architectures are supported");
+    if (Build.SUPPORTED_ABIS.length == 0) {
+      Log.w(TAG, "No supported ABIs reported by the runtime");
       return false;
     }
 
