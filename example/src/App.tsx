@@ -13,7 +13,6 @@ import TranscribeData from './TranscribeData'
 import Vad from './Vad'
 import Bench from './Bench'
 import RealtimeTranscriber from './RealtimeTranscriber'
-import JSITestScreen from './JSITest'
 
 // Example: Catch logs from whisper.cpp
 toggleNativeLog(true)
@@ -78,12 +77,6 @@ function HomeScreen({ navigation }: { navigation: any }) {
       >
         <Text style={styles.buttonText}>Benchmark</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('JSITest')}
-      >
-        <Text style={styles.buttonText}>JSI Test</Text>
-      </TouchableOpacity>
     </View>
   )
 }
@@ -100,7 +93,6 @@ function App() {
           <Stack.Screen name="TranscribeData" component={TranscribeData} />
           <Stack.Screen name="RealtimeTranscriber" component={RealtimeTranscriber} />
           <Stack.Screen name="VAD" component={Vad} />
-          <Stack.Screen name="JSITest" component={JSITestScreen} />
           <Stack.Screen name="Bench" component={Bench} />
         </Stack.Navigator>
       </NavigationContainer>

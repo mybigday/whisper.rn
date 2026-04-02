@@ -28,7 +28,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L183)
+[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L183)
 
 ___
 
@@ -38,7 +38,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L194)
+[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L194)
 
 ___
 
@@ -48,7 +48,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L182)
+[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L182)
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L197)
+[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L197)
 
 ___
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L204)
+[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L204)
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L190)
+[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L190)
 
 ___
 
@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:200](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L200)
+[realtime-transcription/types.ts:200](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L200)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:184](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L184)
+[realtime-transcription/types.ts:184](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L184)
 
 ___
 
@@ -122,7 +122,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L191)
+[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L191)
 
 ___
 
@@ -132,7 +132,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:203](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L203)
+[realtime-transcription/types.ts:203](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L203)
 
 ___
 
@@ -142,4 +142,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/25a2438/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L187)
