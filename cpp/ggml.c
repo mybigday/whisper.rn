@@ -4970,6 +4970,7 @@ static struct wsp_ggml_tensor * wsp_ggml_interpolate_impl(
     WSP_GGML_ASSERT((mode & 0xFF) < WSP_GGML_SCALE_MODE_COUNT);
     // TODO: implement antialias for modes other than bilinear
     WSP_GGML_ASSERT(!(mode & WSP_GGML_SCALE_FLAG_ANTIALIAS) || (mode & 0xFF) == WSP_GGML_SCALE_MODE_BILINEAR);
+    WSP_GGML_ASSERT(a->type == WSP_GGML_TYPE_F32);
 
     struct wsp_ggml_tensor * result = wsp_ggml_new_tensor_4d(ctx, a->type, ne0, ne1, ne2, ne3);
 
@@ -5315,6 +5316,7 @@ struct wsp_ggml_tensor * wsp_ggml_flash_attn_ext(
     WSP_GGML_ASSERT(q->ne[3] == v->ne[3]);
 
     if (mask) {
+        WSP_GGML_ASSERT(mask->type == WSP_GGML_TYPE_F16);
         WSP_GGML_ASSERT(wsp_ggml_is_contiguous(mask));
         //WSP_GGML_ASSERT(wsp_ggml_can_repeat_rows(mask, qk));
 

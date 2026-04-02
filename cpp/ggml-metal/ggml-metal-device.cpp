@@ -246,6 +246,10 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_unary(ws
                 case WSP_GGML_UNARY_OP_EXP:         op_num = OP_UNARY_NUM_EXP;         break;
                 case WSP_GGML_UNARY_OP_SOFTPLUS:    op_num = OP_UNARY_NUM_SOFTPLUS;    break;
                 case WSP_GGML_UNARY_OP_EXPM1:       op_num = OP_UNARY_NUM_EXPM1;       break;
+                case WSP_GGML_UNARY_OP_FLOOR:       op_num = OP_UNARY_NUM_FLOOR;       break;
+                case WSP_GGML_UNARY_OP_CEIL:        op_num = OP_UNARY_NUM_CEIL;        break;
+                case WSP_GGML_UNARY_OP_ROUND:       op_num = OP_UNARY_NUM_ROUND;       break;
+                case WSP_GGML_UNARY_OP_TRUNC:       op_num = OP_UNARY_NUM_TRUNC;       break;
                 default: WSP_GGML_ABORT("fatal error");
             } break;
         default: WSP_GGML_ABORT("fatal error");
@@ -1738,6 +1742,28 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_2d(
     char name[256];
 
     snprintf(base, 256, "kernel_conv_2d_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->src[1]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    }
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_3d(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    assert(op->op == WSP_GGML_OP_CONV_3D);
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(op->src[0]));
+    WSP_GGML_ASSERT(op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(op->src[1]->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(op->type         == WSP_GGML_TYPE_F32);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_conv_3d_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->src[1]->type));
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);

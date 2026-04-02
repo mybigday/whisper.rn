@@ -77,6 +77,7 @@ extern "C" {
     };
 
     WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_empty(void);
+    WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_file_ptr(FILE * file, struct wsp_gguf_init_params params);
     WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_file(const char * fname, struct wsp_gguf_init_params params);
     //WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_buffer(..);
 
@@ -189,6 +190,7 @@ extern "C" {
     //
 
     // write the entire context to a binary file
+    WSP_GGML_API bool wsp_gguf_write_to_file_ptr(const struct wsp_gguf_context * ctx, FILE * file, bool only_meta);
     WSP_GGML_API bool wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fname, bool only_meta);
 
     // get the size in bytes of the meta data (header, kv pairs, tensor info) including padding

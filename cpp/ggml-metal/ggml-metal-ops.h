@@ -75,6 +75,7 @@ int wsp_ggml_metal_op_norm              (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_rope              (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_im2col            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_conv_2d           (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_conv_3d           (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_conv_transpose_1d (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_conv_transpose_2d (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_upscale           (wsp_ggml_metal_op_t ctx, int idx);

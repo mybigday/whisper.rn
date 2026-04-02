@@ -690,7 +690,7 @@ wsp_ggml_metal_device_t wsp_ggml_metal_device_init(int device) {
                     "    auto tB = B.slice((int)tgid.x, 0); \n"
                     " \n"
                     "    matmul2d< \n"
-                    "        matmul2d_descriptor(8, 8, dynamic_extent), \n"
+                    "        matmul2d_descriptor(16, 16, dynamic_extent), \n"
                     "        execution_simdgroups<4>> mm; \n"
                     " \n"
                     "    auto cT = mm.get_destination_cooperative_tensor<decltype(tA), decltype(tB), float>(); \n"
@@ -740,7 +740,7 @@ wsp_ggml_metal_device_t wsp_ggml_metal_device_init(int device) {
                     "    auto tB = B.slice((int)tgid.x, 0); \n"
                     " \n"
                     "    matmul2d< \n"
-                    "        matmul2d_descriptor(8, 8, dynamic_extent), \n"
+                    "        matmul2d_descriptor(16, 16, dynamic_extent), \n"
                     "        execution_simdgroups<4>> mm; \n"
                     " \n"
                     "    auto cT = mm.get_destination_cooperative_tensor<decltype(tA), decltype(tB), float>(); \n"
@@ -1039,6 +1039,10 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 case WSP_GGML_UNARY_OP_EXP:
                 case WSP_GGML_UNARY_OP_SOFTPLUS:
                 case WSP_GGML_UNARY_OP_EXPM1:
+                case WSP_GGML_UNARY_OP_FLOOR:
+                case WSP_GGML_UNARY_OP_CEIL:
+                case WSP_GGML_UNARY_OP_ROUND:
+                case WSP_GGML_UNARY_OP_TRUNC:
                     return wsp_ggml_is_contiguous_rows(op->src[0]) && (op->src[0]->type == WSP_GGML_TYPE_F32 || op->src[0]->type == WSP_GGML_TYPE_F16);
                 default:
                     return false;
@@ -1077,6 +1081,11 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 (op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32) &&
                 op->src[1]->type == WSP_GGML_TYPE_F32 &&
                 op->type == WSP_GGML_TYPE_F32;
+        case WSP_GGML_OP_CONV_3D:
+            return wsp_ggml_is_contiguous(op->src[0]) &&
+                   wsp_ggml_is_contiguous(op->src[1]) &&
+                   (op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32) &&
+                   op->src[1]->type == WSP_GGML_TYPE_F32;
         case WSP_GGML_OP_SUM:
             return has_simdgroup_reduction && wsp_ggml_is_contiguous(op->src[0]);
         case WSP_GGML_OP_TRI:
@@ -1143,6 +1152,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
                 op->src[0]->ne[0] != 192 &&
                 op->src[0]->ne[0] != 256 &&
                 op->src[0]->ne[0] != 320 &&
+                op->src[0]->ne[0] != 512 &&
                 op->src[0]->ne[0] != 576) {
                 return false;
             }

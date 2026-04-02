@@ -773,6 +773,5 @@ inline bool wsp_ggml_check_edges(const struct wsp_ggml_cgraph *                c
 
 // expose GGUF internals for test code
 WSP_GGML_API size_t wsp_gguf_type_size(enum wsp_gguf_type type);
-WSP_GGML_API struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_gguf_init_params params);
 WSP_GGML_API void wsp_gguf_write_to_buf(const struct wsp_gguf_context * ctx, std::vector<int8_t> & buf, bool only_meta);
 #endif // __cplusplus

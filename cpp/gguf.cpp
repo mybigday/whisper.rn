@@ -394,7 +394,11 @@ bool wsp_gguf_read_emplace_helper(const struct wsp_gguf_reader & gr, std::vector
     return true;
 }
 
-struct wsp_gguf_context * wsp_gguf_init_from_file_impl(FILE * file, struct wsp_gguf_init_params params) {
+struct wsp_gguf_context * wsp_gguf_init_from_file_ptr(FILE * file, struct wsp_gguf_init_params params) {
+    if (!file) {
+        return nullptr;
+    }
+
     const struct wsp_gguf_reader gr(file);
     struct wsp_gguf_context * ctx = new wsp_gguf_context;
 
@@ -848,7 +852,7 @@ struct wsp_gguf_context * wsp_gguf_init_from_file(const char * fname, struct wsp
         return nullptr;
     }
 
-    struct wsp_gguf_context * result = wsp_gguf_init_from_file_impl(file, params);
+    struct wsp_gguf_context * result = wsp_gguf_init_from_file_ptr(file, params);
     fclose(file);
     return result;
 }
@@ -1508,6 +1512,19 @@ void wsp_gguf_write_to_buf(const struct wsp_gguf_context * ctx, std::vector<int8
     wsp_gguf_write_out(ctx, gw, only_meta);
 }
 
+bool wsp_gguf_write_to_file_ptr(const struct wsp_gguf_context * ctx, FILE * file, bool only_meta) {
+    WSP_GGML_ASSERT(file);
+
+    try {
+        wsp_gguf_writer_file gw(file);
+        wsp_gguf_write_out(ctx, gw, only_meta);
+    } catch (const std::runtime_error& ex) {
+        WSP_GGML_LOG_ERROR("%s: failed to write GGUF data: %s\n", __func__, ex.what());
+        return false;
+    }
+    return true;
+}
+
 bool wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fname, bool only_meta) {
     FILE * file = wsp_ggml_fopen(fname, "wb");
 
@@ -1516,17 +1533,13 @@ bool wsp_gguf_write_to_file(const struct wsp_gguf_context * ctx, const char * fn
         return false;
     }
 
-    try {
-        wsp_gguf_writer_file gw(file);
-        wsp_gguf_write_out(ctx, gw, only_meta);
-    } catch (const std::runtime_error& ex) {
-        WSP_GGML_LOG_ERROR("%s: failed to write GGUF data into '%s': %s\n", __func__, fname, ex.what());
-        fclose(file);
-        return false;
+    const bool success = wsp_gguf_write_to_file_ptr(ctx, file, only_meta);
+    if (!success) {
+        WSP_GGML_LOG_ERROR("%s: failed to write GGUF data into '%s'\n", __func__, fname);
     }
 
     fclose(file);
-    return true;
+    return success;
 }
 
 size_t wsp_gguf_get_meta_size(const struct wsp_gguf_context * ctx) {
