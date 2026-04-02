@@ -1,65 +1,66 @@
 import { NativeModules } from 'react-native'
 
+const transcribeResult = {
+  language: 'en',
+  result: ' Test',
+  segments: [{ text: ' Test', t0: 0, t1: 33 }],
+  isAborted: false,
+}
+
+const vadResult = {
+  hasSpeech: true,
+  segments: [
+    { t0: 0.5, t1: 2.3 },
+    { t0: 3.1, t1: 5.8 },
+    { t0: 7.2, t1: 9.4 },
+  ],
+}
+
 if (!NativeModules.RNWhisper) {
   NativeModules.RNWhisper = {
-    installJSIBindings: jest.fn(() => Promise.resolve()),
-    initContext: jest.fn(() => Promise.resolve({ contextId: 1 })),
-    transcribeFile: jest.fn(() => Promise.resolve({
-      language: 'en',
-      result: ' Test',
-      segments: [{ text: ' Test', t0: 0, t1: 33 }],
-      isAborted: false,
+    install: jest.fn(async () => true),
+    getConstants: jest.fn(() => ({
+      useCoreML: false,
+      coreMLAllowFallback: false,
     })),
-    transcribeData: jest.fn(() => Promise.resolve({
-      language: 'en',
-      result: ' Test',
-      segments: [{ text: ' Test', t0: 0, t1: 33 }],
-      isAborted: false,
-    })),
-    bench: jest.fn(() => Promise.resolve({
-      config: 'NEON',
-      nThreads: 1,
-      encodeMs: 1,
-      decodeMs: 1,
-      batchMs: 1,
-      promptMs: 1,
-    })),
-    releaseContext: jest.fn(() => Promise.resolve()),
-    releaseAllContexts: jest.fn(() => Promise.resolve()),
-
-    // VAD methods
-    initVadContext: jest.fn(() => Promise.resolve({
-      contextId: 2,
-      gpu: false,
-      reasonNoGPU: 'Mock VAD context'
-    })),
-    vadDetectSpeech: jest.fn().mockResolvedValue([
-      { t0: 0.5, t1: 2.3 },
-      { t0: 3.1, t1: 5.8 },
-      { t0: 7.2, t1: 9.4 }
-    ]),
-    vadDetectSpeechFile: jest.fn().mockResolvedValue([
-      { t0: 0.5, t1: 2.3 },
-      { t0: 3.1, t1: 5.8 },
-      { t0: 7.2, t1: 9.4 }
-    ]),
-    releaseVadContext: jest.fn(() => Promise.resolve()),
-    releaseAllVadContexts: jest.fn(() => Promise.resolve()),
-
-    // iOS AudioSession utils
-    getAudioSessionCurrentCategory: jest.fn(() => Promise.resolve({
-      category: 'AVAudioSessionCategoryPlayAndRecord',
-      options: [],
-    })),
-    getAudioSessionCurrentMode: jest.fn(() => Promise.resolve('')),
-    setAudioSessionCategory: jest.fn(() => Promise.resolve()),
-    setAudioSessionMode: jest.fn(() => Promise.resolve()),
-    setAudioSessionActive: jest.fn(() => Promise.resolve()),
-
-    // For NativeEventEmitter
-    addListener: jest.fn(),
-    removeListeners: jest.fn(),
   }
 }
 
-module.exports = jest.requireActual('whisper.rn/index')
+global.whisperGetConstants = jest.fn(async () => ({
+  useCoreML: false,
+  coreMLAllowFallback: false,
+}))
+global.whisperInitContext = jest.fn(async (contextId: number) => ({
+  contextPtr: contextId,
+  contextId,
+  gpu: false,
+  reasonNoGPU: 'Mock context',
+}))
+global.whisperReleaseContext = jest.fn(async () => undefined)
+global.whisperReleaseAllContexts = jest.fn(async () => undefined)
+global.whisperTranscribeFile = jest.fn(async () => transcribeResult)
+global.whisperTranscribeData = jest.fn(
+  async (
+    _contextId: number,
+    options: { onProgress?: (progress: number) => void },
+  ) => {
+    options.onProgress?.(100)
+    return transcribeResult
+  },
+)
+global.whisperAbortTranscribe = jest.fn(async () => undefined)
+global.whisperBench = jest.fn(async () =>
+  JSON.stringify(['NEON', 1, 1, 1, 1, 1]),
+)
+global.whisperInitVadContext = jest.fn(async (contextId: number) => ({
+  contextId,
+  gpu: false,
+  reasonNoGPU: 'Mock VAD context',
+}))
+global.whisperReleaseVadContext = jest.fn(async () => undefined)
+global.whisperReleaseAllVadContexts = jest.fn(async () => undefined)
+global.whisperVadDetectSpeech = jest.fn(async () => vadResult)
+global.whisperVadDetectSpeechFile = jest.fn(async () => vadResult)
+global.whisperToggleNativeLog = jest.fn(async () => undefined)
+
+module.exports = jest.requireActual('./index')

@@ -1,742 +1,1753 @@
 #include "RNWhisperJSI.h"
 #include "ThreadPool.h"
-#include <jsi/jsi.h>
+
+#include <algorithm>
+#include <atomic>
+#include <condition_variable>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <unordered_map>
-#include <algorithm>
+#include <utility>
 #include <vector>
-#include <atomic>
 
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
 
-using namespace facebook::jsi;
+using namespace facebook;
 
-namespace rnwhisper_jsi {
+namespace {
 
-using namespace facebook::jsi;
+enum class LogLevel { Debug, Info, Error };
 
-// Consolidated logging function
-enum class LogLevel { LOG_DEBUG, LOG_INFO, LOG_ERROR };
-
-static void log(LogLevel level, const char* format, ...) {
+void logMessage(LogLevel level, const char *format, ...) {
     va_list args;
     va_start(args, format);
 
 #if defined(__ANDROID__)
-    int androidLevel = (level == LogLevel::LOG_DEBUG) ? ANDROID_LOG_DEBUG :
-                      (level == LogLevel::LOG_INFO) ? ANDROID_LOG_INFO : ANDROID_LOG_ERROR;
+    int androidLevel = ANDROID_LOG_INFO;
+    if (level == LogLevel::Debug) {
+        androidLevel = ANDROID_LOG_DEBUG;
+    } else if (level == LogLevel::Error) {
+        androidLevel = ANDROID_LOG_ERROR;
+    }
     __android_log_vprint(androidLevel, "RNWhisperJSI", format, args);
 #else
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
-    const char* levelStr = (level == LogLevel::LOG_DEBUG) ? "DEBUG" :
-                          (level == LogLevel::LOG_INFO) ? "INFO" : "ERROR";
-    printf("RNWhisperJSI %s: %s\n", levelStr, buffer);
+    const char *levelName = "INFO";
+    if (level == LogLevel::Debug) {
+        levelName = "DEBUG";
+    } else if (level == LogLevel::Error) {
+        levelName = "ERROR";
+    }
+    std::printf("RNWhisperJSI %s: %s\n", levelName, buffer);
 #endif
 
     va_end(args);
 }
 
-#define logInfo(format, ...) log(LogLevel::LOG_INFO, format, ##__VA_ARGS__)
-#define logError(format, ...) log(LogLevel::LOG_ERROR, format, ##__VA_ARGS__)
-#define logDebug(format, ...) log(LogLevel::LOG_DEBUG, format, ##__VA_ARGS__)
+#define LOG_INFO(format, ...) logMessage(LogLevel::Info, format, ##__VA_ARGS__)
+#define LOG_ERROR(format, ...) logMessage(LogLevel::Error, format, ##__VA_ARGS__)
 
-static std::unique_ptr<ThreadPool> whisperThreadPool = nullptr;
-static std::mutex threadPoolMutex;
+class JsiError : public std::runtime_error {
+public:
+    explicit JsiError(const std::string &message, int errorCode = -1)
+        : std::runtime_error(message), code(errorCode) {}
 
-// Initialize ThreadPool with optimal thread count
-ThreadPool& getWhisperThreadPool() {
-    std::lock_guard<std::mutex> lock(threadPoolMutex);
-    if (!whisperThreadPool) {
-        int max_threads = std::thread::hardware_concurrency();
-        int thread_count = std::max(2, std::min(4, max_threads)); // Use 2-4 threads
-        whisperThreadPool = std::make_unique<ThreadPool>(thread_count);
-        logInfo("Initialized ThreadPool with %d threads", thread_count);
+    int code;
+};
+
+std::atomic<bool> g_isShuttingDown{false};
+std::unique_ptr<ThreadPool> g_threadPool;
+std::mutex g_threadPoolMutex;
+
+ThreadPool &getThreadPool() {
+    std::lock_guard<std::mutex> lock(g_threadPoolMutex);
+    if (!g_threadPool) {
+        int maxThreads = static_cast<int>(std::thread::hardware_concurrency());
+        int threadCount = std::max(2, std::min(4, maxThreads));
+        g_threadPool = std::make_unique<ThreadPool>(threadCount);
+        LOG_INFO("Initialized ThreadPool with %d threads", threadCount);
     }
-    return *whisperThreadPool;
+    return *g_threadPool;
 }
 
-// Template-based context management
-template<typename T>
+template <typename HolderType>
 class ContextManager {
-private:
-    std::unordered_map<int, long> contextMap;
-    std::mutex contextMutex;
-    const char* contextType;
-
 public:
-    ContextManager(const char* type) : contextType(type) {}
-
-    void add(int contextId, long contextPtr) {
-        std::lock_guard<std::mutex> lock(contextMutex);
-        contextMap[contextId] = contextPtr;
-        logDebug("%s Context added: id=%d, ptr=%ld", contextType, contextId, contextPtr);
+    void add(int contextId, std::shared_ptr<HolderType> holder) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        contexts_[contextId] = std::move(holder);
     }
 
-    void remove(int contextId) {
-        std::lock_guard<std::mutex> lock(contextMutex);
-        auto it = contextMap.find(contextId);
-        if (it != contextMap.end()) {
-            logDebug("%s Context removed: id=%d", contextType, contextId);
-            contextMap.erase(it);
+    std::shared_ptr<HolderType> get(int contextId) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = contexts_.find(contextId);
+        return it == contexts_.end() ? nullptr : it->second;
+    }
+
+    std::shared_ptr<HolderType> remove(int contextId) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = contexts_.find(contextId);
+        if (it == contexts_.end()) {
+            return nullptr;
+        }
+        auto holder = it->second;
+        contexts_.erase(it);
+        return holder;
+    }
+
+    std::vector<std::shared_ptr<HolderType>> removeAll() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        std::vector<std::shared_ptr<HolderType>> holders;
+        holders.reserve(contexts_.size());
+        for (const auto &entry : contexts_) {
+            holders.push_back(entry.second);
+        }
+        contexts_.clear();
+        return holders;
+    }
+
+private:
+    std::unordered_map<int, std::shared_ptr<HolderType>> contexts_;
+    std::mutex mutex_;
+};
+
+struct SegmentData {
+    std::string text;
+    int t0 = 0;
+    int t1 = 0;
+};
+
+struct TranscribeResultData {
+    std::string language;
+    std::string result;
+    std::vector<SegmentData> segments;
+    bool isAborted = false;
+};
+
+struct NewSegmentsData {
+    int nNew = 0;
+    int totalNNew = 0;
+    std::string result;
+    std::vector<SegmentData> segments;
+};
+
+struct VadSegmentData {
+    float t0 = 0;
+    float t1 = 0;
+};
+
+struct VadResultData {
+    bool hasSpeech = false;
+    std::vector<VadSegmentData> segments;
+};
+
+struct ContextLifecycle {
+    void retainTask() {
+        std::lock_guard<std::mutex> lock(mutex);
+        pendingTasks += 1;
+    }
+
+    void releaseTask() {
+        std::lock_guard<std::mutex> lock(mutex);
+        pendingTasks -= 1;
+        if (pendingTasks <= 0) {
+            pendingTasks = 0;
+            condition.notify_all();
         }
     }
 
-    long get(int contextId) {
-        std::lock_guard<std::mutex> lock(contextMutex);
-        auto it = contextMap.find(contextId);
-        return (it != contextMap.end()) ? it->second : 0;
+    void waitForIdle() {
+        std::unique_lock<std::mutex> lock(mutex);
+        condition.wait(lock, [this]() { return pendingTasks == 0; });
     }
 
-    T* getTyped(int contextId) {
-        long ptr = get(contextId);
-        return ptr ? reinterpret_cast<T*>(ptr) : nullptr;
-    }
+    std::mutex mutex;
+    std::condition_variable condition;
+    int pendingTasks = 0;
 };
 
-static ContextManager<whisper_context> contextManager("Whisper");
-static ContextManager<whisper_vad_context> vadContextManager("VAD");
+struct WhisperContextHolder : public ContextLifecycle {
+    explicit WhisperContextHolder(int contextId)
+        : id(contextId) {}
 
-// Context management functions
-void addContext(int contextId, long contextPtr) {
-    contextManager.add(contextId, contextPtr);
-}
+    bool beginExclusiveOperation(int jobId) {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        if (busy) {
+            return false;
+        }
+        busy = true;
+        activeJobId = jobId;
+        return true;
+    }
 
-void removeContext(int contextId) {
-    contextManager.remove(contextId);
-}
+    void endExclusiveOperation() {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        busy = false;
+        activeJobId = -1;
+    }
 
-void addVadContext(int contextId, long vadContextPtr) {
-    vadContextManager.add(contextId, vadContextPtr);
-}
+    void abortActiveJob() {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        if (activeJobId < 0) {
+            return;
+        }
+        if (auto *job = rnwhisper::job_get(activeJobId)) {
+            job->abort();
+        }
+    }
 
-void removeVadContext(int contextId) {
-    vadContextManager.remove(contextId);
-}
+    int id = 0;
+    whisper_context *context = nullptr;
+    long ptr = 0;
+    bool gpu = false;
+    std::string reasonNoGPU;
 
-long getContextPtr(int contextId) {
-    return contextManager.get(contextId);
-}
-
-long getVadContextPtr(int contextId) {
-    return vadContextManager.get(contextId);
-}
-
-// Helper function to validate JSI function arguments
-struct JSIValidationResult {
-    bool isValid;
-    std::string errorMessage;
+    std::mutex operationMutex;
+    bool busy = false;
+    int activeJobId = -1;
 };
 
-JSIValidationResult validateJSIArguments(Runtime& runtime, const Value* arguments, size_t count, size_t expectedCount) {
-    if (count != expectedCount) {
-        return {false, "Expected " + std::to_string(expectedCount) + " arguments, got " + std::to_string(count)};
+struct WhisperVadContextHolder : public ContextLifecycle {
+    explicit WhisperVadContextHolder(int contextId)
+        : id(contextId) {}
+
+    int id = 0;
+    whisper_vad_context *context = nullptr;
+    long ptr = 0;
+    bool gpu = false;
+    std::string reasonNoGPU;
+};
+
+ContextManager<WhisperContextHolder> g_whisperContexts;
+ContextManager<WhisperVadContextHolder> g_vadContexts;
+
+using PromiseResultGenerator = std::function<jsi::Value(jsi::Runtime &)>;
+using PromiseTask = std::function<PromiseResultGenerator()>;
+using JsiFunctionPtr = std::shared_ptr<jsi::Function>;
+
+struct JsiCallbackState {
+    std::shared_ptr<react::CallInvoker> callInvoker;
+    JsiFunctionPtr callback;
+    std::shared_ptr<jsi::Runtime> runtime;
+};
+
+struct SegmentCallbackState : public JsiCallbackState {
+    bool tdrzEnable = false;
+    int totalNNew = 0;
+};
+
+jsi::Value createNewSegmentsValue(
+    jsi::Runtime &runtime,
+    const NewSegmentsData &data);
+
+std::mutex g_logMutex;
+std::weak_ptr<react::CallInvoker> g_logInvoker;
+std::shared_ptr<jsi::Function> g_logHandler;
+std::shared_ptr<jsi::Runtime> g_logRuntime;
+
+class PromiseScopeGuard {
+public:
+    explicit PromiseScopeGuard(std::function<void()> onExit)
+        : onExit_(std::move(onExit)) {}
+
+    ~PromiseScopeGuard() {
+        if (active_ && onExit_) {
+            onExit_();
+        }
     }
 
-    if (!arguments[0].isNumber()) {
-        return {false, "First argument (contextId) must be a number"};
+    void dismiss() {
+        active_ = false;
     }
 
-    if (!arguments[1].isObject()) {
-        return {false, "Second argument (options) must be an object"};
+private:
+    std::function<void()> onExit_;
+    bool active_ = true;
+};
+
+JsiFunctionPtr makeJsiFunction(
+    jsi::Runtime &runtime,
+    const jsi::Value &value,
+    const std::shared_ptr<react::CallInvoker> &callInvoker) {
+    if (!value.isObject() || !value.asObject(runtime).isFunction(runtime)) {
+        return nullptr;
     }
 
-    if (!arguments[2].isObject() || !arguments[2].getObject(runtime).isArrayBuffer(runtime)) {
-        return {false, "Third argument must be an ArrayBuffer"};
-    }
+    auto *fn = new jsi::Function(value.asObject(runtime).asFunction(runtime));
+    std::weak_ptr<react::CallInvoker> weakInvoker = callInvoker;
 
-    return {true, ""};
+    return JsiFunctionPtr(fn, [weakInvoker](jsi::Function *ptr) {
+        if (!ptr || g_isShuttingDown.load(std::memory_order_relaxed)) {
+            return;
+        }
+
+        auto invoker = weakInvoker.lock();
+        if (!invoker) {
+            return;
+        }
+
+        try {
+            invoker->invokeAsync([ptr]() {
+                delete ptr;
+            });
+        } catch (...) {
+            // Runtime is shutting down; leak rather than delete on a non-JS thread.
+        }
+    });
 }
 
-// Helper function to create error objects
-Object createErrorObject(Runtime& runtime, const std::string& message, int code = -1) {
-    auto errorObj = Object(runtime);
-    errorObj.setProperty(runtime, "message", String::createFromUtf8(runtime, message));
+jsi::Object createErrorObject(
+    jsi::Runtime &runtime,
+    const std::string &message,
+    int code = -1) {
+    jsi::Object error(runtime);
+    error.setProperty(
+        runtime,
+        "message",
+        jsi::String::createFromUtf8(runtime, message));
     if (code != -1) {
-        errorObj.setProperty(runtime, "code", Value(code));
+        error.setProperty(runtime, "code", jsi::Value(code));
     }
-    return errorObj;
+    return error;
 }
 
-// Helper function to convert JSI object to whisper_full_params
-whisper_full_params createFullParamsFromJSI(Runtime& runtime, const Object& optionsObj) {
-    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+jsi::Value createPromiseTask(
+    jsi::Runtime &runtime,
+    const std::shared_ptr<react::CallInvoker> &callInvoker,
+    PromiseTask task) {
+    auto promiseCtor =
+        runtime.global().getPropertyAsObject(runtime, "Promise").asFunction(runtime);
+    auto runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime *) {});
 
-    params.print_realtime = false;
-    params.print_progress = false;
-    params.print_timestamps = false;
-    params.print_special = false;
+    return promiseCtor.callAsConstructor(
+        runtime,
+        jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, "executor"),
+            2,
+            [callInvoker, task, runtimePtr](
+                jsi::Runtime &runtime,
+                const jsi::Value &,
+                const jsi::Value *arguments,
+                size_t count) -> jsi::Value {
+                if (count != 2) {
+                    throw jsi::JSError(runtime, "Promise executor expects resolve and reject");
+                }
 
-    int max_threads = std::thread::hardware_concurrency();
-    int default_n_threads = max_threads == 4 ? 2 : std::min(4, max_threads);
+                auto resolve = makeJsiFunction(runtime, arguments[0], callInvoker);
+                auto reject = makeJsiFunction(runtime, arguments[1], callInvoker);
+
+                try {
+                    getThreadPool().enqueue([callInvoker, task, resolve, reject, runtimePtr]() {
+                        if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                            return;
+                        }
+
+                        try {
+                            auto resultGenerator = task();
+                            if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                                return;
+                            }
+                            callInvoker->invokeAsync([resolve, resultGenerator, runtimePtr]() {
+                                if (g_isShuttingDown.load(std::memory_order_relaxed) || !resolve) {
+                                    return;
+                                }
+                                auto &rt = *runtimePtr;
+                                resolve->call(rt, resultGenerator(rt));
+                            });
+                        } catch (const JsiError &error) {
+                            try {
+                                callInvoker->invokeAsync([reject, runtimePtr, message = std::string(error.what()), code = error.code]() {
+                                    if (g_isShuttingDown.load(std::memory_order_relaxed) || !reject) {
+                                        return;
+                                    }
+                                    auto &rt = *runtimePtr;
+                                    reject->call(rt, createErrorObject(rt, message, code));
+                                });
+                            } catch (...) {
+                            }
+                        } catch (const std::exception &error) {
+                            try {
+                                callInvoker->invokeAsync([reject, runtimePtr, message = std::string(error.what())]() {
+                                    if (g_isShuttingDown.load(std::memory_order_relaxed) || !reject) {
+                                        return;
+                                    }
+                                    auto &rt = *runtimePtr;
+                                    reject->call(rt, createErrorObject(rt, message));
+                                });
+                            } catch (...) {
+                            }
+                        } catch (...) {
+                            try {
+                                callInvoker->invokeAsync([reject, runtimePtr]() {
+                                    if (g_isShuttingDown.load(std::memory_order_relaxed) || !reject) {
+                                        return;
+                                    }
+                                    auto &rt = *runtimePtr;
+                                    reject->call(rt, createErrorObject(rt, "Unknown error"));
+                                });
+                            } catch (...) {
+                            }
+                        }
+                    });
+                } catch (const std::exception &error) {
+                    if (reject) {
+                        auto errorObject = createErrorObject(runtime, error.what());
+                        reject->call(runtime, errorObject);
+                    }
+                }
+
+                return jsi::Value::undefined();
+            }));
+}
+
+void invokeAsync(
+    const std::shared_ptr<react::CallInvoker> &callInvoker,
+    std::function<void()> callback) {
+    if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+        return;
+    }
 
     try {
-        auto propNames = optionsObj.getPropertyNames(runtime);
-        for (size_t i = 0; i < propNames.size(runtime); i++) {
-            auto propNameValue = propNames.getValueAtIndex(runtime, i);
-            std::string propName = propNameValue.getString(runtime).utf8(runtime);
-            Value propValue = optionsObj.getProperty(runtime, propNameValue.getString(runtime));
-
-            if (propName == "maxThreads" && propValue.isNumber()) {
-                int n_threads = (int)propValue.getNumber();
-                params.n_threads = n_threads > 0 ? n_threads : default_n_threads;
-            } else if (propName == "translate" && propValue.isBool()) {
-                params.translate = propValue.getBool();
-            } else if (propName == "tokenTimestamps" && propValue.isBool()) {
-                params.token_timestamps = propValue.getBool();
-            } else if (propName == "tdrzEnable" && propValue.isBool()) {
-                params.tdrz_enable = propValue.getBool();
-            } else if (propName == "beamSize" && propValue.isNumber()) {
-                int beam_size = (int)propValue.getNumber();
-                if (beam_size > 0) {
-                    params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
-                    params.beam_search.beam_size = beam_size;
-                }
-            } else if (propName == "bestOf" && propValue.isNumber()) {
-                params.greedy.best_of = (int)propValue.getNumber();
-            } else if (propName == "maxLen" && propValue.isNumber()) {
-                params.max_len = (int)propValue.getNumber();
-            } else if (propName == "maxContext" && propValue.isNumber()) {
-                params.n_max_text_ctx = (int)propValue.getNumber();
-            } else if (propName == "offset" && propValue.isNumber()) {
-                params.offset_ms = (int)propValue.getNumber();
-            } else if (propName == "duration" && propValue.isNumber()) {
-                params.duration_ms = (int)propValue.getNumber();
-            } else if (propName == "wordThold" && propValue.isNumber()) {
-                params.thold_pt = (int)propValue.getNumber();
-            } else if (propName == "temperature" && propValue.isNumber()) {
-                params.temperature = (float)propValue.getNumber();
-            } else if (propName == "temperatureInc" && propValue.isNumber()) {
-                params.temperature_inc = (float)propValue.getNumber();
-            } else if (propName == "prompt" && propValue.isString()) {
-                std::string prompt = propValue.getString(runtime).utf8(runtime);
-                params.initial_prompt = strdup(prompt.c_str());
-            } else if (propName == "language" && propValue.isString()) {
-                std::string language = propValue.getString(runtime).utf8(runtime);
-                params.language = strdup(language.c_str());
+        callInvoker->invokeAsync([callback = std::move(callback)]() {
+            if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                return;
             }
-        }
+            callback();
+        });
     } catch (...) {
-        // Use default values if parsing fails
+    }
+}
+
+void emitProgressCallback(
+    const std::shared_ptr<JsiCallbackState> &state,
+    int progress) {
+    if (!state || !state->callInvoker || !state->callback || !state->runtime) {
+        return;
     }
 
-    params.offset_ms = 0;
-    params.no_context = true;
-    params.single_segment = false;
+    invokeAsync(state->callInvoker, [state, progress]() {
+        if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+            return;
+        }
+        auto &rt = *state->runtime;
+        state->callback->call(rt, jsi::Value(progress));
+    });
+}
 
+void emitNewSegmentsCallback(
+    const std::shared_ptr<SegmentCallbackState> &state,
+    NewSegmentsData payload) {
+    if (!state || !state->callInvoker || !state->callback || !state->runtime) {
+        return;
+    }
+
+    invokeAsync(state->callInvoker, [state, payload = std::move(payload)]() {
+        if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+            return;
+        }
+        auto &rt = *state->runtime;
+        state->callback->call(rt, createNewSegmentsValue(rt, payload));
+    });
+}
+
+bool getBoolProperty(
+    jsi::Runtime &runtime,
+    const jsi::Object &object,
+    const char *name,
+    bool fallback) {
+    if (!object.hasProperty(runtime, name)) {
+        return fallback;
+    }
+    auto value = object.getProperty(runtime, name);
+    return value.isBool() ? value.getBool() : fallback;
+}
+
+int getIntProperty(
+    jsi::Runtime &runtime,
+    const jsi::Object &object,
+    const char *name,
+    int fallback) {
+    if (!object.hasProperty(runtime, name)) {
+        return fallback;
+    }
+    auto value = object.getProperty(runtime, name);
+    return value.isNumber() ? static_cast<int>(value.asNumber()) : fallback;
+}
+
+float getFloatProperty(
+    jsi::Runtime &runtime,
+    const jsi::Object &object,
+    const char *name,
+    float fallback) {
+    if (!object.hasProperty(runtime, name)) {
+        return fallback;
+    }
+    auto value = object.getProperty(runtime, name);
+    return value.isNumber() ? static_cast<float>(value.asNumber()) : fallback;
+}
+
+std::string getStringProperty(
+    jsi::Runtime &runtime,
+    const jsi::Object &object,
+    const char *name,
+    const std::string &fallback = "") {
+    if (!object.hasProperty(runtime, name)) {
+        return fallback;
+    }
+    auto value = object.getProperty(runtime, name);
+    return value.isString() ? value.asString(runtime).utf8(runtime) : fallback;
+}
+
+struct TranscribeConfig {
+    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    std::string prompt;
+    std::string language;
+    int nProcessors = 1;
+    int jobId = 0;
+    bool tdrzEnable = false;
+    JsiFunctionPtr onProgress;
+    JsiFunctionPtr onNewSegments;
+};
+
+TranscribeConfig createTranscribeConfig(
+    jsi::Runtime &runtime,
+    const jsi::Object &options,
+    const std::shared_ptr<react::CallInvoker> &callInvoker) {
+    TranscribeConfig config;
+
+    config.params.print_realtime = false;
+    config.params.print_progress = false;
+    config.params.print_timestamps = false;
+    config.params.print_special = false;
+
+    int maxThreads = static_cast<int>(std::thread::hardware_concurrency());
+    int defaultThreads = maxThreads == 4 ? 2 : std::min(4, maxThreads);
+    int nThreads = getIntProperty(runtime, options, "maxThreads", defaultThreads);
+    config.params.n_threads = nThreads > 0 ? nThreads : defaultThreads;
+    config.params.translate = getBoolProperty(runtime, options, "translate", false);
+    config.params.token_timestamps =
+        getBoolProperty(runtime, options, "tokenTimestamps", false);
+    config.params.tdrz_enable = getBoolProperty(runtime, options, "tdrzEnable", false);
+    config.tdrzEnable = config.params.tdrz_enable;
+    config.params.max_len = getIntProperty(runtime, options, "maxLen", config.params.max_len);
+    config.params.n_max_text_ctx =
+        getIntProperty(runtime, options, "maxContext", config.params.n_max_text_ctx);
+    config.params.offset_ms =
+        getIntProperty(runtime, options, "offset", config.params.offset_ms);
+    config.params.duration_ms =
+        getIntProperty(runtime, options, "duration", config.params.duration_ms);
+    config.params.thold_pt =
+        getFloatProperty(runtime, options, "wordThold", config.params.thold_pt);
+    config.params.temperature =
+        getFloatProperty(runtime, options, "temperature", config.params.temperature);
+    config.params.temperature_inc = getFloatProperty(
+        runtime,
+        options,
+        "temperatureInc",
+        config.params.temperature_inc);
+    config.params.greedy.best_of =
+        getIntProperty(runtime, options, "bestOf", config.params.greedy.best_of);
+    config.nProcessors = std::max(1, getIntProperty(runtime, options, "nProcessors", 1));
+    config.jobId = getIntProperty(
+        runtime,
+        options,
+        "jobId",
+        static_cast<int>(std::rand()));
+
+    int beamSize = getIntProperty(runtime, options, "beamSize", -1);
+    if (beamSize > 0) {
+        config.params.strategy = WHISPER_SAMPLING_BEAM_SEARCH;
+        config.params.beam_search.beam_size = beamSize;
+    }
+
+    config.prompt = getStringProperty(runtime, options, "prompt");
+    if (!config.prompt.empty()) {
+        config.params.initial_prompt = config.prompt.c_str();
+    }
+
+    config.language = getStringProperty(runtime, options, "language");
+    if (!config.language.empty()) {
+        config.params.language = config.language.c_str();
+    }
+
+    config.params.no_context = true;
+    config.params.single_segment = false;
+
+    if (options.hasProperty(runtime, "onProgress")) {
+        config.onProgress = makeJsiFunction(
+            runtime,
+            options.getProperty(runtime, "onProgress"),
+            callInvoker);
+    }
+
+    if (options.hasProperty(runtime, "onNewSegments")) {
+        config.onNewSegments = makeJsiFunction(
+            runtime,
+            options.getProperty(runtime, "onNewSegments"),
+            callInvoker);
+    }
+
+    return config;
+}
+
+whisper_vad_params createVadParams(
+    jsi::Runtime &runtime,
+    const jsi::Object &options) {
+    whisper_vad_params params = whisper_vad_default_params();
+    params.threshold =
+        getFloatProperty(runtime, options, "threshold", params.threshold);
+    params.min_speech_duration_ms = getIntProperty(
+        runtime,
+        options,
+        "minSpeechDurationMs",
+        params.min_speech_duration_ms);
+    params.min_silence_duration_ms = getIntProperty(
+        runtime,
+        options,
+        "minSilenceDurationMs",
+        params.min_silence_duration_ms);
+    params.max_speech_duration_s = getFloatProperty(
+        runtime,
+        options,
+        "maxSpeechDurationS",
+        params.max_speech_duration_s);
+    params.speech_pad_ms = getIntProperty(
+        runtime,
+        options,
+        "speechPadMs",
+        params.speech_pad_ms);
+    params.samples_overlap = getFloatProperty(
+        runtime,
+        options,
+        "samplesOverlap",
+        params.samples_overlap);
     return params;
 }
 
-// Helper function to convert ArrayBuffer to float32 audio data
-struct AudioData {
-    std::vector<float> data;
-    int count;
-};
-
-AudioData convertArrayBufferToAudioData(Runtime& runtime, size_t arrayBufferSize, uint8_t* arrayBufferData) {
-    // Convert ArrayBuffer to float32 array (assuming 16-bit PCM input)
-    if (arrayBufferSize % 2 != 0) {
-        throw JSError(runtime, "ArrayBuffer size must be even for 16-bit PCM data");
+std::vector<rnwhisper_jsi::CoreMLAssetInfo> parseCoreMLAssets(
+    jsi::Runtime &runtime,
+    const jsi::Object &options) {
+    std::vector<rnwhisper_jsi::CoreMLAssetInfo> assets;
+    if (!options.hasProperty(runtime, "coreMLAssets")) {
+        return assets;
     }
 
-    int audioDataCount = (int)(arrayBufferSize / 2); // 16-bit samples
-    std::vector<float> audioData(audioDataCount);
-
-    // Convert 16-bit PCM to float32
-    int16_t* pcmData = (int16_t*)arrayBufferData;
-    for (int i = 0; i < audioDataCount; i++) {
-        audioData[i] = (float)pcmData[i] / 32768.0f;
+    auto value = options.getProperty(runtime, "coreMLAssets");
+    if (!value.isObject() || !value.asObject(runtime).isArray(runtime)) {
+        return assets;
     }
 
-    return {std::move(audioData), audioDataCount};
-}
-
-// Common callback data structure
-template<typename CallbackType>
-struct CallbackData {
-    std::shared_ptr<facebook::react::CallInvoker> callInvoker;
-    std::shared_ptr<Function> callback;
-    std::shared_ptr<Runtime> safeRuntime;
-    std::atomic<int> counter{0};
-};
-
-// Helper function to extract callbacks from options
-struct CallbackInfo {
-    std::shared_ptr<Function> onProgressCallback;
-    std::shared_ptr<Function> onNewSegmentsCallback;
-    int jobId;
-    int nProcessors;
-};
-
-CallbackInfo extractCallbacks(Runtime& runtime, const Object& optionsObj) {
-    CallbackInfo info;
-    info.jobId = rand(); // Default fallback jobId
-    info.nProcessors = 1; // Default to 1 processor
-
-    try {
-        auto propNames = optionsObj.getPropertyNames(runtime);
-        for (size_t i = 0; i < propNames.size(runtime); i++) {
-            auto propNameValue = propNames.getValueAtIndex(runtime, i);
-            std::string propName = propNameValue.getString(runtime).utf8(runtime);
-            Value propValue = optionsObj.getProperty(runtime, propNameValue.getString(runtime));
-
-            if (propName == "onProgress" && propValue.isObject() && propValue.getObject(runtime).isFunction(runtime)) {
-                info.onProgressCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
-            } else if (propName == "onNewSegments" && propValue.isObject() && propValue.getObject(runtime).isFunction(runtime)) {
-                info.onNewSegmentsCallback = std::make_shared<Function>(propValue.getObject(runtime).getFunction(runtime));
-            } else if (propName == "jobId" && propValue.isNumber()) {
-                info.jobId = (int)propValue.getNumber();
-            } else if (propName == "nProcessors" && propValue.isNumber()) {
-                info.nProcessors = (int)propValue.getNumber();
-            }
+    auto array = value.asObject(runtime).asArray(runtime);
+    size_t length = array.size(runtime);
+    assets.reserve(length);
+    for (size_t i = 0; i < length; ++i) {
+        auto item = array.getValueAtIndex(runtime, i);
+        if (!item.isObject()) {
+            continue;
         }
-    } catch (...) {
-        // Ignore callback detection errors
-    }
 
-    return info;
+        auto object = item.asObject(runtime);
+        assets.push_back({
+            getStringProperty(runtime, object, "uri"),
+            getStringProperty(runtime, object, "filepath"),
+        });
+    }
+    return assets;
 }
 
-// Helper function to extract VAD parameters from options
-whisper_vad_params extractVadParams(Runtime& runtime, const Object& optionsObj) {
-    whisper_vad_params vadParams = whisper_vad_default_params();
+std::vector<float> decodePcm16(const uint8_t *bytes, size_t byteLength) {
+    if (byteLength == 0 || (byteLength % 2) != 0) {
+        throw JsiError("Invalid audio data", -1);
+    }
 
-    try {
-        auto propNames = optionsObj.getPropertyNames(runtime);
-        for (size_t i = 0; i < propNames.size(runtime); i++) {
-            auto propNameValue = propNames.getValueAtIndex(runtime, i);
-            std::string propName = propNameValue.getString(runtime).utf8(runtime);
-            Value propValue = optionsObj.getProperty(runtime, propNameValue.getString(runtime));
+    size_t sampleCount = byteLength / sizeof(int16_t);
+    std::vector<float> audio(sampleCount);
 
-            if (propName == "threshold" && propValue.isNumber()) {
-                vadParams.threshold = (float)propValue.getNumber();
-            } else if (propName == "minSpeechDurationMs" && propValue.isNumber()) {
-                vadParams.min_speech_duration_ms = (int)propValue.getNumber();
-            } else if (propName == "minSilenceDurationMs" && propValue.isNumber()) {
-                vadParams.min_silence_duration_ms = (int)propValue.getNumber();
-            } else if (propName == "maxSpeechDurationS" && propValue.isNumber()) {
-                vadParams.max_speech_duration_s = (float)propValue.getNumber();
-            } else if (propName == "speechPadMs" && propValue.isNumber()) {
-                vadParams.speech_pad_ms = (int)propValue.getNumber();
-            } else if (propName == "samplesOverlap" && propValue.isNumber()) {
-                vadParams.samples_overlap = (float)propValue.getNumber();
-            }
+    for (size_t i = 0; i < sampleCount; ++i) {
+        int16_t sample = 0;
+        std::memcpy(&sample, bytes + (i * sizeof(int16_t)), sizeof(int16_t));
+        audio[i] = std::max(-1.0f, std::min(1.0f, static_cast<float>(sample) / 32767.0f));
+    }
+
+    return audio;
+}
+
+std::vector<float> decodeWaveBytes(const std::vector<uint8_t> &bytes) {
+    constexpr size_t kWaveHeaderSize = 44;
+    if (bytes.size() <= kWaveHeaderSize) {
+        throw JsiError("Invalid file", -1);
+    }
+    return decodePcm16(bytes.data() + kWaveHeaderSize, bytes.size() - kWaveHeaderSize);
+}
+
+int decodeBase64Value(char value) {
+    if (value >= 'A' && value <= 'Z') return value - 'A';
+    if (value >= 'a' && value <= 'z') return value - 'a' + 26;
+    if (value >= '0' && value <= '9') return value - '0' + 52;
+    if (value == '+') return 62;
+    if (value == '/') return 63;
+    if (value == '=') return -1;
+    return -2;
+}
+
+std::vector<uint8_t> decodeBase64(const std::string &encoded) {
+    std::vector<uint8_t> decoded;
+    decoded.reserve((encoded.size() * 3) / 4);
+
+    int buffer = 0;
+    int bits = 0;
+    for (char ch : encoded) {
+        int value = decodeBase64Value(ch);
+        if (value == -2) {
+            continue;
         }
-    } catch (...) {
-        // Ignore parameter extraction errors
+        if (value == -1) {
+            break;
+        }
+
+        buffer = (buffer << 6) | value;
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            decoded.push_back(static_cast<uint8_t>((buffer >> bits) & 0xff));
+        }
     }
 
-    return vadParams;
+    return decoded;
 }
 
-// Helper function to create segments array
-Array createSegmentsArray(Runtime& runtime, struct whisper_context* ctx, int offset) {
-    int n_segments = whisper_full_n_segments(ctx);
-    auto segmentsArray = Array(runtime, n_segments);
-
-    for (int i = offset; i < n_segments; i++) {
-        const char* text = whisper_full_get_segment_text(ctx, i);
-        auto segmentObj = Object(runtime);
-        segmentObj.setProperty(runtime, "text", String::createFromUtf8(runtime, text));
-        segmentObj.setProperty(runtime, "t0", Value((double)whisper_full_get_segment_t0(ctx, i)));
-        segmentObj.setProperty(runtime, "t1", Value((double)whisper_full_get_segment_t1(ctx, i)));
-        segmentsArray.setValueAtIndex(runtime, i, segmentObj);
+std::string extractBase64Payload(const std::string &value) {
+    static const std::string prefix = "data:audio/wav;base64,";
+    if (value.rfind(prefix, 0) == 0) {
+        return value.substr(prefix.size());
     }
-
-    return segmentsArray;
+    return value;
 }
 
-// Helper function to create full text from segments
-std::string createFullTextFromSegments(struct whisper_context* ctx, int offset) {
-    int n_segments = whisper_full_n_segments(ctx);
-    std::string fullText = "";
-
-    for (int i = offset; i < n_segments; i++) {
-        const char* text = whisper_full_get_segment_text(ctx, i);
-        fullText += text;
-    }
-
-    return fullText;
+bool isWaveBase64(const std::string &value) {
+    static const std::string prefix = "data:audio/wav;base64,";
+    return value.rfind(prefix, 0) == 0;
 }
 
-// Helper function to create and execute promise-based operations
-template<typename ContextType, typename TaskFunc>
-Value createPromiseTask(
-    Runtime& runtime,
-    const std::string& functionName,
-    std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-    const Value* arguments,
-    size_t count,
-    TaskFunc task
-) {
-    // Validate arguments
-    auto validation = validateJSIArguments(runtime, arguments, count, 3);
-    if (!validation.isValid) {
-        throw JSError(runtime, functionName + " " + validation.errorMessage);
+std::vector<float> readWaveAudio(const std::string &pathOrBase64) {
+    if (isWaveBase64(pathOrBase64)) {
+        return decodeWaveBytes(decodeBase64(extractBase64Payload(pathOrBase64)));
+    }
+    return decodeWaveBytes(rnwhisper_jsi::hostLoadFileBytes(pathOrBase64));
+}
+
+std::vector<SegmentData> readSegments(
+    whisper_context *context,
+    int start,
+    bool tdrzEnable,
+    std::string *resultText = nullptr) {
+    int count = whisper_full_n_segments(context);
+    std::vector<SegmentData> segments;
+    if (count <= start) {
+        return segments;
     }
 
-    int contextId = (int)arguments[0].getNumber();
-    auto optionsObj = arguments[1].getObject(runtime);
-    auto arrayBuffer = arguments[2].getObject(runtime).getArrayBuffer(runtime);
-
-    size_t arrayBufferSize = arrayBuffer.size(runtime);
-    uint8_t* arrayBufferData = arrayBuffer.data(runtime);
-
-    logInfo("%s called with contextId=%d, arrayBuffer size=%zu", functionName.c_str(), contextId, arrayBufferSize);
-
-    // Convert ArrayBuffer to audio data
-    AudioData audioResult = convertArrayBufferToAudioData(runtime, arrayBufferSize, arrayBufferData);
-
-    whisper_full_params params = {};
-    CallbackInfo callbackInfo = {};
-    whisper_vad_params vadParams = {};
-    if (functionName == "whisperTranscribeData") {
-        params = createFullParamsFromJSI(runtime, optionsObj);
-        // Extract data from optionsObj before lambda capture
-        callbackInfo = extractCallbacks(runtime, optionsObj);
-    } else if (functionName == "whisperVadDetectSpeech") {
-        vadParams = extractVadParams(runtime, optionsObj);
+    segments.reserve(static_cast<size_t>(count - start));
+    for (int index = start; index < count; ++index) {
+        std::string text = whisper_full_get_segment_text(context, index);
+        if (tdrzEnable && whisper_full_get_segment_speaker_turn_next(context, index)) {
+            text += " [SPEAKER_TURN]";
+        }
+        if (resultText) {
+            resultText->append(text);
+        }
+        segments.push_back({
+            text,
+            static_cast<int>(whisper_full_get_segment_t0(context, index)),
+            static_cast<int>(whisper_full_get_segment_t1(context, index)),
+        });
     }
 
-    // Create promise
-    auto promiseConstructor = runtime.global().getPropertyAsFunction(runtime, "Promise");
+    return segments;
+}
 
-    auto promiseExecutor = Function::createFromHostFunction(
+TranscribeResultData buildTranscribeResult(
+    whisper_context *context,
+    bool tdrzEnable,
+    bool isAborted) {
+    TranscribeResultData result;
+    result.isAborted = isAborted;
+    result.segments = readSegments(context, 0, tdrzEnable, &result.result);
+    const char *language = whisper_lang_str(whisper_full_lang_id(context));
+    result.language = language ? language : "";
+    return result;
+}
+
+jsi::Array createSegmentsArray(
+    jsi::Runtime &runtime,
+    const std::vector<SegmentData> &segments) {
+    jsi::Array array(runtime, segments.size());
+    for (size_t index = 0; index < segments.size(); ++index) {
+        const auto &segment = segments[index];
+        jsi::Object item(runtime);
+        item.setProperty(
+            runtime,
+            "text",
+            jsi::String::createFromUtf8(runtime, segment.text));
+        item.setProperty(runtime, "t0", jsi::Value(segment.t0));
+        item.setProperty(runtime, "t1", jsi::Value(segment.t1));
+        array.setValueAtIndex(runtime, index, item);
+    }
+    return array;
+}
+
+jsi::Value createTranscribeResultValue(
+    jsi::Runtime &runtime,
+    const TranscribeResultData &data) {
+    jsi::Object result(runtime);
+    result.setProperty(
         runtime,
-        PropNameID::forAscii(runtime, ""),
-        2, // resolve, reject
-        [contextId, audioResult, params, callbackInfo, vadParams, task, callInvoker, functionName](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
-            if (count != 2) {
-                throw JSError(runtime, "Promise executor expects 2 arguments (resolve, reject)");
-            }
-
-            auto resolvePtr = std::make_shared<Function>(arguments[0].getObject(runtime).getFunction(runtime));
-            auto rejectPtr = std::make_shared<Function>(arguments[1].getObject(runtime).getFunction(runtime));
-            auto safeRuntime = std::shared_ptr<Runtime>(&runtime, [](Runtime*){});
-
-            // Execute task in ThreadPool
-            auto future = getWhisperThreadPool().enqueue([
-                contextId, audioResult, params, callbackInfo, vadParams, task, resolvePtr, rejectPtr, callInvoker, safeRuntime, functionName]() {
-
-                try {
-                    task(contextId, audioResult, params, callbackInfo, vadParams, resolvePtr, rejectPtr, callInvoker, safeRuntime);
-                } catch (...) {
-                    callInvoker->invokeAsync([rejectPtr, safeRuntime, functionName]() {
-                        auto& runtime = *safeRuntime;
-                        auto errorObj = createErrorObject(runtime, functionName + " processing error");
-                        rejectPtr->call(runtime, errorObj);
-                    });
-                }
-            });
-
-            return Value::undefined();
-        }
-    );
-
-    return promiseConstructor.callAsConstructor(runtime, promiseExecutor);
+        "language",
+        jsi::String::createFromUtf8(runtime, data.language));
+    result.setProperty(
+        runtime,
+        "result",
+        jsi::String::createFromUtf8(runtime, data.result));
+    result.setProperty(runtime, "segments", createSegmentsArray(runtime, data.segments));
+    result.setProperty(runtime, "isAborted", jsi::Value(data.isAborted));
+    return result;
 }
+
+jsi::Value createNewSegmentsValue(
+    jsi::Runtime &runtime,
+    const NewSegmentsData &data) {
+    jsi::Object result(runtime);
+    result.setProperty(runtime, "nNew", jsi::Value(data.nNew));
+    result.setProperty(runtime, "totalNNew", jsi::Value(data.totalNNew));
+    result.setProperty(
+        runtime,
+        "result",
+        jsi::String::createFromUtf8(runtime, data.result));
+    result.setProperty(runtime, "segments", createSegmentsArray(runtime, data.segments));
+    return result;
+}
+
+jsi::Value createVadResultValue(
+    jsi::Runtime &runtime,
+    const VadResultData &data) {
+    jsi::Object result(runtime);
+    result.setProperty(runtime, "hasSpeech", jsi::Value(data.hasSpeech));
+    jsi::Array segments(runtime, data.segments.size());
+    for (size_t index = 0; index < data.segments.size(); ++index) {
+        jsi::Object item(runtime);
+        item.setProperty(runtime, "t0", jsi::Value(data.segments[index].t0));
+        item.setProperty(runtime, "t1", jsi::Value(data.segments[index].t1));
+        segments.setValueAtIndex(runtime, index, item);
+    }
+    result.setProperty(runtime, "segments", segments);
+    return result;
+}
+
+jsi::Value createContextValue(
+    jsi::Runtime &runtime,
+    const std::shared_ptr<WhisperContextHolder> &holder) {
+    jsi::Object result(runtime);
+    result.setProperty(
+        runtime,
+        "contextPtr",
+        jsi::Value(static_cast<double>(holder->ptr)));
+    result.setProperty(runtime, "contextId", jsi::Value(holder->id));
+    result.setProperty(runtime, "gpu", jsi::Value(holder->gpu));
+    result.setProperty(
+        runtime,
+        "reasonNoGPU",
+        jsi::String::createFromUtf8(runtime, holder->reasonNoGPU));
+    return result;
+}
+
+jsi::Value createVadContextValue(
+    jsi::Runtime &runtime,
+    const std::shared_ptr<WhisperVadContextHolder> &holder) {
+    jsi::Object result(runtime);
+    result.setProperty(runtime, "contextId", jsi::Value(holder->id));
+    result.setProperty(runtime, "gpu", jsi::Value(holder->gpu));
+    result.setProperty(
+        runtime,
+        "reasonNoGPU",
+        jsi::String::createFromUtf8(runtime, holder->reasonNoGPU));
+    return result;
+}
+
+void defaultWhisperLogCallback(
+    enum wsp_ggml_log_level level,
+    const char *text,
+    void *) {
+#if defined(__ANDROID__)
+    if (level == WSP_GGML_LOG_LEVEL_ERROR) {
+        __android_log_print(ANDROID_LOG_ERROR, "RNWhisper", "%s", text);
+    } else if (level == WSP_GGML_LOG_LEVEL_WARN) {
+        __android_log_print(ANDROID_LOG_WARN, "RNWhisper", "%s", text);
+    } else if (level == WSP_GGML_LOG_LEVEL_INFO) {
+        __android_log_print(ANDROID_LOG_INFO, "RNWhisper", "%s", text);
+    } else {
+        __android_log_print(ANDROID_LOG_DEBUG, "RNWhisper", "%s", text);
+    }
+#else
+#ifndef WHISPER_DEBUG
+    if (level == WSP_GGML_LOG_LEVEL_DEBUG) {
+        return;
+    }
+#endif
+    std::fputs(text, stderr);
+    std::fflush(stderr);
+#endif
+}
+
+void forwardLogToJs(enum wsp_ggml_log_level level, const char *text, void *) {
+    defaultWhisperLogCallback(level, text, nullptr);
+
+    std::shared_ptr<react::CallInvoker> invoker;
+    std::shared_ptr<jsi::Function> handler;
+    std::shared_ptr<jsi::Runtime> runtime;
+    {
+        std::lock_guard<std::mutex> lock(g_logMutex);
+        invoker = g_logInvoker.lock();
+        handler = g_logHandler;
+        runtime = g_logRuntime;
+    }
+
+    if (!invoker || !handler || !runtime || g_isShuttingDown.load(std::memory_order_relaxed)) {
+        return;
+    }
+
+    std::string levelText = "info";
+    if (level == WSP_GGML_LOG_LEVEL_ERROR) {
+        levelText = "error";
+    } else if (level == WSP_GGML_LOG_LEVEL_WARN) {
+        levelText = "warn";
+    }
+
+    std::string message = text ? text : "";
+    invokeAsync(invoker, [handler, runtime, levelText, message]() {
+        auto &rt = *runtime;
+        handler->call(
+            rt,
+            jsi::String::createFromUtf8(rt, levelText),
+            jsi::String::createFromUtf8(rt, message));
+    });
+}
+
+void releaseWhisperHolder(const std::shared_ptr<WhisperContextHolder> &holder) {
+    if (!holder) {
+        return;
+    }
+    holder->abortActiveJob();
+    holder->waitForIdle();
+    if (holder->context != nullptr) {
+        whisper_free(holder->context);
+        holder->context = nullptr;
+    }
+}
+
+void releaseVadHolder(const std::shared_ptr<WhisperVadContextHolder> &holder) {
+    if (!holder) {
+        return;
+    }
+    holder->waitForIdle();
+    if (holder->context != nullptr) {
+        whisper_vad_free(holder->context);
+        holder->context = nullptr;
+    }
+}
+
+jsi::Object requireObjectArgument(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count,
+    size_t index,
+    const char *message) {
+    if (count <= index || !arguments[index].isObject()) {
+        throw jsi::JSError(runtime, message);
+    }
+    return arguments[index].asObject(runtime);
+}
+
+int requireContextId(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count,
+    size_t index = 0) {
+    if (count <= index || !arguments[index].isNumber()) {
+        throw jsi::JSError(runtime, "First argument must be a context id");
+    }
+    return static_cast<int>(arguments[index].asNumber());
+}
+
+std::string requireStringArgument(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count,
+    size_t index,
+    const char *message) {
+    if (count <= index || !arguments[index].isString()) {
+        throw jsi::JSError(runtime, message);
+    }
+    return arguments[index].asString(runtime).utf8(runtime);
+}
+
+std::vector<float> requireAudioBufferArgument(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count,
+    size_t index) {
+    if (count <= index || !arguments[index].isObject()) {
+        throw jsi::JSError(runtime, "Audio argument must be an ArrayBuffer");
+    }
+    auto object = arguments[index].asObject(runtime);
+    if (!object.isArrayBuffer(runtime)) {
+        throw jsi::JSError(runtime, "Audio argument must be an ArrayBuffer");
+    }
+    auto arrayBuffer = object.getArrayBuffer(runtime);
+    return decodePcm16(arrayBuffer.data(runtime), arrayBuffer.size(runtime));
+}
+
+} // namespace
+
+namespace rnwhisper_jsi {
 
 void installJSIBindings(
-    facebook::jsi::Runtime& runtime,
-    std::shared_ptr<facebook::react::CallInvoker> callInvoker
-) {
-    try {
-        // whisperTranscribeData function
-        auto whisperTranscribeData = Function::createFromHostFunction(
-            runtime,
-            PropNameID::forAscii(runtime, "whisperTranscribeData"),
-            3, // number of arguments
-            [callInvoker](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
-                try {
-                    return createPromiseTask<whisper_context>(
-                        runtime, "whisperTranscribeData", callInvoker, arguments, count,
-                        [](int contextId, const AudioData& audioResult, const whisper_full_params& params, const CallbackInfo& callbackInfo, const whisper_vad_params& vadParams,
-                           std::shared_ptr<Function> resolvePtr, std::shared_ptr<Function> rejectPtr,
-                           std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-                           std::shared_ptr<Runtime> safeRuntime) {
+    jsi::Runtime &runtime,
+    std::shared_ptr<react::CallInvoker> callInvoker) {
+    g_isShuttingDown.store(false, std::memory_order_relaxed);
 
-                            // Get context
-                            auto context = contextManager.getTyped(contextId);
-                            if (!context) {
-                                callInvoker->invokeAsync([rejectPtr, safeRuntime, contextId]() {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "Context not found for id: " + std::to_string(contextId));
-                                    rejectPtr->call(runtime, errorObj);
-                                });
-                                return;
-                            }
+    auto getConstants = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperGetConstants"),
+        0,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *,
+            size_t) -> jsi::Value {
+            return createPromiseTask(runtime, callInvoker, []() -> PromiseResultGenerator {
+                return [](jsi::Runtime &rt) {
+                    jsi::Object result(rt);
+#if defined(WHISPER_USE_COREML)
+                    result.setProperty(rt, "useCoreML", jsi::Value(true));
+#else
+                    result.setProperty(rt, "useCoreML", jsi::Value(false));
+#endif
+#if defined(WHISPER_COREML_ALLOW_FALLBACK)
+                    result.setProperty(rt, "coreMLAllowFallback", jsi::Value(true));
+#else
+                    result.setProperty(rt, "coreMLAllowFallback", jsi::Value(false));
+#endif
+                    return result;
+                };
+            });
+        });
 
-                            // Validate audio data
-                            if (audioResult.data.empty() || audioResult.count <= 0) {
-                                logError("Invalid audio data: size=%zu, count=%d", audioResult.data.size(), audioResult.count);
-                                callInvoker->invokeAsync([rejectPtr, safeRuntime]() {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "Invalid audio data");
-                                    rejectPtr->call(runtime, errorObj);
-                                });
-                                return;
-                            }
+    auto initContext = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperInitContext"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "Context options must be an object");
 
-                            logInfo("Starting whisper_full: context=%p, audioDataCount=%d, jobId=%d",
-                                   context, audioResult.count, callbackInfo.jobId);
-                            whisper_reset_timings(context);
+            WhisperContextInitOptions hostOptions;
+            hostOptions.filePath = getStringProperty(runtime, options, "filePath");
+            hostOptions.isBundleAsset =
+                getBoolProperty(runtime, options, "isBundleAsset", false);
+            hostOptions.useFlashAttn =
+                getBoolProperty(runtime, options, "useFlashAttn", false);
+            hostOptions.useGpu = getBoolProperty(runtime, options, "useGpu", true);
+            hostOptions.useCoreMLIos =
+                getBoolProperty(runtime, options, "useCoreMLIos", true);
+            hostOptions.downloadCoreMLAssets =
+                getBoolProperty(runtime, options, "downloadCoreMLAssets", false);
+            hostOptions.coreMLAssets = parseCoreMLAssets(runtime, options);
 
-                            // Setup callbacks
-                            whisper_full_params mutable_params = params;
-                            auto progress_data = std::make_shared<CallbackData<Function>>();
-                            progress_data->callInvoker = callInvoker;
-                            progress_data->callback = callbackInfo.onProgressCallback;
-                            progress_data->safeRuntime = safeRuntime;
-
-                            if (callbackInfo.onProgressCallback) {
-                                mutable_params.progress_callback = [](struct whisper_context* /*ctx*/, struct whisper_state* /*state*/, int progress, void* user_data) {
-                                    auto* data_ptr = static_cast<std::shared_ptr<CallbackData<Function>>*>(user_data);
-                                    if (data_ptr && *data_ptr) {
-                                        auto data = *data_ptr;
-                                        if (data->callInvoker && data->callback && data->safeRuntime) {
-                                            data->callInvoker->invokeAsync([progress, callback = data->callback, safeRuntime = data->safeRuntime]() {
-                                                try {
-                                                    logInfo("Progress: %d%%", progress);
-                                                    auto& runtime = *safeRuntime;
-                                                    callback->call(runtime, Value(progress));
-                                                } catch (...) {
-                                                    logError("Error in progress callback");
-                                                }
-                                            });
-                                        }
-                                    }
-                                };
-                                mutable_params.progress_callback_user_data = &progress_data;
-                            }
-
-                            auto segments_data = std::make_shared<CallbackData<Function>>();
-                            segments_data->callInvoker = callInvoker;
-                            segments_data->callback = callbackInfo.onNewSegmentsCallback;
-                            segments_data->safeRuntime = safeRuntime;
-
-                            if (callbackInfo.onNewSegmentsCallback) {
-                                mutable_params.new_segment_callback = [](struct whisper_context* ctx, struct whisper_state* /*state*/, int n_new, void* user_data) {
-                                    auto* data_ptr = static_cast<std::shared_ptr<CallbackData<Function>>*>(user_data);
-                                    if (data_ptr && *data_ptr) {
-                                        auto data = *data_ptr;
-                                        if (data->callInvoker && data->callback && data->safeRuntime && ctx) {
-                                            int current_total = data->counter.fetch_add(n_new) + n_new;
-                                            data->callInvoker->invokeAsync([ctx, n_new, current_total, callback = data->callback, safeRuntime = data->safeRuntime]() {
-                                                try {
-                                                    logInfo("New segments: %d (total: %d)", n_new, current_total);
-                                                    auto& runtime = *safeRuntime;
-                                                    auto resultObj = Object(runtime);
-                                                    resultObj.setProperty(runtime, "nNew", Value(n_new));
-                                                    resultObj.setProperty(runtime, "totalNNew", Value(current_total));
-                                                    auto offset = current_total - n_new;
-                                                    resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, ctx, offset));
-                                                    resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(ctx, offset)));
-                                                    callback->call(runtime, resultObj);
-                                                } catch (...) {
-                                                    logError("Error in new segments callback");
-                                                }
-                                            });
-                                        }
-                                    }
-                                };
-                                mutable_params.new_segment_callback_user_data = &segments_data;
-                            }
-
-                            // Execute transcription
-                            rnwhisper::job* job = rnwhisper::job_new(callbackInfo.jobId, mutable_params);
-                            int code = -1;
-
-                            if (job == nullptr) {
-                                logError("Failed to create job for transcription");
-                                code = -2;
-                            } else {
-                                try {
-                                    job->n_processors = callbackInfo.nProcessors;
-                                    code = whisper_full_parallel(context, job->params, audioResult.data.data(), audioResult.count, job->n_processors);
-                                    if (job->is_aborted()) {
-                                        code = -999;
-                                    }
-                                } catch (...) {
-                                    logError("Exception during whisper_full_parallel transcription");
-                                    code = -3;
-                                }
-                                rnwhisper::job_remove(callbackInfo.jobId);
-                            }
-
-                            // Resolve with results
-                            callInvoker->invokeAsync([resolvePtr, rejectPtr, code, context, safeRuntime]() {
-                                try {
-                                    auto& runtime = *safeRuntime;
-                                    if (code == 0) {
-                                        auto resultObj = Object(runtime);
-                                        resultObj.setProperty(runtime, "code", Value(code));
-                                        resultObj.setProperty(runtime, "language", String::createFromUtf8(runtime, whisper_lang_str(whisper_full_lang_id(context))));
-                                        resultObj.setProperty(runtime, "result", String::createFromUtf8(runtime, createFullTextFromSegments(context, 0)));
-                                        resultObj.setProperty(runtime, "segments", createSegmentsArray(runtime, context, 0));
-                                        resolvePtr->call(runtime, resultObj);
-                                    } else {
-                                        std::string errorMsg = (code == -2) ? "Failed to create transcription job" :
-                                                              (code == -3) ? "Transcription failed with exception" :
-                                                              (code == -999) ? "Transcription was aborted" :
-                                                              "Transcription failed";
-                                        auto errorObj = createErrorObject(runtime, errorMsg, code);
-                                        rejectPtr->call(runtime, errorObj);
-                                    }
-                                } catch (...) {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "Unknown error");
-                                    rejectPtr->call(runtime, errorObj);
-                                }
-                            });
-                        }
-                    );
-                } catch (const JSError& e) {
-                    throw;
-                } catch (const std::exception& e) {
-                    logError("Exception in whisperTranscribeData: %s", e.what());
-                    throw JSError(runtime, std::string("whisperTranscribeData error: ") + e.what());
-                } catch (...) {
-                    logError("Unknown exception in whisperTranscribeData");
-                    throw JSError(runtime, "whisperTranscribeData encountered unknown error");
+            return createPromiseTask(runtime, callInvoker, [contextId, hostOptions]() -> PromiseResultGenerator {
+                auto result = hostInitWhisperContext(hostOptions);
+                if (result.context == nullptr) {
+                    throw JsiError("Failed to load the model");
                 }
-            }
-        );
 
-        // whisperVadDetectSpeech function
-        auto whisperVadDetectSpeech = Function::createFromHostFunction(
-            runtime,
-            PropNameID::forAscii(runtime, "whisperVadDetectSpeech"),
-            3, // number of arguments
-            [callInvoker](Runtime& runtime, const Value& thisValue, const Value* arguments, size_t count) -> Value {
-                try {
-                    return createPromiseTask<whisper_vad_context>(
-                        runtime, "whisperVadDetectSpeech", callInvoker, arguments, count,
-                        [](int contextId, const AudioData& audioResult, const whisper_full_params& params, const CallbackInfo& callbackInfo, const whisper_vad_params& vadParams,
-                           std::shared_ptr<Function> resolvePtr, std::shared_ptr<Function> rejectPtr,
-                           std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-                           std::shared_ptr<Runtime> safeRuntime) {
+                auto holder = std::make_shared<WhisperContextHolder>(contextId);
+                holder->context = result.context;
+                holder->ptr = reinterpret_cast<long>(result.context);
+                holder->gpu = result.gpu;
+                holder->reasonNoGPU = result.reasonNoGPU;
+                g_whisperContexts.add(contextId, holder);
 
-                            // Get VAD context
-                            auto vadContext = vadContextManager.getTyped(contextId);
-                            if (!vadContext) {
-                                callInvoker->invokeAsync([rejectPtr, safeRuntime, contextId]() {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "VAD Context not found for id: " + std::to_string(contextId));
-                                    rejectPtr->call(runtime, errorObj);
-                                });
-                                return;
-                            }
+                return [holder](jsi::Runtime &rt) {
+                    return createContextValue(rt, holder);
+                };
+            });
+        });
 
-                            // Validate audio data
-                            if (audioResult.data.empty() || audioResult.count <= 0) {
-                                logError("Invalid audio data: size=%zu, count=%d", audioResult.data.size(), audioResult.count);
-                                callInvoker->invokeAsync([rejectPtr, safeRuntime]() {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "Invalid audio data");
-                                    rejectPtr->call(runtime, errorObj);
-                                });
-                                return;
-                            }
-
-                            logInfo("Starting whisper_vad_detect_speech: vadContext=%p, audioDataCount=%d",
-                                   vadContext, audioResult.count);
-
-                            // Perform VAD detection with error handling
-                            bool isSpeech = false;
-                            try {
-                                isSpeech = whisper_vad_detect_speech(vadContext, audioResult.data.data(), audioResult.count);
-                                logInfo("VAD detection result: %s", isSpeech ? "speech" : "no speech");
-                            } catch (...) {
-                                logError("Exception during whisper_vad_detect_speech");
-                                callInvoker->invokeAsync([rejectPtr, safeRuntime]() {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "VAD detection failed with exception");
-                                    rejectPtr->call(runtime, errorObj);
-                                });
-                                return;
-                            }
-
-                            struct whisper_vad_params vad_params = vadParams;
-
-                            struct whisper_vad_segments* segments = nullptr;
-                            if (isSpeech) {
-                                segments = whisper_vad_segments_from_probs(vadContext, vad_params);
-                            }
-
-                            // Process results on JS thread
-                            callInvoker->invokeAsync([resolvePtr, rejectPtr, segments, safeRuntime]() {
-                                try {
-                                    auto& runtime = *safeRuntime;
-                                    auto resultObj = Object(runtime);
-
-                                    if (segments) {
-                                        int n_segments = whisper_vad_segments_n_segments(segments);
-                                        resultObj.setProperty(runtime, "hasSpeech", Value(n_segments > 0));
-                                        auto segmentsArray = Array(runtime, n_segments);
-
-                                        for (int i = 0; i < n_segments; i++) {
-                                            auto segmentObj = Object(runtime);
-                                            segmentObj.setProperty(runtime, "t0", Value((double)whisper_vad_segments_get_segment_t0(segments, i)));
-                                            segmentObj.setProperty(runtime, "t1", Value((double)whisper_vad_segments_get_segment_t1(segments, i)));
-                                            segmentsArray.setValueAtIndex(runtime, i, segmentObj);
-                                        }
-
-                                        resultObj.setProperty(runtime, "segments", segmentsArray);
-                                        whisper_vad_free_segments(segments);
-                                    } else {
-                                        resultObj.setProperty(runtime, "hasSpeech", Value(false));
-                                        resultObj.setProperty(runtime, "segments", Array(runtime, 0));
-                                    }
-
-                                    resolvePtr->call(runtime, resultObj);
-                                } catch (...) {
-                                    auto& runtime = *safeRuntime;
-                                    auto errorObj = createErrorObject(runtime, "VAD result processing error");
-                                    rejectPtr->call(runtime, errorObj);
-                                }
-                            });
-                        }
-                    );
-                } catch (const JSError& e) {
-                    throw;
-                } catch (const std::exception& e) {
-                    logError("Exception in whisperVadDetectSpeech: %s", e.what());
-                    throw JSError(runtime, std::string("whisperVadDetectSpeech error: ") + e.what());
-                } catch (...) {
-                    logError("Unknown exception in whisperVadDetectSpeech");
-                    throw JSError(runtime, "whisperVadDetectSpeech encountered unknown error");
+    auto releaseContext = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperReleaseContext"),
+        1,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            return createPromiseTask(runtime, callInvoker, [contextId]() -> PromiseResultGenerator {
+                auto holder = g_whisperContexts.remove(contextId);
+                if (!holder) {
+                    throw JsiError("Context not found");
                 }
+                releaseWhisperHolder(holder);
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    auto releaseAllContexts = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperReleaseAllContexts"),
+        0,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *,
+            size_t) -> jsi::Value {
+            return createPromiseTask(runtime, callInvoker, []() -> PromiseResultGenerator {
+                auto holders = g_whisperContexts.removeAll();
+                for (const auto &holder : holders) {
+                    releaseWhisperHolder(holder);
+                }
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    auto transcribeFile = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperTranscribeFile"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            std::string input = requireStringArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "Transcription input must be a string");
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                2,
+                "Transcription options must be an object");
+
+            auto holder = g_whisperContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "Context not found");
             }
-        );
+            auto runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime *) {});
 
-        // Install the JSI functions on the global object
-        runtime.global().setProperty(runtime, "whisperTranscribeData", std::move(whisperTranscribeData));
-        runtime.global().setProperty(runtime, "whisperVadDetectSpeech", std::move(whisperVadDetectSpeech));
+            auto config = createTranscribeConfig(runtime, options, callInvoker);
+            if (!holder->beginExclusiveOperation(config.jobId)) {
+                throw jsi::JSError(runtime, "Context is already transcribing");
+            }
 
-        logInfo("JSI bindings installed successfully");
-    } catch (const JSError& e) {
-        logError("JSError installing JSI bindings: %s", e.getMessage().c_str());
-        throw;
-    } catch (const std::exception& e) {
-        logError("Exception installing JSI bindings: %s", e.what());
-        throw JSError(runtime, std::string("Failed to install JSI bindings: ") + e.what());
-    } catch (...) {
-        logError("Unknown exception installing JSI bindings");
-        throw JSError(runtime, "Failed to install JSI bindings: unknown error");
-    }
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, config, input, callInvoker, runtimePtr]() mutable -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+                    PromiseScopeGuard exclusiveGuard([holder]() { holder->endExclusiveOperation(); });
+
+                    auto audio = readWaveAudio(input);
+                    if (audio.empty()) {
+                        throw JsiError("Invalid file");
+                    }
+
+                    auto progressState = std::make_shared<JsiCallbackState>();
+                    progressState->callInvoker = callInvoker;
+                    progressState->callback = config.onProgress;
+                    progressState->runtime = runtimePtr;
+                    if (config.onProgress) {
+                        config.params.progress_callback =
+                            [](whisper_context *, whisper_state *, int progress, void *userData) {
+                                auto *state = static_cast<std::shared_ptr<JsiCallbackState> *>(userData);
+                                if (!state || !(*state)) {
+                                    return;
+                                }
+                                emitProgressCallback(*state, progress);
+                            };
+                        config.params.progress_callback_user_data = &progressState;
+                    }
+
+                    auto segmentsState = std::make_shared<SegmentCallbackState>();
+                    segmentsState->callInvoker = callInvoker;
+                    segmentsState->callback = config.onNewSegments;
+                    segmentsState->runtime = runtimePtr;
+                    segmentsState->tdrzEnable = config.tdrzEnable;
+
+                    if (config.onNewSegments) {
+                        config.params.new_segment_callback =
+                            [](whisper_context *ctx, whisper_state *, int nNew, void *userData) {
+                                auto *state = static_cast<std::shared_ptr<SegmentCallbackState> *>(userData);
+                                if (!state || !(*state)) {
+                                    return;
+                                }
+
+                                (*state)->totalNNew += nNew;
+                                int offset = (*state)->totalNNew - nNew;
+                                std::string resultText;
+                                auto segments = readSegments(ctx, offset, (*state)->tdrzEnable, &resultText);
+
+                                NewSegmentsData payload;
+                                payload.nNew = nNew;
+                                payload.totalNNew = (*state)->totalNNew;
+                                payload.result = std::move(resultText);
+                                payload.segments = std::move(segments);
+
+                                emitNewSegmentsCallback(*state, std::move(payload));
+                            };
+                        config.params.new_segment_callback_user_data = &segmentsState;
+                    }
+
+                    rnwhisper::job *job = rnwhisper::job_new(config.jobId, config.params);
+                    if (job == nullptr) {
+                        throw JsiError("Failed to create transcription job");
+                    }
+
+                    int code = whisper_full_parallel(
+                        holder->context,
+                        job->params,
+                        audio.data(),
+                        static_cast<int>(audio.size()),
+                        config.nProcessors);
+                    bool isAborted = job->is_aborted();
+                    rnwhisper::job_remove(config.jobId);
+
+                    if (code != 0 && !isAborted) {
+                        throw JsiError("Transcription failed", code);
+                    }
+
+                    auto result = buildTranscribeResult(
+                        holder->context,
+                        config.tdrzEnable,
+                        isAborted);
+                    return [result](jsi::Runtime &rt) {
+                        return createTranscribeResultValue(rt, result);
+                    };
+                });
+            } catch (...) {
+                holder->endExclusiveOperation();
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    auto transcribeData = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperTranscribeData"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "Transcription options must be an object");
+            auto audio = requireAudioBufferArgument(runtime, arguments, count, 2);
+
+            auto holder = g_whisperContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "Context not found");
+            }
+            auto runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime *) {});
+
+            auto config = createTranscribeConfig(runtime, options, callInvoker);
+            if (!holder->beginExclusiveOperation(config.jobId)) {
+                throw jsi::JSError(runtime, "Context is already transcribing");
+            }
+
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, config, audio, callInvoker, runtimePtr]() mutable -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+                    PromiseScopeGuard exclusiveGuard([holder]() { holder->endExclusiveOperation(); });
+
+                    auto progressState = std::make_shared<JsiCallbackState>();
+                    progressState->callInvoker = callInvoker;
+                    progressState->callback = config.onProgress;
+                    progressState->runtime = runtimePtr;
+                    if (config.onProgress) {
+                        config.params.progress_callback =
+                            [](whisper_context *, whisper_state *, int progress, void *userData) {
+                                auto *state = static_cast<std::shared_ptr<JsiCallbackState> *>(userData);
+                                if (!state || !(*state)) {
+                                    return;
+                                }
+                                emitProgressCallback(*state, progress);
+                            };
+                        config.params.progress_callback_user_data = &progressState;
+                    }
+
+                    auto segmentsState = std::make_shared<SegmentCallbackState>();
+                    segmentsState->callInvoker = callInvoker;
+                    segmentsState->callback = config.onNewSegments;
+                    segmentsState->runtime = runtimePtr;
+                    segmentsState->tdrzEnable = config.tdrzEnable;
+
+                    if (config.onNewSegments) {
+                        config.params.new_segment_callback =
+                            [](whisper_context *ctx, whisper_state *, int nNew, void *userData) {
+                                auto *state = static_cast<std::shared_ptr<SegmentCallbackState> *>(userData);
+                                if (!state || !(*state)) {
+                                    return;
+                                }
+
+                                (*state)->totalNNew += nNew;
+                                int offset = (*state)->totalNNew - nNew;
+                                std::string resultText;
+                                auto segments = readSegments(ctx, offset, (*state)->tdrzEnable, &resultText);
+
+                                NewSegmentsData payload;
+                                payload.nNew = nNew;
+                                payload.totalNNew = (*state)->totalNNew;
+                                payload.result = std::move(resultText);
+                                payload.segments = std::move(segments);
+
+                                emitNewSegmentsCallback(*state, std::move(payload));
+                            };
+                        config.params.new_segment_callback_user_data = &segmentsState;
+                    }
+
+                    rnwhisper::job *job = rnwhisper::job_new(config.jobId, config.params);
+                    if (job == nullptr) {
+                        throw JsiError("Failed to create transcription job");
+                    }
+
+                    int code = whisper_full_parallel(
+                        holder->context,
+                        job->params,
+                        audio.data(),
+                        static_cast<int>(audio.size()),
+                        config.nProcessors);
+                    bool isAborted = job->is_aborted();
+                    rnwhisper::job_remove(config.jobId);
+
+                    if (code != 0 && !isAborted) {
+                        throw JsiError("Transcription failed", code);
+                    }
+
+                    auto result = buildTranscribeResult(
+                        holder->context,
+                        config.tdrzEnable,
+                        isAborted);
+                    return [result](jsi::Runtime &rt) {
+                        return createTranscribeResultValue(rt, result);
+                    };
+                });
+            } catch (...) {
+                holder->endExclusiveOperation();
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    auto abortTranscribe = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperAbortTranscribe"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int jobId = count > 1 && arguments[1].isNumber()
+                ? static_cast<int>(arguments[1].asNumber())
+                : -1;
+            return createPromiseTask(runtime, callInvoker, [contextId, jobId]() -> PromiseResultGenerator {
+                auto holder = g_whisperContexts.get(contextId);
+                if (holder) {
+                    holder->abortActiveJob();
+                }
+                if (jobId >= 0) {
+                    if (auto *job = rnwhisper::job_get(jobId)) {
+                        job->abort();
+                    }
+                }
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    auto bench = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperBench"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int maxThreads =
+                count > 1 && arguments[1].isNumber()
+                    ? static_cast<int>(arguments[1].asNumber())
+                    : 0;
+
+            auto holder = g_whisperContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "Context not found");
+            }
+
+            if (!holder->beginExclusiveOperation(-1)) {
+                throw jsi::JSError(runtime, "The context is transcribing");
+            }
+
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, maxThreads]() -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+                    PromiseScopeGuard exclusiveGuard([holder]() { holder->endExclusiveOperation(); });
+
+                    std::string result = rnwhisper::bench(holder->context, maxThreads);
+                    return [result](jsi::Runtime &rt) {
+                        return jsi::String::createFromUtf8(rt, result);
+                    };
+                });
+            } catch (...) {
+                holder->endExclusiveOperation();
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    auto initVadContext = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperInitVadContext"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "VAD options must be an object");
+
+            WhisperVadContextInitOptions hostOptions;
+            hostOptions.filePath = getStringProperty(runtime, options, "filePath");
+            hostOptions.isBundleAsset =
+                getBoolProperty(runtime, options, "isBundleAsset", false);
+            hostOptions.useGpu = getBoolProperty(runtime, options, "useGpu", true);
+            hostOptions.nThreads = getIntProperty(runtime, options, "nThreads", 0);
+
+            return createPromiseTask(runtime, callInvoker, [contextId, hostOptions]() -> PromiseResultGenerator {
+                auto result = hostInitWhisperVadContext(hostOptions);
+                if (result.context == nullptr) {
+                    throw JsiError("Failed to load the VAD model");
+                }
+
+                auto holder = std::make_shared<WhisperVadContextHolder>(contextId);
+                holder->context = result.context;
+                holder->ptr = reinterpret_cast<long>(result.context);
+                holder->gpu = result.gpu;
+                holder->reasonNoGPU = result.reasonNoGPU;
+                g_vadContexts.add(contextId, holder);
+
+                return [holder](jsi::Runtime &rt) {
+                    return createVadContextValue(rt, holder);
+                };
+            });
+        });
+
+    auto releaseVadContext = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperReleaseVadContext"),
+        1,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            return createPromiseTask(runtime, callInvoker, [contextId]() -> PromiseResultGenerator {
+                auto holder = g_vadContexts.remove(contextId);
+                if (!holder) {
+                    throw JsiError("VAD context not found");
+                }
+                releaseVadHolder(holder);
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    auto releaseAllVadContexts = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperReleaseAllVadContexts"),
+        0,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *,
+            size_t) -> jsi::Value {
+            return createPromiseTask(runtime, callInvoker, []() -> PromiseResultGenerator {
+                auto holders = g_vadContexts.removeAll();
+                for (const auto &holder : holders) {
+                    releaseVadHolder(holder);
+                }
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    auto vadDetectSpeech = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadDetectSpeech"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "VAD options must be an object");
+            auto audio = requireAudioBufferArgument(runtime, arguments, count, 2);
+
+            auto holder = g_vadContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "VAD context not found");
+            }
+
+            auto vadOptions = createVadParams(runtime, options);
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, audio, vadOptions]() -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+
+                    bool detected = whisper_vad_detect_speech(
+                        holder->context,
+                        audio.data(),
+                        static_cast<int>(audio.size()));
+
+                    VadResultData result;
+                    result.hasSpeech = detected;
+                    if (detected) {
+                        auto *segments = whisper_vad_segments_from_probs(holder->context, vadOptions);
+                        if (segments != nullptr) {
+                            int count = whisper_vad_segments_n_segments(segments);
+                            result.segments.reserve(static_cast<size_t>(count));
+                            for (int index = 0; index < count; ++index) {
+                                result.segments.push_back({
+                                    whisper_vad_segments_get_segment_t0(segments, index),
+                                    whisper_vad_segments_get_segment_t1(segments, index),
+                                });
+                            }
+                            whisper_vad_free_segments(segments);
+                            result.hasSpeech = !result.segments.empty();
+                        } else {
+                            result.hasSpeech = false;
+                        }
+                    }
+
+                    return [result](jsi::Runtime &rt) {
+                        return createVadResultValue(rt, result);
+                    };
+                });
+            } catch (...) {
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    auto vadDetectSpeechFile = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadDetectSpeechFile"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            std::string input = requireStringArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "VAD input must be a string");
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                2,
+                "VAD options must be an object");
+
+            auto holder = g_vadContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "VAD context not found");
+            }
+
+            auto vadOptions = createVadParams(runtime, options);
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, input, vadOptions]() -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+
+                    auto audio = readWaveAudio(input);
+                    bool detected = whisper_vad_detect_speech(
+                        holder->context,
+                        audio.data(),
+                        static_cast<int>(audio.size()));
+
+                    VadResultData result;
+                    result.hasSpeech = detected;
+                    if (detected) {
+                        auto *segments = whisper_vad_segments_from_probs(holder->context, vadOptions);
+                        if (segments != nullptr) {
+                            int count = whisper_vad_segments_n_segments(segments);
+                            result.segments.reserve(static_cast<size_t>(count));
+                            for (int index = 0; index < count; ++index) {
+                                result.segments.push_back({
+                                    whisper_vad_segments_get_segment_t0(segments, index),
+                                    whisper_vad_segments_get_segment_t1(segments, index),
+                                });
+                            }
+                            whisper_vad_free_segments(segments);
+                            result.hasSpeech = !result.segments.empty();
+                        } else {
+                            result.hasSpeech = false;
+                        }
+                    }
+
+                    return [result](jsi::Runtime &rt) {
+                        return createVadResultValue(rt, result);
+                    };
+                });
+            } catch (...) {
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    auto toggleNativeLog = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperToggleNativeLog"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            bool enabled = count > 0 && arguments[0].isBool() ? arguments[0].getBool() : false;
+            auto callback =
+                enabled && count > 1 ? makeJsiFunction(runtime, arguments[1], callInvoker) : nullptr;
+            auto runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime *) {});
+
+            return createPromiseTask(runtime, callInvoker, [enabled, callback, callInvoker, runtimePtr]() -> PromiseResultGenerator {
+                std::lock_guard<std::mutex> lock(g_logMutex);
+                if (enabled && callback) {
+                    g_logInvoker = callInvoker;
+                    g_logHandler = callback;
+                    g_logRuntime = runtimePtr;
+                    whisper_log_set(forwardLogToJs, nullptr);
+                } else {
+                    g_logInvoker.reset();
+                    g_logHandler.reset();
+                    g_logRuntime.reset();
+                    whisper_log_set(defaultWhisperLogCallback, nullptr);
+                }
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    runtime.global().setProperty(runtime, "whisperGetConstants", std::move(getConstants));
+    runtime.global().setProperty(runtime, "whisperInitContext", std::move(initContext));
+    runtime.global().setProperty(runtime, "whisperReleaseContext", std::move(releaseContext));
+    runtime.global().setProperty(runtime, "whisperReleaseAllContexts", std::move(releaseAllContexts));
+    runtime.global().setProperty(runtime, "whisperTranscribeFile", std::move(transcribeFile));
+    runtime.global().setProperty(runtime, "whisperTranscribeData", std::move(transcribeData));
+    runtime.global().setProperty(runtime, "whisperAbortTranscribe", std::move(abortTranscribe));
+    runtime.global().setProperty(runtime, "whisperBench", std::move(bench));
+    runtime.global().setProperty(runtime, "whisperInitVadContext", std::move(initVadContext));
+    runtime.global().setProperty(runtime, "whisperReleaseVadContext", std::move(releaseVadContext));
+    runtime.global().setProperty(runtime, "whisperReleaseAllVadContexts", std::move(releaseAllVadContexts));
+    runtime.global().setProperty(runtime, "whisperVadDetectSpeech", std::move(vadDetectSpeech));
+    runtime.global().setProperty(runtime, "whisperVadDetectSpeechFile", std::move(vadDetectSpeechFile));
+    runtime.global().setProperty(runtime, "whisperToggleNativeLog", std::move(toggleNativeLog));
 }
 
-// Cleanup function to dispose of ThreadPool
 void cleanupJSIBindings() {
-    std::lock_guard<std::mutex> lock(threadPoolMutex);
-    if (whisperThreadPool) {
-        logInfo("Cleaning up ThreadPool");
-        whisperThreadPool.reset();
+    g_isShuttingDown.store(true, std::memory_order_relaxed);
+
+    {
+        std::lock_guard<std::mutex> lock(g_logMutex);
+        g_logInvoker.reset();
+        g_logHandler.reset();
+        g_logRuntime.reset();
     }
+    whisper_log_set(defaultWhisperLogCallback, nullptr);
+
+    auto whisperHolders = g_whisperContexts.removeAll();
+    auto vadHolders = g_vadContexts.removeAll();
+
+    for (const auto &holder : whisperHolders) {
+        releaseWhisperHolder(holder);
+    }
+    for (const auto &holder : vadHolders) {
+        releaseVadHolder(holder);
+    }
+
+    hostClearCache();
+
+    std::lock_guard<std::mutex> lock(g_threadPoolMutex);
+    g_threadPool.reset();
 }
 
 } // namespace rnwhisper_jsi

@@ -1,20 +1,243 @@
 #import "RNWhisper.h"
-#import "RNWhisperContext.h"
-#import "RNWhisperVadContext.h"
-#import "RNWhisperDownloader.h"
-#import "RNWhisperAudioUtils.h"
 #import "RNWhisperJSI.h"
-#include <stdlib.h>
-#include <string>
+
+#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#import <TargetConditionals.h>
+
+#include <cstring>
 
 #ifdef RCT_NEW_ARCH_ENABLED
 #import <RNWhisperSpec/RNWhisperSpec.h>
 #endif
 
-@implementation RNWhisper
+namespace {
 
-NSMutableDictionary *contexts;
-NSMutableDictionary *vadContexts;
+NSString *cacheDirectoryPath() {
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:@"rnwhisper_debug_assets"];
+}
+
+NSString *ensureDirectoryForFile(NSString *filePath) {
+    NSString *directory = [filePath stringByDeletingLastPathComponent];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:directory]) {
+        [[NSFileManager defaultManager]
+            createDirectoryAtPath:directory
+      withIntermediateDirectories:YES
+                       attributes:nil
+                            error:nil];
+    }
+    return filePath;
+}
+
+bool isRemoteUrl(const std::string &path) {
+    return path.rfind("http://", 0) == 0 || path.rfind("https://", 0) == 0;
+}
+
+std::string toStdString(NSString *value) {
+    return value ? std::string([value UTF8String]) : std::string();
+}
+
+NSString *toNSString(const std::string &value) {
+    return [NSString stringWithUTF8String:value.c_str()];
+}
+
+std::string downloadToCache(const std::string &url, const std::string &relativePath) {
+    NSString *urlString = toNSString(url);
+    NSURL *nsUrl = [NSURL URLWithString:urlString];
+    NSString *baseDirectory = cacheDirectoryPath();
+    NSString *targetPath = nil;
+
+    if (!relativePath.empty()) {
+        targetPath = [baseDirectory stringByAppendingPathComponent:toNSString(relativePath)];
+    } else {
+        NSString *filename = nsUrl.lastPathComponent ?: @"download.bin";
+        targetPath = [baseDirectory stringByAppendingPathComponent:filename];
+    }
+
+    ensureDirectoryForFile(targetPath);
+    if ([[NSFileManager defaultManager] fileExistsAtPath:targetPath]) {
+        return toStdString(targetPath);
+    }
+
+    NSData *data = [NSData dataWithContentsOfURL:nsUrl];
+    if (!data || ![data writeToFile:targetPath atomically:YES]) {
+        return std::string();
+    }
+
+    return toStdString(targetPath);
+}
+
+} // namespace
+
+namespace rnwhisper_jsi {
+
+std::string resolveIosAssetPath(const std::string &path, bool isBundleAsset) {
+    if (!isBundleAsset) {
+        return path;
+    }
+
+    NSString *resourcePath = [[NSBundle mainBundle] pathForResource:toNSString(path) ofType:nil];
+    return resourcePath ? toStdString(resourcePath) : path;
+}
+
+std::string downloadIosFile(const std::string &url, const std::string &relativePath) {
+    return downloadToCache(url, relativePath);
+}
+
+MetalAvailability getMetalAvailability(bool requestedGpu) {
+    MetalAvailability availability;
+    if (!requestedGpu) {
+        availability.available = false;
+        availability.reason = "GPU disabled by user";
+        return availability;
+    }
+
+#if defined(WSP_GGML_USE_METAL)
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    bool supportsMetal = false;
+
+    if (device) {
+        supportsMetal = [device supportsFamily:MTLGPUFamilyApple7];
+        if (@available(iOS 16.0, tvOS 16.0, *)) {
+            supportsMetal = supportsMetal && [device supportsFamily:MTLGPUFamilyMetal3];
+        }
+    }
+
+#if TARGET_OS_SIMULATOR
+    supportsMetal = false;
+#endif
+
+    availability.available = supportsMetal;
+    if (!supportsMetal) {
+#if TARGET_OS_SIMULATOR
+        availability.reason = "Metal is not supported in simulator";
+#else
+        availability.reason = "Metal is not supported in this device";
+#endif
+    }
+#else
+    availability.available = false;
+    availability.reason = "Metal is not enabled in this build";
+#endif
+
+    return availability;
+}
+
+WhisperContextInitResult hostInitWhisperContext(
+    const WhisperContextInitOptions &options) {
+    WhisperContextInitResult result;
+
+    if (options.downloadCoreMLAssets) {
+        for (const auto &asset : options.coreMLAssets) {
+            if (isRemoteUrl(asset.uri)) {
+                downloadToCache(asset.uri, asset.filepath);
+            }
+        }
+    }
+
+    std::string modelPath = options.filePath;
+    if (options.isBundleAsset) {
+        modelPath = resolveIosAssetPath(modelPath, true);
+    } else if (isRemoteUrl(modelPath)) {
+        modelPath = downloadToCache(modelPath, "");
+    }
+
+    if (modelPath.empty()) {
+        return result;
+    }
+
+    auto params = whisper_context_default_params();
+    params.use_gpu = options.useGpu;
+    params.flash_attn = options.useFlashAttn;
+    params.dtw_token_timestamps = false;
+    params.use_coreml = options.useCoreMLIos;
+
+#if !defined(WHISPER_USE_COREML)
+    if (params.use_coreml) {
+        params.use_coreml = false;
+    }
+#endif
+
+    NSString *reasonNoGPU = @"";
+    auto metalAvailability = getMetalAvailability(params.use_gpu);
+    if (!metalAvailability.available) {
+        params.use_gpu = false;
+        reasonNoGPU = toNSString(metalAvailability.reason);
+    } else {
+        params.gpu_device = 0;
+    }
+
+    if (params.use_gpu && params.use_coreml) {
+        params.use_coreml = false;
+    }
+
+    result.context =
+        whisper_init_from_file_with_params(modelPath.c_str(), params);
+    result.gpu = params.use_gpu;
+    result.reasonNoGPU = toStdString(reasonNoGPU);
+    return result;
+}
+
+WhisperVadContextInitResult hostInitWhisperVadContext(
+    const WhisperVadContextInitOptions &options) {
+    WhisperVadContextInitResult result;
+
+    std::string modelPath = options.filePath;
+    if (options.isBundleAsset) {
+        modelPath = resolveIosAssetPath(modelPath, true);
+    } else if (isRemoteUrl(modelPath)) {
+        modelPath = downloadToCache(modelPath, "");
+    }
+
+    if (modelPath.empty()) {
+        return result;
+    }
+
+    auto params = whisper_vad_default_context_params();
+    if (options.nThreads > 0) {
+        params.n_threads = options.nThreads;
+    }
+    params.use_gpu = false;
+
+    result.context =
+        whisper_vad_init_from_file_with_params(modelPath.c_str(), params);
+    result.gpu = false;
+    if (options.useGpu) {
+        result.reasonNoGPU = "GPU VAD is not supported";
+    }
+    return result;
+}
+
+std::vector<uint8_t> hostLoadFileBytes(const std::string &path) {
+    std::string resolvedPath = path;
+    if (isRemoteUrl(resolvedPath)) {
+        resolvedPath = downloadToCache(resolvedPath, "");
+    }
+    if (resolvedPath.empty()) {
+        return {};
+    }
+
+    NSData *data = [NSData dataWithContentsOfFile:toNSString(resolvedPath)];
+    if (!data) {
+        return {};
+    }
+
+    std::vector<uint8_t> bytes([data length]);
+    if (!bytes.empty()) {
+        std::memcpy(bytes.data(), [data bytes], [data length]);
+    }
+    return bytes;
+}
+
+void hostClearCache() {
+    [[NSFileManager defaultManager] removeItemAtPath:cacheDirectoryPath() error:nil];
+}
+
+} // namespace rnwhisper_jsi
+
+@implementation RNWhisper {
+    __unsafe_unretained RCTBridge *_bridge;
+}
 
 RCT_EXPORT_MODULE()
 
@@ -23,14 +246,12 @@ RCT_EXPORT_MODULE()
   return NO;
 }
 
-RCT_EXPORT_METHOD(toggleNativeLog:(BOOL)enabled) {
-    void (^onEmitLog)(NSString *level, NSString *text) = nil;
-    if (enabled) {
-        onEmitLog = ^(NSString *level, NSString *text) {
-            [self sendEventWithName:@"@RNWhisper_onNativeLog" body:@{ @"level": level, @"text": text }];
-        };
-    }
-    [RNWhisperContext toggleNativeLog:enabled onEmitLog:onEmitLog];
+- (RCTBridge *)bridge {
+    return _bridge;
+}
+
+- (void)setBridge:(RCTBridge *)bridge {
+    _bridge = bridge;
 }
 
 - (NSDictionary *)constantsToExport
@@ -49,464 +270,35 @@ RCT_EXPORT_METHOD(toggleNativeLog:(BOOL)enabled) {
   };
 }
 
-RCT_REMAP_METHOD(initContext,
-                 withOptions:(NSDictionary *)modelOptions
-                 withResolver:(RCTPromiseResolveBlock)resolve
+RCT_EXPORT_METHOD(install:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
-    if (contexts == nil) {
-        contexts = [[NSMutableDictionary alloc] init];
-    }
-
-    NSString *modelPath = [modelOptions objectForKey:@"filePath"];
-    BOOL isBundleAsset = [[modelOptions objectForKey:@"isBundleAsset"] boolValue];
-    BOOL useGpu = [[modelOptions objectForKey:@"useGpu"] boolValue];
-    BOOL useCoreMLIos = [[modelOptions objectForKey:@"useCoreMLIos"] boolValue];
-    BOOL useFlashAttn = [[modelOptions objectForKey:@"useFlashAttn"] boolValue];
-
-    // For support debug assets in development mode
-    BOOL downloadCoreMLAssets = [[modelOptions objectForKey:@"downloadCoreMLAssets"] boolValue];
-    if (downloadCoreMLAssets) {
-        NSArray *coreMLAssets = [modelOptions objectForKey:@"coreMLAssets"];
-        // Download coreMLAssets ([{ uri, filepath }])
-        for (NSDictionary *coreMLAsset in coreMLAssets) {
-            NSString *path = coreMLAsset[@"uri"];
-            if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-                [RNWhisperDownloader downloadFile:path toFile:coreMLAsset[@"filepath"]];
-            }
-        }
-    }
-
-    NSString *path = modelPath;
-    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-        path = [RNWhisperDownloader downloadFile:path toFile:nil];
-    }
-    if (isBundleAsset) {
-        path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
-    }
-
-    int contextId = arc4random_uniform(1000000);
-
-    RNWhisperContext *context = [RNWhisperContext
-        initWithModelPath:path
-        contextId:contextId
-        noCoreML:!useCoreMLIos
-        noMetal:!useGpu
-        useFlashAttn:useFlashAttn
-    ];
-    if ([context getContext] == NULL) {
-        reject(@"whisper_cpp_error", @"Failed to load the model", nil);
+    RCTBridge *bridge = self.bridge ?: [RCTBridge currentBridge];
+    if (!bridge) {
+        resolve(@false);
         return;
     }
 
-    [contexts setObject:context forKey:[NSNumber numberWithInt:contextId]];
-    // Also add to unified context management - store raw context pointer like Android
-    rnwhisper_jsi::addContext(contextId, reinterpret_cast<long>([context getContext]));
+    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge.batchedBridge;
+    if (!cxxBridge) {
+        cxxBridge = (RCTCxxBridge *)bridge;
+    }
 
-    resolve(@{
-        @"contextId": @(contextId),
-        @"gpu": @([context isMetalEnabled]),
-        @"reasonNoGPU": [context reasonNoMetal],
+    auto callInvoker = cxxBridge.jsCallInvoker ?: bridge.jsCallInvoker;
+    if (!cxxBridge.runtime || !callInvoker) {
+        resolve(@false);
+        return;
+    }
+
+    auto *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
+    callInvoker->invokeAsync([runtime, callInvoker]() {
+        rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
     });
-}
-
-- (NSArray *)supportedEvents {
-  return@[
-    @"@RNWhisper_onTranscribeProgress",
-    @"@RNWhisper_onTranscribeNewSegments",
-    @"@RNWhisper_onNativeLog",
-  ];
-}
-
-- (void)transcribeData:(RNWhisperContext *)context
-    withContextId:(int)contextId
-    withJobId:(int)jobId
-    withData:(float *)data
-    withDataCount:(int)count
-    withOptions:(NSDictionary *)options
-    withResolver:(RCTPromiseResolveBlock)resolve
-    withRejecter:(RCTPromiseRejectBlock)reject
-{
-    [context transcribeData:jobId
-        audioData:data
-        audioDataCount:count
-        options:options
-        onProgress: ^(int progress) {
-            rnwhisper::job* job = rnwhisper::job_get(jobId);
-            if (job && job->is_aborted()) return;
-
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self sendEventWithName:@"@RNWhisper_onTranscribeProgress"
-                    body:@{
-                        @"contextId": [NSNumber numberWithInt:contextId],
-                        @"jobId": [NSNumber numberWithInt:jobId],
-                        @"progress": [NSNumber numberWithInt:progress]
-                    }
-                ];
-            });
-        }
-        onNewSegments: ^(NSDictionary *result) {
-            rnwhisper::job* job = rnwhisper::job_get(jobId);
-            if (job && job->is_aborted()) return;
-
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self sendEventWithName:@"@RNWhisper_onTranscribeNewSegments"
-                    body:@{
-                        @"contextId": [NSNumber numberWithInt:contextId],
-                        @"jobId": [NSNumber numberWithInt:jobId],
-                        @"result": result
-                    }
-                ];
-            });
-        }
-        onEnd: ^(int code) {
-            if (code != 0 && code != 999) {
-                reject(@"whisper_cpp_error", [NSString stringWithFormat:@"Failed to transcribe the file. Code: %d", code], nil);
-                return;
-            }
-            NSMutableDictionary *result = [context getTextSegments:options];
-            resolve(result);
-        }
-    ];
-}
-
-RCT_REMAP_METHOD(transcribeFile,
-                 withContextId:(int)contextId
-                 withJobId:(int)jobId
-                 withWaveFile:(NSString *)waveFilePathOrDataBase64
-                 withOptions:(NSDictionary *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-
-    if (context == nil) {
-        reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    if ([context isTranscribing]) {
-        reject(@"whisper_error", @"Context is already transcribing", nil);
-        return;
-    }
-
-    float *data = nil;
-    int count = 0;
-    if ([waveFilePathOrDataBase64 hasPrefix:@"http://"] || [waveFilePathOrDataBase64 hasPrefix:@"https://"]) {
-        NSString *path = [RNWhisperDownloader downloadFile:waveFilePathOrDataBase64 toFile:nil];
-        data = [RNWhisperAudioUtils decodeWaveFile:path count:&count];
-    } else if ([waveFilePathOrDataBase64 hasPrefix:@"data:audio/wav;base64,"]) {
-        NSData *waveData = [[NSData alloc] initWithBase64EncodedString:[waveFilePathOrDataBase64 substringFromIndex:22] options:0];
-        data = [RNWhisperAudioUtils decodeWaveData:waveData count:&count cutHeader:YES];
-    } else {
-        data = [RNWhisperAudioUtils decodeWaveFile:waveFilePathOrDataBase64 count:&count];
-    }
-    if (data == nil) {
-        reject(@"whisper_error", @"Invalid file", nil);
-        return;
-    }
-
-    [self transcribeData:context
-        withContextId:contextId
-        withJobId:jobId
-        withData:data
-        withDataCount:count
-        withOptions:options
-        withResolver:resolve
-        withRejecter:reject
-    ];
-}
-
-RCT_REMAP_METHOD(transcribeData,
-                 withContextId:(int)contextId
-                 withJobId:(int)jobId
-                 withData:(NSString *)dataBase64 // pcm data base64 encoded
-                 withOptions:(NSDictionary *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-  RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-
-  if (context == nil) {
-      reject(@"whisper_error", @"Context not found", nil);
-      return;
-  }
-  if ([context isTranscribing]) {
-      reject(@"whisper_error", @"Context is already transcribing", nil);
-      return;
-  }
-
-  NSData *pcmData = [[NSData alloc] initWithBase64EncodedString:dataBase64 options:0];
-  int count = 0;
-  float *data = [RNWhisperAudioUtils decodeWaveData:pcmData count:&count cutHeader:NO];
-
-  if (data == nil) {
-      reject(@"whisper_error", @"Invalid data", nil);
-      return;
-  }
-
-  [self transcribeData:context
-      withContextId:contextId
-      withJobId:jobId
-      withData:data
-      withDataCount:count
-      withOptions:options
-      withResolver:resolve
-      withRejecter:reject
-  ];
-}
-
-RCT_REMAP_METHOD(abortTranscribe,
-                 withContextId:(int)contextId
-                 withJobId:(int)jobId
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-    if (context == nil) {
-        reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    [context stopTranscribe:jobId];
-    resolve(nil);
-}
-
-RCT_REMAP_METHOD(bench,
-                 withContextId:(int)contextId
-                 withMaxThreads:(int)maxThreads
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-    if (context == nil) {
-        reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    if ([context isTranscribing]) {
-        reject(@"whisper_error", @"The context is transcribing", nil);
-        return;
-    }
-    NSString *result = [context bench:maxThreads];
-    resolve(result);
-}
-
-RCT_REMAP_METHOD(releaseContext,
-                 withContextId:(int)contextId
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperContext *context = contexts[[NSNumber numberWithInt:contextId]];
-    if (context == nil) {
-        reject(@"whisper_error", @"Context not found", nil);
-        return;
-    }
-    rnwhisper_jsi::removeContext(contextId);
-    [contexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
-    [context invalidate];
-    resolve(nil);
-}
-
-RCT_REMAP_METHOD(releaseAllContexts,
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    [self releaseAllContexts];
-    resolve(nil);
-}
-
-RCT_REMAP_METHOD(initVadContext,
-                 withVadOptions:(NSDictionary *)vadOptions
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    if (vadContexts == nil) {
-        vadContexts = [[NSMutableDictionary alloc] init];
-    }
-
-    NSString *modelPath = [vadOptions objectForKey:@"filePath"];
-    BOOL isBundleAsset = [[vadOptions objectForKey:@"isBundleAsset"] boolValue];
-    BOOL useGpu = [[vadOptions objectForKey:@"useGpu"] boolValue];
-    NSNumber *nThreads = [vadOptions objectForKey:@"nThreads"];
-
-    NSString *path = modelPath;
-    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
-        path = [RNWhisperDownloader downloadFile:path toFile:nil];
-    }
-    if (isBundleAsset) {
-        path = [[NSBundle mainBundle] pathForResource:modelPath ofType:nil];
-    }
-
-    int contextId = arc4random_uniform(1000000);
-
-    RNWhisperVadContext *vadContext = [RNWhisperVadContext
-        initWithModelPath:path
-        contextId:contextId
-        noMetal:!useGpu
-        nThreads:nThreads
-    ];
-    if ([vadContext getVadContext] == NULL) {
-        reject(@"whisper_vad_error", @"Failed to load the VAD model", nil);
-        return;
-    }
-
-    [vadContexts setObject:vadContext forKey:[NSNumber numberWithInt:contextId]];
-    // Also add to unified context management - store raw VAD context pointer like Android
-    rnwhisper_jsi::addVadContext(contextId, reinterpret_cast<long>([vadContext getVadContext]));
-
-    resolve(@{
-        @"contextId": @(contextId),
-        @"gpu": @([vadContext isMetalEnabled]),
-        @"reasonNoGPU": [vadContext reasonNoMetal],
-    });
-}
-
-RCT_REMAP_METHOD(vadDetectSpeech,
-                 withContextId:(int)contextId
-                 withAudioData:(NSString *)audioDataBase64
-                 withOptions:(NSDictionary *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperVadContext *vadContext = vadContexts[[NSNumber numberWithInt:contextId]];
-
-    if (vadContext == nil) {
-        reject(@"whisper_vad_error", @"VAD context not found", nil);
-        return;
-    }
-
-    // Decode base64 audio data
-    NSData *pcmData = [[NSData alloc] initWithBase64EncodedString:audioDataBase64 options:0];
-    if (pcmData == nil) {
-        reject(@"whisper_vad_error", @"Invalid audio data", nil);
-        return;
-    }
-
-    int count = 0;
-    float *data = [RNWhisperAudioUtils decodeWaveData:pcmData count:&count cutHeader:NO];
-
-    NSArray *segments = [vadContext detectSpeech:data samplesCount:count options:options];
-    resolve(segments);
-}
-
-RCT_REMAP_METHOD(vadDetectSpeechFile,
-                 withVadContextId:(int)contextId
-                 withFilePath:(NSString *)filePath
-                 withOptions:(NSDictionary *)options
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperVadContext *vadContext = vadContexts[[NSNumber numberWithInt:contextId]];
-
-    if (vadContext == nil) {
-        reject(@"whisper_vad_error", @"VAD context not found", nil);
-        return;
-    }
-
-    // Handle different input types like transcribeFile does
-    float *data = nil;
-    int count = 0;
-    if ([filePath hasPrefix:@"http://"] || [filePath hasPrefix:@"https://"]) {
-        NSString *path = [RNWhisperDownloader downloadFile:filePath toFile:nil];
-        data = [RNWhisperAudioUtils decodeWaveFile:path count:&count];
-    } else if ([filePath hasPrefix:@"data:audio/wav;base64,"]) {
-        NSData *waveData = [[NSData alloc] initWithBase64EncodedString:[filePath substringFromIndex:22] options:0];
-        data = [RNWhisperAudioUtils decodeWaveData:waveData count:&count cutHeader:YES];
-    } else {
-        data = [RNWhisperAudioUtils decodeWaveFile:filePath count:&count];
-    }
-
-    if (data == nil) {
-        reject(@"whisper_vad_error", @"Failed to load or decode audio file", nil);
-        return;
-    }
-
-    NSArray *segments = [vadContext detectSpeech:data samplesCount:count options:options];
-    resolve(segments);
-}
-
-RCT_REMAP_METHOD(releaseVadContext,
-                 withVadContextId:(int)contextId
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RNWhisperVadContext *vadContext = vadContexts[[NSNumber numberWithInt:contextId]];
-    if (vadContext == nil) {
-        reject(@"whisper_vad_error", @"VAD context not found", nil);
-        return;
-    }
-    rnwhisper_jsi::removeVadContext(contextId);
-    [vadContexts removeObjectForKey:[NSNumber numberWithInt:contextId]];
-    [vadContext invalidate];
-    resolve(nil);
-}
-
-RCT_EXPORT_METHOD(releaseAllVadContexts:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    [self releaseAllVadContexts];
-    resolve(nil);
-}
-
-- (void)releaseAllContexts {
-    rnwhisper::job_abort_all(); // graceful abort
-    if (contexts != nil) {
-        for (NSNumber *contextId in contexts) {
-            RNWhisperContext *context = contexts[contextId];
-            rnwhisper_jsi::removeContext([contextId intValue]);
-            [context invalidate];
-        }
-        [contexts removeAllObjects];
-        contexts = nil;
-    }
-}
-
-- (void)releaseAllVadContexts {
-    if (vadContexts != nil) {
-        for (NSNumber *contextId in vadContexts) {
-            RNWhisperVadContext *vadContext = vadContexts[contextId];
-            rnwhisper_jsi::removeVadContext([contextId intValue]);
-            [vadContext invalidate];
-        }
-        [vadContexts removeAllObjects];
-        vadContexts = nil;
-    }
-}
-
-RCT_EXPORT_METHOD(installJSIBindings:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-{
-    RCTBridge *bridge = [RCTBridge currentBridge];
-    if (bridge == nil) {
-        reject(@"whisper_jsi_error", @"Bridge not available", nil);
-        return;
-    }
-
-    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge;
-    auto callInvoker = bridge.jsCallInvoker;
-    if (cxxBridge.runtime) {
-        facebook::jsi::Runtime *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
-
-        if (callInvoker) {
-          callInvoker->invokeAsync([runtime, callInvoker]() {
-            rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
-          });
-        } else {
-          reject(@"whisper_jsi_error", @"CallInvoker not available", nil);
-          return;
-        }
-
-        resolve(@{});
-    } else {
-        reject(@"whisper_jsi_error", @"Runtime not available", nil);
-    }
+    resolve(@true);
 }
 
 - (void)invalidate {
-    [super invalidate];
-
-    [self releaseAllContexts];
-    [self releaseAllVadContexts];
-
-    [RNWhisperDownloader clearCache];
+    rnwhisper_jsi::cleanupJSIBindings();
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

@@ -38,7 +38,7 @@
 
 #### Defined in
 
-[index.ts:147](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L147)
+[index.ts:235](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L235)
 
 ## Properties
 
@@ -48,7 +48,7 @@
 
 #### Defined in
 
-[index.ts:143](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L143)
+[index.ts:231](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L231)
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-[index.ts:141](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L141)
+[index.ts:229](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L229)
 
 ___
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-[index.ts:139](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L139)
+[index.ts:227](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L227)
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[index.ts:145](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L145)
+[index.ts:233](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L233)
 
 ## Methods
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-[index.ts:340](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L340)
+[index.ts:357](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L357)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[index.ts:354](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L354)
+[index.ts:363](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L363)
 
 ___
 
@@ -128,7 +128,7 @@ base64: need add `data:audio/wav;base64,` prefix
 | Name | Type |
 | :------ | :------ |
 | `filePathOrBase64` | `string` \| `number` |
-| `options` | [`TranscribeFileOptions`](../modules/index.md#transcribefileoptions) |
+| `options` | [`TranscribeFileOptions`](../interfaces/index.TranscribeFileOptions.md) |
 
 #### Returns
 
@@ -141,7 +141,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:241](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L241)
+[index.ts:265](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L265)
 
 ___
 
@@ -156,7 +156,7 @@ Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
 | Name | Type |
 | :------ | :------ |
 | `data` | `string` \| `ArrayBuffer` |
-| `options` | [`TranscribeFileOptions`](../modules/index.md#transcribefileoptions) |
+| `options` | [`TranscribeFileOptions`](../interfaces/index.TranscribeFileOptions.md) |
 
 #### Returns
 
@@ -169,4 +169,4 @@ Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
 
 #### Defined in
 
-[index.ts:272](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L272)
+[index.ts:318](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L318)

@@ -9,15 +9,16 @@
 - [WhisperContext](../classes/index.WhisperContext.md)
 - [WhisperVadContext](../classes/index.WhisperVadContext.md)
 
+### Interfaces
+
+- [TranscribeFileOptions](../interfaces/index.TranscribeFileOptions.md)
+
 ### Type Aliases
 
 - [BenchResult](index.md#benchresult)
 - [ContextOptions](index.md#contextoptions)
-- [TranscribeFileOptions](index.md#transcribefileoptions)
-- [TranscribeNewSegmentsNativeEvent](index.md#transcribenewsegmentsnativeevent)
 - [TranscribeNewSegmentsResult](index.md#transcribenewsegmentsresult)
 - [TranscribeOptions](index.md#transcribeoptions)
-- [TranscribeProgressNativeEvent](index.md#transcribeprogressnativeevent)
 - [TranscribeResult](index.md#transcriberesult)
 - [VadContextOptions](index.md#vadcontextoptions)
 - [VadOptions](index.md#vadoptions)
@@ -34,6 +35,7 @@
 - [addNativeLogListener](index.md#addnativeloglistener)
 - [initWhisper](index.md#initwhisper)
 - [initWhisperVad](index.md#initwhispervad)
+- [installJsi](index.md#installjsi)
 - [releaseAllWhisper](index.md#releaseallwhisper)
 - [releaseAllWhisperVad](index.md#releaseallwhispervad)
 - [toggleNativeLog](index.md#togglenativelog)
@@ -57,7 +59,7 @@
 
 #### Defined in
 
-[index.ts:129](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L129)
+[index.ts:217](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L217)
 
 ___
 
@@ -80,35 +82,7 @@ ___
 
 #### Defined in
 
-[index.ts:359](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L359)
-
-___
-
-### TranscribeFileOptions
-
-Ƭ **TranscribeFileOptions**: [`TranscribeOptions`](index.md#transcribeoptions) & { `onNewSegments?`: (`result`: [`TranscribeNewSegmentsResult`](index.md#transcribenewsegmentsresult)) => `void` ; `onProgress?`: (`progress`: `number`) => `void`  }
-
-#### Defined in
-
-[index.ts:112](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L112)
-
-___
-
-### TranscribeNewSegmentsNativeEvent
-
-Ƭ **TranscribeNewSegmentsNativeEvent**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `contextId` | `number` |
-| `jobId` | `number` |
-| `result` | [`TranscribeNewSegmentsResult`](index.md#transcribenewsegmentsresult) |
-
-#### Defined in
-
-[index.ts:105](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L105)
+[index.ts:369](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L369)
 
 ___
 
@@ -127,7 +101,7 @@ ___
 
 #### Defined in
 
-[index.ts:98](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L98)
+[index.ts:203](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L203)
 
 ___
 
@@ -150,33 +124,15 @@ ___
 | `offset?` | `number` | Time offset in milliseconds |
 | `prompt?` | `string` | Initial Prompt |
 | `tdrzEnable?` | `boolean` | Enable tinydiarize (requires a tdrz model) |
-| `temperature?` | `number` | Tnitial decoding temperature |
-| `temperatureInc?` | `number` | - |
+| `temperature?` | `number` | Initial decoding temperature |
+| `temperatureInc?` | `number` | Temperature fallback increment applied between decoding retries |
 | `tokenTimestamps?` | `boolean` | Enable token-level timestamps |
 | `translate?` | `boolean` | Translate from source language to english (Default: false) |
 | `wordThold?` | `number` | Word timestamp probability threshold |
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/25a2438/src/NativeRNWhisper.ts#L5)
-
-___
-
-### TranscribeProgressNativeEvent
-
-Ƭ **TranscribeProgressNativeEvent**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `contextId` | `number` |
-| `jobId` | `number` |
-| `progress` | `number` |
-
-#### Defined in
-
-[index.ts:123](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L123)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -195,7 +151,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:39](https://github.com/mybigday/whisper.rn/blob/25a2438/src/NativeRNWhisper.ts#L39)
+[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L40)
 
 ___
 
@@ -214,7 +170,7 @@ ___
 
 #### Defined in
 
-[index.ts:476](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L476)
+[index.ts:449](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L449)
 
 ___
 
@@ -235,7 +191,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:72](https://github.com/mybigday/whisper.rn/blob/25a2438/src/NativeRNWhisper.ts#L72)
+[NativeRNWhisper.ts:73](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L73)
 
 ___
 
@@ -252,31 +208,31 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:100](https://github.com/mybigday/whisper.rn/blob/25a2438/src/NativeRNWhisper.ts#L100)
+[NativeRNWhisper.ts:101](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L101)
 
 ## Variables
 
 ### isCoreMLAllowFallback
 
-• `Const` **isCoreMLAllowFallback**: `boolean` = `!!coreMLAllowFallback`
+• `Const` **isCoreMLAllowFallback**: `boolean` = `!!nativeConstants.coreMLAllowFallback`
 
 Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:470](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L470)
+[index.ts:442](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L442)
 
 ___
 
 ### isUseCoreML
 
-• `Const` **isUseCoreML**: `boolean` = `!!useCoreML`
+• `Const` **isUseCoreML**: `boolean` = `!!nativeConstants.useCoreML`
 
 Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:467](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L467)
+[index.ts:439](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L439)
 
 ___
 
@@ -288,13 +244,15 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:462](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L462)
+[index.ts:436](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L436)
 
 ## Functions
 
 ### addNativeLogListener
 
 ▸ **addNativeLogListener**(`listener`): `Object`
+
+Add a listener for native whisper.cpp log output
 
 #### Parameters
 
@@ -312,27 +270,31 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:622](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L622)
+[index.ts:577](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L577)
 
 ___
 
 ### initWhisper
 
-▸ **initWhisper**(`«destructured»`): `Promise`<[`WhisperContext`](../classes/index.WhisperContext.md)\>
+▸ **initWhisper**(`options`): `Promise`<[`WhisperContext`](../classes/index.WhisperContext.md)\>
+
+Initialize a whisper context with a GGML model file
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `«destructured»` | [`ContextOptions`](index.md#contextoptions) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `options` | [`ContextOptions`](index.md#contextoptions) | Whisper context options |
 
 #### Returns
 
 `Promise`<[`WhisperContext`](../classes/index.WhisperContext.md)\>
 
+Promise resolving to WhisperContext instance
+
 #### Defined in
 
-[index.ts:387](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L387)
+[index.ts:395](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L395)
 
 ___
 
@@ -356,7 +318,21 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:566](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L566)
+[index.ts:525](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L525)
+
+___
+
+### installJsi
+
+▸ **installJsi**(): `Promise`<`void`\>
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[index.ts:80](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L80)
 
 ___
 
@@ -370,7 +346,7 @@ ___
 
 #### Defined in
 
-[index.ts:455](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L455)
+[index.ts:429](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L429)
 
 ___
 
@@ -388,13 +364,15 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:605](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L605)
+[index.ts:557](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L557)
 
 ___
 
 ### toggleNativeLog
 
 ▸ **toggleNativeLog**(`enabled`): `Promise`<`void`\>
+
+Enable or disable native whisper.cpp logging
 
 #### Parameters
 
@@ -408,4 +386,4 @@ ___
 
 #### Defined in
 
-[index.ts:613](https://github.com/mybigday/whisper.rn/blob/25a2438/src/index.ts#L613)
+[index.ts:566](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L566)

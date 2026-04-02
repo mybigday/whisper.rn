@@ -1,73 +1,201 @@
-import {
-  NativeEventEmitter,
-  DeviceEventEmitter,
-  Platform,
-  DeviceEventEmitterStatic,
-  Image,
-} from 'react-native'
-import RNWhisper, {
+import { Image, NativeModules } from 'react-native'
+import { Buffer } from 'safe-buffer'
+import RNWhisper from './NativeRNWhisper'
+import './jsi'
+import type {
+  CoreMLAsset,
   NativeWhisperContext,
   NativeWhisperVadContext,
-} from './NativeRNWhisper'
-import type {
+  NativeContextOptions,
+  NativeVadContextOptions,
   TranscribeOptions,
   TranscribeResult,
-  CoreMLAsset,
   VadOptions,
   VadSegment,
 } from './NativeRNWhisper'
 import { version } from './version.json'
 
-declare global {
-  // eslint-disable-next-line no-var
-  var whisperTranscribeData: (
-    contextId: number,
-    options: TranscribeOptions,
-    data: ArrayBuffer,
-  ) => Promise<TranscribeResult>
-  // eslint-disable-next-line no-var
-  var whisperVadDetectSpeech: (
-    contextId: number,
-    options: VadOptions,
-    audioData: ArrayBuffer,
-  ) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
+type NativeConstants = {
+  useCoreML?: boolean
+  coreMLAllowFallback?: boolean
 }
 
-let jsiWhisperTranscribeData: (
-  contextId: number,
-  options: TranscribeOptions,
-  data: ArrayBuffer,
-) => Promise<TranscribeResult>
-let jsiWhisperVadDetectSpeech: (
-  contextId: number,
-  options: VadOptions,
-  audioData: ArrayBuffer,
-) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
+type CoreMLModelAssetOptions = {
+  filename: string
+  assets: string[] | number[]
+}
 
-let jsiInstalled = false
+const nativeConstants: NativeConstants =
+  ((RNWhisper as any)?.getConstants?.() as NativeConstants | undefined) ??
+  (NativeModules.RNWhisper?.getConstants?.() as NativeConstants | undefined) ??
+  {}
 
-const installJSIBindingsIfNeeded = async () => {
-  if (jsiInstalled) return
-  jsiInstalled = true
-  return RNWhisper.installJSIBindings()
-    .then(() => {
-      jsiWhisperTranscribeData = global.whisperTranscribeData
-      delete (global as any).whisperTranscribeData
-      jsiWhisperVadDetectSpeech = global.whisperVadDetectSpeech
-      delete (global as any).whisperVadDetectSpeech
+const jsiBindingKeys = [
+  'whisperGetConstants',
+  'whisperInitContext',
+  'whisperReleaseContext',
+  'whisperReleaseAllContexts',
+  'whisperTranscribeFile',
+  'whisperTranscribeData',
+  'whisperAbortTranscribe',
+  'whisperBench',
+  'whisperInitVadContext',
+  'whisperReleaseVadContext',
+  'whisperReleaseAllVadContexts',
+  'whisperVadDetectSpeech',
+  'whisperVadDetectSpeechFile',
+  'whisperToggleNativeLog',
+] as const
+
+type JsiBindingKey = (typeof jsiBindingKeys)[number]
+type JsiBindings = { [K in JsiBindingKey]: NonNullable<(typeof globalThis)[K]> }
+
+let jsiBindings: JsiBindings | null = null
+let isJsiInstalled = false
+
+const bindJsiFromGlobal = () => {
+  const bindings: Partial<JsiBindings> = {}
+  const missing: string[] = []
+
+  jsiBindingKeys.forEach((key) => {
+    const value = global[key]
+    if (typeof value === 'function') {
+      ;(bindings as Record<string, unknown>)[key] =
+        value as JsiBindings[typeof key]
+      delete (globalThis as any)[key]
+    } else {
+      missing.push(key)
+    }
+  })
+
+  if (missing.length > 0) {
+    throw new Error(`[RNWhisper] Missing JSI bindings: ${missing.join(', ')}`)
+  }
+
+  jsiBindings = bindings as JsiBindings
+}
+
+const getJsi = (): JsiBindings => {
+  if (!jsiBindings) {
+    throw new Error('JSI bindings not installed')
+  }
+  return jsiBindings
+}
+
+export const installJsi = async () => {
+  if (isJsiInstalled) return
+
+  if (typeof global.whisperInitContext !== 'function') {
+    const installed = await RNWhisper.install()
+    if (!installed && typeof global.whisperInitContext !== 'function') {
+      throw new Error('JSI bindings not installed')
+    }
+  }
+
+  bindJsiFromGlobal()
+  isJsiInstalled = true
+}
+
+const toArrayBuffer = (view: Uint8Array): ArrayBuffer =>
+  view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength)
+
+const decodeBase64ToArrayBuffer = (data: string): ArrayBuffer =>
+  toArrayBuffer(Buffer.from(data, 'base64') as unknown as Uint8Array)
+
+const stripFileScheme = (path: string): string =>
+  path.startsWith('file://') ? path.slice(7) : path
+
+let contextIdCounter = 1
+const contextIdRandom = () =>
+  process.env.NODE_ENV === 'test'
+    ? 0
+    : Math.floor(Math.random() * 0x7fffffff)
+
+const createContextId = (): number => {
+  const contextId = contextIdCounter + contextIdRandom()
+  contextIdCounter += 1
+  return contextId
+}
+
+const coreMLModelAssetPaths = [
+  'analytics/coremldata.bin',
+  'weights/weight.bin',
+  'model.mil',
+  'coremldata.bin',
+]
+
+const resolvePathFromAsset = (asset: number): string => {
+  try {
+    const source = Image.resolveAssetSource(asset)
+    if (source?.uri) {
+      return source.uri
+    }
+  } catch (error) {
+    throw new Error(`Invalid asset: ${asset}`)
+  }
+  throw new Error(`Invalid asset: ${asset}`)
+}
+
+const resolveLocalInputPath = (
+  input: string | number,
+  remoteError: string,
+): string => {
+  if (typeof input === 'number') {
+    return resolvePathFromAsset(input)
+  }
+
+  if (input.startsWith('http://') || input.startsWith('https://')) {
+    throw new Error(remoteError)
+  }
+
+  return stripFileScheme(input)
+}
+
+const createCoreMLAssets = (
+  coreMLModelAsset?: CoreMLModelAssetOptions,
+): CoreMLAsset[] | undefined => {
+  if (!coreMLModelAsset?.filename || !coreMLModelAsset.assets) {
+    return undefined
+  }
+
+  return coreMLModelAsset.assets
+    .map((asset) => {
+      if (typeof asset === 'number') {
+        const { uri } = Image.resolveAssetSource(asset)
+        const filepath = coreMLModelAssetPaths.find((path) =>
+          uri.includes(path),
+        )
+        if (!filepath) return undefined
+        return {
+          uri,
+          filepath: `${coreMLModelAsset.filename}/${filepath}`,
+        }
+      }
+
+      return {
+        uri: asset,
+        filepath: `${coreMLModelAsset.filename}/${asset}`,
+      }
     })
-    .catch((e) => {
-      console.warn('Failed to install JSI bindings', e)
-    })
+    .filter((asset): asset is CoreMLAsset => asset !== undefined)
 }
 
-let EventEmitter: NativeEventEmitter | DeviceEventEmitterStatic
-if (Platform.OS === 'ios') {
-  // @ts-ignore
-  EventEmitter = new NativeEventEmitter(RNWhisper)
+const normalizeBenchResult = (result: string) => {
+  const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] =
+    JSON.parse(result)
+  return {
+    config,
+    nThreads,
+    encodeMs,
+    decodeMs,
+    batchMs,
+    promptMs,
+  }
 }
-if (Platform.OS === 'android') {
-  EventEmitter = DeviceEventEmitter
+
+const logListeners: Array<(level: string, text: string) => void> = []
+const emitNativeLog = (level: string, text: string) => {
+  logListeners.forEach((listener) => listener(level, text))
 }
 
 export type {
@@ -77,24 +205,6 @@ export type {
   VadSegment,
 }
 
-const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
-const EVENT_ON_TRANSCRIBE_NEW_SEGMENTS = '@RNWhisper_onTranscribeNewSegments'
-const EVENT_ON_NATIVE_LOG = '@RNWhisper_onNativeLog'
-
-const logListeners: Array<(level: string, text: string) => void> = []
-
-// @ts-ignore
-if (EventEmitter) {
-  EventEmitter.addListener(
-    EVENT_ON_NATIVE_LOG,
-    (evt: { level: string; text: string }) => {
-      logListeners.forEach((listener) => listener(evt.level, evt.text))
-    },
-  )
-  // Trigger unset to use default log callback
-  RNWhisper?.toggleNativeLog?.(false)?.catch?.(() => {})
-}
-
 export type TranscribeNewSegmentsResult = {
   nNew: number
   totalNNew: number
@@ -102,28 +212,11 @@ export type TranscribeNewSegmentsResult = {
   segments: TranscribeResult['segments']
 }
 
-export type TranscribeNewSegmentsNativeEvent = {
-  contextId: number
-  jobId: number
-  result: TranscribeNewSegmentsResult
-}
-
-// Fn -> Boolean in TranscribeFileNativeOptions
-export type TranscribeFileOptions = TranscribeOptions & {
-  /**
-   * Progress callback, the progress is between 0 and 100
-   */
+export interface TranscribeFileOptions extends TranscribeOptions {
+  /** Progress callback, the progress is between 0 and 100 */
   onProgress?: (progress: number) => void
-  /**
-   * Callback when new segments are transcribed
-   */
+  /** Callback when new segments are transcribed */
   onNewSegments?: (result: TranscribeNewSegmentsResult) => void
-}
-
-export type TranscribeProgressNativeEvent = {
-  contextId: number
-  jobId: number
-  progress: number
 }
 
 export type BenchResult = {
@@ -140,9 +233,9 @@ export class WhisperContext {
 
   id: number
 
-  gpu: boolean = false
+  gpu = false
 
-  reasonNoGPU: string = ''
+  reasonNoGPU = ''
 
   constructor({
     contextPtr,
@@ -156,81 +249,17 @@ export class WhisperContext {
     this.reasonNoGPU = reasonNoGPU
   }
 
-  private transcribeWithNativeMethod(
-    method: 'transcribeFile' | 'transcribeData',
-    data: string,
-    options: TranscribeFileOptions = {},
-  ): {
-    stop: () => Promise<void>
-    promise: Promise<TranscribeResult>
-  } {
-    const jobId: number = Math.floor(Math.random() * 10000)
-
-    const { onProgress, onNewSegments, ...rest } = options
-
-    let progressListener: any
-    let lastProgress: number = 0
-    if (onProgress) {
-      progressListener = EventEmitter.addListener(
-        EVENT_ON_TRANSCRIBE_PROGRESS,
-        (evt: TranscribeProgressNativeEvent) => {
-          const { contextId, progress } = evt
-          if (contextId !== this.id || evt.jobId !== jobId) return
-          lastProgress = progress > 100 ? 100 : progress
-          onProgress(lastProgress)
-        },
-      )
-    }
-    const removeProgressListener = () => {
-      if (progressListener) {
-        progressListener.remove()
-        progressListener = null
-      }
-    }
-
-    let newSegmentsListener: any
-    if (onNewSegments) {
-      newSegmentsListener = EventEmitter.addListener(
-        EVENT_ON_TRANSCRIBE_NEW_SEGMENTS,
-        (evt: TranscribeNewSegmentsNativeEvent) => {
-          const { contextId, result } = evt
-          if (contextId !== this.id || evt.jobId !== jobId) return
-          onNewSegments(result)
-        },
-      )
-    }
-    const removeNewSegmenetsListener = () => {
-      if (newSegmentsListener) {
-        newSegmentsListener.remove()
-        newSegmentsListener = null
-      }
-    }
+  private runTranscription(
+    run: (jobId: number) => Promise<TranscribeResult>,
+  ): { stop: () => Promise<void>; promise: Promise<TranscribeResult> } {
+    const { whisperAbortTranscribe } = getJsi()
+    const jobId = Math.floor(Math.random() * 10000)
 
     return {
       stop: async () => {
-        await RNWhisper.abortTranscribe(this.id, jobId)
-        removeProgressListener()
-        removeNewSegmenetsListener()
+        await whisperAbortTranscribe(this.id, jobId)
       },
-      promise: RNWhisper[method](this.id, jobId, data, {
-        ...rest,
-        onProgress: !!onProgress,
-        onNewSegments: !!onNewSegments,
-      })
-        .then((result) => {
-          removeProgressListener()
-          removeNewSegmenetsListener()
-          if (!result.isAborted && lastProgress !== 100) {
-            // Handle the case that the last progress event is not triggered
-            onProgress?.(100)
-          }
-          return result
-        })
-        .catch((e) => {
-          removeProgressListener()
-          removeNewSegmenetsListener()
-          throw e
-        }),
+      promise: run(jobId),
     }
   }
 
@@ -247,23 +276,45 @@ export class WhisperContext {
     /** Transcribe result promise */
     promise: Promise<TranscribeResult>
   } {
+    const { whisperTranscribeFile } = getJsi()
+    const { onProgress, ...rest } = options
+    let lastProgress = 0
+    const progressCallback = onProgress
+      ? (progress: number) => {
+          lastProgress = progress
+          onProgress(progress)
+        }
+      : undefined
+
     let path = ''
     if (typeof filePathOrBase64 === 'number') {
-      try {
-        const source = Image.resolveAssetSource(filePathOrBase64)
-        if (source) path = source.uri
-      } catch (e) {
-        throw new Error(`Invalid asset: ${filePathOrBase64}`)
-      }
-    } else {
-      if (filePathOrBase64.startsWith('http'))
-        throw new Error(
-          'Transcribe remote file is not supported, please download it first',
-        )
+      path = resolvePathFromAsset(filePathOrBase64)
+    } else if (filePathOrBase64.startsWith('data:audio/wav;base64,')) {
       path = filePathOrBase64
+    } else {
+      path = resolveLocalInputPath(
+        filePathOrBase64,
+        'Transcribe remote file is not supported, please download it first',
+      )
     }
-    if (path.startsWith('file://')) path = path.slice(7)
-    return this.transcribeWithNativeMethod('transcribeFile', path, options)
+
+    const task = this.runTranscription((jobId) =>
+      whisperTranscribeFile(this.id, path, {
+        ...rest,
+        onProgress: progressCallback,
+        jobId,
+      }),
+    )
+
+    return {
+      stop: task.stop,
+      promise: task.promise.then((result) => {
+        if (onProgress && !result.isAborted && lastProgress !== 100) {
+          onProgress(100)
+        }
+        return result
+      }),
+    }
   }
 
   /**
@@ -276,83 +327,47 @@ export class WhisperContext {
     stop: () => Promise<void>
     promise: Promise<TranscribeResult>
   } {
-    if (data instanceof ArrayBuffer) {
-      // Use JSI function for ArrayBuffer
-      if (!jsiWhisperTranscribeData) {
-        throw new Error('JSI binding `whisperTranscribeData` not installed')
-      }
-      return this.transcribeDataArrayBuffer(data, options)
-    }
-    return this.transcribeWithNativeMethod('transcribeData', data, options)
-  }
-
-  /**
-   * Transcribe audio data from ArrayBuffer (16-bit PCM, mono, 16kHz)
-   */
-  private transcribeDataArrayBuffer(
-    data: ArrayBuffer,
-    options: TranscribeFileOptions = {},
-  ): {
-    stop: () => Promise<void>
-    promise: Promise<TranscribeResult>
-  } {
-    const { onProgress, onNewSegments, ...rest } = options
-
-    // Generate a unique jobId for this transcription
-    const jobId = Math.floor(Math.random() * 10000)
-
-    const jsiOptions = {
-      ...rest,
-      onProgress: onProgress || undefined,
-      onNewSegments: onNewSegments || undefined,
-      jobId, // Pass jobId to native implementation
-    }
-
-    let isAborted = false
-    const promise = jsiWhisperTranscribeData(this.id, jsiOptions, data)
-      .then((result: any) => {
-        if (isAborted) {
-          return { ...result, isAborted: true }
+    const { whisperTranscribeData } = getJsi()
+    const { onProgress, ...rest } = options
+    let lastProgress = 0
+    const progressCallback = onProgress
+      ? (progress: number) => {
+          lastProgress = progress
+          onProgress(progress)
         }
-        return result
-      })
-      .catch((error: any) => {
-        if (isAborted) {
-          return { isAborted: true, error: 'Transcription aborted' }
-        }
-        throw error
-      })
+      : undefined
+    const audioData =
+      data instanceof ArrayBuffer ? data : decodeBase64ToArrayBuffer(data)
+
+    const task = this.runTranscription(
+      (jobId) =>
+        whisperTranscribeData(
+          this.id,
+          { ...rest, onProgress: progressCallback, jobId },
+          audioData,
+        ),
+    )
 
     return {
-      stop: async () => {
-        isAborted = true
-        try {
-          // Use the existing native abort method
-          await RNWhisper.abortTranscribe(this.id, jobId)
-        } catch (error) {
-          // Ignore errors if context is already released or job doesn't exist
+      stop: task.stop,
+      promise: task.promise.then((result) => {
+        if (onProgress && !result.isAborted && lastProgress !== 100) {
+          onProgress(100)
         }
-      },
-      promise,
+        return result
+      }),
     }
   }
 
   async bench(maxThreads: number): Promise<BenchResult> {
-    const result = await RNWhisper.bench(this.id, maxThreads)
-    const [config, nThreads, encodeMs, decodeMs, batchMs, promptMs] =
-      JSON.parse(result)
-    return {
-      config,
-      nThreads,
-      encodeMs,
-      decodeMs,
-      batchMs,
-      promptMs,
-    } as BenchResult
+    const { whisperBench } = getJsi()
+    const result = await whisperBench(this.id, maxThreads)
+    return normalizeBenchResult(result)
   }
 
   async release(): Promise<void> {
-    return RNWhisper.releaseContext(this.id)
+    const { whisperReleaseContext } = getJsi()
+    return whisperReleaseContext(this.id)
   }
 }
 
@@ -363,10 +378,7 @@ export type ContextOptions = {
    * use this option is required if you want to enable Core ML,
    * you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require`
    */
-  coreMLModelAsset?: {
-    filename: string
-    assets: string[] | number[]
-  }
+  coreMLModelAsset?: CoreMLModelAssetOptions
   /** Is the file path a bundle asset for pure string filePath */
   isBundleAsset?: boolean
   /** Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. */
@@ -377,13 +389,11 @@ export type ContextOptions = {
   useFlashAttn?: boolean
 }
 
-const coreMLModelAssetPaths = [
-  'analytics/coremldata.bin',
-  'weights/weight.bin',
-  'model.mil',
-  'coremldata.bin',
-]
-
+/**
+ * Initialize a whisper context with a GGML model file
+ * @param options Whisper context options
+ * @returns Promise resolving to WhisperContext instance
+ */
 export async function initWhisper({
   filePath,
   coreMLModelAsset,
@@ -392,82 +402,47 @@ export async function initWhisper({
   useCoreMLIos = true,
   useFlashAttn = false,
 }: ContextOptions): Promise<WhisperContext> {
-  await installJSIBindingsIfNeeded()
+  await installJsi()
+  const { whisperInitContext } = getJsi()
 
-  let path = ''
-  let coreMLAssets: CoreMLAsset[] | undefined
-  if (coreMLModelAsset) {
-    const { filename, assets } = coreMLModelAsset
-    if (filename && assets) {
-      coreMLAssets = assets
-        ?.map((asset) => {
-          if (typeof asset === 'number') {
-            const { uri } = Image.resolveAssetSource(asset)
-            const filepath = coreMLModelAssetPaths.find((p) => uri.includes(p))
-            if (filepath) {
-              return {
-                uri,
-                filepath: `${filename}/${filepath}`,
-              }
-            }
-          } else if (typeof asset === 'string') {
-            return {
-              uri: asset,
-              filepath: `${filename}/${asset}`,
-            }
-          }
-          return undefined
-        })
-        .filter((asset): asset is CoreMLAsset => asset !== undefined)
-    }
-  }
-  if (typeof filePath === 'number') {
-    try {
-      const source = Image.resolveAssetSource(filePath)
-      if (source) {
-        path = source.uri
-      }
-    } catch (e) {
-      throw new Error(`Invalid asset: ${filePath}`)
-    }
-  } else {
-    if (!isBundleAsset && filePath.startsWith('http'))
-      throw new Error(
-        'Transcribe remote file is not supported, please download it first',
-      )
-    path = filePath
-  }
-  if (path.startsWith('file://')) path = path.slice(7)
-  const { contextPtr, contextId, gpu, reasonNoGPU } =
-    await RNWhisper.initContext({
-      filePath: path,
-      isBundleAsset: !!isBundleAsset,
-      useFlashAttn,
-      useGpu,
-      useCoreMLIos,
-      // Only development mode need download Core ML model assets (from packager server)
-      downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
-      coreMLAssets,
-    })
-  return new WhisperContext({ contextPtr, contextId, gpu, reasonNoGPU })
+  const coreMLAssets = createCoreMLAssets(coreMLModelAsset)
+  const path =
+    typeof filePath === 'number'
+      ? resolvePathFromAsset(filePath)
+      : resolveLocalInputPath(
+          filePath,
+          'Transcribe remote file is not supported, please download it first',
+        )
+
+  const contextId = createContextId()
+  const context = await whisperInitContext(contextId, {
+    filePath: path,
+    isBundleAsset: !!isBundleAsset,
+    useFlashAttn,
+    useGpu,
+    useCoreMLIos,
+    downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
+    coreMLAssets,
+  } satisfies NativeContextOptions)
+
+  return new WhisperContext(context)
 }
 
 export async function releaseAllWhisper(): Promise<void> {
-  await installJSIBindingsIfNeeded()
-
-  return RNWhisper.releaseAllContexts()
+  if (!isJsiInstalled) return
+  const { whisperReleaseAllContexts } = getJsi()
+  return whisperReleaseAllContexts()
 }
 
 /** Current version of whisper.cpp */
 export const libVersion: string = version
 
-const { useCoreML, coreMLAllowFallback } = RNWhisper.getConstants?.() || {}
-
 /** Is use CoreML models on iOS */
-export const isUseCoreML: boolean = !!useCoreML
+export const isUseCoreML: boolean = !!nativeConstants.useCoreML
 
 /** Is allow fallback to CPU if load CoreML model failed */
-export const isCoreMLAllowFallback: boolean = !!coreMLAllowFallback
+export const isCoreMLAllowFallback: boolean =
+  !!nativeConstants.coreMLAllowFallback
 
 //
 // VAD (Voice Activity Detection) Context
@@ -486,9 +461,9 @@ export type VadContextOptions = {
 export class WhisperVadContext {
   id: number
 
-  gpu: boolean = false
+  gpu = false
 
-  reasonNoGPU: string = ''
+  reasonNoGPU = ''
 
   constructor({ contextId, gpu, reasonNoGPU }: NativeWhisperVadContext) {
     this.id = contextId
@@ -504,31 +479,22 @@ export class WhisperVadContext {
     filePathOrBase64: string | number,
     options: VadOptions = {},
   ): Promise<VadSegment[]> {
+    const { whisperVadDetectSpeechFile } = getJsi()
+
     let path = ''
     if (typeof filePathOrBase64 === 'number') {
-      try {
-        const source = Image.resolveAssetSource(filePathOrBase64)
-        if (source) path = source.uri
-      } catch (e) {
-        throw new Error(`Invalid asset: ${filePathOrBase64}`)
-      }
-    } else {
-      if (filePathOrBase64.startsWith('http'))
-        throw new Error(
-          'VAD remote file is not supported, please download it first',
-        )
+      path = resolvePathFromAsset(filePathOrBase64)
+    } else if (filePathOrBase64.startsWith('data:audio/wav;base64,')) {
       path = filePathOrBase64
-    }
-    if (path.startsWith('file://')) path = path.slice(7)
-
-    // Check if this is base64 encoded audio data
-    if (path.startsWith('data:audio/')) {
-      // This is base64 encoded audio data, use the raw data method
-      return RNWhisper.vadDetectSpeech(this.id, path, options)
     } else {
-      // This is a file path, use the file method
-      return RNWhisper.vadDetectSpeechFile(this.id, path, options)
+      path = resolveLocalInputPath(
+        filePathOrBase64,
+        'VAD remote file is not supported, please download it first',
+      )
     }
+
+    const result = await whisperVadDetectSpeechFile(this.id, path, options)
+    return result.segments || []
   }
 
   /**
@@ -538,23 +504,18 @@ export class WhisperVadContext {
     audioData: string | ArrayBuffer,
     options: VadOptions = {},
   ): Promise<VadSegment[]> {
-    if (audioData instanceof ArrayBuffer) {
-      // Use JSI function for ArrayBuffer
-      if (!jsiWhisperVadDetectSpeech) {
-        throw new Error('JSI binding `whisperVadDetectSpeech` not installed')
-      }
-      const result = await jsiWhisperVadDetectSpeech(
-        this.id,
-        options,
-        audioData,
-      )
-      return result.segments || []
-    }
-    return RNWhisper.vadDetectSpeech(this.id, audioData, options)
+    const { whisperVadDetectSpeech } = getJsi()
+    const pcmData =
+      audioData instanceof ArrayBuffer
+        ? audioData
+        : decodeBase64ToArrayBuffer(audioData)
+    const result = await whisperVadDetectSpeech(this.id, options, pcmData)
+    return result.segments || []
   }
 
   async release(): Promise<void> {
-    return RNWhisper.releaseVadContext(this.id)
+    const { whisperReleaseVadContext } = getJsi()
+    return whisperReleaseVadContext(this.id)
   }
 }
 
@@ -569,33 +530,26 @@ export async function initWhisperVad({
   useGpu = true,
   nThreads,
 }: VadContextOptions): Promise<WhisperVadContext> {
-  await installJSIBindingsIfNeeded()
+  await installJsi()
+  const { whisperInitVadContext } = getJsi()
 
-  let path = ''
-  if (typeof filePath === 'number') {
-    try {
-      const source = Image.resolveAssetSource(filePath)
-      if (source) {
-        path = source.uri
-      }
-    } catch (e) {
-      throw new Error(`Invalid asset: ${filePath}`)
-    }
-  } else {
-    if (!isBundleAsset && filePath.startsWith('http'))
-      throw new Error(
-        'VAD remote file is not supported, please download it first',
-      )
-    path = filePath
-  }
-  if (path.startsWith('file://')) path = path.slice(7)
-  const { contextId, gpu, reasonNoGPU } = await RNWhisper.initVadContext({
+  const path =
+    typeof filePath === 'number'
+      ? resolvePathFromAsset(filePath)
+      : resolveLocalInputPath(
+          filePath,
+          'VAD remote file is not supported, please download it first',
+        )
+
+  const contextId = createContextId()
+  const context = await whisperInitVadContext(contextId, {
     filePath: path,
     isBundleAsset: !!isBundleAsset,
     useGpu,
     nThreads,
-  })
-  return new WhisperVadContext({ contextId, gpu, reasonNoGPU })
+  } satisfies NativeVadContextOptions)
+
+  return new WhisperVadContext(context)
 }
 
 /**
@@ -603,22 +557,25 @@ export async function initWhisperVad({
  * @returns Promise resolving when all contexts are released
  */
 export async function releaseAllWhisperVad(): Promise<void> {
-  await installJSIBindingsIfNeeded()
-
-  return RNWhisper.releaseAllVadContexts()
+  if (!isJsiInstalled) return
+  const { whisperReleaseAllVadContexts } = getJsi()
+  return whisperReleaseAllVadContexts()
 }
 
 let logInitialized = false
 
+/** Enable or disable native whisper.cpp logging */
 export async function toggleNativeLog(enabled: boolean): Promise<void> {
-  if (!enabled && !logInitialized) return // If first call is false, skip
+  if (!enabled && !logInitialized) return
 
   logInitialized = true
-  await installJSIBindingsIfNeeded()
+  await installJsi()
 
-  return RNWhisper.toggleNativeLog(enabled)
+  const { whisperToggleNativeLog } = getJsi()
+  return whisperToggleNativeLog(enabled, enabled ? emitNativeLog : undefined)
 }
 
+/** Add a listener for native whisper.cpp log output */
 export function addNativeLogListener(
   listener: (level: string, text: string) => void,
 ): { remove: () => void } {

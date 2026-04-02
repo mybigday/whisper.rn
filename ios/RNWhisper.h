@@ -11,9 +11,8 @@
 #import <Foundation/Foundation.h>
 #import <React/RCTBridgeModule.h>
 #import <React/RCTBridge+Private.h>
-#import <React/RCTEventEmitter.h>
 #import <ReactCommon/RCTTurboModule.h>
 
-@interface RNWhisper : RCTEventEmitter <RCTBridgeModule>
+@interface RNWhisper : NSObject <RCTBridgeModule>
 
 @end

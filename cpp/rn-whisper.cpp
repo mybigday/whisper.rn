@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -105,8 +106,10 @@ job::~job() {
 }
 
 std::unordered_map<int, job*> job_map;
+std::mutex job_map_mutex;
 
 void job_abort_all() {
+    std::lock_guard<std::mutex> lock(job_map_mutex);
     for (auto it = job_map.begin(); it != job_map.end(); ++it) {
         it->second->abort();
     }
@@ -116,25 +119,25 @@ job* job_new(int job_id, struct whisper_full_params params) {
     job* ctx = new job();
     ctx->job_id = job_id;
     ctx->params = params;
-
-    job_map[job_id] = ctx;
-
-    // Abort handler
-    params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
+    ctx->params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         job *j = (job*)user_data;
         return !j->is_aborted();
     };
-    params.encoder_begin_callback_user_data = job_map[job_id];
-    params.abort_callback = [](void * user_data) {
+    ctx->params.abort_callback = [](void * user_data) {
         job *j = (job*)user_data;
         return j->is_aborted();
     };
-    params.abort_callback_user_data = job_map[job_id];
+    ctx->params.encoder_begin_callback_user_data = ctx;
+    ctx->params.abort_callback_user_data = ctx;
 
-    return job_map[job_id];
+    std::lock_guard<std::mutex> lock(job_map_mutex);
+    job_map[job_id] = ctx;
+
+    return ctx;
 }
 
 job* job_get(int job_id) {
+    std::lock_guard<std::mutex> lock(job_map_mutex);
     if (job_map.find(job_id) != job_map.end()) {
         return job_map[job_id];
     }
@@ -142,6 +145,7 @@ job* job_get(int job_id) {
 }
 
 void job_remove(int job_id) {
+    std::lock_guard<std::mutex> lock(job_map_mutex);
     if (job_map.find(job_id) != job_map.end()) {
         delete job_map[job_id];
     }

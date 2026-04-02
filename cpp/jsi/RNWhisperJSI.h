@@ -1,15 +1,12 @@
 #pragma once
 
-#include <jsi/jsi.h>
-#include <memory>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
-#include <atomic>
 #include <ReactCommon/CallInvoker.h>
+#include <jsi/jsi.h>
+#include <string>
+#include <vector>
 
 #if defined(__ANDROID__)
-#include <android/log.h>
+#include <jni.h>
 #include "whisper.h"
 #include "rn-whisper.h"
 #endif
@@ -26,19 +23,63 @@
 
 namespace rnwhisper_jsi {
 
-// Context management functions
-void addContext(int contextId, long contextPtr);
-void removeContext(int contextId);
-void addVadContext(int contextId, long vadContextPtr);
-void removeVadContext(int contextId);
+struct CoreMLAssetInfo {
+    std::string uri;
+    std::string filepath;
+};
 
-// Main JSI installation function
+struct WhisperContextInitOptions {
+    std::string filePath;
+    bool isBundleAsset = false;
+    bool useFlashAttn = false;
+    bool useGpu = true;
+    bool useCoreMLIos = true;
+    bool downloadCoreMLAssets = false;
+    std::vector<CoreMLAssetInfo> coreMLAssets;
+};
+
+struct WhisperContextInitResult {
+    whisper_context *context = nullptr;
+    bool gpu = false;
+    std::string reasonNoGPU;
+};
+
+struct WhisperVadContextInitOptions {
+    std::string filePath;
+    bool isBundleAsset = false;
+    bool useGpu = true;
+    int nThreads = 0;
+};
+
+struct WhisperVadContextInitResult {
+    whisper_vad_context *context = nullptr;
+    bool gpu = false;
+    std::string reasonNoGPU;
+};
+
+WhisperContextInitResult hostInitWhisperContext(
+    const WhisperContextInitOptions &options);
+WhisperVadContextInitResult hostInitWhisperVadContext(
+    const WhisperVadContextInitOptions &options);
+std::vector<uint8_t> hostLoadFileBytes(const std::string &path);
+void hostClearCache();
+
+#if defined(__ANDROID__)
+void setAndroidContext(JNIEnv *env, jobject applicationContext, jobject assetManager);
+#elif defined(__APPLE__)
+struct MetalAvailability {
+    bool available = false;
+    std::string reason;
+};
+
+std::string resolveIosAssetPath(const std::string &path, bool isBundleAsset);
+std::string downloadIosFile(const std::string &url, const std::string &relativePath);
+MetalAvailability getMetalAvailability(bool requestedGpu);
+#endif
+
 void installJSIBindings(
-    facebook::jsi::Runtime& runtime,
-    std::shared_ptr<facebook::react::CallInvoker> callInvoker
-);
-
-// Cleanup function to dispose of ThreadPool
+    facebook::jsi::Runtime &runtime,
+    std::shared_ptr<facebook::react::CallInvoker> callInvoker);
 void cleanupJSIBindings();
 
 } // namespace rnwhisper_jsi

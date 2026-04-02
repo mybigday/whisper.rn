@@ -2,38 +2,24 @@ package com.rnwhisper;
 
 import androidx.annotation.NonNull;
 
+import android.content.res.AssetManager;
+
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.bridge.ReactMethod;
-import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.module.annotations.ReactModule;
+import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
 
 import java.util.HashMap;
-import java.util.Random;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.PushbackInputStream;
 
-@ReactModule(name = RNWhisperModule.NAME)
+@ReactModule(name = RNWhisper.NAME)
 public class RNWhisperModule extends NativeRNWhisperSpec {
-  public static final String NAME = "RNWhisper";
+  public static final String NAME = RNWhisper.NAME;
 
-  private RNWhisper rnwhisper;
+  private final ReactApplicationContext context;
 
   public RNWhisperModule(ReactApplicationContext reactContext) {
     super(reactContext);
-    rnwhisper = new RNWhisper(reactContext);
-  }
-
-  @ReactMethod
-  public void installJSIBindings(Promise promise) {
-    rnwhisper.installJSIBindings(promise);
-  }
-
-  @ReactMethod
-  public void toggleNativeLog(boolean enabled, Promise promise) {
-    rnwhisper.toggleNativeLog(enabled, promise);
+    this.context = reactContext;
   }
 
   @Override
@@ -43,93 +29,61 @@ public class RNWhisperModule extends NativeRNWhisperSpec {
   }
 
   @Override
-  public HashMap<String, Object> getTypedExportedConstants() {
-    return rnwhisper.getTypedExportedConstants();
+  public HashMap<String, Object> getConstants() {
+    HashMap<String, Object> constants = new HashMap<>();
+    constants.put("useCoreML", false);
+    constants.put("coreMLAllowFallback", false);
+    return constants;
   }
 
-  @ReactMethod
-  public void initContext(final ReadableMap options, final Promise promise) {
-    rnwhisper.initContext(options, promise);
+  @Override
+  public void install(Promise promise) {
+    try {
+      boolean loaded = RNWhisper.loadNative(context);
+      if (!loaded) {
+        promise.resolve(false);
+        return;
+      }
+
+      long jsContextPointer = context.getJavaScriptContextHolder().get();
+      CallInvokerHolderImpl holder =
+        (CallInvokerHolderImpl) context.getCatalystInstance().getJSCallInvokerHolder();
+      AssetManager assetManager = context.getAssets();
+
+      if (jsContextPointer == 0 || holder == null || assetManager == null) {
+        promise.resolve(false);
+        return;
+      }
+
+      installJSIBindings(
+        jsContextPointer,
+        holder,
+        context.getApplicationContext(),
+        assetManager
+      );
+      promise.resolve(true);
+    } catch (UnsatisfiedLinkError error) {
+      promise.resolve(false);
+    } catch (Exception error) {
+      promise.resolve(false);
+    }
   }
 
-  @ReactMethod
-  public void transcribeFile(double id, double jobId, String filePath, ReadableMap options, Promise promise) {
-    rnwhisper.transcribeFile(id, jobId, filePath, options, promise);
-  }
+  private native void installJSIBindings(
+    long jsContextPointer,
+    CallInvokerHolderImpl callInvokerHolder,
+    Object applicationContext,
+    Object assetManager
+  );
 
-  @ReactMethod
-  public void transcribeData(double id, double jobId, String dataBase64, ReadableMap options, Promise promise) {
-    rnwhisper.transcribeData(id, jobId, dataBase64, options, promise);
-  }
+  private native void cleanupJSIBindings();
 
-  @ReactMethod
-  public void abortTranscribe(double contextId, double jobId, Promise promise) {
-    rnwhisper.abortTranscribe(contextId, jobId, promise);
-  }
-
-  @ReactMethod
-  public void bench(double id, double nThreads, Promise promise) {
-    rnwhisper.bench(id, nThreads, promise);
-  }
-
-  @ReactMethod
-  public void releaseContext(double id, Promise promise) {
-    rnwhisper.releaseContext(id, promise);
-  }
-
-  @ReactMethod
-  public void releaseAllContexts(Promise promise) {
-    rnwhisper.releaseAllContexts(promise);
-  }
-
-  // VAD methods
-  @ReactMethod
-  public void initVadContext(final ReadableMap options, final Promise promise) {
-    rnwhisper.initVadContext(options, promise);
-  }
-
-  @ReactMethod
-  public void vadDetectSpeech(double id, String audioDataBase64, ReadableMap options, Promise promise) {
-    rnwhisper.vadDetectSpeech(id, audioDataBase64, options, promise);
-  }
-
-  @ReactMethod
-  public void vadDetectSpeechFile(double id, String filePath, ReadableMap options, Promise promise) {
-    rnwhisper.vadDetectSpeechFile(id, filePath, options, promise);
-  }
-
-  @ReactMethod
-  public void releaseVadContext(double id, Promise promise) {
-    rnwhisper.releaseVadContext(id, promise);
-  }
-
-  @ReactMethod
-  public void releaseAllVadContexts(Promise promise) {
-    rnwhisper.releaseAllVadContexts(promise);
-  }
-
-  /*
-   * iOS Specific methods, left here for make the turbo module happy:
-   */
-
-  @ReactMethod
-  public void getAudioSessionCurrentCategory(Promise promise) {
-    promise.resolve(null);
-  }
-  @ReactMethod
-  public void getAudioSessionCurrentMode(Promise promise) {
-    promise.resolve(null);
-  }
-  @ReactMethod
-  public void setAudioSessionCategory(String category, ReadableArray options, Promise promise) {
-    promise.resolve(null);
-  }
-  @ReactMethod
-  public void setAudioSessionMode(String mode, Promise promise) {
-    promise.resolve(null);
-  }
-  @ReactMethod
-  public void setAudioSessionActive(boolean active, Promise promise) {
-    promise.resolve(null);
+  @Override
+  public void invalidate() {
+    try {
+      cleanupJSIBindings();
+    } catch (UnsatisfiedLinkError ignored) {
+    }
+    super.invalidate();
   }
 }
