@@ -97,7 +97,7 @@ export const installJsi = async () => {
 }
 
 const toArrayBuffer = (view: Uint8Array): ArrayBuffer =>
-  view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength)
+  Uint8Array.from(view).buffer
 
 const decodeBase64ToArrayBuffer = (data: string): ArrayBuffer =>
   toArrayBuffer(Buffer.from(data, 'base64') as unknown as Uint8Array)

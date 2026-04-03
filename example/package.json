@@ -14,26 +14,26 @@
   "dependencies": {
     "@fugood/react-native-audio-pcm-stream": "^1.1.4",
     "@react-native-clipboard/clipboard": "^1.14.3",
-    "@react-native/babel-preset": "0.76.9",
-    "@react-native/metro-config": "0.76.9",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
-    "react": "18.3.1",
-    "react-native": "0.76.9",
+    "react": "19.2.3",
+    "react-native": "0.84.1",
     "react-native-fs": "^2.20.0",
-    "react-native-gesture-handler": "2.25.0",
-    "react-native-safe-area-context": "^5.5.1",
-    "react-native-screens": "4.4.0",
+    "react-native-gesture-handler": "2.31.0",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-screens": "4.24.0",
     "react-native-sound": "^0.11.2",
     "react-native-zip-archive": "^7.0.1"
   },
   "devDependencies": {
-    "@react-native-community/cli": "15.0.1",
-    "@react-native-community/cli-platform-android": "15.0.1",
-    "@react-native-community/cli-platform-ios": "15.0.1",
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli-platform-android": "20.1.0",
+    "@react-native-community/cli-platform-ios": "20.1.0",
+    "@react-native/babel-preset": "0.84.1",
+    "@react-native/metro-config": "0.84.1",
     "patch-package": "^8.0.0"
   }
 }
