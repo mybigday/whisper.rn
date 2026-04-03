@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdarg>
 #include <cstdint>
@@ -59,6 +60,13 @@ void logMessage(LogLevel level, const char *format, ...) {
 #define LOG_INFO(format, ...) logMessage(LogLevel::Info, format, ##__VA_ARGS__)
 #define LOG_ERROR(format, ...) logMessage(LogLevel::Error, format, ##__VA_ARGS__)
 
+void ggmlAbortLogCallback(const char *message) {
+    const char *safeMessage = message ? message : "<null>";
+    std::fprintf(stderr, "RNWhisperJSI GGML ABORT: %s\n", safeMessage);
+    std::fflush(stderr);
+    LOG_ERROR("ggml abort: %s", safeMessage);
+}
+
 class JsiError : public std::runtime_error {
 public:
     explicit JsiError(const std::string &message, int errorCode = -1)
@@ -68,18 +76,9 @@ public:
 };
 
 std::atomic<bool> g_isShuttingDown{false};
-std::unique_ptr<ThreadPool> g_threadPool;
-std::mutex g_threadPoolMutex;
 
 ThreadPool &getThreadPool() {
-    std::lock_guard<std::mutex> lock(g_threadPoolMutex);
-    if (!g_threadPool) {
-        int maxThreads = static_cast<int>(std::thread::hardware_concurrency());
-        int threadCount = std::max(2, std::min(4, maxThreads));
-        g_threadPool = std::make_unique<ThreadPool>(threadCount);
-        LOG_INFO("Initialized ThreadPool with %d threads", threadCount);
-    }
-    return *g_threadPool;
+    return ThreadPool::getInstance();
 }
 
 template <typename HolderType>
@@ -107,6 +106,16 @@ public:
         return holder;
     }
 
+    std::vector<std::shared_ptr<HolderType>> snapshot() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        std::vector<std::shared_ptr<HolderType>> holders;
+        holders.reserve(contexts_.size());
+        for (const auto &entry : contexts_) {
+            holders.push_back(entry.second);
+        }
+        return holders;
+    }
+
     std::vector<std::shared_ptr<HolderType>> removeAll() {
         std::lock_guard<std::mutex> lock(mutex_);
         std::vector<std::shared_ptr<HolderType>> holders;
@@ -121,6 +130,109 @@ public:
 private:
     std::unordered_map<int, std::shared_ptr<HolderType>> contexts_;
     std::mutex mutex_;
+};
+
+class TaskManager {
+public:
+    static TaskManager &getInstance() {
+        static TaskManager instance;
+        return instance;
+    }
+
+    void startTask(int contextId) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        activeTasks_[contextId] += 1;
+        totalTasks_ += 1;
+    }
+
+    void finishTask(int contextId) {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        auto it = activeTasks_.find(contextId);
+        if (it != activeTasks_.end()) {
+            it->second -= 1;
+            if (it->second <= 0) {
+                activeTasks_.erase(it);
+            }
+        }
+
+        if (totalTasks_ > 0) {
+            totalTasks_ -= 1;
+        }
+
+        condition_.notify_all();
+    }
+
+    void beginShutdown() {
+        shuttingDown_.store(true, std::memory_order_relaxed);
+        condition_.notify_all();
+    }
+
+    void reset() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            activeTasks_.clear();
+            totalTasks_ = 0;
+        }
+        shuttingDown_.store(false, std::memory_order_relaxed);
+        condition_.notify_all();
+    }
+
+    bool isShuttingDown() const {
+        return shuttingDown_.load(std::memory_order_relaxed);
+    }
+
+    void waitForContext(int contextId, int targetCount = 0) {
+        if (contextId < 0) {
+            return;
+        }
+
+        std::unique_lock<std::mutex> lock(mutex_);
+        condition_.wait_for(lock, std::chrono::milliseconds(5000), [this, contextId, targetCount]() {
+            if (shuttingDown_.load(std::memory_order_relaxed)) {
+                return true;
+            }
+            auto it = activeTasks_.find(contextId);
+            int count = it != activeTasks_.end() ? it->second : 0;
+            return count <= targetCount;
+        });
+    }
+
+    void waitForAll(int targetCount = 0) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        condition_.wait_for(lock, std::chrono::milliseconds(5000), [this, targetCount]() {
+            if (shuttingDown_.load(std::memory_order_relaxed)) {
+                return true;
+            }
+            return totalTasks_ <= targetCount;
+        });
+    }
+
+private:
+    TaskManager() = default;
+
+    std::mutex mutex_;
+    std::condition_variable condition_;
+    std::unordered_map<int, int> activeTasks_;
+    int totalTasks_ = 0;
+    std::atomic<bool> shuttingDown_{false};
+};
+
+class TaskFinishGuard {
+public:
+    TaskFinishGuard(int contextId, bool tracked)
+        : contextId_(contextId),
+          tracked_(tracked) {}
+
+    ~TaskFinishGuard() {
+        if (tracked_) {
+            TaskManager::getInstance().finishTask(contextId_);
+        }
+    }
+
+private:
+    int contextId_;
+    bool tracked_;
 };
 
 struct SegmentData {
@@ -171,6 +283,11 @@ struct ContextLifecycle {
     void waitForIdle() {
         std::unique_lock<std::mutex> lock(mutex);
         condition.wait(lock, [this]() { return pendingTasks == 0; });
+    }
+
+    bool waitForIdleFor(std::chrono::milliseconds timeout) {
+        std::unique_lock<std::mutex> lock(mutex);
+        return condition.wait_for(lock, timeout, [this]() { return pendingTasks == 0; });
     }
 
     std::mutex mutex;
@@ -241,6 +358,7 @@ struct JsiCallbackState {
     std::shared_ptr<react::CallInvoker> callInvoker;
     JsiFunctionPtr callback;
     std::shared_ptr<jsi::Runtime> runtime;
+    int contextId = -1;
 };
 
 struct SegmentCallbackState : public JsiCallbackState {
@@ -326,7 +444,9 @@ jsi::Object createErrorObject(
 jsi::Value createPromiseTask(
     jsi::Runtime &runtime,
     const std::shared_ptr<react::CallInvoker> &callInvoker,
-    PromiseTask task) {
+    PromiseTask task,
+    int contextId = -1,
+    bool trackTask = true) {
     auto promiseCtor =
         runtime.global().getPropertyAsObject(runtime, "Promise").asFunction(runtime);
     auto runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime *) {});
@@ -337,7 +457,7 @@ jsi::Value createPromiseTask(
             runtime,
             jsi::PropNameID::forAscii(runtime, "executor"),
             2,
-            [callInvoker, task, runtimePtr](
+            [callInvoker, task, runtimePtr, contextId, trackTask](
                 jsi::Runtime &runtime,
                 const jsi::Value &,
                 const jsi::Value *arguments,
@@ -350,59 +470,122 @@ jsi::Value createPromiseTask(
                 auto reject = makeJsiFunction(runtime, arguments[1], callInvoker);
 
                 try {
-                    getThreadPool().enqueue([callInvoker, task, resolve, reject, runtimePtr]() {
-                        if (g_isShuttingDown.load(std::memory_order_relaxed)) {
-                            return;
+                    getThreadPool().enqueue([callInvoker, task, resolve, reject, runtimePtr, contextId, trackTask]() {
+                        bool shouldTrack =
+                            trackTask && !TaskManager::getInstance().isShuttingDown();
+                        if (shouldTrack) {
+                            TaskManager::getInstance().startTask(contextId);
                         }
+                        bool invokeScheduled = false;
 
                         try {
-                            auto resultGenerator = task();
                             if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                                if (shouldTrack) {
+                                    TaskManager::getInstance().finishTask(contextId);
+                                }
                                 return;
                             }
-                            callInvoker->invokeAsync([resolve, resultGenerator, runtimePtr]() {
-                                if (g_isShuttingDown.load(std::memory_order_relaxed) || !resolve) {
+                            auto resultGenerator = task();
+                            if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                                if (shouldTrack) {
+                                    TaskManager::getInstance().finishTask(contextId);
+                                }
+                                return;
+                            }
+                            try {
+                                callInvoker->invokeAsync([resolve, resultGenerator, runtimePtr, contextId, shouldTrack]() {
+                                    TaskFinishGuard guard(contextId, shouldTrack);
+                                    if (g_isShuttingDown.load(std::memory_order_relaxed) || !resolve) {
+                                        return;
+                                    }
+                                    auto &rt = *runtimePtr;
+                                    resolve->call(rt, resultGenerator(rt));
+                                });
+                                invokeScheduled = true;
+                            } catch (...) {
+                                LOG_ERROR("createPromiseTask failed to schedule resolve contextId=%d", contextId);
+                            }
+                        } catch (const JsiError &error) {
+                            LOG_ERROR(
+                                "createPromiseTask task JsiError contextId=%d message=%s code=%d",
+                                contextId,
+                                error.what(),
+                                error.code);
+                            try {
+                                if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                                    if (shouldTrack) {
+                                        TaskManager::getInstance().finishTask(contextId);
+                                    }
                                     return;
                                 }
-                                auto &rt = *runtimePtr;
-                                resolve->call(rt, resultGenerator(rt));
-                            });
-                        } catch (const JsiError &error) {
-                            try {
-                                callInvoker->invokeAsync([reject, runtimePtr, message = std::string(error.what()), code = error.code]() {
+                                callInvoker->invokeAsync([reject, runtimePtr, message = std::string(error.what()), code = error.code, contextId, shouldTrack]() {
+                                    TaskFinishGuard guard(contextId, shouldTrack);
                                     if (g_isShuttingDown.load(std::memory_order_relaxed) || !reject) {
                                         return;
                                     }
                                     auto &rt = *runtimePtr;
                                     reject->call(rt, createErrorObject(rt, message, code));
                                 });
+                                invokeScheduled = true;
                             } catch (...) {
+                                LOG_ERROR("createPromiseTask failed to schedule JsiError reject contextId=%d", contextId);
                             }
                         } catch (const std::exception &error) {
+                            LOG_ERROR(
+                                "createPromiseTask task std::exception contextId=%d message=%s",
+                                contextId,
+                                error.what());
                             try {
-                                callInvoker->invokeAsync([reject, runtimePtr, message = std::string(error.what())]() {
+                                if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                                    if (shouldTrack) {
+                                        TaskManager::getInstance().finishTask(contextId);
+                                    }
+                                    return;
+                                }
+                                callInvoker->invokeAsync([reject, runtimePtr, message = std::string(error.what()), contextId, shouldTrack]() {
+                                    TaskFinishGuard guard(contextId, shouldTrack);
                                     if (g_isShuttingDown.load(std::memory_order_relaxed) || !reject) {
                                         return;
                                     }
                                     auto &rt = *runtimePtr;
                                     reject->call(rt, createErrorObject(rt, message));
                                 });
+                                invokeScheduled = true;
                             } catch (...) {
+                                LOG_ERROR("createPromiseTask failed to schedule std::exception reject contextId=%d", contextId);
                             }
                         } catch (...) {
+                            LOG_ERROR("createPromiseTask task unknown exception contextId=%d", contextId);
                             try {
-                                callInvoker->invokeAsync([reject, runtimePtr]() {
+                                if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                                    if (shouldTrack) {
+                                        TaskManager::getInstance().finishTask(contextId);
+                                    }
+                                    return;
+                                }
+                                callInvoker->invokeAsync([reject, runtimePtr, contextId, shouldTrack]() {
+                                    TaskFinishGuard guard(contextId, shouldTrack);
                                     if (g_isShuttingDown.load(std::memory_order_relaxed) || !reject) {
                                         return;
                                     }
                                     auto &rt = *runtimePtr;
                                     reject->call(rt, createErrorObject(rt, "Unknown error"));
                                 });
+                                invokeScheduled = true;
                             } catch (...) {
+                                LOG_ERROR("createPromiseTask failed to schedule unknown reject contextId=%d", contextId);
                             }
+                        }
+
+                        if (!invokeScheduled && shouldTrack) {
+                            TaskManager::getInstance().finishTask(contextId);
                         }
                     });
                 } catch (const std::exception &error) {
+                    LOG_ERROR(
+                        "createPromiseTask enqueue exception contextId=%d message=%s",
+                        contextId,
+                        error.what());
                     if (reject) {
                         auto errorObject = createErrorObject(runtime, error.what());
                         reject->call(runtime, errorObject);
@@ -413,21 +596,23 @@ jsi::Value createPromiseTask(
             }));
 }
 
-void invokeAsync(
+void invokeAsyncTracked(
     const std::shared_ptr<react::CallInvoker> &callInvoker,
-    std::function<void()> callback) {
-    if (g_isShuttingDown.load(std::memory_order_relaxed)) {
-        return;
+    int contextId,
+    std::function<void(bool shouldProceed)> callback) {
+    bool shouldTrack = !TaskManager::getInstance().isShuttingDown();
+    if (shouldTrack) {
+        TaskManager::getInstance().startTask(contextId);
     }
-
     try {
-        callInvoker->invokeAsync([callback = std::move(callback)]() {
-            if (g_isShuttingDown.load(std::memory_order_relaxed)) {
-                return;
-            }
-            callback();
+        callInvoker->invokeAsync([contextId, shouldTrack, callback = std::move(callback)]() {
+            TaskFinishGuard guard(contextId, shouldTrack);
+            callback(!g_isShuttingDown.load(std::memory_order_relaxed));
         });
     } catch (...) {
+        if (shouldTrack) {
+            TaskManager::getInstance().finishTask(contextId);
+        }
     }
 }
 
@@ -438,8 +623,8 @@ void emitProgressCallback(
         return;
     }
 
-    invokeAsync(state->callInvoker, [state, progress]() {
-        if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+    invokeAsyncTracked(state->callInvoker, state->contextId, [state, progress](bool shouldProceed) {
+        if (!shouldProceed || !g_whisperContexts.get(state->contextId)) {
             return;
         }
         auto &rt = *state->runtime;
@@ -454,8 +639,11 @@ void emitNewSegmentsCallback(
         return;
     }
 
-    invokeAsync(state->callInvoker, [state, payload = std::move(payload)]() {
-        if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+    invokeAsyncTracked(
+        state->callInvoker,
+        state->contextId,
+        [state, payload = std::move(payload)](bool shouldProceed) {
+        if (!shouldProceed || !g_whisperContexts.get(state->contextId)) {
             return;
         }
         auto &rt = *state->runtime;
@@ -685,12 +873,189 @@ std::vector<float> decodePcm16(const uint8_t *bytes, size_t byteLength) {
     return audio;
 }
 
+uint16_t readUint16LE(const std::vector<uint8_t> &bytes, size_t offset) {
+    if (offset + sizeof(uint16_t) > bytes.size()) {
+        throw JsiError("Invalid WAV file", -1);
+    }
+    return static_cast<uint16_t>(bytes[offset])
+        | (static_cast<uint16_t>(bytes[offset + 1]) << 8);
+}
+
+uint32_t readUint32LE(const std::vector<uint8_t> &bytes, size_t offset) {
+    if (offset + sizeof(uint32_t) > bytes.size()) {
+        throw JsiError("Invalid WAV file", -1);
+    }
+    return static_cast<uint32_t>(bytes[offset])
+        | (static_cast<uint32_t>(bytes[offset + 1]) << 8)
+        | (static_cast<uint32_t>(bytes[offset + 2]) << 16)
+        | (static_cast<uint32_t>(bytes[offset + 3]) << 24);
+}
+
+bool matchesChunkId(
+    const std::vector<uint8_t> &bytes,
+    size_t offset,
+    const char (&chunkId)[5]) {
+    return offset + 4 <= bytes.size()
+        && std::memcmp(bytes.data() + offset, chunkId, 4) == 0;
+}
+
+struct WaveAudioData {
+    size_t dataOffset = 0;
+    size_t dataSize = 0;
+    uint16_t channels = 0;
+    uint32_t sampleRate = 0;
+    uint16_t bitsPerSample = 0;
+};
+
+WaveAudioData parseWaveAudioData(const std::vector<uint8_t> &bytes) {
+    if (bytes.size() < 12) {
+        throw JsiError("Invalid WAV file", -1);
+    }
+    if (!matchesChunkId(bytes, 0, "RIFF") || !matchesChunkId(bytes, 8, "WAVE")) {
+        throw JsiError("Invalid WAV file", -1);
+    }
+
+    bool hasFmtChunk = false;
+    bool hasDataChunk = false;
+    uint16_t audioFormat = 0;
+    WaveAudioData waveData;
+    size_t offset = 12;
+
+    while (offset + 8 <= bytes.size()) {
+        uint32_t chunkSize = readUint32LE(bytes, offset + 4);
+        size_t chunkDataOffset = offset + 8;
+        if (chunkDataOffset > bytes.size()
+            || static_cast<size_t>(chunkSize) > bytes.size() - chunkDataOffset) {
+            throw JsiError("Invalid WAV file", -1);
+        }
+
+        if (matchesChunkId(bytes, offset, "fmt ")) {
+            if (chunkSize < 16) {
+                throw JsiError("Invalid WAV file: malformed fmt chunk", -1);
+            }
+            audioFormat = readUint16LE(bytes, chunkDataOffset);
+            waveData.channels = readUint16LE(bytes, chunkDataOffset + 2);
+            waveData.sampleRate = readUint32LE(bytes, chunkDataOffset + 4);
+            waveData.bitsPerSample = readUint16LE(bytes, chunkDataOffset + 14);
+            hasFmtChunk = true;
+        } else if (matchesChunkId(bytes, offset, "data")) {
+            waveData.dataOffset = chunkDataOffset;
+            waveData.dataSize = static_cast<size_t>(chunkSize);
+            hasDataChunk = true;
+        }
+
+        offset = chunkDataOffset + chunkSize + (chunkSize % 2 == 0 ? 0 : 1);
+    }
+
+    if (!hasFmtChunk) {
+        throw JsiError("Invalid WAV file: missing fmt chunk", -1);
+    }
+    if (!hasDataChunk || waveData.dataSize == 0) {
+        throw JsiError("Invalid WAV file: missing data chunk", -1);
+    }
+    if (audioFormat != 1) {
+        throw JsiError("Unsupported WAV format: only PCM is supported", -1);
+    }
+    if (waveData.channels == 0) {
+        throw JsiError("Invalid WAV file: channel count must be positive", -1);
+    }
+    if (waveData.sampleRate == 0) {
+        throw JsiError("Invalid WAV file: sample rate must be positive", -1);
+    }
+    if (waveData.bitsPerSample != 16) {
+        throw JsiError("Unsupported WAV format: only 16-bit PCM is supported", -1);
+    }
+    if ((waveData.dataSize % sizeof(int16_t)) != 0) {
+        throw JsiError("Invalid WAV file: malformed PCM data", -1);
+    }
+
+    return waveData;
+}
+
+std::vector<float> decodeWavePcm16(
+    const uint8_t *bytes,
+    size_t byteLength,
+    uint16_t channels) {
+    if (channels <= 1) {
+        return decodePcm16(bytes, byteLength);
+    }
+
+    size_t bytesPerFrame = sizeof(int16_t) * channels;
+    if (byteLength == 0 || (byteLength % bytesPerFrame) != 0) {
+        throw JsiError("Invalid WAV file: malformed multi-channel PCM data", -1);
+    }
+
+    size_t frameCount = byteLength / bytesPerFrame;
+    std::vector<float> audio(frameCount);
+
+    for (size_t frame = 0; frame < frameCount; ++frame) {
+        float mixed = 0.0f;
+        for (uint16_t channel = 0; channel < channels; ++channel) {
+            int16_t sample = 0;
+            std::memcpy(
+                &sample,
+                bytes + ((frame * channels + channel) * sizeof(int16_t)),
+                sizeof(int16_t));
+            mixed += std::max(
+                -1.0f,
+                std::min(1.0f, static_cast<float>(sample) / 32767.0f));
+        }
+        audio[frame] = mixed / static_cast<float>(channels);
+    }
+
+    return audio;
+}
+
+std::vector<float> resampleAudio(
+    const std::vector<float> &audio,
+    uint32_t sourceSampleRate,
+    uint32_t targetSampleRate) {
+    if (audio.empty()) {
+        return {};
+    }
+    if (sourceSampleRate == targetSampleRate) {
+        return audio;
+    }
+    if (sourceSampleRate == 0 || targetSampleRate == 0) {
+        throw JsiError("Invalid WAV file: sample rate must be positive", -1);
+    }
+
+    size_t targetSize = static_cast<size_t>(
+        (static_cast<uint64_t>(audio.size()) * targetSampleRate) / sourceSampleRate);
+    targetSize = std::max<size_t>(1, targetSize);
+    if (targetSize == audio.size()) {
+        return audio;
+    }
+
+    std::vector<float> resampled(targetSize);
+    if (targetSize == 1) {
+        resampled[0] = audio.front();
+        return resampled;
+    }
+
+    double scale = static_cast<double>(audio.size() - 1) / static_cast<double>(targetSize - 1);
+    for (size_t index = 0; index < targetSize; ++index) {
+        double sourceIndex = static_cast<double>(index) * scale;
+        size_t leftIndex = static_cast<size_t>(sourceIndex);
+        size_t rightIndex = std::min(leftIndex + 1, audio.size() - 1);
+        float fraction = static_cast<float>(sourceIndex - static_cast<double>(leftIndex));
+        resampled[index] =
+            audio[leftIndex] + ((audio[rightIndex] - audio[leftIndex]) * fraction);
+    }
+
+    return resampled;
+}
+
 std::vector<float> decodeWaveBytes(const std::vector<uint8_t> &bytes) {
-    constexpr size_t kWaveHeaderSize = 44;
-    if (bytes.size() <= kWaveHeaderSize) {
+    auto waveData = parseWaveAudioData(bytes);
+    auto audio = decodeWavePcm16(
+        bytes.data() + waveData.dataOffset,
+        waveData.dataSize,
+        waveData.channels);
+    if (audio.empty()) {
         throw JsiError("Invalid file", -1);
     }
-    return decodePcm16(bytes.data() + kWaveHeaderSize, bytes.size() - kWaveHeaderSize);
+    return resampleAudio(audio, waveData.sampleRate, WHISPER_SAMPLE_RATE);
 }
 
 int decodeBase64Value(char value) {
@@ -936,7 +1301,10 @@ void forwardLogToJs(enum wsp_ggml_log_level level, const char *text, void *) {
     }
 
     std::string message = text ? text : "";
-    invokeAsync(invoker, [handler, runtime, levelText, message]() {
+    invokeAsyncTracked(invoker, -1, [handler, runtime, levelText, message](bool shouldProceed) {
+        if (!shouldProceed) {
+            return;
+        }
         auto &rt = *runtime;
         handler->call(
             rt,
@@ -945,27 +1313,49 @@ void forwardLogToJs(enum wsp_ggml_log_level level, const char *text, void *) {
     });
 }
 
-void releaseWhisperHolder(const std::shared_ptr<WhisperContextHolder> &holder) {
+constexpr auto kCleanupWaitTimeout = std::chrono::milliseconds(250);
+
+bool releaseWhisperHolder(
+    const std::shared_ptr<WhisperContextHolder> &holder,
+    bool allowBlocking = true) {
     if (!holder) {
-        return;
+        return true;
     }
     holder->abortActiveJob();
-    holder->waitForIdle();
+    if (allowBlocking) {
+        holder->waitForIdle();
+    } else if (!holder->waitForIdleFor(kCleanupWaitTimeout)) {
+        LOG_ERROR(
+            "Timed out waiting for whisper context %d to become idle during cleanup",
+            holder->id);
+        return false;
+    }
     if (holder->context != nullptr) {
         whisper_free(holder->context);
         holder->context = nullptr;
     }
+    return true;
 }
 
-void releaseVadHolder(const std::shared_ptr<WhisperVadContextHolder> &holder) {
+bool releaseVadHolder(
+    const std::shared_ptr<WhisperVadContextHolder> &holder,
+    bool allowBlocking = true) {
     if (!holder) {
-        return;
+        return true;
     }
-    holder->waitForIdle();
+    if (allowBlocking) {
+        holder->waitForIdle();
+    } else if (!holder->waitForIdleFor(kCleanupWaitTimeout)) {
+        LOG_ERROR(
+            "Timed out waiting for VAD context %d to become idle during cleanup",
+            holder->id);
+        return false;
+    }
     if (holder->context != nullptr) {
         whisper_vad_free(holder->context);
         holder->context = nullptr;
     }
+    return true;
 }
 
 jsi::Object requireObjectArgument(
@@ -1026,7 +1416,9 @@ namespace rnwhisper_jsi {
 void installJSIBindings(
     jsi::Runtime &runtime,
     std::shared_ptr<react::CallInvoker> callInvoker) {
+    wsp_ggml_set_abort_callback(ggmlAbortLogCallback);
     g_isShuttingDown.store(false, std::memory_order_relaxed);
+    TaskManager::getInstance().reset();
 
     auto getConstants = jsi::Function::createFromHostFunction(
         runtime,
@@ -1088,7 +1480,14 @@ void installJSIBindings(
             return createPromiseTask(runtime, callInvoker, [contextId, hostOptions]() -> PromiseResultGenerator {
                 auto result = hostInitWhisperContext(hostOptions);
                 if (result.context == nullptr) {
+                    LOG_ERROR("whisperInitContext failed to load model contextId=%d", contextId);
                     throw JsiError("Failed to load the model");
+                }
+                if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                    whisper_free(result.context);
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
                 }
 
                 auto holder = std::make_shared<WhisperContextHolder>(contextId);
@@ -1101,7 +1500,7 @@ void installJSIBindings(
                 return [holder](jsi::Runtime &rt) {
                     return createContextValue(rt, holder);
                 };
-            });
+            }, contextId);
         });
 
     auto releaseContext = jsi::Function::createFromHostFunction(
@@ -1115,15 +1514,28 @@ void installJSIBindings(
             size_t count) -> jsi::Value {
             int contextId = requireContextId(runtime, arguments, count);
             return createPromiseTask(runtime, callInvoker, [contextId]() -> PromiseResultGenerator {
-                auto holder = g_whisperContexts.remove(contextId);
+                auto holder = g_whisperContexts.get(contextId);
                 if (!holder) {
                     throw JsiError("Context not found");
+                }
+                holder->abortActiveJob();
+                TaskManager::getInstance().waitForContext(contextId, 0);
+                if (TaskManager::getInstance().isShuttingDown()) {
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
+                }
+                holder = g_whisperContexts.remove(contextId);
+                if (!holder) {
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
                 }
                 releaseWhisperHolder(holder);
                 return [](jsi::Runtime &) {
                     return jsi::Value::undefined();
                 };
-            });
+            }, contextId, false);
         });
 
     auto releaseAllContexts = jsi::Function::createFromHostFunction(
@@ -1136,14 +1548,24 @@ void installJSIBindings(
             const jsi::Value *,
             size_t) -> jsi::Value {
             return createPromiseTask(runtime, callInvoker, []() -> PromiseResultGenerator {
-                auto holders = g_whisperContexts.removeAll();
+                auto holders = g_whisperContexts.snapshot();
+                for (const auto &holder : holders) {
+                    holder->abortActiveJob();
+                }
+                TaskManager::getInstance().waitForAll(0);
+                if (TaskManager::getInstance().isShuttingDown()) {
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
+                }
+                holders = g_whisperContexts.removeAll();
                 for (const auto &holder : holders) {
                     releaseWhisperHolder(holder);
                 }
                 return [](jsi::Runtime &) {
                     return jsi::Value::undefined();
                 };
-            });
+            }, -1, false);
         });
 
     auto transcribeFile = jsi::Function::createFromHostFunction(
@@ -1195,6 +1617,7 @@ void installJSIBindings(
                     progressState->callInvoker = callInvoker;
                     progressState->callback = config.onProgress;
                     progressState->runtime = runtimePtr;
+                    progressState->contextId = holder->id;
                     if (config.onProgress) {
                         config.params.progress_callback =
                             [](whisper_context *, whisper_state *, int progress, void *userData) {
@@ -1211,6 +1634,7 @@ void installJSIBindings(
                     segmentsState->callInvoker = callInvoker;
                     segmentsState->callback = config.onNewSegments;
                     segmentsState->runtime = runtimePtr;
+                    segmentsState->contextId = holder->id;
                     segmentsState->tdrzEnable = config.tdrzEnable;
 
                     if (config.onNewSegments) {
@@ -1262,7 +1686,7 @@ void installJSIBindings(
                     return [result](jsi::Runtime &rt) {
                         return createTranscribeResultValue(rt, result);
                     };
-                });
+                }, contextId);
             } catch (...) {
                 holder->endExclusiveOperation();
                 holder->releaseTask();
@@ -1309,6 +1733,7 @@ void installJSIBindings(
                     progressState->callInvoker = callInvoker;
                     progressState->callback = config.onProgress;
                     progressState->runtime = runtimePtr;
+                    progressState->contextId = holder->id;
                     if (config.onProgress) {
                         config.params.progress_callback =
                             [](whisper_context *, whisper_state *, int progress, void *userData) {
@@ -1325,6 +1750,7 @@ void installJSIBindings(
                     segmentsState->callInvoker = callInvoker;
                     segmentsState->callback = config.onNewSegments;
                     segmentsState->runtime = runtimePtr;
+                    segmentsState->contextId = holder->id;
                     segmentsState->tdrzEnable = config.tdrzEnable;
 
                     if (config.onNewSegments) {
@@ -1376,7 +1802,7 @@ void installJSIBindings(
                     return [result](jsi::Runtime &rt) {
                         return createTranscribeResultValue(rt, result);
                     };
-                });
+                }, contextId);
             } catch (...) {
                 holder->endExclusiveOperation();
                 holder->releaseTask();
@@ -1410,7 +1836,7 @@ void installJSIBindings(
                 return [](jsi::Runtime &) {
                     return jsi::Value::undefined();
                 };
-            });
+            }, contextId);
         });
 
     auto bench = jsi::Function::createFromHostFunction(
@@ -1447,7 +1873,7 @@ void installJSIBindings(
                     return [result](jsi::Runtime &rt) {
                         return jsi::String::createFromUtf8(rt, result);
                     };
-                });
+                }, contextId);
             } catch (...) {
                 holder->endExclusiveOperation();
                 holder->releaseTask();
@@ -1484,6 +1910,12 @@ void installJSIBindings(
                 if (result.context == nullptr) {
                     throw JsiError("Failed to load the VAD model");
                 }
+                if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                    whisper_vad_free(result.context);
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
+                }
 
                 auto holder = std::make_shared<WhisperVadContextHolder>(contextId);
                 holder->context = result.context;
@@ -1495,7 +1927,7 @@ void installJSIBindings(
                 return [holder](jsi::Runtime &rt) {
                     return createVadContextValue(rt, holder);
                 };
-            });
+            }, contextId);
         });
 
     auto releaseVadContext = jsi::Function::createFromHostFunction(
@@ -1509,6 +1941,12 @@ void installJSIBindings(
             size_t count) -> jsi::Value {
             int contextId = requireContextId(runtime, arguments, count);
             return createPromiseTask(runtime, callInvoker, [contextId]() -> PromiseResultGenerator {
+                TaskManager::getInstance().waitForContext(contextId, 0);
+                if (TaskManager::getInstance().isShuttingDown()) {
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
+                }
                 auto holder = g_vadContexts.remove(contextId);
                 if (!holder) {
                     throw JsiError("VAD context not found");
@@ -1517,7 +1955,7 @@ void installJSIBindings(
                 return [](jsi::Runtime &) {
                     return jsi::Value::undefined();
                 };
-            });
+            }, contextId, false);
         });
 
     auto releaseAllVadContexts = jsi::Function::createFromHostFunction(
@@ -1530,6 +1968,12 @@ void installJSIBindings(
             const jsi::Value *,
             size_t) -> jsi::Value {
             return createPromiseTask(runtime, callInvoker, []() -> PromiseResultGenerator {
+                TaskManager::getInstance().waitForAll(0);
+                if (TaskManager::getInstance().isShuttingDown()) {
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
+                    };
+                }
                 auto holders = g_vadContexts.removeAll();
                 for (const auto &holder : holders) {
                     releaseVadHolder(holder);
@@ -1537,7 +1981,7 @@ void installJSIBindings(
                 return [](jsi::Runtime &) {
                     return jsi::Value::undefined();
                 };
-            });
+            }, -1, false);
         });
 
     auto vadDetectSpeech = jsi::Function::createFromHostFunction(
@@ -1597,7 +2041,7 @@ void installJSIBindings(
                     return [result](jsi::Runtime &rt) {
                         return createVadResultValue(rt, result);
                     };
-                });
+                }, contextId);
             } catch (...) {
                 holder->releaseTask();
                 throw;
@@ -1667,7 +2111,7 @@ void installJSIBindings(
                     return [result](jsi::Runtime &rt) {
                         return createVadResultValue(rt, result);
                     };
-                });
+                }, contextId);
             } catch (...) {
                 holder->releaseTask();
                 throw;
@@ -1724,7 +2168,9 @@ void installJSIBindings(
 }
 
 void cleanupJSIBindings() {
+    wsp_ggml_set_abort_callback(nullptr);
     g_isShuttingDown.store(true, std::memory_order_relaxed);
+    TaskManager::getInstance().beginShutdown();
 
     {
         std::lock_guard<std::mutex> lock(g_logMutex);
@@ -1734,20 +2180,27 @@ void cleanupJSIBindings() {
     }
     whisper_log_set(defaultWhisperLogCallback, nullptr);
 
-    auto whisperHolders = g_whisperContexts.removeAll();
-    auto vadHolders = g_vadContexts.removeAll();
+    auto whisperHolders = g_whisperContexts.snapshot();
+    auto vadHolders = g_vadContexts.snapshot();
+    bool releasedAllContexts = true;
 
     for (const auto &holder : whisperHolders) {
-        releaseWhisperHolder(holder);
+        releasedAllContexts = releaseWhisperHolder(holder, false) && releasedAllContexts;
     }
     for (const auto &holder : vadHolders) {
-        releaseVadHolder(holder);
+        releasedAllContexts = releaseVadHolder(holder, false) && releasedAllContexts;
     }
+
+    g_whisperContexts.removeAll();
+    g_vadContexts.removeAll();
 
     hostClearCache();
 
-    std::lock_guard<std::mutex> lock(g_threadPoolMutex);
-    g_threadPool.reset();
+    if (releasedAllContexts) {
+        getThreadPool().shutdown();
+    } else {
+        LOG_ERROR("Skipping ThreadPool shutdown during cleanup because whisper tasks did not drain");
+    }
 }
 
 } // namespace rnwhisper_jsi

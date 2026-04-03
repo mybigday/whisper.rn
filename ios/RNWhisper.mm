@@ -285,16 +285,29 @@ RCT_EXPORT_METHOD(install:(RCTPromiseResolveBlock)resolve
     }
 
     auto callInvoker = cxxBridge.jsCallInvoker ?: bridge.jsCallInvoker;
-    if (!cxxBridge.runtime || !callInvoker) {
+    if (!cxxBridge.runtime) {
         resolve(@false);
         return;
     }
 
     auto *runtime = static_cast<facebook::jsi::Runtime *>(cxxBridge.runtime);
-    callInvoker->invokeAsync([runtime, callInvoker]() {
-        rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
-    });
-    resolve(@true);
+    RCTPromiseResolveBlock resolveBlock = [resolve copy];
+
+    if (callInvoker) {
+        try {
+            callInvoker->invokeAsync([runtime, callInvoker, resolveBlock]() {
+                rnwhisper_jsi::installJSIBindings(*runtime, callInvoker);
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    resolveBlock(@true);
+                });
+            });
+        } catch (...) {
+            resolveBlock(@false);
+        }
+    } else {
+        resolveBlock(@false);
+        return;
+    }
 }
 
 - (void)invalidate {
