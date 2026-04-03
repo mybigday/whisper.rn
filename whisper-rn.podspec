@@ -28,15 +28,19 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => "11.0", :tvos => "11.0" }
+  s.platforms    = { :ios => "13.0", :tvos => "13.0" }
   s.source       = { :git => "https://github.com/mybigday/whisper.rn.git", :tag => "#{s.version}" }
 
   s.requires_arc = true
 
+  header_search_paths = ['$(inherited)']
+
   if ENV["RNWHISPER_BUILD_FROM_SOURCE"] == "1"
     s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,hpp,c,m,mm}"
+    s.exclude_files = "cpp/ggml-metal/*.m"
     s.resources = "cpp/ggml-metal/ggml-metal.metal"
     base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE"
+    header_search_paths << '"$(PODS_TARGET_SRCROOT)/cpp"'
 
     s.subspec "no-require-arc" do |ss|
       ss.requires_arc = false
@@ -51,15 +55,12 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS" => base_ld_flags,
     "OTHER_CFLAGS" => base_optimizer_flags,
-    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags + " -std=c++20"
+    "OTHER_CPLUSPLUSFLAGS" => base_optimizer_flags + " -std=c++20",
+    "HEADER_SEARCH_PATHS" => header_search_paths.join(" ")
   }
 
   s.dependency "React-callinvoker"
   s.dependency "React"
-  # Don't install the dependencies when we run `pod install` in the old architecture.
-  if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
-    install_modules_dependencies(s)
-  else
-    s.dependency "React-Core"
-  end
+
+  install_modules_dependencies(s)
 end
