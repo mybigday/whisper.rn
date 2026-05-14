@@ -2,6 +2,7 @@
 #include "ggml-backend-impl.h"
 #include "ggml.h"
 #include "ggml-impl.h"
+
 #include <assert.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -1236,6 +1237,9 @@ size_t wsp_ggml_backend_alloc_ctx_tensors_from_buft_size(struct wsp_ggml_context
 
 wsp_ggml_backend_buffer_t wsp_ggml_backend_alloc_ctx_tensors_from_buft(struct wsp_ggml_context * ctx, wsp_ggml_backend_buffer_type_t buft) {
     size_t nbytes_total = 0;
+    if (wsp_ggml_backend_buft_is_meta(buft)) {
+        return wsp_ggml_backend_meta_alloc_ctx_tensors_from_buft(ctx, buft);
+    }
     return wsp_ggml_backend_alloc_ctx_tensors_from_buft_impl(ctx, buft, &nbytes_total, /*no_alloc =*/ false);
 }
 

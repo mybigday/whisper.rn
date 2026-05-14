@@ -68,7 +68,7 @@ extern "C" {
     WSP_GGML_API void                           wsp_ggml_backend_buffer_reset         (wsp_ggml_backend_buffer_t buffer);
 
     // tensor copy between different backends
-    WSP_GGML_API void wsp_ggml_backend_tensor_copy(struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst);
+    WSP_GGML_API void wsp_ggml_backend_tensor_copy(const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst);
 
     //
     // Backend (stream)
@@ -83,13 +83,17 @@ extern "C" {
     WSP_GGML_API size_t                     wsp_ggml_backend_get_alignment(wsp_ggml_backend_t backend);
     WSP_GGML_API size_t                     wsp_ggml_backend_get_max_size(wsp_ggml_backend_t backend);
 
-    WSP_GGML_API void wsp_ggml_backend_tensor_set_async(wsp_ggml_backend_t backend,       struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);
-    WSP_GGML_API void wsp_ggml_backend_tensor_get_async(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size);
+    WSP_GGML_API void wsp_ggml_backend_tensor_set_async   (wsp_ggml_backend_t backend,       struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);
+    WSP_GGML_API void wsp_ggml_backend_tensor_get_async   (wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size);
+    WSP_GGML_API void wsp_ggml_backend_tensor_set_2d_async(wsp_ggml_backend_t backend,       struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data);
+    WSP_GGML_API void wsp_ggml_backend_tensor_get_2d_async(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data);
 
     // "offset" refers to the offset in tensor->data for setting/getting data
-    WSP_GGML_API void wsp_ggml_backend_tensor_set(      struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);
-    WSP_GGML_API void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size);
-    WSP_GGML_API void wsp_ggml_backend_tensor_memset(   struct wsp_ggml_tensor * tensor,     uint8_t value, size_t offset, size_t size);
+    WSP_GGML_API void wsp_ggml_backend_tensor_set   (      struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size);
+    WSP_GGML_API void wsp_ggml_backend_tensor_get   (const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size);
+    WSP_GGML_API void wsp_ggml_backend_tensor_set_2d(      struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data);
+    WSP_GGML_API void wsp_ggml_backend_tensor_get_2d(const struct wsp_ggml_tensor * tensor,       void * data, size_t offset, size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data);
+    WSP_GGML_API void wsp_ggml_backend_tensor_memset(      struct wsp_ggml_tensor * tensor,     uint8_t value, size_t offset, size_t size);
 
     WSP_GGML_API void wsp_ggml_backend_synchronize(wsp_ggml_backend_t backend);
 
@@ -109,7 +113,7 @@ extern "C" {
     // the copy is performed after all the currently queued operations in backend_src
     // backend_dst will wait for the copy to complete before performing other operations
     // automatic fallback to sync copy if async is not supported
-    WSP_GGML_API void wsp_ggml_backend_tensor_copy_async(wsp_ggml_backend_t backend_src, wsp_ggml_backend_t backend_dst, struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst);
+    WSP_GGML_API void wsp_ggml_backend_tensor_copy_async(wsp_ggml_backend_t backend_src, wsp_ggml_backend_t backend_dst, const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst);
 
     WSP_GGML_API wsp_ggml_backend_dev_t wsp_ggml_backend_get_device(wsp_ggml_backend_t backend);
 
@@ -135,7 +139,9 @@ extern "C" {
         // integrated GPU device using host memory
         WSP_GGML_BACKEND_DEVICE_TYPE_IGPU,
         // accelerator devices intended to be used together with the CPU backend (e.g. BLAS or AMX)
-        WSP_GGML_BACKEND_DEVICE_TYPE_ACCEL
+        WSP_GGML_BACKEND_DEVICE_TYPE_ACCEL,
+        // "meta" device wrapping multiple other devices for tensor parallelism
+        WSP_GGML_BACKEND_DEVICE_TYPE_META,
     };
 
     // functionality supported by the device
@@ -196,7 +202,12 @@ extern "C" {
 
     // Common functions that may be obtained using wsp_ggml_backend_reg_get_proc_address
 
-    // Split buffer type for tensor parallelism
+    // Context management and operations for faster communication between backends, used for tensor parallelism (meta backend)
+    typedef void * (*wsp_ggml_backend_comm_init_t)(wsp_ggml_backend_t * backends, size_t n_backends);
+    typedef void   (*wsp_ggml_backend_comm_free_t)(void * comm_ctx);
+    typedef bool   (*wsp_ggml_backend_comm_allreduce_tensor_t)(void * comm_ctx, struct wsp_ggml_tensor ** tensors);
+
+    // Split buffer type for tensor parallelism (old)
     typedef wsp_ggml_backend_buffer_type_t   (*wsp_ggml_backend_split_buffer_type_t)(int main_device, const float * tensor_split);
     // Set the number of threads for the backend
     typedef void                         (*wsp_ggml_backend_set_n_threads_t)(wsp_ggml_backend_t backend, int n_threads);
@@ -339,6 +350,53 @@ extern "C" {
 
     // Set a callback to be called for each resulting node during graph compute
     WSP_GGML_API void                 wsp_ggml_backend_sched_set_eval_callback(wsp_ggml_backend_sched_t sched, wsp_ggml_backend_sched_eval_callback callback, void * user_data);
+
+    //
+    // Meta backend
+    //
+
+#define WSP_GGML_BACKEND_META_MAX_DEVICES 16
+
+    enum wsp_ggml_backend_meta_split_axis {
+        // tensor split by tensor dimensions:
+        WSP_GGML_BACKEND_SPLIT_AXIS_0 = 0,
+        WSP_GGML_BACKEND_SPLIT_AXIS_1 = 1,
+        WSP_GGML_BACKEND_SPLIT_AXIS_2 = 2,
+        WSP_GGML_BACKEND_SPLIT_AXIS_3 = 3,
+
+        WSP_GGML_BACKEND_SPLIT_AXIS_MIRRORED = 10, // all values on all backends
+        WSP_GGML_BACKEND_SPLIT_AXIS_PARTIAL  = 11, // each backend has a partial sum
+
+        // for internal bookkeeping only:
+        WSP_GGML_BACKEND_SPLIT_AXIS_NONE    = 98,
+        WSP_GGML_BACKEND_SPLIT_AXIS_UNKNOWN = 99,
+    };
+    WSP_GGML_API const char * wsp_ggml_backend_meta_split_axis_name(enum wsp_ggml_backend_meta_split_axis split_axis);
+
+    struct wsp_ggml_backend_meta_split_state {
+        enum wsp_ggml_backend_meta_split_axis axis;
+
+        // for tensors with axis >= 0 && axis < WSP_GGML_MAX_DIMS:
+        //   - each device has a slice of the tensor along the split axis
+        //   - most tensors have n_segments == 1 and a contiguous slice of the tensor data
+        //   - some tensors have an inhomogenenous data layout along the split axis,
+        //     those tensors are divided into segments which are each individually split across devices
+        //   - ne has one entry per segment and device that add up to wsp_ggml_tensor::ne for that axis,
+        //     the outer/inner loops are over segments/devices like [seg0_dev0, seg0_dev1, seg1_dev0, seg1_dev1],
+        //   - for example, a transformer may have a fused QKV matrix rather than 3 matrices, those would be 3 separate segments
+        //     that each need to be split individually across devices so that each device gets a slice of Q, K, and V
+        int64_t  ne[16*WSP_GGML_BACKEND_META_MAX_DEVICES];
+        uint32_t n_segments;
+    };
+
+    // function to assign split states for statically allocated tensors, compute tensor split states will be assigned to be compatible:
+    typedef struct wsp_ggml_backend_meta_split_state(*wsp_ggml_backend_meta_get_split_state_t)(const struct wsp_ggml_tensor * tensor, void * userdata);
+
+    // create a new meta device from "simple" devices, meta buffer type/buffer/backend is then derived from this:
+    // TODO: this looks a bit strange - a backend API creates a device. I think we should try
+    //       express this as a backend registry functionality instead
+    WSP_GGML_API wsp_ggml_backend_dev_t wsp_ggml_backend_meta_device(
+        wsp_ggml_backend_dev_t * devs, size_t n_devs, wsp_ggml_backend_meta_get_split_state_t get_split_state, void * get_split_state_ud);
 
     //
     // Utils

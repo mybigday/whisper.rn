@@ -123,7 +123,7 @@ size_t wsp_ggml_backend_buffer_get_size(wsp_ggml_backend_buffer_t buffer) {
 void * wsp_ggml_backend_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
     WSP_GGML_ASSERT(buffer);
     // get_base is optional if the buffer is zero-sized
-    if (buffer->size == 0) {
+    if (!wsp_ggml_backend_buffer_is_meta(buffer) && buffer->size == 0) {
         return NULL;
     }
 
@@ -279,15 +279,57 @@ void wsp_ggml_backend_tensor_get_async(wsp_ggml_backend_t backend, const struct 
     }
 }
 
+void wsp_ggml_backend_tensor_set_2d_async(wsp_ggml_backend_t backend, struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size,
+            size_t n_copies, size_t stride_tensor, size_t stride_data) {
+    WSP_GGML_ASSERT(backend);
+    WSP_GGML_ASSERT(tensor);
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+
+    if (n_copies <= 1 || backend->iface.set_tensor_2d_async == NULL) {
+        for (size_t i = 0; i < n_copies; i++) {
+            wsp_ggml_backend_tensor_set_async(backend, tensor, (const char *) data + i*stride_data, offset + i*stride_tensor, size);
+        }
+        return;
+    }
+    if (size == 0) {
+        return;
+    }
+
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+    WSP_GGML_ASSERT(offset + (n_copies-1)*stride_tensor + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
+    backend->iface.set_tensor_2d_async(backend, tensor, data, offset, size, n_copies, stride_tensor, stride_data);
+}
+
+void wsp_ggml_backend_tensor_get_2d_async(wsp_ggml_backend_t backend, const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size,
+            size_t n_copies, size_t stride_tensor, size_t stride_data) {
+    WSP_GGML_ASSERT(backend);
+    WSP_GGML_ASSERT(tensor);
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+
+    if (n_copies <= 1 || backend->iface.set_tensor_2d_async == NULL) {
+        for (size_t i = 0; i < n_copies; i++) {
+            wsp_ggml_backend_tensor_get_async(backend, tensor, (char *) data + i*stride_data, offset + i*stride_tensor, size);
+        }
+        return;
+    }
+    if (size == 0) {
+        return;
+    }
+
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+    WSP_GGML_ASSERT(offset + (n_copies-1)*stride_tensor + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
+    backend->iface.get_tensor_2d_async(backend, tensor, data, offset, size, n_copies, stride_tensor, stride_data);
+}
+
 void wsp_ggml_backend_tensor_set(struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     WSP_GGML_ASSERT(tensor);
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
 
     if (size == 0) {
         return;
     }
 
-    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
     WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
 
@@ -297,16 +339,60 @@ void wsp_ggml_backend_tensor_set(struct wsp_ggml_tensor * tensor, const void * d
 void wsp_ggml_backend_tensor_get(const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     WSP_GGML_ASSERT(tensor);
     wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
 
     if (size == 0) {
         return;
     }
 
-    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
     WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     WSP_GGML_ASSERT(offset + size <= wsp_ggml_nbytes(tensor) && "tensor read out of bounds");
 
     buf->iface.get_tensor(buf, tensor, data, offset, size);
+}
+
+void wsp_ggml_backend_tensor_set_2d(struct wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size,
+            size_t n_copies, size_t stride_tensor, size_t stride_data) {
+    WSP_GGML_ASSERT(tensor);
+    wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
+
+    if (n_copies <= 1 || buf->iface.set_tensor_2d == NULL) {
+        for (size_t i = 0; i < n_copies; i++) {
+            wsp_ggml_backend_tensor_set(tensor, (const char *) data + i*stride_data, offset + i*stride_tensor, size);
+        }
+        return;
+    }
+    if (size == 0) {
+        return;
+    }
+
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+    WSP_GGML_ASSERT(offset + (n_copies-1)*stride_tensor + size <= wsp_ggml_nbytes(tensor) && "tensor write out of bounds");
+
+    buf->iface.set_tensor_2d(buf, tensor, data, offset, size, n_copies, stride_tensor, stride_data);
+}
+
+void wsp_ggml_backend_tensor_get_2d(const struct wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size,
+            size_t n_copies, size_t stride_tensor, size_t stride_data) {
+    WSP_GGML_ASSERT(tensor);
+    wsp_ggml_backend_buffer_t buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+    WSP_GGML_ASSERT(buf != NULL && "tensor buffer not set");
+
+    if (n_copies <= 1 || buf->iface.set_tensor_2d == NULL) {
+        for (size_t i = 0; i < n_copies; i++) {
+            wsp_ggml_backend_tensor_get(tensor, (char *) data + i*stride_data, offset + i*stride_tensor, size);
+        }
+        return;
+    }
+    if (size == 0) {
+        return;
+    }
+
+    WSP_GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+    WSP_GGML_ASSERT(offset + (n_copies-1)*stride_tensor + size <= wsp_ggml_nbytes(tensor) && "tensor read out of bounds");
+
+    buf->iface.get_tensor_2d(buf, tensor, data, offset, size, n_copies, stride_tensor, stride_data);
 }
 
 void wsp_ggml_backend_tensor_memset(struct wsp_ggml_tensor * tensor, uint8_t value, size_t offset, size_t size) {
@@ -388,7 +474,7 @@ wsp_ggml_backend_dev_t wsp_ggml_backend_get_device(wsp_ggml_backend_t backend) {
 
 // backend copy
 
-void wsp_ggml_backend_tensor_copy(struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+void wsp_ggml_backend_tensor_copy(const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
     WSP_GGML_ASSERT(wsp_ggml_are_same_layout(src, dst) && "cannot copy tensors with different layouts");
 
     if (src == dst) {
@@ -402,7 +488,7 @@ void wsp_ggml_backend_tensor_copy(struct wsp_ggml_tensor * src, struct wsp_ggml_
     } else if (!wsp_ggml_backend_buffer_copy_tensor(src, dst)) {
 #ifndef NDEBUG
         WSP_GGML_LOG_DEBUG("%s: warning: slow copy from %s to %s\n", __func__, wsp_ggml_backend_buffer_name(src->buffer), wsp_ggml_backend_buffer_name(dst->buffer));
-#endif
+#endif // NDEBUG
         size_t nbytes = wsp_ggml_nbytes(src);
         void * data = malloc(nbytes);
         wsp_ggml_backend_tensor_get(src, data, 0, nbytes);
@@ -411,7 +497,7 @@ void wsp_ggml_backend_tensor_copy(struct wsp_ggml_tensor * src, struct wsp_ggml_
     }
 }
 
-void wsp_ggml_backend_tensor_copy_async(wsp_ggml_backend_t backend_src, wsp_ggml_backend_t backend_dst, struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+void wsp_ggml_backend_tensor_copy_async(wsp_ggml_backend_t backend_src, wsp_ggml_backend_t backend_dst, const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
     WSP_GGML_ASSERT(wsp_ggml_are_same_layout(src, dst) && "cannot copy tensors with different layouts");
 
     if (src == dst) {
@@ -500,6 +586,7 @@ enum wsp_ggml_backend_dev_type wsp_ggml_backend_dev_type(wsp_ggml_backend_dev_t 
 }
 
 void wsp_ggml_backend_dev_get_props(wsp_ggml_backend_dev_t device, struct wsp_ggml_backend_dev_props * props) {
+    WSP_GGML_ASSERT(device);
     memset(props, 0, sizeof(*props));
     device->iface.get_props(device, props);
 }
@@ -610,6 +697,8 @@ static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_multi_buffer_i = 
     /* .memset_tensor   = */ NULL,
     /* .set_tensor      = */ NULL,
     /* .get_tensor      = */ NULL,
+    /* .set_tensor_2d   = */ NULL,
+    /* .get_tensor_2d   = */ NULL,
     /* .cpy_tensor      = */ NULL,
     /* .clear           = */ wsp_ggml_backend_multi_buffer_clear,
     /* .reset           = */ NULL,
@@ -940,6 +1029,8 @@ void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, struct w
     if (sched->ctx == NULL) {
         WSP_GGML_ABORT("%s: failed to initialize context\n", __func__);
     }
+
+    graph->uid = wsp_ggml_graph_next_uid();
 
     // pass 1: assign backends to ops with pre-allocated inputs
     for (int i = 0; i < graph->n_leafs; i++) {
@@ -1387,6 +1478,11 @@ void wsp_ggml_backend_sched_split_graph(wsp_ggml_backend_sched_t sched, struct w
         sched->leaf_backend_ids[graph_copy->n_leafs] = tensor_backend_id(leaf);
         assert(graph_copy->size > graph_copy->n_leafs);
         graph_copy->leafs[graph_copy->n_leafs++] = leaf;
+    }
+
+    // set ids for all splits
+    for (int i = 0; i < sched->n_splits; ++i) {
+        sched->splits[i].graph.uid = wsp_ggml_graph_next_uid();
     }
 }
 
@@ -1899,8 +1995,9 @@ enum wsp_ggml_status wsp_ggml_backend_tensor_alloc(wsp_ggml_backend_buffer_t buf
     WSP_GGML_ASSERT(tensor->data == NULL);
     WSP_GGML_ASSERT(tensor->view_src == NULL);
     WSP_GGML_ASSERT(addr >= wsp_ggml_backend_buffer_get_base(buffer));
-    WSP_GGML_ASSERT((char *)addr + wsp_ggml_backend_buffer_get_alloc_size(buffer, tensor) <=
-                (char *)wsp_ggml_backend_buffer_get_base(buffer) + wsp_ggml_backend_buffer_get_size(buffer));
+    WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(buffer) ||
+        (char *) addr + wsp_ggml_backend_buffer_get_alloc_size(buffer, tensor) <=
+        (char *) wsp_ggml_backend_buffer_get_base(buffer) + wsp_ggml_backend_buffer_get_size(buffer));
 
     tensor->buffer = buffer;
     tensor->data = addr;
@@ -2174,6 +2271,8 @@ static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_cpu_buffer_i = {
     /* .memset_tensor   = */ wsp_ggml_backend_cpu_buffer_memset_tensor,
     /* .set_tensor      = */ wsp_ggml_backend_cpu_buffer_set_tensor,
     /* .get_tensor      = */ wsp_ggml_backend_cpu_buffer_get_tensor,
+    /* .set_tensor_2d   = */ NULL,
+    /* .get_tensor_2d   = */ NULL,
     /* .cpy_tensor      = */ wsp_ggml_backend_cpu_buffer_cpy_tensor,
     /* .clear           = */ wsp_ggml_backend_cpu_buffer_clear,
     /* .reset           = */ NULL,
@@ -2186,6 +2285,8 @@ static const struct wsp_ggml_backend_buffer_i wsp_ggml_backend_cpu_buffer_from_p
     /* .memset_tensor   = */ wsp_ggml_backend_cpu_buffer_memset_tensor,
     /* .set_tensor      = */ wsp_ggml_backend_cpu_buffer_set_tensor,
     /* .get_tensor      = */ wsp_ggml_backend_cpu_buffer_get_tensor,
+    /* .set_tensor_2d   = */ NULL,
+    /* .get_tensor_2d   = */ NULL,
     /* .cpy_tensor      = */ wsp_ggml_backend_cpu_buffer_cpy_tensor,
     /* .clear           = */ wsp_ggml_backend_cpu_buffer_clear,
     /* .reset           = */ NULL,

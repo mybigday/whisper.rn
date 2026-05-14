@@ -61,6 +61,21 @@
 
 #define UNUSED WSP_GGML_UNUSED
 
+uint64_t wsp_ggml_graph_next_uid(void) {
+#ifdef _MSC_VER
+#if defined(_WIN32)
+    static volatile LONG counter = 1;
+    return (uint64_t) InterlockedIncrement(&counter) - 1;
+#else
+    static volatile long long counter = 1;
+    return (uint64_t) _InterlockedIncrement64(&counter) - 1;
+#endif
+#else
+    static uint64_t counter = 1;
+    return __atomic_fetch_add(&counter, 1, __ATOMIC_RELAXED);
+#endif
+}
+
 // Needed for wsp_ggml_fp32_to_bf16_row()
 #if defined(__AVX512BF16__)
 #if defined(_MSC_VER)
@@ -658,6 +673,14 @@ static const struct wsp_ggml_type_traits type_traits[WSP_GGML_TYPE_COUNT] = {
         .is_quantized             = false,
         .to_float                 = (wsp_ggml_to_float_t) wsp_ggml_fp16_to_fp32_row,
         .from_float_ref           = (wsp_ggml_from_float_t) wsp_ggml_fp32_to_fp16_row,
+    },
+    [WSP_GGML_TYPE_Q1_0] = {
+        .type_name                = "q1_0",
+        .blck_size                = QK1_0,
+        .type_size                = sizeof(block_q1_0),
+        .is_quantized             = true,
+        .to_float                 = (wsp_ggml_to_float_t) wsp_dewsp_quantize_row_q1_0,
+        .from_float_ref           = (wsp_ggml_from_float_t) wsp_quantize_row_q1_0_ref,
     },
     [WSP_GGML_TYPE_Q4_0] = {
         .type_name                = "q4_0",
@@ -1392,6 +1415,7 @@ enum wsp_ggml_type wsp_ggml_ftype_to_wsp_ggml_type(enum wsp_ggml_ftype ftype) {
         case WSP_GGML_FTYPE_MOSTLY_BF16:          wtype = WSP_GGML_TYPE_BF16;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q4_0:          wtype = WSP_GGML_TYPE_Q4_0;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q4_1:          wtype = WSP_GGML_TYPE_Q4_1;  break;
+        case WSP_GGML_FTYPE_MOSTLY_Q1_0:          wtype = WSP_GGML_TYPE_Q1_0;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q5_0:          wtype = WSP_GGML_TYPE_Q5_0;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q5_1:          wtype = WSP_GGML_TYPE_Q5_1;  break;
         case WSP_GGML_FTYPE_MOSTLY_Q8_0:          wtype = WSP_GGML_TYPE_Q8_0;  break;
@@ -7097,6 +7121,7 @@ struct wsp_ggml_cgraph * wsp_ggml_new_graph_custom(struct wsp_ggml_context * ctx
         /*.use_counts   =*/ use_counts_ptr,
         /*.hash_table   =*/ { hash_size, hash_used, hash_keys_ptr },
         /*.order        =*/ WSP_GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
+        /*.uid          =*/ 0,
     };
 
     wsp_ggml_hash_set_reset(&cgraph->visited_hash_set);
@@ -7124,6 +7149,7 @@ struct wsp_ggml_cgraph wsp_ggml_graph_view(struct wsp_ggml_cgraph * cgraph0, int
         /*.use_counts       =*/ cgraph0->use_counts,
         /*.visited_hash_set =*/ cgraph0->visited_hash_set,
         /*.order            =*/ cgraph0->order,
+        /*.uid              =*/ 0
     };
 
     return cgraph;
@@ -7643,7 +7669,7 @@ size_t wsp_ggml_wsp_quantize_chunk(
                int64_t   nrows,
                int64_t   n_per_row,
            const float * imatrix) {
-    const int64_t n = (int64_t) nrows * n_per_row;
+    const int64_t n = nrows * n_per_row;
 
     if (wsp_ggml_wsp_quantize_requires_imatrix(type)) {
         WSP_GGML_ASSERT(imatrix != NULL);
@@ -7660,20 +7686,21 @@ size_t wsp_ggml_wsp_quantize_chunk(
     size_t result = 0;
 
     switch (type) {
-        case WSP_GGML_TYPE_Q4_0:    result = wsp_quantize_q4_0(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q4_1:    result = wsp_quantize_q4_1(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q5_0:    result = wsp_quantize_q5_0(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q5_1:    result = wsp_quantize_q5_1(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q8_0:    result = wsp_quantize_q8_0(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_MXFP4:   result = wsp_quantize_mxfp4(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_NVFP4:   result = wsp_quantize_nvfp4(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q2_K:    result = wsp_quantize_q2_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q3_K:    result = wsp_quantize_q3_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q4_K:    result = wsp_quantize_q4_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q5_K:    result = wsp_quantize_q5_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_Q6_K:    result = wsp_quantize_q6_K(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_TQ1_0:   result = wsp_quantize_tq1_0(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
-        case WSP_GGML_TYPE_TQ2_0:   result = wsp_quantize_tq2_0(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q1_0:    result = wsp_quantize_q1_0   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q4_0:    result = wsp_quantize_q4_0   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q4_1:    result = wsp_quantize_q4_1   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q5_0:    result = wsp_quantize_q5_0   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q5_1:    result = wsp_quantize_q5_1   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q8_0:    result = wsp_quantize_q8_0   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_MXFP4:   result = wsp_quantize_mxfp4  (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_NVFP4:   result = wsp_quantize_nvfp4  (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q2_K:    result = wsp_quantize_q2_K   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q3_K:    result = wsp_quantize_q3_K   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q4_K:    result = wsp_quantize_q4_K   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q5_K:    result = wsp_quantize_q5_K   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_Q6_K:    result = wsp_quantize_q6_K   (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_TQ1_0:   result = wsp_quantize_tq1_0  (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
+        case WSP_GGML_TYPE_TQ2_0:   result = wsp_quantize_tq2_0  (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_IQ2_XXS: result = wsp_quantize_iq2_xxs(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_IQ2_XS:  result = wsp_quantize_iq2_xs (src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
         case WSP_GGML_TYPE_IQ3_XXS: result = wsp_quantize_iq3_xxs(src + start, (char *) dst + start_row * row_size, nrows, n_per_row, imatrix); break;
@@ -7738,9 +7765,9 @@ struct wsp_ggml_threadpool_params wsp_ggml_threadpool_params_default(int n_threa
 }
 
 bool wsp_ggml_threadpool_params_match(const struct wsp_ggml_threadpool_params * p0, const struct wsp_ggml_threadpool_params * p1) {
-    if (p0->n_threads      != p1->n_threads  )    return false;
-    if (p0->prio           != p1->prio       )    return false;
-    if (p0->poll           != p1->poll       )    return false;
-    if (p0->strict_cpu     != p1->strict_cpu )    return false;
+    if (p0->n_threads  != p1->n_threads  ) return false;
+    if (p0->prio       != p1->prio       ) return false;
+    if (p0->poll       != p1->poll       ) return false;
+    if (p0->strict_cpu != p1->strict_cpu ) return false;
     return memcmp(p0->cpumask, p1->cpumask, WSP_GGML_MAX_N_THREADS) == 0;
 }

@@ -22,6 +22,10 @@
 
 #define UNUSED WSP_GGML_UNUSED
 
+void wsp_quantize_row_q1_0(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k) {
+    wsp_quantize_row_q1_0_ref(x, y, k);
+}
+
 void wsp_quantize_row_q4_0(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k) {
     wsp_quantize_row_q4_0_ref(x, y, k);
 }
@@ -115,6 +119,57 @@ void wsp_quantize_row_q8_K_generic(const float * WSP_GGML_RESTRICT x, void * WSP
 }
 
 //===================================== Dot products =================================
+
+void wsp_ggml_vec_dot_q1_0_q8_0_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc) {
+    const int qk = QK1_0;
+    const int nb = n / qk;
+
+    assert(n % qk == 0);
+    assert(nrc == 1);
+    UNUSED(nrc);
+    UNUSED(bx);
+    UNUSED(by);
+    UNUSED(bs);
+
+    const block_q1_0 * WSP_GGML_RESTRICT x = vx;
+    const block_q8_0 * WSP_GGML_RESTRICT y = vy;
+
+    float sumf = 0.0;
+
+    for (int i = 0; i < nb; i++) {
+        const float d0 = WSP_GGML_CPU_FP16_TO_FP32(x[i].d);
+
+        float sumi = 0.0f;
+
+        for (int k = 0; k < 4; k++) {
+            const block_q8_0 * WSP_GGML_RESTRICT yb = &y[i * 4 + k];
+            const float d1 = WSP_GGML_CPU_FP16_TO_FP32(yb->d);
+            int sumi_block = 0;
+
+            const uint8_t * WSP_GGML_RESTRICT bits = &x[i].qs[k * 4];
+            const int8_t  * WSP_GGML_RESTRICT qy   = yb->qs;
+
+            for (int b = 0; b < 4; ++b, qy += 8) {
+                const unsigned mask = bits[b];
+                sumi_block += ((mask & 0x01) ? qy[0] : -qy[0])
+                           +  ((mask & 0x02) ? qy[1] : -qy[1])
+                           +  ((mask & 0x04) ? qy[2] : -qy[2])
+                           +  ((mask & 0x08) ? qy[3] : -qy[3])
+                           +  ((mask & 0x10) ? qy[4] : -qy[4])
+                           +  ((mask & 0x20) ? qy[5] : -qy[5])
+                           +  ((mask & 0x40) ? qy[6] : -qy[6])
+                           +  ((mask & 0x80) ? qy[7] : -qy[7]);
+            }
+
+            sumi += d1 * sumi_block;
+        }
+
+        sumf += d0 * sumi;
+    }
+
+    *s = sumf;
+}
+
 
 void wsp_ggml_vec_dot_q4_0_q8_0_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc) {
     const int qk = QK8_0;

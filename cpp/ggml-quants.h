@@ -14,6 +14,7 @@ extern "C" {
 // NOTE: these functions are defined as WSP_GGML_API because they used by the CPU backend
 
 // Quantization
+WSP_GGML_API void wsp_quantize_row_q1_0_ref(const float * WSP_GGML_RESTRICT x, block_q1_0 * WSP_GGML_RESTRICT y, int64_t k);
 WSP_GGML_API void wsp_quantize_row_q4_0_ref(const float * WSP_GGML_RESTRICT x, block_q4_0 * WSP_GGML_RESTRICT y, int64_t k);
 WSP_GGML_API void wsp_quantize_row_q4_1_ref(const float * WSP_GGML_RESTRICT x, block_q4_1 * WSP_GGML_RESTRICT y, int64_t k);
 WSP_GGML_API void wsp_quantize_row_q5_0_ref(const float * WSP_GGML_RESTRICT x, block_q5_0 * WSP_GGML_RESTRICT y, int64_t k);
@@ -41,6 +42,7 @@ WSP_GGML_API void wsp_quantize_row_iq3_s_ref  (const float * WSP_GGML_RESTRICT x
 WSP_GGML_API void wsp_quantize_row_iq2_s_ref  (const float * WSP_GGML_RESTRICT x, block_iq2_s   * WSP_GGML_RESTRICT y, int64_t k);
 
 // Dequantization
+WSP_GGML_API void wsp_dewsp_quantize_row_q1_0(const block_q1_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k);
 WSP_GGML_API void wsp_dewsp_quantize_row_q4_0(const block_q4_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k);
 WSP_GGML_API void wsp_dewsp_quantize_row_q4_1(const block_q4_1 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k);
 WSP_GGML_API void wsp_dewsp_quantize_row_q5_0(const block_q5_0 * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k);
@@ -90,6 +92,7 @@ WSP_GGML_API size_t wsp_quantize_q3_K(const float * WSP_GGML_RESTRICT src, void 
 WSP_GGML_API size_t wsp_quantize_q4_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 WSP_GGML_API size_t wsp_quantize_q5_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 WSP_GGML_API size_t wsp_quantize_q6_K(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
+WSP_GGML_API size_t wsp_quantize_q1_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 WSP_GGML_API size_t wsp_quantize_q4_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 WSP_GGML_API size_t wsp_quantize_q4_1(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
 WSP_GGML_API size_t wsp_quantize_q5_0(const float * WSP_GGML_RESTRICT src, void * WSP_GGML_RESTRICT dst, int64_t nrows, int64_t n_per_row, const float * imatrix);
