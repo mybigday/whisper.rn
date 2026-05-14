@@ -81,6 +81,7 @@ int wsp_ggml_metal_op_conv_transpose_2d (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_upscale           (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_pad               (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_pad_reflect_1d    (wsp_ggml_metal_op_t ctx, int idx);
+int wsp_ggml_metal_op_roll              (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_arange            (wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_timestep_embedding(wsp_ggml_metal_op_t ctx, int idx);
 int wsp_ggml_metal_op_argmax            (wsp_ggml_metal_op_t ctx, int idx);

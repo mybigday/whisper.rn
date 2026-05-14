@@ -589,6 +589,7 @@ void wsp_ggml_opt_free(wsp_ggml_opt_context_t opt_ctx) {
     wsp_ggml_backend_buffer_free(opt_ctx->buf_cpu);
     wsp_ggml_free(opt_ctx->ctx_static);
     wsp_ggml_free(opt_ctx->ctx_cpu);
+    wsp_ggml_free(opt_ctx->ctx_copy);
     delete opt_ctx;
 }
 

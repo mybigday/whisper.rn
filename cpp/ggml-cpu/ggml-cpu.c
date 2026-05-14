@@ -217,6 +217,12 @@ static const struct wsp_ggml_type_traits_cpu type_traits_cpu[WSP_GGML_TYPE_COUNT
         .vec_dot_type             = WSP_GGML_TYPE_F16,
         .nrows                    = 1,
     },
+    [WSP_GGML_TYPE_Q1_0] = {
+        .from_float               = wsp_quantize_row_q1_0,
+        .vec_dot                  = wsp_ggml_vec_dot_q1_0_q8_0,
+        .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
+        .nrows                    = 1,
+    },
     [WSP_GGML_TYPE_Q4_0] = {
         .from_float               = wsp_quantize_row_q4_0,
         .vec_dot                  = wsp_ggml_vec_dot_q4_0_q8_0,
@@ -2350,11 +2356,15 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
         case WSP_GGML_OP_FLASH_ATTN_BACK:
         case WSP_GGML_OP_SSM_CONV:
         case WSP_GGML_OP_SSM_SCAN:
+            {
+                n_tasks = n_threads;
+            } break;
         case WSP_GGML_OP_RWKV_WKV6:
         case WSP_GGML_OP_GATED_LINEAR_ATTN:
         case WSP_GGML_OP_RWKV_WKV7:
             {
-                n_tasks = n_threads;
+                const int64_t n_heads = node->src[1]->ne[1];
+                n_tasks = MIN(n_threads, n_heads);
             } break;
         case WSP_GGML_OP_WIN_PART:
         case WSP_GGML_OP_WIN_UNPART:

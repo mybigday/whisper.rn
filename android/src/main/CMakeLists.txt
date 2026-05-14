@@ -21,8 +21,10 @@ include_directories(
 set(
     SOURCE_FILES
     ${RNWHISPER_LIB_DIR}/ggml.c
+    ${RNWHISPER_LIB_DIR}/ggml.cpp
     ${RNWHISPER_LIB_DIR}/ggml-alloc.c
     ${RNWHISPER_LIB_DIR}/ggml-backend.cpp
+    ${RNWHISPER_LIB_DIR}/ggml-backend-meta.cpp
     ${RNWHISPER_LIB_DIR}/ggml-backend-reg.cpp
     ${RNWHISPER_LIB_DIR}/ggml-backend-dl.cpp
     ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/amx.cpp

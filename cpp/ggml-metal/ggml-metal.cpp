@@ -90,6 +90,8 @@ static wsp_ggml_backend_buffer_i wsp_ggml_backend_metal_buffer_shared_i = {
     /* .memset_tensor   = */ wsp_ggml_backend_metal_buffer_shared_memset_tensor,
     /* .set_tensor      = */ wsp_ggml_backend_metal_buffer_shared_set_tensor,
     /* .get_tensor      = */ wsp_ggml_backend_metal_buffer_shared_get_tensor,
+    /* .set_tensor_2d   = */ NULL,
+    /* .get_tensor_2d   = */ NULL,
     /* .cpy_tensor      = */ wsp_ggml_backend_metal_buffer_shared_cpy_tensor,
     /* .clear           = */ wsp_ggml_backend_metal_buffer_shared_clear,
     /* .reset           = */ NULL,
@@ -158,15 +160,17 @@ static void wsp_ggml_backend_metal_buffer_private_clear(wsp_ggml_backend_buffer_
 }
 
 static wsp_ggml_backend_buffer_i wsp_ggml_backend_metal_buffer_private_i = {
-    /* .free_buffer     = */ wsp_ggml_backend_metal_buffer_private_free_buffer,
-    /* .get_base        = */ wsp_ggml_backend_metal_buffer_private_get_base,
-    /* .init_tensor     = */ NULL,
-    /* .memset_tensor   = */ wsp_ggml_backend_metal_buffer_private_memset_tensor,
-    /* .set_tensor      = */ wsp_ggml_backend_metal_buffer_private_set_tensor,
-    /* .get_tensor      = */ wsp_ggml_backend_metal_buffer_private_get_tensor,
-    /* .cpy_tensor      = */ wsp_ggml_backend_metal_buffer_private_cpy_tensor,
-    /* .clear           = */ wsp_ggml_backend_metal_buffer_private_clear,
-    /* .reset           = */ NULL,
+    /* .free_buffer             = */ wsp_ggml_backend_metal_buffer_private_free_buffer,
+    /* .get_base                = */ wsp_ggml_backend_metal_buffer_private_get_base,
+    /* .init_tensor             = */ NULL,
+    /* .memset_tensor           = */ wsp_ggml_backend_metal_buffer_private_memset_tensor,
+    /* .set_tensor              = */ wsp_ggml_backend_metal_buffer_private_set_tensor,
+    /* .get_tensor              = */ wsp_ggml_backend_metal_buffer_private_get_tensor,
+    /* .set_tensor_2d           = */ NULL,
+    /* .get_tensor_2d           = */ NULL,
+    /* .cpy_tensor              = */ wsp_ggml_backend_metal_buffer_private_cpy_tensor,
+    /* .clear                   = */ wsp_ggml_backend_metal_buffer_private_clear,
+    /* .reset                   = */ NULL,
 };
 
 static bool wsp_ggml_backend_buffer_is_metal(wsp_ggml_backend_buffer_t buffer) {
@@ -563,6 +567,8 @@ static wsp_ggml_backend_i wsp_ggml_backend_metal_i = {
     /* .free                    = */ wsp_ggml_backend_metal_free,
     /* .set_tensor_async        = */ wsp_ggml_backend_metal_set_tensor_async,
     /* .get_tensor_async        = */ wsp_ggml_backend_metal_get_tensor_async,
+    /* .set_tensor_2d_async     = */ NULL,
+    /* .get_tensor_2d_async     = */ NULL,
     /* .cpy_tensor_async        = */ wsp_ggml_backend_metal_cpy_tensor_async, // only needed for multi-GPU setups
     /* .synchronize             = */ wsp_ggml_backend_metal_synchronize,
     /* .graph_plan_create       = */ NULL,
@@ -912,6 +918,10 @@ wsp_ggml_backend_reg_t wsp_ggml_backend_metal_reg(void) {
         static std::vector<wsp_ggml_backend_device_ptr> devs;
 
         if (!initialized) {
+            // workaround macOS limitation (kIOGPUCommandBufferCallbackErrorImpactingInteractivity) until proper fix becomes possible
+            // ref: https://github.com/ggml-org/llama.cpp/issues/20141#issuecomment-4272947703
+            setenv("AGX_RELAX_CDM_CTXSTORE_TIMEOUT", "1", true);
+
             static wsp_ggml_backend_metal_reg_ptr reg_ctx(wsp_ggml_backend_metal_reg_init());
 
             for (int i = 0; i < g_devices; ++i) {

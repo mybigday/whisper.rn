@@ -102,6 +102,8 @@ wsp_ggml_metal_library_t wsp_ggml_metal_library_init_from_source(wsp_ggml_metal_
 
 void wsp_ggml_metal_library_free(wsp_ggml_metal_library_t lib);
 
+wsp_ggml_metal_device_t wsp_ggml_metal_library_get_device(wsp_ggml_metal_library_t lib);
+
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline    (wsp_ggml_metal_library_t lib, const char * name);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_compile_pipeline(wsp_ggml_metal_library_t lib, const char * base, const char * name, wsp_ggml_metal_cv_t cv);
 
@@ -152,6 +154,7 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_c
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_upscale           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_pad               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_pad_reflect_1d    (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_roll              (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_arange            (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_timestep_embedding(wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_opt_step_adamw    (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
