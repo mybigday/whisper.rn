@@ -14,6 +14,11 @@ export interface WavFileHeader {
   duration: number
 }
 
+type ParsedWavFileHeader = {
+  header: WavFileHeader
+  dataOffset: number
+}
+
 export class WavFileReader {
   private filePath: string
 
@@ -49,11 +54,13 @@ export class WavFileReader {
       const fileContent = await this.fs.readFile(this.filePath, 'base64')
       const fileData = base64ToUint8Array(fileContent)
 
-      // Parse WAV header
-      this.header = WavFileReader.parseWavHeader(fileData)
-
-      // Extract audio data (skip the 44-byte header)
-      this.audioData = fileData.slice(44, 44 + this.header.dataSize)
+      // Parse WAV chunks and extract audio from the actual data chunk.
+      const parsedHeader = WavFileReader.parseWavHeader(fileData)
+      this.header = parsedHeader.header
+      this.audioData = fileData.slice(
+        parsedHeader.dataOffset,
+        parsedHeader.dataOffset + this.header.dataSize,
+      )
 
       console.log(
         `WAV file loaded: ${this.header.duration.toFixed(2)}s, ${
@@ -68,62 +75,135 @@ export class WavFileReader {
   /**
    * Parse WAV file header
    */
-  private static parseWavHeader(data: Uint8Array): WavFileHeader {
+  private static parseWavHeader(data: Uint8Array): ParsedWavFileHeader {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
 
     // Verify RIFF header
-    const riffHeader = String.fromCharCode(...data.slice(0, 4))
+    const riffHeader = WavFileReader.readChunkId(data, 0)
     if (riffHeader !== 'RIFF') {
       throw new Error('Invalid WAV file: Missing RIFF header')
     }
 
     // Verify WAVE format
-    const waveHeader = String.fromCharCode(...data.slice(8, 12))
+    const waveHeader = WavFileReader.readChunkId(data, 8)
     if (waveHeader !== 'WAVE') {
       throw new Error('Invalid WAV file: Missing WAVE header')
     }
 
-    // Read format chunk
-    const fmtHeader = String.fromCharCode(...data.slice(12, 16))
-    if (fmtHeader !== 'fmt ') {
-      throw new Error('Invalid WAV file: Missing fmt chunk')
-    }
+    let channels = 0
+    let sampleRate = 0
+    let bitsPerSample = 0
+    let isPcm = false
+    let hasFmtChunk = false
+    let dataOffset = 0
+    let dataSize = 0
+    let offset = 12
 
-    const audioFormat = view.getUint16(20, true)
-    if (audioFormat !== 1) {
-      throw new Error('Unsupported WAV format: Only PCM is supported')
-    }
-
-    const channels = view.getUint16(22, true)
-    const sampleRate = view.getUint32(24, true)
-    const bitsPerSample = view.getUint16(34, true)
-
-    // Find data chunk
-    let dataOffset = 36
-    while (dataOffset < data.length - 8) {
-      const chunkId = String.fromCharCode(
-        ...data.slice(dataOffset, dataOffset + 4),
-      )
-      const chunkSize = view.getUint32(dataOffset + 4, true)
-
-      if (chunkId === 'data') {
-        const dataSize = chunkSize
-        const duration =
-          dataSize / (sampleRate * channels * (bitsPerSample / 8))
-
-        return {
-          sampleRate,
-          channels,
-          bitsPerSample,
-          dataSize,
-          duration,
-        }
+    while (offset + 8 <= data.length) {
+      const chunkId = WavFileReader.readChunkId(data, offset)
+      const chunkSize = view.getUint32(offset + 4, true)
+      const chunkDataOffset = offset + 8
+      if (chunkDataOffset > data.length) {
+        throw new Error('Invalid WAV file: Malformed chunk')
       }
 
-      dataOffset += 8 + chunkSize
+      const availableBytes = data.length - chunkDataOffset
+      const chunkExceedsFile = chunkSize > availableBytes
+      if (chunkExceedsFile && chunkId !== 'data') {
+        throw new Error('Invalid WAV file: Malformed chunk')
+      }
+
+      const effectiveChunkSize = chunkExceedsFile ? availableBytes : chunkSize
+      if (chunkId === 'fmt ') {
+        if (chunkSize < 16) {
+          throw new Error('Invalid WAV file: Malformed fmt chunk')
+        }
+
+        const audioFormat = view.getUint16(chunkDataOffset, true)
+        channels = view.getUint16(chunkDataOffset + 2, true)
+        sampleRate = view.getUint32(chunkDataOffset + 4, true)
+        bitsPerSample = view.getUint16(chunkDataOffset + 14, true)
+        isPcm =
+          audioFormat === 1 ||
+          (audioFormat === 0xfffe &&
+            WavFileReader.hasPcmExtensibleSubFormat(
+              data,
+              chunkDataOffset,
+              chunkSize,
+            ))
+        hasFmtChunk = true
+      } else if (chunkId === 'data') {
+        dataOffset = chunkDataOffset
+        dataSize = effectiveChunkSize
+        if (hasFmtChunk) break
+      }
+
+      let nextOffset = chunkDataOffset + effectiveChunkSize
+      if (!chunkExceedsFile && chunkSize % 2 !== 0 && nextOffset < data.length) {
+        nextOffset += 1
+      }
+      if (nextOffset <= offset) {
+        throw new Error('Invalid WAV file: Malformed chunk')
+      }
+      offset = nextOffset
     }
 
-    throw new Error('Invalid WAV file: Missing data chunk')
+    if (!hasFmtChunk) {
+      throw new Error('Invalid WAV file: Missing fmt chunk')
+    }
+    if (!dataOffset) {
+      throw new Error('Invalid WAV file: Missing data chunk')
+    }
+    if (!isPcm) {
+      throw new Error('Unsupported WAV format: Only PCM is supported')
+    }
+    if (!channels) {
+      throw new Error('Invalid WAV file: Invalid channel count')
+    }
+    if (!sampleRate) {
+      throw new Error('Invalid WAV file: Invalid sample rate')
+    }
+
+    const duration = dataSize / (sampleRate * channels * (bitsPerSample / 8))
+    return {
+      header: {
+        sampleRate,
+        channels,
+        bitsPerSample,
+        dataSize,
+        duration,
+      },
+      dataOffset,
+    }
+  }
+
+  private static readChunkId(data: Uint8Array, offset: number): string {
+    if (offset + 4 > data.length) return ''
+    return String.fromCharCode(
+      data[offset] ?? 0,
+      data[offset + 1] ?? 0,
+      data[offset + 2] ?? 0,
+      data[offset + 3] ?? 0,
+    )
+  }
+
+  private static hasPcmExtensibleSubFormat(
+    data: Uint8Array,
+    fmtDataOffset: number,
+    chunkSize: number,
+  ): boolean {
+    const pcmSubFormatGuid = [
+      0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa,
+      0x00, 0x38, 0x9b, 0x71,
+    ]
+    const subFormatOffset = fmtDataOffset + 24
+    if (chunkSize < 40 || subFormatOffset + pcmSubFormatGuid.length > data.length) {
+      return false
+    }
+
+    return pcmSubFormatGuid.every(
+      (value, index) => data[subFormatOffset + index] === value,
+    )
   }
 
   /**

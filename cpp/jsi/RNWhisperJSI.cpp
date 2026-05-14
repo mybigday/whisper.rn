@@ -857,7 +857,7 @@ std::vector<rnwhisper_jsi::CoreMLAssetInfo> parseCoreMLAssets(
 }
 
 std::vector<float> decodePcm16(const uint8_t *bytes, size_t byteLength) {
-    if (byteLength == 0 || (byteLength % 2) != 0) {
+    if (byteLength < sizeof(int16_t)) {
         throw JsiError("Invalid audio data", -1);
     }
 
@@ -907,6 +907,30 @@ struct WaveAudioData {
     uint16_t bitsPerSample = 0;
 };
 
+constexpr uint16_t kWaveFormatPcm = 1;
+constexpr uint16_t kWaveFormatExtensible = 0xfffe;
+
+bool isPcmSubFormat(
+    const std::vector<uint8_t> &bytes,
+    size_t fmtDataOffset,
+    uint32_t chunkSize) {
+    static constexpr uint8_t kPcmSubFormatGuid[16] = {
+        0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+        0x10, 0x00,
+        0x80, 0x00,
+        0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71,
+    };
+
+    constexpr size_t kExtensibleSubFormatOffset = 24;
+    constexpr size_t kExtensibleSubFormatSize = sizeof(kPcmSubFormatGuid);
+    return chunkSize >= kExtensibleSubFormatOffset + kExtensibleSubFormatSize
+        && std::memcmp(
+            bytes.data() + fmtDataOffset + kExtensibleSubFormatOffset,
+            kPcmSubFormatGuid,
+            kExtensibleSubFormatSize) == 0;
+}
+
 WaveAudioData parseWaveAudioData(const std::vector<uint8_t> &bytes) {
     if (bytes.size() < 12) {
         throw JsiError("Invalid WAV file", -1);
@@ -917,34 +941,57 @@ WaveAudioData parseWaveAudioData(const std::vector<uint8_t> &bytes) {
 
     bool hasFmtChunk = false;
     bool hasDataChunk = false;
-    uint16_t audioFormat = 0;
+    bool isPcm = false;
     WaveAudioData waveData;
     size_t offset = 12;
 
     while (offset + 8 <= bytes.size()) {
         uint32_t chunkSize = readUint32LE(bytes, offset + 4);
         size_t chunkDataOffset = offset + 8;
-        if (chunkDataOffset > bytes.size()
-            || static_cast<size_t>(chunkSize) > bytes.size() - chunkDataOffset) {
+        if (chunkDataOffset > bytes.size()) {
             throw JsiError("Invalid WAV file", -1);
         }
+
+        size_t availableBytes = bytes.size() - chunkDataOffset;
+        bool chunkExceedsFile = static_cast<size_t>(chunkSize) > availableBytes;
+        bool isDataChunk = matchesChunkId(bytes, offset, "data");
+        if (chunkExceedsFile && !isDataChunk) {
+            throw JsiError("Invalid WAV file", -1);
+        }
+        size_t effectiveChunkSize =
+            chunkExceedsFile ? availableBytes : static_cast<size_t>(chunkSize);
 
         if (matchesChunkId(bytes, offset, "fmt ")) {
             if (chunkSize < 16) {
                 throw JsiError("Invalid WAV file: malformed fmt chunk", -1);
             }
-            audioFormat = readUint16LE(bytes, chunkDataOffset);
+            uint16_t audioFormat = readUint16LE(bytes, chunkDataOffset);
             waveData.channels = readUint16LE(bytes, chunkDataOffset + 2);
             waveData.sampleRate = readUint32LE(bytes, chunkDataOffset + 4);
             waveData.bitsPerSample = readUint16LE(bytes, chunkDataOffset + 14);
+            isPcm = audioFormat == kWaveFormatPcm
+                || (audioFormat == kWaveFormatExtensible
+                    && isPcmSubFormat(bytes, chunkDataOffset, chunkSize));
             hasFmtChunk = true;
-        } else if (matchesChunkId(bytes, offset, "data")) {
+        } else if (isDataChunk) {
             waveData.dataOffset = chunkDataOffset;
-            waveData.dataSize = static_cast<size_t>(chunkSize);
+            waveData.dataSize = effectiveChunkSize;
             hasDataChunk = true;
+            if (hasFmtChunk) {
+                break;
+            }
         }
 
-        offset = chunkDataOffset + chunkSize + (chunkSize % 2 == 0 ? 0 : 1);
+        size_t nextOffset = chunkDataOffset + effectiveChunkSize;
+        if (!chunkExceedsFile
+            && (chunkSize % 2) != 0
+            && nextOffset < bytes.size()) {
+            nextOffset += 1;
+        }
+        if (nextOffset <= offset) {
+            throw JsiError("Invalid WAV file", -1);
+        }
+        offset = nextOffset;
     }
 
     if (!hasFmtChunk) {
@@ -953,7 +1000,7 @@ WaveAudioData parseWaveAudioData(const std::vector<uint8_t> &bytes) {
     if (!hasDataChunk || waveData.dataSize == 0) {
         throw JsiError("Invalid WAV file: missing data chunk", -1);
     }
-    if (audioFormat != 1) {
+    if (!isPcm) {
         throw JsiError("Unsupported WAV format: only PCM is supported", -1);
     }
     if (waveData.channels == 0) {
@@ -965,10 +1012,6 @@ WaveAudioData parseWaveAudioData(const std::vector<uint8_t> &bytes) {
     if (waveData.bitsPerSample != 16) {
         throw JsiError("Unsupported WAV format: only 16-bit PCM is supported", -1);
     }
-    if ((waveData.dataSize % sizeof(int16_t)) != 0) {
-        throw JsiError("Invalid WAV file: malformed PCM data", -1);
-    }
-
     return waveData;
 }
 
@@ -981,7 +1024,7 @@ std::vector<float> decodeWavePcm16(
     }
 
     size_t bytesPerFrame = sizeof(int16_t) * channels;
-    if (byteLength == 0 || (byteLength % bytesPerFrame) != 0) {
+    if (byteLength < bytesPerFrame) {
         throw JsiError("Invalid WAV file: malformed multi-channel PCM data", -1);
     }
 
