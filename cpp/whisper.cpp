@@ -3434,7 +3434,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
             return nullptr;
         }
         const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
-        WHISPER_LOG_INFO("%s: alignment heads masks size = %ld B\n", __func__, memory_size);
+        WHISPER_LOG_INFO("%s: alignment heads masks size = %zu B\n", __func__, memory_size);
     }
 
 
@@ -8262,9 +8262,6 @@ WHISPER_API const char * whisper_bench_wsp_ggml_mul_mat_str(int n_threads) {
     // when F16 is used, there is an extra work buffer of size N*N*sizeof(float)
     std::vector<uint8_t> buf(3llu*N_max*N_max*sizeof(float) + 3*wsp_ggml_tensor_overhead() + wsp_ggml_graph_overhead());
 
-    // put a bunch of random data in the buffer
-    for (size_t i = 0; i < buf.size(); i++) buf[i] = i;
-
     for (int j = 0; j < (int) sizes.size(); j++) {
         int n_q4_0 = 0;
         int n_q4_1 = 0;
@@ -8307,6 +8304,15 @@ WHISPER_API const char * whisper_bench_wsp_ggml_mul_mat_str(int n_threads) {
 
             struct wsp_ggml_tensor * a = wsp_ggml_new_tensor_2d(ctx0, wtype,         N, N);
             struct wsp_ggml_tensor * b = wsp_ggml_new_tensor_2d(ctx0, WSP_GGML_TYPE_F32, N, N);
+
+            // set tensor data after allocation so previous iteration results don't corrupt it.
+            {
+                uint8_t * a_data = (uint8_t *) a->data;
+                for (size_t ii = 0; ii < wsp_ggml_nbytes(a); ii++) a_data[ii] = ii & 0x3F;
+
+                uint8_t * b_data = (uint8_t *) b->data;
+                for (size_t ii = 0; ii < wsp_ggml_nbytes(b); ii++) b_data[ii] = ii & 0x3F;
+            }
 
             struct wsp_ggml_tensor * c = wsp_ggml_mul_mat(ctx0, a, b);
 
@@ -8988,7 +8994,7 @@ void whisper_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
 }
 
 const char * whisper_version(void) {
-    return "1.8.0";
+    return "1.8.6";
 }
 
 WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

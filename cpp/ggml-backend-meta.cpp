@@ -13,6 +13,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -392,64 +393,100 @@ static wsp_ggml_backend_buffer_type_t wsp_ggml_backend_meta_device_get_host_buff
 // meta backend buffer
 //
 
+// Container to hold the tensor slices per simple ggml backend buffer.
+struct wsp_ggml_backend_meta_simple_tensor_container {
+    std::vector<wsp_ggml_context_ptr> ctxs;
+    std::map<const wsp_ggml_tensor *, std::vector<wsp_ggml_tensor *>> simple_tensors;
+
+    wsp_ggml_backend_meta_simple_tensor_container(const wsp_ggml_init_params & params, const int n_simple) {
+        ctxs.reserve(n_simple);
+        for (int i = 0; i < n_simple; i++) {
+            ctxs.emplace_back(wsp_ggml_init(params));
+        }
+    }
+    wsp_ggml_backend_meta_simple_tensor_container() {}
+};
+
 struct wsp_ggml_backend_meta_buffer_context {
+    // FIXME
+    // Most tensors can simply be stored statically in their own buffer.
+    // Externally created views however also need a mapping to simple tensors but they use the buffer of the view source.
+    // If external views are simply using that buffer they will slowly deplete its memory.
+    // Current solution: rotating set of 2 "compute" containers to hold external views, works correctly for llama.cpp.
+    // Long-term: tie the lifetime of external views to the meta backend executing the graph instead,
+    //     currently not possible due to graph-external operations in the backend scheduler.
+    wsp_ggml_backend_meta_simple_tensor_container stc_static;
+    wsp_ggml_backend_meta_simple_tensor_container stc_compute[2];
+    int stc_compute_index      = 0;
+    int stc_compute_index_next = 0;
+    std::vector<wsp_ggml_backend_buffer_ptr> bufs;
+
+    // FIXME
+    // The size of the split state cache is unbounded and can theoretically grow infinitely large.
+    // However, it is also expensive to build and clearing it on every rebuild in wsp_ggml_backend_meta_graph_compute is too expensive.
     static constexpr size_t nbtc = WSP_GGML_TENSOR_SIZE - sizeof(wsp_ggml_tensor::padding);
-
     std::map<std::pair<const wsp_ggml_tensor *, bool>, std::pair<wsp_ggml_backend_meta_split_state, char[nbtc]>> split_state_cache;
-    std::map<          const wsp_ggml_tensor *,        std::vector<wsp_ggml_tensor *>>                           simple_tensors;
-
-    struct buffer_config {
-        wsp_ggml_context          * ctx;
-        wsp_ggml_backend_buffer_t   buf;
-
-        buffer_config(wsp_ggml_context * ctx, wsp_ggml_backend_buffer_t buf) : ctx(ctx), buf(buf) {}
-    };
-    std::vector<buffer_config> buf_configs;
 
     int debug;
 
-    wsp_ggml_backend_meta_buffer_context() {
+    wsp_ggml_backend_meta_buffer_context(
+            wsp_ggml_backend_meta_simple_tensor_container & stc_static,
+            wsp_ggml_backend_meta_simple_tensor_container & stc_compute_0,
+            wsp_ggml_backend_meta_simple_tensor_container & stc_compute_1,
+            const std::vector<wsp_ggml_backend_buffer_t> & bufs)
+            : stc_static(std::move(stc_static)), stc_compute{std::move(stc_compute_0), std::move(stc_compute_1)} {
+        this->bufs.reserve(bufs.size());
+        for (wsp_ggml_backend_buffer_t buf : bufs) {
+            this->bufs.emplace_back(buf);
+        }
         const char * WSP_GGML_META_DEBUG = getenv("WSP_GGML_META_DEBUG");
         debug = WSP_GGML_META_DEBUG ? atoi(WSP_GGML_META_DEBUG) : 0;
+    }
+
+    wsp_ggml_backend_meta_simple_tensor_container & get_simple_tensor_container(const wsp_ggml_tensor * tensor) {
+        if (stc_static.simple_tensors.find(tensor) != stc_static.simple_tensors.end()) {
+            return stc_static;
+        }
+        return stc_compute[stc_compute_index];
     }
 };
 
 static void wsp_ggml_backend_meta_buffer_free_buffer(wsp_ggml_backend_buffer_t buffer) {
     WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(buffer));
     wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) buffer->context;
-    for (auto & [ctx, buf] : buf_ctx->buf_configs) {
-        wsp_ggml_backend_buffer_free(buf);
-        wsp_ggml_free(ctx);
-    }
     delete buf_ctx;
 }
 
 static size_t wsp_ggml_backend_meta_buffer_n_bufs(wsp_ggml_backend_buffer_t meta_buf) {
     WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(meta_buf));
     wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) meta_buf->context;
-    return buf_ctx->buf_configs.size();
+    return buf_ctx->bufs.size();
 }
 
 static wsp_ggml_backend_buffer_t wsp_ggml_backend_meta_buffer_simple_buffer(wsp_ggml_backend_buffer_t meta_buf, size_t index) {
     WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(meta_buf));
     wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) meta_buf->context;
-    WSP_GGML_ASSERT(index < buf_ctx->buf_configs.size());
-    return buf_ctx->buf_configs[index].buf;
+    WSP_GGML_ASSERT(index < buf_ctx->bufs.size());
+    return buf_ctx->bufs[index].get();
 }
 
 static struct wsp_ggml_tensor * wsp_ggml_backend_meta_buffer_simple_tensor(const struct wsp_ggml_tensor * tensor, size_t index) {
     WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(tensor->buffer));
     wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) tensor->buffer->context;
-    WSP_GGML_ASSERT(index < buf_ctx->buf_configs.size());
+    WSP_GGML_ASSERT(index < buf_ctx->bufs.size());
 
-    auto it = buf_ctx->simple_tensors.find(tensor);
-    if (it == buf_ctx->simple_tensors.end()) {
+    wsp_ggml_backend_meta_simple_tensor_container & stc = buf_ctx->get_simple_tensor_container(tensor);
+    auto it = stc.simple_tensors.find(tensor);
+    if (it == stc.simple_tensors.end()) {
         return nullptr;
     }
     return it->second[index];
 }
 
-static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_state(const struct wsp_ggml_tensor * tensor, bool assume_sync) {
+static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_state(const struct wsp_ggml_tensor * tensor, bool assume_sync);
+
+static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_state(
+        wsp_ggml_backend_meta_simple_tensor_container & stc, const struct wsp_ggml_tensor * tensor, bool assume_sync) {
     const size_t n_bufs = wsp_ggml_backend_meta_buffer_n_bufs(tensor->buffer);
     wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) tensor->buffer->context;
 
@@ -753,7 +790,9 @@ static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_
         WSP_GGML_ASSERT(src_ss[2].axis == WSP_GGML_BACKEND_SPLIT_AXIS_1);
         WSP_GGML_ASSERT(src_ss[3].axis == WSP_GGML_BACKEND_SPLIT_AXIS_1);
         WSP_GGML_ASSERT(src_ss[4].axis == WSP_GGML_BACKEND_SPLIT_AXIS_1);
-        WSP_GGML_ASSERT(src_ss[5].axis == WSP_GGML_BACKEND_SPLIT_AXIS_2);
+        // state shape is (S_v*S_v*H, K, n_seqs); the heads dim is nested inside axis 0,
+        // so a head-aligned split on the input cache reshapes to axis 0 here (not axis 2).
+        WSP_GGML_ASSERT(src_ss[5].axis == WSP_GGML_BACKEND_SPLIT_AXIS_2 || src_ss[5].axis == WSP_GGML_BACKEND_SPLIT_AXIS_1 || src_ss[5].axis == WSP_GGML_BACKEND_SPLIT_AXIS_0);
         return {WSP_GGML_BACKEND_SPLIT_AXIS_0, {0}, 1};
     };
 
@@ -783,7 +822,7 @@ static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_
                 src_ss[i] = {WSP_GGML_BACKEND_SPLIT_AXIS_UNKNOWN, {0}, 1};
                 continue;
             }
-            src_ss[i] = wsp_ggml_backend_meta_get_split_state(tensor->src[i], /*assume_sync =*/ true);
+            src_ss[i] = wsp_ggml_backend_meta_get_split_state(stc, tensor->src[i], /*assume_sync =*/ true);
             WSP_GGML_ASSERT(src_ss[i].axis != WSP_GGML_BACKEND_SPLIT_AXIS_UNKNOWN);
         }
 
@@ -1077,17 +1116,23 @@ static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_
     return ret;
 }
 
+static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_state(const struct wsp_ggml_tensor * tensor, bool assume_sync) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(tensor->buffer));
+    wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) tensor->buffer->context;
+    return wsp_ggml_backend_meta_get_split_state(buf_ctx->get_simple_tensor_container(tensor), tensor, assume_sync);
+}
+
 static void * wsp_ggml_backend_meta_buffer_get_base(wsp_ggml_backend_buffer_t buffer) {
     WSP_GGML_UNUSED(buffer);
     return (void *) 0x1000000000000000; // FIXME
 }
 
-static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, wsp_ggml_tensor * tensor) {
-    WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(buffer));
-    wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) buffer->context;
-    const size_t n_simple_bufs = wsp_ggml_backend_meta_buffer_n_bufs(buffer);
+static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor_impl(wsp_ggml_backend_meta_simple_tensor_container & stc, wsp_ggml_tensor * tensor) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(tensor->buffer));
+    wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) tensor->buffer->context;
+    const size_t n_simple_bufs = wsp_ggml_backend_meta_buffer_n_bufs(tensor->buffer);
 
-    const wsp_ggml_backend_meta_split_state split_state = wsp_ggml_backend_meta_get_split_state(tensor, /*assume_sync =*/ true);
+    const wsp_ggml_backend_meta_split_state split_state = wsp_ggml_backend_meta_get_split_state(stc, tensor, /*assume_sync =*/ true);
     WSP_GGML_ASSERT(wsp_ggml_nelements(tensor) == 0 || split_state.axis != WSP_GGML_BACKEND_SPLIT_AXIS_UNKNOWN);
     WSP_GGML_ASSERT(split_state.n_segments <= 16);
 
@@ -1102,8 +1147,8 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor(wsp_ggml_ba
     std::vector<wsp_ggml_tensor *> simple_tensors;
     simple_tensors.reserve(n_simple_bufs);
     for (size_t j = 0; j < n_simple_bufs; j++) {
-        wsp_ggml_context          * simple_ctx = buf_ctx->buf_configs[j].ctx;
-        wsp_ggml_backend_buffer_t   simple_buf = buf_ctx->buf_configs[j].buf;
+        wsp_ggml_context          * simple_ctx = stc.ctxs[j].get();
+        wsp_ggml_backend_buffer_t   simple_buf = buf_ctx->bufs[j].get();
 
         if (split_dim >= 0 && split_dim < WSP_GGML_MAX_DIMS) {
             // TODO: the following assert fails for llama-parallel even though the results are correct:
@@ -1156,7 +1201,7 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor(wsp_ggml_ba
             t_ij->data = (char *) t_ij->view_src->data + t_ij->view_offs;
         } else if (simple_buf != nullptr) {
             t_ij->data = (char *) wsp_ggml_backend_buffer_get_base(simple_buf)
-                + size_t(tensor->data) - size_t(wsp_ggml_backend_buffer_get_base(buffer));
+                + size_t(tensor->data) - size_t(wsp_ggml_backend_buffer_get_base(tensor->buffer));
         }
         t_ij->extra = tensor->extra;
         for (int i = 0; i < WSP_GGML_MAX_SRC; i++) {
@@ -1192,9 +1237,16 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor(wsp_ggml_ba
         }
     }
 
-    buf_ctx->simple_tensors[tensor] = simple_tensors;
+    stc.simple_tensors[tensor] = simple_tensors;
 
     return WSP_GGML_STATUS_SUCCESS;
+}
+
+static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor(wsp_ggml_backend_buffer_t buffer, wsp_ggml_tensor * tensor) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(buffer));
+    wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) buffer->context;
+    buf_ctx->stc_compute_index = buf_ctx->stc_compute_index_next;
+    return wsp_ggml_backend_meta_buffer_init_tensor_impl(buf_ctx->get_simple_tensor_container(tensor), tensor);
 }
 
 static void wsp_ggml_backend_meta_buffer_set_tensor(wsp_ggml_backend_buffer_t buffer, wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
@@ -1273,6 +1325,9 @@ static void wsp_ggml_backend_meta_buffer_set_tensor(wsp_ggml_backend_buffer_t bu
             for (size_t j = 0; j < n_bufs; j++) {
                 wsp_ggml_tensor * simple_tensor = wsp_ggml_backend_meta_buffer_simple_tensor(tensor, j);
                 const size_t chunk_size_j = simple_tensor->nb[split_state.axis + 1];
+                if (chunk_size_j == 0) {
+                    continue;
+                }
                 const size_t simple_offset = i_start * chunk_size_j;
                 wsp_ggml_backend_tensor_set_2d(simple_tensor, (const char *) data + offset_j, simple_offset, chunk_size_j, i_stop - i_start, chunk_size_j, chunk_size_full);
                 offset_j += chunk_size_j;
@@ -1380,6 +1435,9 @@ static void wsp_ggml_backend_meta_buffer_get_tensor(wsp_ggml_backend_buffer_t bu
             for (size_t j = 0; j < n_bufs; j++){
                 const wsp_ggml_tensor * simple_tensor = wsp_ggml_backend_meta_buffer_simple_tensor(tensor, j);
                 const size_t chunk_size_j = simple_tensor->nb[split_state.axis + 1];
+                if (chunk_size_j == 0) {
+                    continue;
+                }
                 const size_t simple_offset = i_start * chunk_size_j;
                 wsp_ggml_backend_tensor_get_2d(simple_tensor, (char *) data + offset_j, simple_offset, chunk_size_j, i_stop - i_start, chunk_size_j, chunk_size_full);
                 offset_j += chunk_size_j;
@@ -1405,8 +1463,9 @@ static void wsp_ggml_backend_meta_buffer_clear(wsp_ggml_backend_buffer_t buffer,
 }
 
 static void wsp_ggml_backend_meta_buffer_reset(wsp_ggml_backend_buffer_t buffer) {
-    const size_t n_buffers = wsp_ggml_backend_meta_buffer_n_bufs(buffer);
-    for (size_t i = 0; i < n_buffers; i++) {
+    WSP_GGML_ASSERT(wsp_ggml_backend_buffer_is_meta(buffer));
+    wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) buffer->context;
+    for (size_t i = 0; i < buf_ctx->bufs.size(); i++) {
         wsp_ggml_backend_buffer_reset(wsp_ggml_backend_meta_buffer_simple_buffer(buffer, i));
     }
 }
@@ -1432,20 +1491,24 @@ bool wsp_ggml_backend_buffer_is_meta(wsp_ggml_backend_buffer_t buf) {
 static wsp_ggml_backend_buffer_t wsp_ggml_backend_meta_buffer_type_alloc_buffer(wsp_ggml_backend_buffer_type_t buft, size_t size) {
     const size_t n_simple_bufts = wsp_ggml_backend_meta_buft_n_bufts(buft);
 
-    wsp_ggml_init_params params = {
-        /*.mem_size   =*/ 1024*1024*1024, // FIXME
+    const wsp_ggml_init_params params = {
+        /*.mem_size   =*/ 1024*1024*wsp_ggml_tensor_overhead(), // FIXME
         /*.mem_buffer =*/ nullptr,
         /*.no_alloc   =*/ true,
     };
+    wsp_ggml_backend_meta_simple_tensor_container stc_static;
+    wsp_ggml_backend_meta_simple_tensor_container stc_compute_0(params, n_simple_bufts);
+    wsp_ggml_backend_meta_simple_tensor_container stc_compute_1(params, n_simple_bufts);
 
-    wsp_ggml_backend_meta_buffer_context * buf_ctx = new wsp_ggml_backend_meta_buffer_context();
     size_t max_size = 0;
-    buf_ctx->buf_configs.reserve(n_simple_bufts);
+    std::vector<wsp_ggml_backend_buffer_t> bufs;
+    bufs.reserve(n_simple_bufts);
     for (size_t i = 0; i < n_simple_bufts; i++) {
-        wsp_ggml_backend_buffer_t simple_buf = wsp_ggml_backend_buft_alloc_buffer(wsp_ggml_backend_meta_buft_simple_buft(buft, i), size);
-        max_size = std::max(max_size, wsp_ggml_backend_buffer_get_size(simple_buf));
-        buf_ctx->buf_configs.emplace_back(wsp_ggml_init(params), simple_buf);
+        bufs.push_back(wsp_ggml_backend_buft_alloc_buffer(wsp_ggml_backend_meta_buft_simple_buft(buft, i), size));
+        WSP_GGML_ASSERT(bufs.back() != nullptr);
+        max_size = std::max(max_size, wsp_ggml_backend_buffer_get_size(bufs.back()));
     }
+    wsp_ggml_backend_meta_buffer_context * buf_ctx = new wsp_ggml_backend_meta_buffer_context(stc_static, stc_compute_0, stc_compute_1, bufs);
 
     return wsp_ggml_backend_buffer_init(buft, wsp_ggml_backend_meta_buffer_iface, buf_ctx, max_size);
 }
@@ -1453,28 +1516,53 @@ static wsp_ggml_backend_buffer_t wsp_ggml_backend_meta_buffer_type_alloc_buffer(
 struct wsp_ggml_backend_buffer * wsp_ggml_backend_meta_alloc_ctx_tensors_from_buft(struct wsp_ggml_context * ctx, wsp_ggml_backend_buffer_type_t buft) {
     const size_t n_simple_bufts = wsp_ggml_backend_meta_buft_n_bufts(buft);
 
-    wsp_ggml_init_params params = {
-        /*.mem_size   =*/ 1024*1024*1024, // FIXME
+    constexpr size_t compute_headroom = 16; // Maximum number of views per statically allocated tensor that can be created between evals.
+    const wsp_ggml_init_params params_static = {
+        /*.mem_size   =*/ wsp_ggml_get_mem_size(ctx),
         /*.mem_buffer =*/ nullptr,
         /*.no_alloc   =*/ true,
     };
+    const wsp_ggml_init_params params_compute = {
+        /*.mem_size   =*/ compute_headroom*wsp_ggml_get_mem_size(ctx),
+        /*.mem_buffer =*/ nullptr,
+        /*.no_alloc   =*/ true,
+    };
+    wsp_ggml_backend_meta_simple_tensor_container stc_static   (params_static,  n_simple_bufts);
+    wsp_ggml_backend_meta_simple_tensor_container stc_compute_0(params_compute, n_simple_bufts);
+    wsp_ggml_backend_meta_simple_tensor_container stc_compute_1(params_compute, n_simple_bufts);
 
-    wsp_ggml_backend_meta_buffer_context * meta_buf_ctx = new wsp_ggml_backend_meta_buffer_context();
-    meta_buf_ctx->buf_configs.reserve(n_simple_bufts);
-    for (size_t i = 0; i < n_simple_bufts; i++) {
-        meta_buf_ctx->buf_configs.emplace_back(wsp_ggml_init(params), nullptr);
-    }
+    std::vector<wsp_ggml_backend_buffer_t> bufs(n_simple_bufts, nullptr);
+    wsp_ggml_backend_meta_buffer_context * meta_buf_ctx = new wsp_ggml_backend_meta_buffer_context(stc_static, stc_compute_0, stc_compute_1, bufs);
 
     wsp_ggml_backend_buffer_t meta_buf = wsp_ggml_backend_buffer_init(buft, wsp_ggml_backend_meta_buffer_iface, meta_buf_ctx, 0);
     for (wsp_ggml_tensor * t = wsp_ggml_get_first_tensor(ctx); t != nullptr; t = wsp_ggml_get_next_tensor(ctx, t)) {
         t->buffer = meta_buf;
-        wsp_ggml_backend_meta_buffer_init_tensor(meta_buf, t);
+        wsp_ggml_backend_meta_buffer_init_tensor_impl(meta_buf_ctx->stc_static, t);
         t->data = (void *) 0x2000000000000000; // FIXME
     }
     for (size_t i = 0; i < n_simple_bufts; i++) {
-        meta_buf_ctx->buf_configs[i].buf = wsp_ggml_backend_alloc_ctx_tensors_from_buft(
-            meta_buf_ctx->buf_configs[i].ctx, wsp_ggml_backend_meta_buft_simple_buft(buft, i));
-        meta_buf->size = std::max(meta_buf->size, wsp_ggml_backend_buffer_get_size(meta_buf_ctx->buf_configs[i].buf));
+        wsp_ggml_context * ctx = meta_buf_ctx->stc_static.ctxs[i].get();
+        wsp_ggml_backend_buffer_type_t simple_buft = wsp_ggml_backend_meta_buft_simple_buft(buft, i);
+
+        // If a wsp_ggml_context only has zero-sized tensors, wsp_ggml_backend_alloc_ctx_tensors_from_buft returns NULL.
+        // For those edge cases, allocate a dummy buffer instead.
+        bool any_nonzero_slice = false;
+        for (wsp_ggml_tensor * t = wsp_ggml_get_first_tensor(ctx); t != nullptr; t = wsp_ggml_get_next_tensor(ctx, t)) {
+            if (wsp_ggml_nelements(t) != 0) {
+                any_nonzero_slice = true;
+                break;
+            }
+        }
+        if (any_nonzero_slice) {
+            meta_buf_ctx->bufs[i].reset(wsp_ggml_backend_alloc_ctx_tensors_from_buft(ctx, simple_buft));
+        } else {
+            meta_buf_ctx->bufs[i].reset(wsp_ggml_backend_buft_alloc_buffer(simple_buft, 0));
+            for (wsp_ggml_tensor * t = wsp_ggml_get_first_tensor(ctx); t != nullptr; t = wsp_ggml_get_next_tensor(ctx, t)) {
+                t->buffer = meta_buf_ctx->bufs[i].get();
+            }
+        }
+        WSP_GGML_ASSERT(meta_buf_ctx->bufs[i]);
+        meta_buf->size = std::max(meta_buf->size, wsp_ggml_backend_buffer_get_size(meta_buf_ctx->bufs[i].get()));
     }
     return meta_buf;
 }
@@ -1603,6 +1691,9 @@ static void wsp_ggml_backend_meta_set_tensor_async(wsp_ggml_backend_t backend, w
                 wsp_ggml_backend_t simple_backend = wsp_ggml_backend_meta_simple_backend(backend, j);
                 wsp_ggml_tensor * simple_tensor = wsp_ggml_backend_meta_buffer_simple_tensor(tensor, j);
                 const size_t chunk_size_j = simple_tensor->nb[split_state.axis + 1];
+                if (chunk_size_j == 0) {
+                    continue;
+                }
                 wsp_ggml_backend_tensor_set_2d_async(simple_backend, simple_tensor, (const char *) data + offset_j, offset, chunk_size_j,
                     i_stop - i_start, chunk_size_j, chunk_size_full);
                 offset_j += chunk_size_j;
@@ -1644,6 +1735,9 @@ static void wsp_ggml_backend_meta_get_tensor_async(wsp_ggml_backend_t backend, c
                 wsp_ggml_backend_t simple_backend = wsp_ggml_backend_meta_simple_backend(backend, j);
                 const wsp_ggml_tensor * simple_tensor = wsp_ggml_backend_meta_buffer_simple_tensor(tensor, j);
                 const size_t chunk_size_j = simple_tensor->nb[split_state.axis + 1];
+                if (chunk_size_j == 0) {
+                    continue;
+                }
                 wsp_ggml_backend_tensor_get_2d_async(simple_backend, simple_tensor, (char *) data + offset_j, offset, chunk_size_j,
                     i_stop - i_start, chunk_size_j, chunk_size_full);
                 offset_j += chunk_size_j;
@@ -1690,6 +1784,26 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_graph_compute(wsp_ggml_backend
     }
 
     if (needs_rebuild) {
+        std::set<wsp_ggml_backend_buffer_t> used_buffers;
+        for (int i = 0; i < cgraph->n_leafs; i++) {
+            if (wsp_ggml_backend_buffer_is_meta(cgraph->leafs[i]->buffer)) {
+                used_buffers.emplace(cgraph->leafs[i]->buffer);
+            }
+        }
+        for (int i = 0; i < cgraph->n_nodes; i++) {
+            if (wsp_ggml_backend_buffer_is_meta(cgraph->nodes[i]->buffer)) {
+                used_buffers.emplace(cgraph->nodes[i]->buffer);
+            }
+        }
+        for (wsp_ggml_backend_buffer_t buf : used_buffers) {
+            wsp_ggml_backend_meta_buffer_context * buf_ctx = (wsp_ggml_backend_meta_buffer_context *) buf->context;
+            buf_ctx->stc_compute_index_next = buf_ctx->stc_compute_index ^ 1;
+            wsp_ggml_backend_meta_simple_tensor_container & stc = buf_ctx->stc_compute[buf_ctx->stc_compute_index_next];
+            for (wsp_ggml_context_ptr & ctx : stc.ctxs) {
+                wsp_ggml_reset(ctx.get());
+            }
+            stc.simple_tensors.clear();
+        }
         size_t n_subgraphs  = 0;
         size_t max_tmp_size = 0;
 
@@ -1875,7 +1989,7 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_graph_compute(wsp_ggml_backend
             const size_t mem_per_device_graphs_main = backend_ctx->max_subgraphs*wsp_ggml_graph_overhead_custom(backend_ctx->max_nnodes, cgraph->grads);
             const size_t mem_per_device_graphs_aux = n_cgraphs_per_device*backend_ctx->max_subgraphs*wsp_ggml_graph_overhead_custom(1, cgraph->grads);
             const size_t mem_per_device_nodes_aux = n_nodes_per_device*backend_ctx->max_subgraphs*wsp_ggml_tensor_overhead();
-            wsp_ggml_init_params params = {
+            const wsp_ggml_init_params params = {
                 /*.mem_size   =*/ n_backends * (mem_per_device_graphs_main + mem_per_device_graphs_aux + mem_per_device_nodes_aux),
                 /*.mem_buffer =*/ nullptr,
                 /*.no_alloc   =*/ true,
@@ -1962,6 +2076,7 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_graph_compute(wsp_ggml_backend
             node_zero->src[0] = node;
             wsp_ggml_set_op_params_f32(node_zero, 0, 0.0f);
             node_zero->data = node->data;
+            node_zero->buffer = node->buffer;
             node_zero->flags |= WSP_GGML_TENSOR_FLAG_COMPUTE;
 
             step_cgraphs[j] = get_cgraph_aux();
@@ -2140,4 +2255,3 @@ wsp_ggml_backend_t wsp_ggml_backend_meta_simple_backend(wsp_ggml_backend_t meta_
     const wsp_ggml_backend_meta_context * backend_ctx = (const wsp_ggml_backend_meta_context *) meta_backend->context;
     return backend_ctx->backend_configs[index].backend;
 }
-

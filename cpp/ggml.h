@@ -438,6 +438,12 @@ extern "C" {
         WSP_GGML_PREC_F32     = 10,
     };
 
+    // op hint
+    enum wsp_ggml_op_hint {
+        WSP_GGML_HINT_NONE             = 0,
+        WSP_GGML_HINT_SRC0_IS_HADAMARD = 1,
+    };
+
     // model file types
     enum wsp_ggml_ftype {
         WSP_GGML_FTYPE_UNKNOWN        = -1,
@@ -1183,8 +1189,8 @@ extern "C" {
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
 
-    // a - x
-    // b - dy
+    // a - dy
+    // b - x
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_silu_back(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a,
@@ -1418,6 +1424,11 @@ extern "C" {
     WSP_GGML_API void wsp_ggml_mul_mat_set_prec(
             struct wsp_ggml_tensor * a,
             enum wsp_ggml_prec       prec);
+
+    // change the hint of a matrix multiplication
+    WSP_GGML_API void wsp_ggml_mul_mat_set_hint(
+            struct wsp_ggml_tensor * a,
+            enum wsp_ggml_op_hint    hint);
 
     // indirect matrix multiplication
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mul_mat_id(
@@ -2530,6 +2541,11 @@ extern "C" {
 
     // TODO: add wsp_ggml_gated_delta_net_set_bcast() to be able to configure Q, K broadcast type: tiled vs interleaved [TAG_WSP_GGML_GDN_BCAST]
     // ref: https://github.com/ggml-org/llama.cpp/pull/19468#discussion_r2786394306
+    //
+    // state is a 3D tensor of shape (S_v*S_v*H, K, n_seqs):
+    //   K == 1: output carries the final state only.
+    //   K  > 1: output carries K snapshot slots; the kernel writes the last min(n_tokens, K)
+    //   per-token snapshots into the trailing slots
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gated_delta_net(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * q,

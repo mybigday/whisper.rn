@@ -203,7 +203,6 @@
 #elif defined(__riscv)
 // quants.c
 #define wsp_ggml_vec_dot_nvfp4_q8_0_generic wsp_ggml_vec_dot_nvfp4_q8_0
-#define wsp_ggml_vec_dot_q1_0_q8_0_generic wsp_ggml_vec_dot_q1_0_q8_0
 // repack.cpp
 #define wsp_ggml_wsp_quantize_mat_q8_0_4x1_generic wsp_ggml_wsp_quantize_mat_q8_0_4x1
 #define wsp_ggml_wsp_quantize_mat_q8_0_4x4_generic wsp_ggml_wsp_quantize_mat_q8_0_4x4

@@ -44,6 +44,7 @@ void wsp_ggml_compute_forward_concat(const struct wsp_ggml_compute_params * para
 void wsp_ggml_compute_forward_silu_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_norm(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_rms_norm(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_rms_norm_mul_fused(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst_rms_norm, struct wsp_ggml_tensor * dst_mul);
 void wsp_ggml_compute_forward_rms_norm_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_group_norm(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_l2_norm(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
@@ -111,6 +112,7 @@ void wsp_ggml_compute_forward_cross_entropy_loss(const struct wsp_ggml_compute_p
 void wsp_ggml_compute_forward_cross_entropy_loss_back(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_opt_step_adamw(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_mul_mat(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_fwht(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_opt_step_sgd(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 #ifdef __cplusplus
 }

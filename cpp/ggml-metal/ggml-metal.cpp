@@ -17,6 +17,9 @@
 // note: can be overridden with WSP_GGML_METAL_DEVICES env to simulate virtual devices
 static int g_devices = 1;
 
+// forward declaration
+static bool wsp_ggml_backend_buffer_is_metal(wsp_ggml_backend_buffer_t buffer);
+
 ////////////////////////////////////////////////////////////////////////////////
 // backend interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,11 +71,11 @@ static bool wsp_ggml_backend_metal_buffer_shared_cpy_tensor(wsp_ggml_backend_buf
 
     WSP_GGML_ASSERT(wsp_ggml_metal_buffer_is_shared(ctx));
 
-    WSP_GGML_UNUSED(buffer);
-    WSP_GGML_UNUSED(src);
-    WSP_GGML_UNUSED(dst);
+    if (!wsp_ggml_backend_buffer_is_metal(src->buffer)) {
+        return false;
+    }
 
-    return false;
+    return wsp_ggml_metal_buffer_cpy_tensor(ctx, src, dst);
 }
 
 static void wsp_ggml_backend_metal_buffer_shared_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
@@ -84,17 +87,17 @@ static void wsp_ggml_backend_metal_buffer_shared_clear(wsp_ggml_backend_buffer_t
 }
 
 static wsp_ggml_backend_buffer_i wsp_ggml_backend_metal_buffer_shared_i = {
-    /* .free_buffer     = */ wsp_ggml_backend_metal_buffer_shared_free_buffer,
-    /* .get_base        = */ wsp_ggml_backend_metal_buffer_shared_get_base,
-    /* .init_tensor     = */ NULL,
-    /* .memset_tensor   = */ wsp_ggml_backend_metal_buffer_shared_memset_tensor,
-    /* .set_tensor      = */ wsp_ggml_backend_metal_buffer_shared_set_tensor,
-    /* .get_tensor      = */ wsp_ggml_backend_metal_buffer_shared_get_tensor,
-    /* .set_tensor_2d   = */ NULL,
-    /* .get_tensor_2d   = */ NULL,
-    /* .cpy_tensor      = */ wsp_ggml_backend_metal_buffer_shared_cpy_tensor,
-    /* .clear           = */ wsp_ggml_backend_metal_buffer_shared_clear,
-    /* .reset           = */ NULL,
+    /* .free_buffer   = */ wsp_ggml_backend_metal_buffer_shared_free_buffer,
+    /* .get_base      = */ wsp_ggml_backend_metal_buffer_shared_get_base,
+    /* .init_tensor   = */ NULL,
+    /* .memset_tensor = */ wsp_ggml_backend_metal_buffer_shared_memset_tensor,
+    /* .set_tensor    = */ wsp_ggml_backend_metal_buffer_shared_set_tensor,
+    /* .get_tensor    = */ wsp_ggml_backend_metal_buffer_shared_get_tensor,
+    /* .set_tensor_2d = */ NULL,
+    /* .get_tensor_2d = */ NULL,
+    /* .cpy_tensor    = */ wsp_ggml_backend_metal_buffer_shared_cpy_tensor,
+    /* .clear         = */ wsp_ggml_backend_metal_buffer_shared_clear,
+    /* .reset         = */ NULL,
 };
 
 // private buffer
@@ -144,11 +147,11 @@ static bool wsp_ggml_backend_metal_buffer_private_cpy_tensor(wsp_ggml_backend_bu
 
     WSP_GGML_ASSERT(!wsp_ggml_metal_buffer_is_shared(ctx));
 
-    WSP_GGML_UNUSED(buffer);
-    WSP_GGML_UNUSED(src);
-    WSP_GGML_UNUSED(dst);
+    if (!wsp_ggml_backend_buffer_is_metal(src->buffer)) {
+        return false;
+    }
 
-    return false;
+    return wsp_ggml_metal_buffer_cpy_tensor(ctx, src, dst);
 }
 
 static void wsp_ggml_backend_metal_buffer_private_clear(wsp_ggml_backend_buffer_t buffer, uint8_t value) {
@@ -160,17 +163,17 @@ static void wsp_ggml_backend_metal_buffer_private_clear(wsp_ggml_backend_buffer_
 }
 
 static wsp_ggml_backend_buffer_i wsp_ggml_backend_metal_buffer_private_i = {
-    /* .free_buffer             = */ wsp_ggml_backend_metal_buffer_private_free_buffer,
-    /* .get_base                = */ wsp_ggml_backend_metal_buffer_private_get_base,
-    /* .init_tensor             = */ NULL,
-    /* .memset_tensor           = */ wsp_ggml_backend_metal_buffer_private_memset_tensor,
-    /* .set_tensor              = */ wsp_ggml_backend_metal_buffer_private_set_tensor,
-    /* .get_tensor              = */ wsp_ggml_backend_metal_buffer_private_get_tensor,
-    /* .set_tensor_2d           = */ NULL,
-    /* .get_tensor_2d           = */ NULL,
-    /* .cpy_tensor              = */ wsp_ggml_backend_metal_buffer_private_cpy_tensor,
-    /* .clear                   = */ wsp_ggml_backend_metal_buffer_private_clear,
-    /* .reset                   = */ NULL,
+    /* .free_buffer   = */ wsp_ggml_backend_metal_buffer_private_free_buffer,
+    /* .get_base      = */ wsp_ggml_backend_metal_buffer_private_get_base,
+    /* .init_tensor   = */ NULL,
+    /* .memset_tensor = */ wsp_ggml_backend_metal_buffer_private_memset_tensor,
+    /* .set_tensor    = */ wsp_ggml_backend_metal_buffer_private_set_tensor,
+    /* .get_tensor    = */ wsp_ggml_backend_metal_buffer_private_get_tensor,
+    /* .set_tensor_2d = */ NULL,
+    /* .get_tensor_2d = */ NULL,
+    /* .cpy_tensor    = */ wsp_ggml_backend_metal_buffer_private_cpy_tensor,
+    /* .clear         = */ wsp_ggml_backend_metal_buffer_private_clear,
+    /* .reset         = */ NULL,
 };
 
 static bool wsp_ggml_backend_buffer_is_metal(wsp_ggml_backend_buffer_t buffer) {

@@ -2,7 +2,8 @@
 +++ whisper.cpp	2025-10-11 18:42:34
 @@ -3431,8 +3431,10 @@
          const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
-         WHISPER_LOG_INFO("%s: alignment heads masks size = %ld B\n", __func__, memory_size);
+-        WHISPER_LOG_INFO("%s: alignment heads masks size = %ld B\n", __func__, memory_size);
++        WHISPER_LOG_INFO("%s: alignment heads masks size = %zu B\n", __func__, memory_size);
      }
 +
 
@@ -32,7 +33,7 @@
 
  const char * whisper_version(void) {
 -    return WHISPER_VERSION;
-+    return "1.8.0";
++    return "1.8.6";
  }
 
  WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

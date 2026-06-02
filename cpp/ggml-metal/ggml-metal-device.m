@@ -1,6 +1,7 @@
 #import "ggml-metal-device.h"
 
 #import "ggml-impl.h"
+#import "ggml-backend-impl.h"
 
 #include <Foundation/Foundation.h>
 
@@ -627,6 +628,50 @@ void wsp_ggml_metal_rsets_free(wsp_ggml_metal_rsets_t rsets) {
     free(rsets);
 }
 
+static enum wsp_ggml_metal_device_id wsp_ggml_metal_device_id_parse(const char * name) {
+    if (!name) {
+        return WSP_GGML_METAL_DEVICE_GENERIC;
+    }
+
+    static const char prefix[] = "Apple ";
+    if (strncmp(name, prefix, sizeof(prefix) - 1) != 0) {
+        return WSP_GGML_METAL_DEVICE_GENERIC;
+    }
+    const char * suffix = name + sizeof(prefix) - 1;
+
+    static const struct {
+        const char * name;
+        enum wsp_ggml_metal_device_id id;
+    } table[] = {
+        {"M1",       WSP_GGML_METAL_DEVICE_M1},
+        {"M1 Pro",   WSP_GGML_METAL_DEVICE_M1_PRO},
+        {"M1 Max",   WSP_GGML_METAL_DEVICE_M1_MAX},
+        {"M1 Ultra", WSP_GGML_METAL_DEVICE_M1_ULTRA},
+        {"M2",       WSP_GGML_METAL_DEVICE_M2},
+        {"M2 Pro",   WSP_GGML_METAL_DEVICE_M2_PRO},
+        {"M2 Max",   WSP_GGML_METAL_DEVICE_M2_MAX},
+        {"M2 Ultra", WSP_GGML_METAL_DEVICE_M2_ULTRA},
+        {"M3",       WSP_GGML_METAL_DEVICE_M3},
+        {"M3 Pro",   WSP_GGML_METAL_DEVICE_M3_PRO},
+        {"M3 Max",   WSP_GGML_METAL_DEVICE_M3_MAX},
+        {"M3 Ultra", WSP_GGML_METAL_DEVICE_M3_ULTRA},
+        {"M4",       WSP_GGML_METAL_DEVICE_M4},
+        {"M4 Pro",   WSP_GGML_METAL_DEVICE_M4_PRO},
+        {"M4 Max",   WSP_GGML_METAL_DEVICE_M4_MAX},
+        {"M5",       WSP_GGML_METAL_DEVICE_M5},
+        {"M5 Pro",   WSP_GGML_METAL_DEVICE_M5_PRO},
+        {"M5 Max",   WSP_GGML_METAL_DEVICE_M5_MAX},
+        {"M5 Ultra", WSP_GGML_METAL_DEVICE_M5_ULTRA},
+    };
+
+    for (size_t i = 0; i < sizeof(table)/sizeof(table[0]); ++i) {
+        if (strcmp(suffix, table[i].name) == 0) {
+            return table[i].id;
+        }
+    }
+    return WSP_GGML_METAL_DEVICE_GENERIC;
+}
+
 wsp_ggml_metal_device_t wsp_ggml_metal_device_init(int device) {
     wsp_ggml_metal_device_t dev = calloc(1, sizeof(struct wsp_ggml_metal_device));
 
@@ -671,7 +716,7 @@ wsp_ggml_metal_device_t wsp_ggml_metal_device_init(int device) {
                 ![[dev->mtl_device name] containsString:@"M6"] &&
                 ![[dev->mtl_device name] containsString:@"A19"] &&
                 ![[dev->mtl_device name] containsString:@"A20"]) {
-                WSP_GGML_LOG_WARN("%s: tensor API disabled for pre-M5 and pre-A19 devices\n", __func__);
+                WSP_GGML_LOG_INFO("%s: tensor API disabled for pre-M5 and pre-A19 devices\n", __func__);
                 dev->props.has_tensor = false;
             }
 
@@ -793,6 +838,8 @@ wsp_ggml_metal_device_t wsp_ggml_metal_device_init(int device) {
             }
 
             dev->props.supports_gpu_family_apple7 = [dev->mtl_device supportsFamily:MTLGPUFamilyApple7];
+
+            dev->props.device_id = wsp_ggml_metal_device_id_parse([[dev->mtl_device name] UTF8String]);
 
             dev->props.op_offload_min_batch_size  = getenv("WSP_GGML_OP_OFFLOAD_MIN_BATCH") ? atoi(getenv("WSP_GGML_OP_OFFLOAD_MIN_BATCH")) : 32;
 
@@ -1735,6 +1782,47 @@ void wsp_ggml_metal_buffer_get_tensor(wsp_ggml_metal_buffer_t buf, const struct 
         [cmd_buf commit];
         [cmd_buf waitUntilCompleted];
     }
+}
+
+bool wsp_ggml_metal_buffer_cpy_tensor(wsp_ggml_metal_buffer_t buf_dst, const struct wsp_ggml_tensor * src, struct wsp_ggml_tensor * dst) {
+    wsp_ggml_metal_buffer_t buf_src = (wsp_ggml_metal_buffer_t)src->buffer->context;
+
+    const size_t size = wsp_ggml_nbytes(src);
+
+    // if both buffers are shared, we can use memcpy directly
+    if (buf_dst->is_shared && buf_src->is_shared) {
+        memcpy(dst->data, src->data, size);
+        return true;
+    }
+
+    // for private buffers, we need to use Metal blit commands
+    @autoreleasepool {
+        struct wsp_ggml_metal_buffer_id bid_src = wsp_ggml_metal_buffer_get_id(buf_src, src);
+        struct wsp_ggml_metal_buffer_id bid_dst = wsp_ggml_metal_buffer_get_id(buf_dst, dst);
+
+        if (bid_src.metal == nil || bid_dst.metal == nil) {
+            return false;
+        }
+
+        id<MTLCommandBuffer> cmd_buf = [buf_dst->dev->mtl_queue commandBufferWithUnretainedReferences];
+
+        {
+            id<MTLBlitCommandEncoder> encoder = [cmd_buf blitCommandEncoder];
+
+            [encoder copyFromBuffer:bid_src.metal
+                       sourceOffset:bid_src.offs
+                           toBuffer:bid_dst.metal
+                  destinationOffset:bid_dst.offs
+                               size:size];
+
+            [encoder endEncoding];
+        }
+
+        [cmd_buf commit];
+        [cmd_buf waitUntilCompleted];
+    }
+
+    return true;
 }
 
 void wsp_ggml_metal_buffer_clear(wsp_ggml_metal_buffer_t buf, uint8_t value) {
