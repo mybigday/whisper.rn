@@ -1039,6 +1039,7 @@ static const char * WSP_GGML_OP_NAME[WSP_GGML_OP_COUNT] = {
     "IM2COL",
     "IM2COL_BACK",
     "IM2COL_3D",
+    "COL2IM_1D",
     "CONV_2D",
     "CONV_3D",
     "CONV_2D_DW",
@@ -1088,7 +1089,7 @@ static const char * WSP_GGML_OP_NAME[WSP_GGML_OP_COUNT] = {
     "GLU",
 };
 
-static_assert(WSP_GGML_OP_COUNT == 96, "WSP_GGML_OP_COUNT != 96");
+static_assert(WSP_GGML_OP_COUNT == 97, "WSP_GGML_OP_COUNT != 97");
 
 static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "none",
@@ -1149,6 +1150,7 @@ static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "im2col(x)",
     "im2col_back(x)",
     "im2col_3d(x)",
+    "col2im_1d(x)",
     "conv_2d(x)",
     "conv_3d(x)",
     "conv_2d_dw(x)",
@@ -1198,7 +1200,7 @@ static const char * WSP_GGML_OP_SYMBOL[WSP_GGML_OP_COUNT] = {
     "glu(x)",
 };
 
-static_assert(WSP_GGML_OP_COUNT == 96, "WSP_GGML_OP_COUNT != 96");
+static_assert(WSP_GGML_OP_COUNT == 97, "WSP_GGML_OP_COUNT != 97");
 
 static_assert(WSP_GGML_OP_POOL_COUNT == 2, "WSP_GGML_OP_POOL_COUNT != 2");
 
@@ -4549,6 +4551,41 @@ struct wsp_ggml_tensor * wsp_ggml_conv_1d_dw_ph(
     return wsp_ggml_conv_1d_dw(ctx, a, b, s0, a->ne[0] / 2, d0);
 }
 
+// wsp_ggml_col2im_1d
+
+struct wsp_ggml_tensor * wsp_ggml_col2im_1d(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        int                   s0,
+        int                   oc,
+        int                   p0) {
+    WSP_GGML_ASSERT(wsp_ggml_is_matrix(a));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(a));
+    WSP_GGML_ASSERT(a->type == WSP_GGML_TYPE_F32 || a->type == WSP_GGML_TYPE_F16 || a->type == WSP_GGML_TYPE_BF16);
+    WSP_GGML_ASSERT(s0 > 0);
+    WSP_GGML_ASSERT(oc > 0);
+    WSP_GGML_ASSERT(p0 >= 0);
+
+    const int64_t K_OC = a->ne[0];
+    const int64_t T_in = a->ne[1];
+    const int64_t K = K_OC / oc;
+    const int64_t T_out = (T_in - 1) * s0 + K - 2 * p0;
+
+    WSP_GGML_ASSERT(K_OC == K * oc);  // a->ne[0] must be a whole number of oc blocks
+    WSP_GGML_ASSERT(K > 0 && T_out > 0);
+
+    const int64_t ne[4] = { T_out, oc, 1, 1 };
+    struct wsp_ggml_tensor * result = wsp_ggml_new_tensor(ctx, a->type, 2, ne);
+
+    int32_t params[] = { s0, (int32_t)oc, (int32_t)p0 };
+    wsp_ggml_set_op_params(result, params, sizeof(params));
+
+    result->op     = WSP_GGML_OP_COL2IM_1D;
+    result->src[0] = a;
+
+    return result;
+}
+
 // wsp_ggml_conv_transpose_1d
 
 static int64_t wsp_ggml_calc_conv_transpose_1d_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
@@ -5231,7 +5268,7 @@ static struct wsp_ggml_tensor * wsp_ggml_fill_impl(
     struct wsp_ggml_tensor  * a,
     float                 c,
     bool                  inplace) {
-    WSP_GGML_ASSERT(a->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(a->type == WSP_GGML_TYPE_F32 || a->type == WSP_GGML_TYPE_F16);
     WSP_GGML_ASSERT(wsp_ggml_is_contiguous(a));
 
     struct wsp_ggml_tensor * result = inplace ? wsp_ggml_view_tensor(ctx, a) : wsp_ggml_dup_tensor(ctx, a);
@@ -6194,7 +6231,8 @@ struct wsp_ggml_tensor * wsp_ggml_gated_delta_net(
         struct wsp_ggml_tensor  * v,
         struct wsp_ggml_tensor  * g,
         struct wsp_ggml_tensor  * beta,
-        struct wsp_ggml_tensor  * state) {
+        struct wsp_ggml_tensor  * state,
+        int64_t               K) {
     WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(q));
     WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(k));
     WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(v));
@@ -6218,14 +6256,17 @@ struct wsp_ggml_tensor * wsp_ggml_gated_delta_net(
     WSP_GGML_ASSERT(g->ne[0] == 1 || g->ne[0] == S_v);
     WSP_GGML_ASSERT(beta->ne[0] == 1);
 
-    // state is a 3D tensor (S_v*S_v*H, K, n_seqs). K is the snapshot slot count.
-    WSP_GGML_ASSERT(state->ne[0] == S_v * S_v * H);
-    WSP_GGML_ASSERT(state->ne[2] == n_seqs);
-    WSP_GGML_ASSERT(state->ne[3] == 1);
-    const int64_t K = state->ne[1];
+    // state holds the initial state s0 only: [S_v, S_v, H, n_seqs]. K (snapshot slot count) is an op param.
+    WSP_GGML_ASSERT(state->ne[0] == S_v);
+    WSP_GGML_ASSERT(state->ne[1] == S_v);
+    WSP_GGML_ASSERT(state->ne[2] == H);
+    WSP_GGML_ASSERT(state->ne[3] == n_seqs);
+    WSP_GGML_ASSERT(K >= 1);
     const int64_t state_rows = K * S_v * n_seqs;
     const int64_t ne[4] = { S_v * H, n_tokens * n_seqs + state_rows, 1, 1 };
     struct wsp_ggml_tensor * result = wsp_ggml_new_tensor(ctx, WSP_GGML_TYPE_F32, 4, ne);
+
+    wsp_ggml_set_op_params_i32(result, 0, (int32_t) K);
 
     result->op     = WSP_GGML_OP_GATED_DELTA_NET;
     result->src[0] = q;

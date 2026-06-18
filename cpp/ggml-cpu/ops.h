@@ -68,6 +68,7 @@ void wsp_ggml_compute_forward_conv_transpose_1d(const struct wsp_ggml_compute_pa
 void wsp_ggml_compute_forward_im2col(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_im2col_back_f32(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_im2col_3d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
+void wsp_ggml_compute_forward_col2im_1d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_conv_2d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_conv_3d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);
 void wsp_ggml_compute_forward_conv_transpose_2d(const struct wsp_ggml_compute_params * params, struct wsp_ggml_tensor * dst);

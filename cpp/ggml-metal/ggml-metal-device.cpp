@@ -590,8 +590,8 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_gated_de
     const int ne20 = op->src[2]->ne[0]; // S_v
     const int ne21 = op->src[2]->ne[1]; // H
     const int ne30 = op->src[3]->ne[0]; // G
-    // state is src[5], 3D (S_v*S_v*H, K, n_seqs); K is the snapshot slot count.
-    const int K = op->src[5]->ne[1];
+    // state is src[5], 4D [S_v, S_v, H_v, n_seqs] (s0 only); K is op param 0.
+    const int K = wsp_ggml_get_op_params_i32(op, 0);
 
     const int nsg = op->src[2]->ne[0]/32;
 
@@ -1732,14 +1732,24 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_rope(wsp
 wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_im2col(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
     assert(op->op == WSP_GGML_OP_IM2COL);
 
+    WSP_GGML_TENSOR_LOCALS(int64_t, ne0, op->src[0], ne);
+
     WSP_GGML_ASSERT(wsp_ggml_is_contiguous(op->src[1]));
     WSP_GGML_ASSERT(op->src[1]->type == WSP_GGML_TYPE_F32);
     WSP_GGML_ASSERT(op->type         == WSP_GGML_TYPE_F16 || op->type == WSP_GGML_TYPE_F32);
 
+    const bool is_2D = ((const int32_t *)(op->op_params))[6] == 1;
+    const int64_t KH = is_2D ? ne01 : 1;
+    const int64_t KW = ne00;
+
     char base[256];
     char name[256];
 
-    snprintf(base, 256, "kernel_im2col_%s", wsp_ggml_type_name(op->type));
+    if (KH*KW <= 1024) {
+        snprintf(base, 256, "kernel_im2col_%s", wsp_ggml_type_name(op->type));
+    } else {
+        snprintf(base, 256, "kernel_im2col_ext_%s", wsp_ggml_type_name(op->type));
+    }
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);

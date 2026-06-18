@@ -3635,16 +3635,26 @@ int wsp_ggml_metal_op_im2col(wsp_ggml_metal_op_t ctx, int idx) {
 
     auto pipeline = wsp_ggml_metal_library_get_pipeline_im2col(lib, op);
 
-    WSP_GGML_ASSERT(KH*KW <= wsp_ggml_metal_pipeline_max_theads_per_threadgroup(pipeline));
+    if (KH*KW <= wsp_ggml_metal_pipeline_max_theads_per_threadgroup(pipeline)) {
+        const uint64_t ntptg0 = std::min(wsp_ggml_metal_pipeline_max_theads_per_threadgroup(pipeline)/(KH*KW), N);
 
-    const uint64_t ntptg0 = std::min(wsp_ggml_metal_pipeline_max_theads_per_threadgroup(pipeline)/(KH*KW), N);
+        wsp_ggml_metal_encoder_set_pipeline(enc, pipeline);
+        wsp_ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
+        wsp_ggml_metal_encoder_set_buffer  (enc, wsp_ggml_metal_get_buffer_id(op->src[1]), 1);
+        wsp_ggml_metal_encoder_set_buffer  (enc, wsp_ggml_metal_get_buffer_id(op),         2);
 
-    wsp_ggml_metal_encoder_set_pipeline(enc, pipeline);
-    wsp_ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
-    wsp_ggml_metal_encoder_set_buffer  (enc, wsp_ggml_metal_get_buffer_id(op->src[1]), 1);
-    wsp_ggml_metal_encoder_set_buffer  (enc, wsp_ggml_metal_get_buffer_id(op),         2);
+        wsp_ggml_metal_encoder_dispatch_threadgroups(enc, IC, OH, OW, ntptg0, KH, KW);
+    } else {
+        const uint64_t n_threads = std::min(wsp_ggml_metal_pipeline_max_theads_per_threadgroup(pipeline), N);
+        const int64_t  quotient  = N / n_threads + (N % n_threads > 0 ? 1 : 0);
 
-    wsp_ggml_metal_encoder_dispatch_threadgroups(enc, IC, OH, OW, ntptg0, KH, KW);
+        wsp_ggml_metal_encoder_set_pipeline(enc, pipeline);
+        wsp_ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
+        wsp_ggml_metal_encoder_set_buffer  (enc, wsp_ggml_metal_get_buffer_id(op->src[1]), 1);
+        wsp_ggml_metal_encoder_set_buffer  (enc, wsp_ggml_metal_get_buffer_id(op),         2);
+
+        wsp_ggml_metal_encoder_dispatch_threadgroups(enc, quotient * CHW, OH, OW, n_threads, 1, 1);
+    }
 
     return 1;
 }
