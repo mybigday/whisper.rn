@@ -9,10 +9,16 @@
   "source": "src/index",
   "exports": {
     "./*": {
-      "import": "./lib/module/*",
-      "require": "./lib/commonjs/*",
-      "types": "./lib/typescript/*",
-      "react-native": "src/*"
+      "react-native": "./src/*.ts",
+      "types": "./lib/typescript/*.d.ts",
+      "import": "./lib/module/*.js",
+      "require": "./lib/commonjs/*.js"
+    },
+    "./*/": {
+      "react-native": "./src/*/index.ts",
+      "types": "./lib/typescript/*/index.d.ts",
+      "import": "./lib/module/*/index.js",
+      "require": "./lib/commonjs/*/index.js"
     }
   },
   "files": [
