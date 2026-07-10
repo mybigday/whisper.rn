@@ -13,6 +13,7 @@ import TranscribeData from './TranscribeData'
 import Vad from './Vad'
 import Bench from './Bench'
 import RealtimeTranscriber from './RealtimeTranscriber'
+import Parakeet from './Parakeet'
 
 // Example: Catch logs from whisper.cpp
 toggleNativeLog(true)
@@ -67,6 +68,12 @@ function HomeScreen({ navigation }: { navigation: any }) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
+        onPress={() => navigation.navigate('Parakeet')}
+      >
+        <Text style={styles.buttonText}>Example: Parakeet Transcription</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
         onPress={() => navigation.navigate('VAD')}
       >
         <Text style={styles.buttonText}>Example: VAD</Text>
@@ -92,6 +99,7 @@ function App() {
           <Stack.Screen name="Transcribe" component={Transcribe} />
           <Stack.Screen name="TranscribeData" component={TranscribeData} />
           <Stack.Screen name="RealtimeTranscriber" component={RealtimeTranscriber} />
+          <Stack.Screen name="Parakeet" component={Parakeet} />
           <Stack.Screen name="VAD" component={Vad} />
           <Stack.Screen name="Bench" component={Bench} />
         </Stack.Navigator>

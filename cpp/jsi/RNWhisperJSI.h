@@ -7,15 +7,18 @@
 
 #if defined(__ANDROID__)
 #include <jni.h>
+#include "parakeet.h"
 #include "whisper.h"
 #include "rn-whisper.h"
 #endif
 
 #if defined(__APPLE__)
 #if RNWHISPER_BUILD_FROM_SOURCE
+#include "parakeet.h"
 #include "whisper.h"
 #include "rn-whisper.h"
 #else
+#include <rnwhisper/parakeet.h>
 #include <rnwhisper/whisper.h>
 #include <rnwhisper/rn-whisper.h>
 #endif
@@ -57,10 +60,24 @@ struct WhisperVadContextInitResult {
     std::string reasonNoGPU;
 };
 
+struct ParakeetContextInitOptions {
+    std::string filePath;
+    bool isBundleAsset = false;
+    bool useGpu = true;
+};
+
+struct ParakeetContextInitResult {
+    parakeet_context *context = nullptr;
+    bool gpu = false;
+    std::string reasonNoGPU;
+};
+
 WhisperContextInitResult hostInitWhisperContext(
     const WhisperContextInitOptions &options);
 WhisperVadContextInitResult hostInitWhisperVadContext(
     const WhisperVadContextInitOptions &options);
+ParakeetContextInitResult hostInitParakeetContext(
+    const ParakeetContextInitOptions &options);
 std::vector<uint8_t> hostLoadFileBytes(const std::string &path);
 void hostClearCache();
 

@@ -8,6 +8,9 @@ export const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/m
 
 export const vadModelHost = 'https://huggingface.co/ggml-org/whisper-vad/resolve/main'
 
+export const parakeetModelHost =
+  'https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main'
+
 export const createDir = async (log: any) => {
   if (!(await RNFS.exists(fileDir))) {
     log?.('Create dir', fileDir)
@@ -28,6 +31,10 @@ export const whisperModels = [
 ] as const
 
 export type WhisperModel = typeof whisperModels[number]
+
+export const parakeetModels = ['q4_0', 'q4_k', 'q8_0', 'f16'] as const
+
+export type ParakeetModel = typeof parakeetModels[number]
 
 export const downloadModel = async (
   model: WhisperModel,
@@ -62,6 +69,47 @@ export const downloadModel = async (
     return modelPath
   } catch (error) {
     log?.(`Failed to download ${model} model: ${error}`)
+    if (await RNFS.exists(modelPath)) {
+      await RNFS.unlink(modelPath)
+    }
+    throw error
+  }
+}
+
+export const downloadParakeetModel = async (
+  model: ParakeetModel,
+  onProgress?: (progress: number) => void,
+  log?: (message: string) => void,
+): Promise<string> => {
+  const modelFileName = `ggml-parakeet-tdt-0.6b-v3-${model}.bin`
+  const modelPath = `${fileDir}/${modelFileName}`
+  const modelUrl = `${parakeetModelHost}/${modelFileName}`
+
+  await createDir(log)
+
+  if (await RNFS.exists(modelPath)) {
+    log?.(`Parakeet model ${model} already exists at ${modelPath}`)
+    return modelPath
+  }
+
+  log?.(`Downloading Parakeet ${model} model from ${modelUrl}`)
+
+  try {
+    await RNFS.downloadFile({
+      fromUrl: modelUrl,
+      toFile: modelPath,
+      progress: onProgress
+        ? (res: { bytesWritten: number; contentLength: number }) => {
+            if (res.contentLength > 0) {
+              onProgress(res.bytesWritten / res.contentLength)
+            }
+          }
+        : undefined,
+    }).promise
+    log?.(`Successfully downloaded Parakeet ${model} model to ${modelPath}`)
+    return modelPath
+  } catch (error) {
+    log?.(`Failed to download Parakeet ${model} model: ${error}`)
     if (await RNFS.exists(modelPath)) {
       await RNFS.unlink(modelPath)
     }

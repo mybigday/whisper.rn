@@ -6,6 +6,7 @@ whisper.rn is a React Native binding for [whisper.cpp](https://github.com/ggerga
 
 **Key Features:**
 - Native speech-to-text transcription via whisper.cpp
+- NVIDIA Parakeet TDT transcription with multilingual model support
 - Voice Activity Detection (VAD) using Silero VAD model
 - Realtime transcription with auto-slicing and memory management
 - Core ML support for iOS (encoder acceleration)
@@ -70,7 +71,7 @@ yarn release            # Publish new version with release-it
 whisper.rn has a 4-layer architecture:
 
 1. **JavaScript/TypeScript Layer** (`src/`):
-   - `index.ts`: Main API exports, `WhisperContext` and `WhisperVadContext` classes
+   - `index.ts`: Main API exports, `WhisperContext`, `ParakeetContext`, and `WhisperVadContext` classes
    - `NativeRNWhisper.ts`: TurboModule spec (New Architecture compatible)
    - `realtime-transcription/`: Enhanced realtime transcription framework
      - `RealtimeTranscriber.ts`: Main transcriber with VAD integration
@@ -81,7 +82,7 @@ whisper.rn has a 4-layer architecture:
    - `RNWhisperJSI.cpp/h`: High-performance JSI functions for ArrayBuffer operations
    - Direct memory transfer for audio data (bypasses JSON serialization)
    - Thread pool for async processing
-   - Functions: `whisperTranscribeData`, `whisperVadDetectSpeech`
+   - Functions: `whisperTranscribeData`, `parakeetTranscribeData`, `whisperVadDetectSpeech`
 
 3. **Native Modules** (`ios/`, `android/src/main/java/`):
    - **iOS**: `RNWhisper.mm`, `RNWhisperContext.mm`, `RNWhisperVadContext.mm`
@@ -94,6 +95,7 @@ whisper.rn has a 4-layer architecture:
    - `rn-whisper.cpp/h`: Job management, transcription orchestration
    - `rn-audioutils.cpp/h`: Audio conversion utilities (WAV, PCM)
    - `whisper.cpp`: Core whisper.cpp library (git submodule)
+   - `parakeet.cpp/h`: NVIDIA Parakeet TDT inference engine (from whisper.cpp)
    - `ggml*.cpp/h`: GGML tensor library files (from whisper.cpp)
    - `coreml/`: Core ML integration headers (iOS)
 
@@ -105,11 +107,15 @@ The library uses a context-based model:
   - Methods: `transcribe()`, `transcribeData()`, `transcribeRealtime()` (deprecated), `bench()`, `release()`
   - Supports file paths, base64 WAV, ArrayBuffer (via JSI), and asset URIs
 
+- **ParakeetContext**: Parakeet TDT transcription context, initialized with a Parakeet GGUF model
+  - Methods: `transcribe()`, `transcribeData()`, `release()`
+  - Supports WAV file paths, base64 WAV, raw PCM16 ArrayBuffer data, and asset URIs
+
 - **WhisperVadContext**: VAD context, initialized with Silero VAD model
   - Methods: `detectSpeech()`, `detectSpeechData()`, `release()`
   - Used for voice activity detection in audio segments
 
-Both contexts maintain:
+All contexts maintain:
 - `id`: Unique context identifier
 - `gpu`: Whether GPU/Metal acceleration is active
 - `reasonNoGPU`: Explanation if GPU is not available
@@ -117,8 +123,8 @@ Both contexts maintain:
 ### JSI Installation
 
 JSI bindings are lazily installed on first use:
-- Called automatically by `initWhisper()` and `initWhisperVad()`
-- Installs global functions: `whisperTranscribeData`, `whisperVadDetectSpeech`
+- Called automatically by `initWhisper()`, `initParakeet()`, and `initWhisperVad()`
+- Installs global functions including `whisperTranscribeData`, `parakeetTranscribeData`, and `whisperVadDetectSpeech`
 - These functions are then captured and removed from global scope
 
 ### Realtime Transcription Architecture
@@ -259,7 +265,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Example App
 - Located in `example/`
 - Uses tiny.en model and jfk.wav sample
-- Demonstrates: basic transcription, VAD, realtime transcription
+- Demonstrates: Whisper and Parakeet transcription, VAD, realtime transcription
 - Test realtime: Requires microphone permissions
 
 ## Build System

@@ -5,6 +5,12 @@ if ! command -v cmake &> /dev/null; then
   exit 1
 fi
 
+if [ -n "$RNWHISPER_CMAKE_GENERATOR" ]; then
+  CMAKE_GENERATOR=$RNWHISPER_CMAKE_GENERATOR
+else
+  CMAKE_GENERATOR="Unix Makefiles"
+fi
+
 function cp_headers() {
   mkdir -p ../ios/rnwhisper.xcframework/$1/rnwhisper.framework/Headers
   cp ../cpp/*.h ../ios/rnwhisper.xcframework/$1/rnwhisper.framework/Headers/
@@ -18,29 +24,35 @@ function build_framework() {
   # $4: output_path
   # $5: build_dir
 
-  cd $5
+  cd "$5"
 
   # Configure CMake
   cmake ../ios \
-    -GXcode \
+    -G"$CMAKE_GENERATOR" \
     -DCMAKE_SYSTEM_NAME=$1 \
     -DCMAKE_OSX_ARCHITECTURES="$2" \
     -DCMAKE_OSX_SYSROOT=$3 \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=`pwd`/install \
     -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
-    -DCMAKE_IOS_INSTALL_COMBINED=YES 
+    -DCMAKE_IOS_INSTALL_COMBINED=YES
   # Build
   cmake --build . --config Release -j $(sysctl -n hw.logicalcpu)
 
   # Setup framework directory
   rm -rf ../ios/rnwhisper.xcframework/$4
   mkdir -p ../ios/rnwhisper.xcframework/$4
-  mv Release-$3/rnwhisper.framework ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
+  framework_path="Release-$3/rnwhisper.framework"
+  if [ ! -d "$framework_path" ]; then
+    framework_path="rnwhisper.framework"
+  fi
+  mv "$framework_path" ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
   mkdir -p ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/Headers
 
   # Copy headers and metal shader
   cp_headers $4
   cp ../cpp/ggml-metal/ggml-metal.metal ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-metal.metal
+  codesign --force --sign - --timestamp=none ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
 
   rm -rf ./*
   cd ..

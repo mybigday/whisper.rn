@@ -125,4 +125,4 @@ Key Parameters:
 
 #### Defined in
 
-[realtime-transcription/types.ts:62](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L62)
+[realtime-transcription/types.ts:62](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L62)

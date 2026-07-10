@@ -90,6 +90,9 @@ cp ./whisper.cpp/ggml/src/gguf.cpp ./cpp/gguf.cpp
 cp ./whisper.cpp/include/whisper.h ./cpp/whisper.h
 cp ./whisper.cpp/src/whisper-arch.h ./cpp/whisper-arch.h
 cp ./whisper.cpp/src/whisper.cpp ./cpp/whisper.cpp
+cp ./whisper.cpp/include/parakeet.h ./cpp/parakeet.h
+cp ./whisper.cpp/src/parakeet-arch.h ./cpp/parakeet-arch.h
+cp ./whisper.cpp/src/parakeet.cpp ./cpp/parakeet.cpp
 
 rm -rf ./cpp/coreml/
 cp -R ./whisper.cpp/src/coreml/ ./cpp/coreml/
@@ -170,6 +173,9 @@ files=(
   "./cpp/whisper-arch.h"
   "./cpp/whisper.h"
   "./cpp/whisper.cpp"
+  "./cpp/parakeet-arch.h"
+  "./cpp/parakeet.h"
+  "./cpp/parakeet.cpp"
 )
 
 # Loop through each file and run the sed commands
@@ -230,6 +236,7 @@ patch -p0 -d ./cpp < ./scripts/patches/ggml-quants.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/ggml.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
+patch -p0 -d ./cpp < ./scripts/patches/parakeet.cpp.patch
 rm -rf ./cpp/*.orig
 
 # Download model for example

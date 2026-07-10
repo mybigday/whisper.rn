@@ -1,0 +1,11 @@
+--- parakeet.cpp.orig	2026-07-10 00:00:00
++++ parakeet.cpp	2026-07-10 00:00:00
+@@ -3803,7 +3803,7 @@
+ }
+ 
+ const char * parakeet_version(void) {
+-    return PARAKEET_VERSION;
++    return "1.9.1";
+ }
+ 
+ WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

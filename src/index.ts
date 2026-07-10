@@ -4,6 +4,8 @@ import RNWhisper from './NativeRNWhisper'
 import './jsi'
 import type {
   CoreMLAsset,
+  NativeParakeetContext,
+  NativeParakeetContextOptions,
   NativeWhisperContext,
   NativeWhisperVadContext,
   NativeContextOptions,
@@ -39,6 +41,12 @@ const jsiBindingKeys = [
   'whisperTranscribeData',
   'whisperAbortTranscribe',
   'whisperBench',
+  'parakeetInitContext',
+  'parakeetReleaseContext',
+  'parakeetReleaseAllContexts',
+  'parakeetTranscribeFile',
+  'parakeetTranscribeData',
+  'parakeetAbortTranscribe',
   'whisperInitVadContext',
   'whisperReleaseVadContext',
   'whisperReleaseAllVadContexts',
@@ -128,7 +136,7 @@ const resolvePathFromAsset = (asset: number): string => {
   try {
     const source = Image.resolveAssetSource(asset)
     if (source?.uri) {
-      return source.uri
+      return stripFileScheme(source.uri)
     }
   } catch (error) {
     throw new Error(`Invalid asset: ${asset}`)
@@ -443,6 +451,134 @@ export const isUseCoreML: boolean = !!nativeConstants.useCoreML
 /** Is allow fallback to CPU if load CoreML model failed */
 export const isCoreMLAllowFallback: boolean =
   !!nativeConstants.coreMLAllowFallback
+
+//
+// Parakeet Context
+//
+
+export type ParakeetContextOptions = {
+  filePath: string | number
+  /** Is the file path a bundle asset for a string filePath. */
+  isBundleAsset?: boolean
+  /** Use GPU acceleration if it is available. */
+  useGpu?: boolean
+}
+
+export type ParakeetTranscribeOptions = {
+  /** Number of threads to use during computation. */
+  maxThreads?: number
+  /** Override the model audio context size (0 uses the model default). */
+  audioCtx?: number
+}
+
+export class ParakeetContext {
+  id: number
+
+  gpu = false
+
+  reasonNoGPU = ''
+
+  constructor({ contextId, gpu, reasonNoGPU }: NativeParakeetContext) {
+    this.id = contextId
+    this.gpu = gpu
+    this.reasonNoGPU = reasonNoGPU
+  }
+
+  private runTranscription(
+    run: (jobId: number) => Promise<TranscribeResult>,
+  ): { stop: () => Promise<void>; promise: Promise<TranscribeResult> } {
+    const { parakeetAbortTranscribe } = getJsi()
+    const jobId = Math.floor(Math.random() * 10000)
+
+    return {
+      stop: () => parakeetAbortTranscribe(this.id, jobId),
+      promise: run(jobId),
+    }
+  }
+
+  /** Transcribe an audio file path, bundled asset, or base64-encoded WAV. */
+  transcribe(
+    filePathOrBase64: string | number,
+    options: ParakeetTranscribeOptions = {},
+  ): {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  } {
+    const { parakeetTranscribeFile } = getJsi()
+
+    let path = ''
+    if (typeof filePathOrBase64 === 'number') {
+      path = resolvePathFromAsset(filePathOrBase64)
+    } else if (filePathOrBase64.startsWith('data:audio/wav;base64,')) {
+      path = filePathOrBase64
+    } else {
+      path = resolveLocalInputPath(
+        filePathOrBase64,
+        'Parakeet remote audio files are not supported, please download the file first',
+      )
+    }
+
+    return this.runTranscription((jobId) =>
+      parakeetTranscribeFile(this.id, path, { ...options, jobId }),
+    )
+  }
+
+  /** Transcribe base64-encoded signed 16-bit PCM data or an ArrayBuffer. */
+  transcribeData(
+    data: string | ArrayBuffer,
+    options: ParakeetTranscribeOptions = {},
+  ): {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  } {
+    const { parakeetTranscribeData } = getJsi()
+    const audioData =
+      data instanceof ArrayBuffer ? data : decodeBase64ToArrayBuffer(data)
+
+    return this.runTranscription((jobId) =>
+      parakeetTranscribeData(this.id, { ...options, jobId }, audioData),
+    )
+  }
+
+  async release(): Promise<void> {
+    const { parakeetReleaseContext } = getJsi()
+    return parakeetReleaseContext(this.id)
+  }
+}
+
+/** Initialize a Parakeet context with a GGML model file. */
+export async function initParakeet({
+  filePath,
+  isBundleAsset,
+  useGpu = true,
+}: ParakeetContextOptions): Promise<ParakeetContext> {
+  await installJsi()
+  const { parakeetInitContext } = getJsi()
+
+  const path =
+    typeof filePath === 'number'
+      ? resolvePathFromAsset(filePath)
+      : resolveLocalInputPath(
+          filePath,
+          'Remote Parakeet models are not supported, please download the model first',
+        )
+
+  const contextId = createContextId()
+  const context = await parakeetInitContext(contextId, {
+    filePath: path,
+    isBundleAsset: !!isBundleAsset,
+    useGpu,
+  } satisfies NativeParakeetContextOptions)
+
+  return new ParakeetContext(context)
+}
+
+/** Release every Parakeet context and free its memory. */
+export async function releaseAllParakeet(): Promise<void> {
+  if (!isJsiInstalled) return
+  const { parakeetReleaseAllContexts } = getJsi()
+  return parakeetReleaseAllContexts()
+}
 
 //
 // VAD (Voice Activity Detection) Context

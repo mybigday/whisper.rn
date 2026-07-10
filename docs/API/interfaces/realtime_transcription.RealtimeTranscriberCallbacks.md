@@ -21,7 +21,7 @@
 
 ### onBeginTranscribe
 
-• `Optional` **onBeginTranscribe**: (`sliceInfo`: { `audioData`: `Uint8Array` ; `duration`: `number` ; `sliceIndex`: `number` ; `vadEvent?`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)  }) => `Promise`<`boolean`\>
+• `Optional` **onBeginTranscribe**: (`sliceInfo`: { `audioData`: `Uint8Array`<`ArrayBufferLike`\> ; `duration`: `number` ; `sliceIndex`: `number` ; `vadEvent?`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)  }) => `Promise`<`boolean`\>
 
 #### Type declaration
 
@@ -32,7 +32,7 @@
 | Name | Type |
 | :------ | :------ |
 | `sliceInfo` | `Object` |
-| `sliceInfo.audioData` | `Uint8Array` |
+| `sliceInfo.audioData` | `Uint8Array`<`ArrayBufferLike`\> |
 | `sliceInfo.duration` | `number` |
 | `sliceInfo.sliceIndex` | `number` |
 | `sliceInfo.vadEvent?` | [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md) |
@@ -43,13 +43,13 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:243](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L243)
+[realtime-transcription/types.ts:243](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L243)
 
 ___
 
 ### onBeginVad
 
-• `Optional` **onBeginVad**: (`sliceInfo`: { `audioData`: `Uint8Array` ; `duration`: `number` ; `sliceIndex`: `number`  }) => `Promise`<`boolean`\>
+• `Optional` **onBeginVad**: (`sliceInfo`: { `audioData`: `Uint8Array`<`ArrayBufferLike`\> ; `duration`: `number` ; `sliceIndex`: `number`  }) => `Promise`<`boolean`\>
 
 #### Type declaration
 
@@ -60,7 +60,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `sliceInfo` | `Object` |
-| `sliceInfo.audioData` | `Uint8Array` |
+| `sliceInfo.audioData` | `Uint8Array`<`ArrayBufferLike`\> |
 | `sliceInfo.duration` | `number` |
 | `sliceInfo.sliceIndex` | `number` |
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:250](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L250)
+[realtime-transcription/types.ts:250](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L250)
 
 ___
 
@@ -94,7 +94,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:256](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L256)
+[realtime-transcription/types.ts:256](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L256)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:259](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L259)
+[realtime-transcription/types.ts:259](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L259)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:258](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L258)
+[realtime-transcription/types.ts:258](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L258)
 
 ___
 
@@ -166,7 +166,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:257](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L257)
+[realtime-transcription/types.ts:257](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L257)
 
 ___
 
@@ -190,7 +190,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:249](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L249)
+[realtime-transcription/types.ts:249](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L249)
 
 ___
 
@@ -214,4 +214,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:255](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L255)
+[realtime-transcription/types.ts:255](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L255)

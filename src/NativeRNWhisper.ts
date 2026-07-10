@@ -70,6 +70,18 @@ export type NativeWhisperContext = {
   reasonNoGPU: string
 }
 
+export type NativeParakeetContextOptions = {
+  filePath: string
+  isBundleAsset: boolean
+  useGpu?: boolean
+}
+
+export type NativeParakeetContext = {
+  contextId: number
+  gpu: boolean
+  reasonNoGPU: string
+}
+
 export type VadOptions = {
   /** Probability threshold to consider as speech (Default: 0.5) */
   threshold?: number

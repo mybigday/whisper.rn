@@ -235,6 +235,23 @@ whisper_vad_context *whisperVadInitFromInputStream(
     return whisper_vad_init_with_params(&loader, params);
 }
 
+parakeet_context *parakeetInitFromInputStream(
+    JNIEnv *env,
+    jobject inputStream,
+    parakeet_context_params params) {
+    auto *context = new input_stream_context;
+    context->env = env;
+    context->input_stream = env->NewGlobalRef(inputStream);
+
+    parakeet_model_loader loader = {
+        .context = context,
+        .read = &inputStreamRead,
+        .eof = &inputStreamIsEof,
+        .close = &inputStreamClose,
+    };
+    return parakeet_init_with_params(&loader, params);
+}
+
 size_t assetRead(void *ctx, void *output, size_t readSize) {
     return AAsset_read(static_cast<AAsset *>(ctx), output, readSize);
 }
@@ -287,6 +304,31 @@ whisper_vad_context *whisperVadInitFromAsset(
         .close = &assetClose,
     };
     return whisper_vad_init_with_params(&loader, params);
+}
+
+parakeet_context *parakeetInitFromAsset(
+    JNIEnv *env,
+    jobject assetManager,
+    const std::string &assetPath,
+    parakeet_context_params params) {
+    auto *manager = AAssetManager_fromJava(env, assetManager);
+    AAsset *asset = AAssetManager_open(manager, assetPath.c_str(), AASSET_MODE_STREAMING);
+    if (!asset) {
+        __android_log_print(
+            ANDROID_LOG_WARN,
+            kTag,
+            "Failed to open Parakeet asset %s",
+            assetPath.c_str());
+        return nullptr;
+    }
+
+    parakeet_model_loader loader = {
+        .context = asset,
+        .read = &assetRead,
+        .eof = &assetIsEof,
+        .close = &assetClose,
+    };
+    return parakeet_init_with_params(&loader, params);
 }
 
 jobject openPushbackInputStreamForResource(JNIEnv *env, int resourceId) {
@@ -618,6 +660,51 @@ WhisperVadContextInitResult hostInitWhisperVadContext(
         } else if (!modelPath.empty()) {
             result.context =
                 whisper_vad_init_from_file_with_params(modelPath.c_str(), params);
+        }
+    }
+
+    detachThreadIfNeeded(needsDetach);
+    return result;
+}
+
+ParakeetContextInitResult hostInitParakeetContext(
+    const ParakeetContextInitOptions &options) {
+    ParakeetContextInitResult result;
+    bool needsDetach = false;
+    JNIEnv *env = getEnv(&needsDetach);
+    if (!env) {
+        return result;
+    }
+
+    auto params = parakeet_context_default_params();
+    params.use_gpu = false;
+    if (options.useGpu) {
+        result.reasonNoGPU = "Currently not supported";
+    }
+
+    std::string modelPath = options.filePath;
+    if (isRemoteUrl(modelPath)) {
+        modelPath = downloadToCache(env, modelPath, "");
+    }
+
+    if (options.isBundleAsset || isAssetPath(modelPath)) {
+        result.context = parakeetInitFromAsset(
+            env,
+            getAssetManager(),
+            stripAssetPrefix(modelPath),
+            params);
+    } else {
+        int resourceId = getResourceIdentifier(env, modelPath);
+        if (resourceId != 0) {
+            jobject pushbackStream = openPushbackInputStreamForResource(env, resourceId);
+            if (pushbackStream) {
+                result.context =
+                    parakeetInitFromInputStream(env, pushbackStream, params);
+                env->DeleteLocalRef(pushbackStream);
+            }
+        } else if (!modelPath.empty()) {
+            result.context =
+                parakeet_init_from_file_with_params(modelPath.c_str(), params);
         }
     }
 

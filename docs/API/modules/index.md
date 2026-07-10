@@ -6,6 +6,7 @@
 
 ### Classes
 
+- [ParakeetContext](../classes/index.ParakeetContext.md)
 - [WhisperContext](../classes/index.WhisperContext.md)
 - [WhisperVadContext](../classes/index.WhisperVadContext.md)
 
@@ -17,6 +18,8 @@
 
 - [BenchResult](index.md#benchresult)
 - [ContextOptions](index.md#contextoptions)
+- [ParakeetContextOptions](index.md#parakeetcontextoptions)
+- [ParakeetTranscribeOptions](index.md#parakeettranscribeoptions)
 - [TranscribeNewSegmentsResult](index.md#transcribenewsegmentsresult)
 - [TranscribeOptions](index.md#transcribeoptions)
 - [TranscribeResult](index.md#transcriberesult)
@@ -33,9 +36,11 @@
 ### Functions
 
 - [addNativeLogListener](index.md#addnativeloglistener)
+- [initParakeet](index.md#initparakeet)
 - [initWhisper](index.md#initwhisper)
 - [initWhisperVad](index.md#initwhispervad)
 - [installJsi](index.md#installjsi)
+- [releaseAllParakeet](index.md#releaseallparakeet)
 - [releaseAllWhisper](index.md#releaseallwhisper)
 - [releaseAllWhisperVad](index.md#releaseallwhispervad)
 - [toggleNativeLog](index.md#togglenativelog)
@@ -59,7 +64,7 @@
 
 #### Defined in
 
-[index.ts:217](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L217)
+[index.ts:230](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L230)
 
 ___
 
@@ -71,9 +76,7 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `coreMLModelAsset?` | { `assets`: `string`[] \| `number`[] ; `filename`: `string`  } | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
-| `coreMLModelAsset.assets` | `string`[] \| `number`[] | - |
-| `coreMLModelAsset.filename` | `string` | - |
+| `coreMLModelAsset?` | `CoreMLModelAssetOptions` | CoreML model assets, if you're using `require` on filePath, use this option is required if you want to enable Core ML, you will need bundle weights/weight.bin, model.mil, coremldata.bin into app by `require` |
 | `filePath` | `string` \| `number` | - |
 | `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
 | `useCoreMLIos?` | `boolean` | Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. |
@@ -82,7 +85,42 @@ ___
 
 #### Defined in
 
-[index.ts:369](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L369)
+[index.ts:382](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L382)
+
+___
+
+### ParakeetContextOptions
+
+Ƭ **ParakeetContextOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `filePath` | `string` \| `number` | - |
+| `isBundleAsset?` | `boolean` | Is the file path a bundle asset for a string filePath. |
+| `useGpu?` | `boolean` | Use GPU acceleration if it is available. |
+
+#### Defined in
+
+[index.ts:459](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L459)
+
+___
+
+### ParakeetTranscribeOptions
+
+Ƭ **ParakeetTranscribeOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `audioCtx?` | `number` | Override the model audio context size (0 uses the model default). |
+| `maxThreads?` | `number` | Number of threads to use during computation. |
+
+#### Defined in
+
+[index.ts:467](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L467)
 
 ___
 
@@ -101,7 +139,7 @@ ___
 
 #### Defined in
 
-[index.ts:203](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L203)
+[index.ts:216](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L216)
 
 ___
 
@@ -132,7 +170,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -151,7 +189,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L40)
+[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L40)
 
 ___
 
@@ -170,7 +208,7 @@ ___
 
 #### Defined in
 
-[index.ts:449](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L449)
+[index.ts:587](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L587)
 
 ___
 
@@ -191,7 +229,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:73](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L73)
+[NativeRNWhisper.ts:85](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L85)
 
 ___
 
@@ -208,7 +246,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:101](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/NativeRNWhisper.ts#L101)
+[NativeRNWhisper.ts:113](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L113)
 
 ## Variables
 
@@ -220,7 +258,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:442](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L442)
+[index.ts:452](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L452)
 
 ___
 
@@ -232,7 +270,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:439](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L439)
+[index.ts:449](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L449)
 
 ___
 
@@ -244,7 +282,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:436](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L436)
+[index.ts:446](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L446)
 
 ## Functions
 
@@ -270,7 +308,29 @@ Add a listener for native whisper.cpp log output
 
 #### Defined in
 
-[index.ts:577](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L577)
+[index.ts:715](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L715)
+
+___
+
+### initParakeet
+
+▸ **initParakeet**(`«destructured»`): `Promise`<[`ParakeetContext`](../classes/index.ParakeetContext.md)\>
+
+Initialize a Parakeet context with a GGML model file.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `«destructured»` | [`ParakeetContextOptions`](index.md#parakeetcontextoptions) |
+
+#### Returns
+
+`Promise`<[`ParakeetContext`](../classes/index.ParakeetContext.md)\>
+
+#### Defined in
+
+[index.ts:550](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L550)
 
 ___
 
@@ -294,7 +354,7 @@ Promise resolving to WhisperContext instance
 
 #### Defined in
 
-[index.ts:395](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L395)
+[index.ts:405](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L405)
 
 ___
 
@@ -318,7 +378,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:525](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L525)
+[index.ts:663](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L663)
 
 ___
 
@@ -332,7 +392,23 @@ ___
 
 #### Defined in
 
-[index.ts:80](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L80)
+[index.ts:93](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L93)
+
+___
+
+### releaseAllParakeet
+
+▸ **releaseAllParakeet**(): `Promise`<`void`\>
+
+Release every Parakeet context and free its memory.
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[index.ts:577](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L577)
 
 ___
 
@@ -346,7 +422,7 @@ ___
 
 #### Defined in
 
-[index.ts:429](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L429)
+[index.ts:439](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L439)
 
 ___
 
@@ -364,7 +440,7 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:557](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L557)
+[index.ts:695](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L695)
 
 ___
 
@@ -386,4 +462,4 @@ Enable or disable native whisper.cpp logging
 
 #### Defined in
 
-[index.ts:566](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L566)
+[index.ts:704](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L704)
