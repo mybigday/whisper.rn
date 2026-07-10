@@ -115,6 +115,7 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_g
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_set_rows          (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tidx, enum wsp_ggml_type tdst);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_diag              (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_repeat            (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tsrc);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_concat            (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tsrc);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_unary             (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_glu               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_sum               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);

@@ -8079,6 +8079,94 @@ struct whisper_token_data whisper_full_get_token_data(struct whisper_context * c
     return ctx->state->result_all[i_segment].tokens[i_token];
 }
 
+// map a token time (centiseconds) from the VAD-processed timeline back to the original
+// audio. a token inside a speech segment is interpolated within that segment; a token that
+// falls in the silence removed between two segments snaps to the nearer boundary, so it
+// never ends up in the middle of a cut-out gap (which a single global interpolation over
+// the whole mapping table would do).
+static int64_t whisper_map_token_time_segment_aware(
+        int64_t t,
+        const std::vector<whisper_state::vad_segment_info> & segs) {
+    if (segs.empty()) {
+        return t;
+    }
+    if (t <= segs.front().vad_start) {
+        return segs.front().orig_start;
+    }
+    if (t >= segs.back().vad_end) {
+        return segs.back().orig_end;
+    }
+    for (size_t i = 0; i < segs.size(); ++i) {
+        const auto & s = segs[i];
+        if (t >= s.vad_start && t <= s.vad_end) {
+            const int64_t vd = s.vad_end - s.vad_start;
+            const int64_t od = s.orig_end - s.orig_start;
+            if (vd <= 0) {
+                return s.orig_start;
+            }
+            return s.orig_start + (t - s.vad_start) * od / vd;
+        }
+        if (i + 1 < segs.size() && t > s.vad_end && t < segs[i + 1].vad_start) {
+            const int64_t mid = (s.vad_end + segs[i + 1].vad_start) / 2;
+            return (t <= mid) ? s.orig_end : segs[i + 1].orig_start;
+        }
+    }
+    return t;
+}
+
+int64_t whisper_full_get_token_t0_from_state(struct whisper_state * state, int i_segment, int i_token) {
+    const int64_t t0 = state->result_all[i_segment].tokens[i_token].t0;
+    if (!state->has_vad_segments || state->vad_segments.empty()) {
+        return t0;
+    }
+    return whisper_map_token_time_segment_aware(t0, state->vad_segments);
+}
+
+int64_t whisper_full_get_token_t0(struct whisper_context * ctx, int i_segment, int i_token) {
+    return whisper_full_get_token_t0_from_state(ctx->state, i_segment, i_token);
+}
+
+int64_t whisper_full_get_token_t1_from_state(struct whisper_state * state, int i_segment, int i_token) {
+    const int64_t t1 = state->result_all[i_segment].tokens[i_token].t1;
+    if (!state->has_vad_segments || state->vad_segments.empty()) {
+        return t1;
+    }
+    const int64_t orig_t0 = whisper_full_get_token_t0_from_state(state, i_segment, i_token);
+    int64_t orig_t1 = whisper_map_token_time_segment_aware(t1, state->vad_segments);
+    if (orig_t1 < orig_t0 + 1) {
+        orig_t1 = orig_t0 + 1; // keep a strictly positive duration after snapping
+    }
+    return orig_t1;
+}
+
+int64_t whisper_full_get_token_t1(struct whisper_context * ctx, int i_segment, int i_token) {
+    return whisper_full_get_token_t1_from_state(ctx->state, i_segment, i_token);
+}
+
+int whisper_full_n_vad_segments_from_state(struct whisper_state * state) {
+    return (int) state->vad_segments.size();
+}
+
+int whisper_full_n_vad_segments(struct whisper_context * ctx) {
+    return (int) ctx->state->vad_segments.size();
+}
+
+int64_t whisper_full_get_vad_segment_t0_from_state(struct whisper_state * state, int i) {
+    return state->vad_segments[i].orig_start;
+}
+
+int64_t whisper_full_get_vad_segment_t0(struct whisper_context * ctx, int i) {
+    return ctx->state->vad_segments[i].orig_start;
+}
+
+int64_t whisper_full_get_vad_segment_t1_from_state(struct whisper_state * state, int i) {
+    return state->vad_segments[i].orig_end;
+}
+
+int64_t whisper_full_get_vad_segment_t1(struct whisper_context * ctx, int i) {
+    return ctx->state->vad_segments[i].orig_end;
+}
+
 float whisper_full_get_token_p_from_state(struct whisper_state * state, int i_segment, int i_token) {
     return state->result_all[i_segment].tokens[i_token].p;
 }
@@ -8401,24 +8489,86 @@ static int64_t sample_to_timestamp(int i_sample) {
 
 // a cost-function / heuristic that is high for text that takes longer to pronounce
 // obviously, can be improved
+//
+// iterate over utf-8 code points rather than raw bytes: a CJK glyph is 3 bytes, so the
+// old per-byte loop counted every Han/kana/hangul character ~3x and never matched
+// full-width punctuation, skewing how a segment's time is shared between its tokens for
+// Chinese/Japanese. full-width punctuation gets the same weight as its ASCII form and
+// pure-ASCII text decodes to the same weights as before.
 static float voice_length(const std::string & text) {
     float res = 0.0f;
 
-    for (char c : text) {
-        if (c == ' ') {
-            res += 0.01f;
-        } else if (c == ',') {
-            res += 2.00f;
-        } else if (c == '.') {
-            res += 3.00f;
-        } else if (c == '!') {
-            res += 3.00f;
-        } else if (c == '?') {
-            res += 3.00f;
-        } else if (c >= '0' && c <= '9') {
-            res += 3.00f;
+    const unsigned char * s = (const unsigned char *) text.data();
+    const size_t n = text.size();
+
+    for (size_t i = 0; i < n; ) {
+        const unsigned char c = s[i];
+        uint32_t cp = c;
+        int len = 1;
+        if (c < 0x80) {
+            len = 1;
+        } else if ((c >> 5) == 0x6) {
+            cp = c & 0x1F;
+            len = 2;
+        } else if ((c >> 4) == 0xE) {
+            cp = c & 0x0F;
+            len = 3;
+        } else if ((c >> 3) == 0x1E) {
+            cp = c & 0x07;
+            len = 4;
         } else {
-            res += 1.00f;
+            cp = c; // stray continuation / invalid lead byte
+            len = 1;
+        }
+        if (i + (size_t) len <= n) {
+            bool ok = true;
+            for (int k = 1; k < len; ++k) {
+                const unsigned char cc = s[i + k];
+                if ((cc & 0xC0) != 0x80) {
+                    ok = false;
+                    break;
+                }
+                cp = (cp << 6) | (cc & 0x3F);
+            }
+            if (!ok) {
+                cp = c;
+                len = 1;
+            }
+        } else {
+            cp = c;
+            len = 1;
+        }
+        i += (size_t) len;
+
+        switch (cp) {
+            case ' ':
+            case 0x3000: // ideographic space
+                res += 0.01f;
+                break;
+            case ',':
+            case 0xFF0C: // ，
+            case 0x3001: // 、
+            case 0xFF1B: // ；
+            case 0xFF1A: // ：
+                res += 2.00f;
+                break;
+            case '.':
+            case '!':
+            case '?':
+            case 0x3002: // 。
+            case 0xFF0E: // ．
+            case 0xFF01: // ！
+            case 0xFF1F: // ？
+            case 0x2026: // …
+                res += 3.00f;
+                break;
+            default:
+                if ((cp >= '0' && cp <= '9') || (cp >= 0xFF10 && cp <= 0xFF19)) {
+                    res += 3.00f; // half/full-width digits
+                } else {
+                    res += 1.00f; // letters, CJK ideographs, kana, hangul, ...
+                }
+                break;
         }
     }
 
@@ -9008,7 +9158,7 @@ void whisper_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
 }
 
 const char * whisper_version(void) {
-    return "1.8.6";
+    return "1.9.1";
 }
 
 WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

@@ -33,7 +33,7 @@
 
  const char * whisper_version(void) {
 -    return WHISPER_VERSION;
-+    return "1.8.6";
++    return "1.9.1";
  }
 
  WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

@@ -1123,13 +1123,24 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
             return true;
         case WSP_GGML_OP_CONCAT:
             {
-                // kernel_concat copies one float-sized value per element.
-                // Other scalar types need a type-generic copy kernel first.
                 const enum wsp_ggml_type src0_type = op->src[0]->type;
                 const enum wsp_ggml_type src1_type = op->src[1]->type;
-                return src0_type == src1_type &&
-                       src0_type == op->type &&
-                       (src0_type == WSP_GGML_TYPE_F32 || src0_type == WSP_GGML_TYPE_I32);
+                if (src0_type != src1_type || src0_type != op->type) {
+                    return false;
+                }
+                switch (src0_type) {
+                    case WSP_GGML_TYPE_F32:
+                    case WSP_GGML_TYPE_F16:
+                    case WSP_GGML_TYPE_I8:
+                    case WSP_GGML_TYPE_I16:
+                    case WSP_GGML_TYPE_I32:
+                    case WSP_GGML_TYPE_I64:
+                        return true;
+                    case WSP_GGML_TYPE_BF16:
+                        return has_bfloat;
+                    default:
+                        return false;
+                }
             }
         case WSP_GGML_OP_ADD:
         case WSP_GGML_OP_SUB:
@@ -1173,6 +1184,7 @@ bool wsp_ggml_metal_device_supports_op(wsp_ggml_metal_device_t dev, const struct
         case WSP_GGML_OP_RMS_NORM:
             return has_simdgroup_reduction && (wsp_ggml_is_contiguous_rows(op->src[0]));
         case WSP_GGML_OP_ROPE:
+        case WSP_GGML_OP_ROPE_BACK:
             return true;
         case WSP_GGML_OP_IM2COL:
             return wsp_ggml_is_contiguous(op->src[1]) && op->src[1]->type == WSP_GGML_TYPE_F32 && (op->type == WSP_GGML_TYPE_F16 || op->type == WSP_GGML_TYPE_F32);
