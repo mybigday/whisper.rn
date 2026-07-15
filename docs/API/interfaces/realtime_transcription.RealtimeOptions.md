@@ -28,7 +28,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L183)
+[realtime-transcription/types.ts:188](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L188)
 
 ___
 
@@ -38,7 +38,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L194)
+[realtime-transcription/types.ts:200](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L200)
 
 ___
 
@@ -48,7 +48,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:182](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L182)
+[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L187)
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L197)
+[realtime-transcription/types.ts:203](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L203)
 
 ___
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:204](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L204)
+[realtime-transcription/types.ts:210](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L210)
 
 ___
 
@@ -76,9 +76,11 @@ ___
 
 • `Optional` **initialPrompt**: `string`
 
+Initial Whisper prompt. Ignored when using ParakeetContext.
+
 #### Defined in
 
-[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L190)
+[realtime-transcription/types.ts:195](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L195)
 
 ___
 
@@ -102,7 +104,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:200](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L200)
+[realtime-transcription/types.ts:206](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L206)
 
 ___
 
@@ -112,7 +114,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:184](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L184)
+[realtime-transcription/types.ts:189](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L189)
 
 ___
 
@@ -120,9 +122,11 @@ ___
 
 • `Optional` **promptPreviousSlices**: `boolean`
 
+Add previous Whisper results to the next prompt. Ignored for Parakeet. Defaults to true.
+
 #### Defined in
 
-[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L191)
+[realtime-transcription/types.ts:197](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L197)
 
 ___
 
@@ -132,14 +136,16 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:203](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L203)
+[realtime-transcription/types.ts:209](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L209)
 
 ___
 
 ### transcribeOptions
 
-• `Optional` **transcribeOptions**: [`TranscribeOptions`](../modules/index.md#transcribeoptions)
+• `Optional` **transcribeOptions**: [`TranscribeOptions`](../modules/index.md#transcribeoptions) \| [`ParakeetTranscribeOptions`](../modules/index.md#parakeettranscribeoptions)
+
+Options for the selected Whisper or Parakeet context.
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:192](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L192)

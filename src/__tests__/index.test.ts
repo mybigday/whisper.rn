@@ -5,16 +5,16 @@ import {
   releaseAllWhisper,
 } from '..'
 import type { ParakeetContext } from '..'
-import type { WhisperContextLike } from '../realtime-transcription/types'
+import type { ParakeetContextLike } from '../realtime-transcription/types'
 
 jest.mock('..', () => require('../jest-mock'))
 
 Math.random = () => 0.5
 
 type ParakeetContextCompatibility =
-  ParakeetContext extends WhisperContextLike ? true : false
+  ParakeetContext extends ParakeetContextLike ? true : false
 
-const parakeetContextIsWhisperContextLike: ParakeetContextCompatibility = true
+const parakeetContextIsRealtimeCompatible: ParakeetContextCompatibility = true
 
 const parakeetMocks = {
   init: global.parakeetInitContext as jest.MockedFunction<
@@ -58,7 +58,7 @@ test('provides the Whisper mock API', async () => {
 })
 
 test('initializes and releases a Parakeet context', async () => {
-  expect(parakeetContextIsWhisperContextLike).toBe(true)
+  expect(parakeetContextIsRealtimeCompatible).toBe(true)
 
   const context = await initParakeet({
     filePath: 'file:///models/parakeet.bin',

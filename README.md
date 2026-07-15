@@ -215,6 +215,22 @@ await transcriber.start()
 await transcriber.stop()
 ```
 
+To use Parakeet, provide `parakeetContext` instead of `whisperContext`:
+
+```js
+const parakeetContext = await initParakeet({
+  filePath: 'file://.../ggml-parakeet-tdt-0.6b-v3-q4_0.bin',
+})
+
+const transcriber = new RealtimeTranscriber(
+  { parakeetContext, vadContext, audioStream, fs: RNFS },
+  { transcribeOptions: { maxThreads: 4, audioCtx: 0 } },
+  { onTranscribe: (event) => console.log(event.data?.result) },
+)
+```
+
+`initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
+
 **Dependencies:**
 
 - `@fugood/react-native-audio-pcm-stream` for `AudioPcmStreamAdapter`

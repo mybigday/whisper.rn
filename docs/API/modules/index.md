@@ -64,7 +64,7 @@
 
 #### Defined in
 
-[index.ts:230](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L230)
+[index.ts:230](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L230)
 
 ___
 
@@ -85,7 +85,7 @@ ___
 
 #### Defined in
 
-[index.ts:382](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L382)
+[index.ts:382](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L382)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[index.ts:459](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L459)
+[index.ts:459](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L459)
 
 ___
 
@@ -120,7 +120,7 @@ ___
 
 #### Defined in
 
-[index.ts:467](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L467)
+[index.ts:467](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L467)
 
 ___
 
@@ -139,7 +139,7 @@ ___
 
 #### Defined in
 
-[index.ts:216](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L216)
+[index.ts:216](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L216)
 
 ___
 
@@ -170,7 +170,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -189,7 +189,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L40)
+[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L40)
 
 ___
 
@@ -208,7 +208,7 @@ ___
 
 #### Defined in
 
-[index.ts:587](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L587)
+[index.ts:587](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L587)
 
 ___
 
@@ -229,7 +229,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:85](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L85)
+[NativeRNWhisper.ts:85](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L85)
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:113](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/NativeRNWhisper.ts#L113)
+[NativeRNWhisper.ts:113](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L113)
 
 ## Variables
 
@@ -258,7 +258,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:452](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L452)
+[index.ts:452](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L452)
 
 ___
 
@@ -270,7 +270,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:449](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L449)
+[index.ts:449](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L449)
 
 ___
 
@@ -282,7 +282,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:446](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L446)
+[index.ts:446](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L446)
 
 ## Functions
 
@@ -308,7 +308,7 @@ Add a listener for native whisper.cpp log output
 
 #### Defined in
 
-[index.ts:715](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L715)
+[index.ts:715](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L715)
 
 ___
 
@@ -330,7 +330,7 @@ Initialize a Parakeet context with a GGML model file.
 
 #### Defined in
 
-[index.ts:550](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L550)
+[index.ts:550](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L550)
 
 ___
 
@@ -354,7 +354,7 @@ Promise resolving to WhisperContext instance
 
 #### Defined in
 
-[index.ts:405](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L405)
+[index.ts:405](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L405)
 
 ___
 
@@ -378,7 +378,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:663](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L663)
+[index.ts:663](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L663)
 
 ___
 
@@ -392,7 +392,7 @@ ___
 
 #### Defined in
 
-[index.ts:93](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L93)
+[index.ts:93](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L93)
 
 ___
 
@@ -408,7 +408,7 @@ Release every Parakeet context and free its memory.
 
 #### Defined in
 
-[index.ts:577](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L577)
+[index.ts:577](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L577)
 
 ___
 
@@ -422,7 +422,7 @@ ___
 
 #### Defined in
 
-[index.ts:439](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L439)
+[index.ts:439](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L439)
 
 ___
 
@@ -440,7 +440,7 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:695](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L695)
+[index.ts:695](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L695)
 
 ___
 
@@ -462,4 +462,4 @@ Enable or disable native whisper.cpp logging
 
 #### Defined in
 
-[index.ts:704](https://github.com/mybigday/whisper.rn/blob/9f7d692/src/index.ts#L704)
+[index.ts:704](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L704)

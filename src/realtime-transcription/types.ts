@@ -1,4 +1,9 @@
-import type { TranscribeOptions, TranscribeResult, VadOptions } from '../index'
+import type {
+  ParakeetTranscribeOptions,
+  TranscribeOptions,
+  TranscribeResult,
+  VadOptions,
+} from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
 
 // === Audio Stream Interfaces ===
@@ -183,12 +188,13 @@ export interface RealtimeOptions {
   audioMinSec?: number // default: 1
   maxSlicesInMemory?: number // default: 3
 
-  // Transcription settings
-  transcribeOptions?: TranscribeOptions
+  /** Options for the selected Whisper or Parakeet context. */
+  transcribeOptions?: TranscribeOptions | ParakeetTranscribeOptions
 
-  // Prompt settings
-  initialPrompt?: string // Initial prompt to use for transcription
-  promptPreviousSlices?: boolean // Add transcription results from previous slices as prompt (default: true)
+  /** Initial Whisper prompt. Ignored when using ParakeetContext. */
+  initialPrompt?: string
+  /** Add previous Whisper results to the next prompt. Ignored for Parakeet. Defaults to true. */
+  promptPreviousSlices?: boolean
 
   // File settings (Only used if fs dependency is provided)
   audioOutputPath?: string
@@ -271,6 +277,16 @@ export type WhisperContextLike = {
   }
 }
 
+export type ParakeetContextLike = {
+  transcribeData: (
+    data: ArrayBuffer,
+    options: ParakeetTranscribeOptions,
+  ) => {
+    stop: () => Promise<void>
+    promise: Promise<TranscribeResult>
+  }
+}
+
 // VAD context interface
 export type WhisperVadContextLike = {
   detectSpeechData: (
@@ -298,9 +314,24 @@ export interface RealtimeVadContextLike {
   reset(): Promise<void>
 }
 
-export interface RealtimeTranscriberDependencies {
-  whisperContext: WhisperContextLike
+/**
+ * Dependencies for realtime transcription. Provide exactly one transcription
+ * context: `whisperContext` or `parakeetContext`.
+ */
+export type RealtimeTranscriberDependencies = {
   vadContext?: RealtimeVadContextLike
   audioStream: AudioStreamInterface
   fs?: WavFileWriterFs
-}
+} &
+    (
+      | {
+          /** Whisper context used for realtime transcription. */
+          whisperContext: WhisperContextLike
+          parakeetContext?: never
+        }
+      | {
+          /** Parakeet context used for realtime transcription. */
+          parakeetContext: ParakeetContextLike
+          whisperContext?: never
+        }
+    )
