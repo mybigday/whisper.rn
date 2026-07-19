@@ -208,6 +208,38 @@ WhisperVadContextInitResult hostInitWhisperVadContext(
     return result;
 }
 
+ParakeetContextInitResult hostInitParakeetContext(
+    const ParakeetContextInitOptions &options) {
+    ParakeetContextInitResult result;
+
+    std::string modelPath = options.filePath;
+    if (options.isBundleAsset) {
+        modelPath = resolveIosAssetPath(modelPath, true);
+    } else if (isRemoteUrl(modelPath)) {
+        modelPath = downloadToCache(modelPath, "");
+    }
+
+    if (modelPath.empty()) {
+        return result;
+    }
+
+    auto params = parakeet_context_default_params();
+    params.use_gpu = options.useGpu;
+
+    auto metalAvailability = getMetalAvailability(params.use_gpu);
+    if (!metalAvailability.available) {
+        params.use_gpu = false;
+        result.reasonNoGPU = metalAvailability.reason;
+    } else {
+        params.gpu_device = 0;
+    }
+
+    result.context =
+        parakeet_init_from_file_with_params(modelPath.c_str(), params);
+    result.gpu = params.use_gpu;
+    return result;
+}
+
 std::vector<uint8_t> hostLoadFileBytes(const std::string &path) {
     std::string resolvedPath = path;
     if (isRemoteUrl(resolvedPath)) {

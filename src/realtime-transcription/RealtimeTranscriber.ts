@@ -1,5 +1,9 @@
 /* eslint-disable class-methods-use-this */
-import type { VadOptions } from '../index'
+import type {
+  ParakeetTranscribeOptions,
+  TranscribeOptions,
+  VadOptions,
+} from '../index'
 import { SliceManager } from './SliceManager'
 import { WavFileWriter, WavFileWriterFs } from '../utils/WavFileWriter'
 import type {
@@ -14,6 +18,7 @@ import type {
   AudioStreamInterface,
   AudioStreamConfig,
   WhisperContextLike,
+  ParakeetContextLike,
   RealtimeVadContextLike,
 } from './types'
 
@@ -30,7 +35,9 @@ const SILENCE_SEGMENT_REGEX = /\[(\s*\w+\s*)]/i
  * - Queue-based transcription processing
  */
 export class RealtimeTranscriber {
-  private whisperContext: WhisperContextLike
+  private transcriptionContext:
+    | { type: 'whisper'; context: WhisperContextLike }
+    | { type: 'parakeet'; context: ParakeetContextLike }
 
   private vadContext?: RealtimeVadContextLike
 
@@ -46,7 +53,7 @@ export class RealtimeTranscriber {
     audioSliceSec: number
     audioMinSec: number
     maxSlicesInMemory: number
-    transcribeOptions: any
+    transcribeOptions: TranscribeOptions | ParakeetTranscribeOptions
     initialPrompt?: string
     promptPreviousSlices: boolean
     audioOutputPath?: string
@@ -98,7 +105,21 @@ export class RealtimeTranscriber {
     options: RealtimeOptions = {},
     callbacks: RealtimeTranscriberCallbacks = {},
   ) {
-    this.whisperContext = dependencies.whisperContext
+    if (dependencies.parakeetContext) {
+      this.transcriptionContext = {
+        type: 'parakeet',
+        context: dependencies.parakeetContext,
+      }
+    } else if (dependencies.whisperContext) {
+      this.transcriptionContext = {
+        type: 'whisper',
+        context: dependencies.whisperContext,
+      }
+    } else {
+      throw new Error(
+        'RealtimeTranscriber requires either whisperContext or parakeetContext',
+      )
+    }
     this.vadContext = dependencies.vadContext
     this.audioStream = dependencies.audioStream
     this.fs = dependencies.fs
@@ -450,15 +471,40 @@ export class RealtimeTranscriber {
     const startTime = Date.now()
 
     try {
-      // Build prompt from initial prompt and previous slices
-      const prompt = this.buildPrompt(item.sliceIndex)
-
       const audioBuffer = item.audioData.buffer as ArrayBuffer
-      const transcribeRequest = this.whisperContext.transcribeData(audioBuffer, {
-        ...this.options.transcribeOptions,
-        prompt, // Include the constructed prompt
-        onProgress: undefined, // Disable progress for realtime
-      })
+      let transcribeRequest
+
+      if (this.transcriptionContext.type === 'parakeet') {
+        const { maxThreads } = this.options.transcribeOptions
+        const audioCtx = 'audioCtx' in this.options.transcribeOptions
+          ? this.options.transcribeOptions.audioCtx
+          : undefined
+        const parakeetOptions: ParakeetTranscribeOptions = {}
+
+        if (maxThreads !== undefined) parakeetOptions.maxThreads = maxThreads
+        if (audioCtx !== undefined) parakeetOptions.audioCtx = audioCtx
+
+        transcribeRequest = this.transcriptionContext.context.transcribeData(
+          audioBuffer,
+          parakeetOptions,
+        )
+      } else {
+        // Prompt chaining and progress callbacks are Whisper-only features.
+        const prompt = this.buildPrompt(item.sliceIndex)
+        const whisperOptions = {
+          ...this.options.transcribeOptions,
+        } as TranscribeOptions & Partial<ParakeetTranscribeOptions>
+        delete whisperOptions.audioCtx
+        const options = {
+          ...whisperOptions,
+          prompt,
+          onProgress: undefined,
+        }
+        transcribeRequest = this.transcriptionContext.context.transcribeData(
+          audioBuffer,
+          options,
+        )
+      }
 
       // Track active transcription
       this.activeTranscriptions.add(transcribeRequest)

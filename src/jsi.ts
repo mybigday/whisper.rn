@@ -1,6 +1,8 @@
 /* eslint-disable no-var */
 import type {
   NativeContextOptions,
+  NativeParakeetContext,
+  NativeParakeetContextOptions,
   NativeWhisperContext,
   NativeVadContextOptions,
   NativeWhisperVadContext,
@@ -19,6 +21,12 @@ type TranscribeCallbacks = {
     result: string
     segments: TranscribeResult['segments']
   }) => void
+}
+
+type ParakeetTranscribeOptions = {
+  jobId?: number
+  maxThreads?: number
+  audioCtx?: number
 }
 
 declare global {
@@ -47,6 +55,26 @@ declare global {
     jobId: number,
   ) => Promise<void>
   var whisperBench: (contextId: number, maxThreads: number) => Promise<string>
+  var parakeetInitContext: (
+    contextId: number,
+    options: NativeParakeetContextOptions,
+  ) => Promise<NativeParakeetContext>
+  var parakeetReleaseContext: (contextId: number) => Promise<void>
+  var parakeetReleaseAllContexts: () => Promise<void>
+  var parakeetTranscribeFile: (
+    contextId: number,
+    pathOrBase64: string,
+    options: ParakeetTranscribeOptions,
+  ) => Promise<TranscribeResult>
+  var parakeetTranscribeData: (
+    contextId: number,
+    options: ParakeetTranscribeOptions,
+    data: ArrayBuffer,
+  ) => Promise<TranscribeResult>
+  var parakeetAbortTranscribe: (
+    contextId: number,
+    jobId: number,
+  ) => Promise<void>
   var whisperInitVadContext: (
     contextId: number,
     options: NativeVadContextOptions,

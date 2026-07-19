@@ -89,6 +89,19 @@ public:
         contexts_[contextId] = std::move(holder);
     }
 
+    template <typename Predicate>
+    bool addIf(
+        int contextId,
+        std::shared_ptr<HolderType> holder,
+        Predicate &&shouldAdd) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!shouldAdd()) {
+            return false;
+        }
+        contexts_[contextId] = std::move(holder);
+        return true;
+    }
+
     std::shared_ptr<HolderType> get(int contextId) {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = contexts_.find(contextId);
@@ -102,6 +115,21 @@ public:
             return nullptr;
         }
         auto holder = it->second;
+        contexts_.erase(it);
+        return holder;
+    }
+
+    template <typename Action>
+    std::shared_ptr<HolderType> removeAndApply(
+        int contextId,
+        Action &&beforeRemove) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = contexts_.find(contextId);
+        if (it == contexts_.end()) {
+            return nullptr;
+        }
+        auto holder = it->second;
+        beforeRemove(holder);
         contexts_.erase(it);
         return holder;
     }
@@ -121,6 +149,20 @@ public:
         std::vector<std::shared_ptr<HolderType>> holders;
         holders.reserve(contexts_.size());
         for (const auto &entry : contexts_) {
+            holders.push_back(entry.second);
+        }
+        contexts_.clear();
+        return holders;
+    }
+
+    template <typename Action>
+    std::vector<std::shared_ptr<HolderType>> removeAllAndApply(
+        Action &&beforeRemove) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        std::vector<std::shared_ptr<HolderType>> holders;
+        holders.reserve(contexts_.size());
+        for (const auto &entry : contexts_) {
+            beforeRemove(entry.second);
             holders.push_back(entry.second);
         }
         contexts_.clear();
@@ -347,8 +389,96 @@ struct WhisperVadContextHolder : public ContextLifecycle {
     std::string reasonNoGPU;
 };
 
+std::atomic<int> g_parakeetDetachedContexts{0};
+std::atomic<int> g_parakeetPendingInitTasks{0};
+
+struct ParakeetContextHolder : public ContextLifecycle {
+    explicit ParakeetContextHolder(int contextId)
+        : id(contextId) {}
+
+    // A running task retains the holder, so deferred cleanup remains safe.
+    ~ParakeetContextHolder() {
+        if (context != nullptr) {
+            parakeet_free(context);
+            context = nullptr;
+        }
+        if (detached) {
+            g_parakeetDetachedContexts.fetch_sub(1);
+        }
+    }
+
+    bool beginExclusiveOperation(int jobId) {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        if (busy || closing || context == nullptr) {
+            return false;
+        }
+        retainTask();
+        busy = true;
+        activeJobId = jobId;
+        abortRequested.store(false, std::memory_order_relaxed);
+        return true;
+    }
+
+    void endExclusiveOperation() {
+        {
+            std::lock_guard<std::mutex> lock(operationMutex);
+            busy = false;
+            activeJobId = -1;
+            if (!closing) {
+                abortRequested.store(false, std::memory_order_relaxed);
+            }
+        }
+        releaseTask();
+    }
+
+    void beginCloseAndAbort() {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        closing = true;
+        if (activeJobId >= 0) {
+            abortRequested.store(true, std::memory_order_relaxed);
+        }
+    }
+
+    void beginDetachedReleaseAndAbort() {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        if (!detached) {
+            detached = true;
+            g_parakeetDetachedContexts.fetch_add(1);
+        }
+        closing = true;
+        if (activeJobId >= 0) {
+            abortRequested.store(true, std::memory_order_relaxed);
+        }
+    }
+
+    void abortActiveJob(int jobId = -1) {
+        std::lock_guard<std::mutex> lock(operationMutex);
+        if (activeJobId < 0 || (jobId >= 0 && activeJobId != jobId)) {
+            return;
+        }
+        abortRequested.store(true, std::memory_order_relaxed);
+    }
+
+    bool isAborted() const {
+        return abortRequested.load(std::memory_order_relaxed);
+    }
+
+    int id = 0;
+    parakeet_context *context = nullptr;
+    bool gpu = false;
+    std::string reasonNoGPU;
+
+    std::mutex operationMutex;
+    bool busy = false;
+    bool closing = false;
+    bool detached = false;
+    int activeJobId = -1;
+    std::atomic<bool> abortRequested{false};
+};
+
 ContextManager<WhisperContextHolder> g_whisperContexts;
 ContextManager<WhisperVadContextHolder> g_vadContexts;
+ContextManager<ParakeetContextHolder> g_parakeetContexts;
 
 using PromiseResultGenerator = std::function<jsi::Value(jsi::Runtime &)>;
 using PromiseTask = std::function<PromiseResultGenerator()>;
@@ -446,7 +576,8 @@ jsi::Value createPromiseTask(
     const std::shared_ptr<react::CallInvoker> &callInvoker,
     PromiseTask task,
     int contextId = -1,
-    bool trackTask = true) {
+    bool trackTask = true,
+    std::function<void()> onTaskAbandoned = {}) {
     auto promiseCtor =
         runtime.global().getPropertyAsObject(runtime, "Promise").asFunction(runtime);
     auto runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime *) {});
@@ -457,7 +588,7 @@ jsi::Value createPromiseTask(
             runtime,
             jsi::PropNameID::forAscii(runtime, "executor"),
             2,
-            [callInvoker, task, runtimePtr, contextId, trackTask](
+            [callInvoker, task, runtimePtr, contextId, trackTask, onTaskAbandoned](
                 jsi::Runtime &runtime,
                 const jsi::Value &,
                 const jsi::Value *arguments,
@@ -470,7 +601,7 @@ jsi::Value createPromiseTask(
                 auto reject = makeJsiFunction(runtime, arguments[1], callInvoker);
 
                 try {
-                    getThreadPool().enqueue([callInvoker, task, resolve, reject, runtimePtr, contextId, trackTask]() {
+                    getThreadPool().enqueue([callInvoker, task, resolve, reject, runtimePtr, contextId, trackTask, onTaskAbandoned]() {
                         bool shouldTrack =
                             trackTask && !TaskManager::getInstance().isShuttingDown();
                         if (shouldTrack) {
@@ -482,6 +613,9 @@ jsi::Value createPromiseTask(
                             if (g_isShuttingDown.load(std::memory_order_relaxed)) {
                                 if (shouldTrack) {
                                     TaskManager::getInstance().finishTask(contextId);
+                                }
+                                if (onTaskAbandoned) {
+                                    onTaskAbandoned();
                                 }
                                 return;
                             }
@@ -586,6 +720,9 @@ jsi::Value createPromiseTask(
                         "createPromiseTask enqueue exception contextId=%d message=%s",
                         contextId,
                         error.what());
+                    if (onTaskAbandoned) {
+                        onTaskAbandoned();
+                    }
                     if (reject) {
                         auto errorObject = createErrorObject(runtime, error.what());
                         reject->call(runtime, errorObject);
@@ -594,6 +731,16 @@ jsi::Value createPromiseTask(
 
                 return jsi::Value::undefined();
             }));
+}
+
+jsi::Value createResolvedPromise(jsi::Runtime &runtime) {
+    auto promiseConstructor =
+        runtime.global().getPropertyAsObject(runtime, "Promise");
+    auto resolve = promiseConstructor.getPropertyAsFunction(runtime, "resolve");
+    return resolve.callWithThis(
+        runtime,
+        promiseConstructor,
+        jsi::Value::undefined());
 }
 
 void invokeAsyncTracked(
@@ -787,6 +934,33 @@ TranscribeConfig createTranscribeConfig(
             options.getProperty(runtime, "onNewSegments"),
             callInvoker);
     }
+
+    return config;
+}
+
+struct ParakeetTranscribeConfig {
+    parakeet_full_params params =
+        parakeet_full_default_params(PARAKEET_SAMPLING_GREEDY);
+    int jobId = 0;
+};
+
+ParakeetTranscribeConfig createParakeetTranscribeConfig(
+    jsi::Runtime &runtime,
+    const jsi::Object &options) {
+    ParakeetTranscribeConfig config;
+
+    int maxThreads = static_cast<int>(std::thread::hardware_concurrency());
+    int defaultThreads = maxThreads == 4 ? 2 : std::min(4, maxThreads);
+    int nThreads = getIntProperty(runtime, options, "maxThreads", defaultThreads);
+    config.params.n_threads = nThreads > 0 ? nThreads : defaultThreads;
+    config.params.audio_ctx =
+        getIntProperty(runtime, options, "audioCtx", config.params.audio_ctx);
+    config.params.no_context = true;
+    config.jobId = getIntProperty(
+        runtime,
+        options,
+        "jobId",
+        static_cast<int>(std::rand()));
 
     return config;
 }
@@ -1199,6 +1373,34 @@ TranscribeResultData buildTranscribeResult(
     return result;
 }
 
+TranscribeResultData buildParakeetTranscribeResult(
+    parakeet_context *context,
+    bool isAborted) {
+    TranscribeResultData result;
+    result.isAborted = isAborted;
+    result.language = "";
+
+    int count = parakeet_full_n_segments(context);
+    if (count <= 0) {
+        return result;
+    }
+
+    result.segments.reserve(static_cast<size_t>(count));
+    for (int index = 0; index < count; ++index) {
+        const char *segmentText =
+            parakeet_full_get_segment_text(context, index);
+        std::string text = segmentText ? segmentText : "";
+        result.result.append(text);
+        result.segments.push_back({
+            std::move(text),
+            static_cast<int>(parakeet_full_get_segment_t0(context, index)),
+            static_cast<int>(parakeet_full_get_segment_t1(context, index)),
+        });
+    }
+
+    return result;
+}
+
 jsi::Array createSegmentsArray(
     jsi::Runtime &runtime,
     const std::vector<SegmentData> &segments) {
@@ -1284,6 +1486,19 @@ jsi::Value createContextValue(
 jsi::Value createVadContextValue(
     jsi::Runtime &runtime,
     const std::shared_ptr<WhisperVadContextHolder> &holder) {
+    jsi::Object result(runtime);
+    result.setProperty(runtime, "contextId", jsi::Value(holder->id));
+    result.setProperty(runtime, "gpu", jsi::Value(holder->gpu));
+    result.setProperty(
+        runtime,
+        "reasonNoGPU",
+        jsi::String::createFromUtf8(runtime, holder->reasonNoGPU));
+    return result;
+}
+
+jsi::Value createParakeetContextValue(
+    jsi::Runtime &runtime,
+    const std::shared_ptr<ParakeetContextHolder> &holder) {
     jsi::Object result(runtime);
     result.setProperty(runtime, "contextId", jsi::Value(holder->id));
     result.setProperty(runtime, "gpu", jsi::Value(holder->gpu));
@@ -1401,6 +1616,28 @@ bool releaseVadHolder(
     return true;
 }
 
+bool releaseParakeetHolder(
+    const std::shared_ptr<ParakeetContextHolder> &holder,
+    bool allowBlocking = true) {
+    if (!holder) {
+        return true;
+    }
+    holder->beginCloseAndAbort();
+    if (allowBlocking) {
+        holder->waitForIdle();
+    } else if (!holder->waitForIdleFor(kCleanupWaitTimeout)) {
+        LOG_ERROR(
+            "Timed out waiting for Parakeet context %d to become idle during cleanup",
+            holder->id);
+        return false;
+    }
+    if (holder->context != nullptr) {
+        parakeet_free(holder->context);
+        holder->context = nullptr;
+    }
+    return true;
+}
+
 jsi::Object requireObjectArgument(
     jsi::Runtime &runtime,
     const jsi::Value *arguments,
@@ -1450,6 +1687,31 @@ std::vector<float> requireAudioBufferArgument(
     }
     auto arrayBuffer = object.getArrayBuffer(runtime);
     return decodePcm16(arrayBuffer.data(runtime), arrayBuffer.size(runtime));
+}
+
+TranscribeResultData runParakeetTranscription(
+    const std::shared_ptr<ParakeetContextHolder> &holder,
+    ParakeetTranscribeConfig config,
+    const std::vector<float> &audio) {
+    config.params.abort_callback = [](void *userData) {
+        auto *abortRequested = static_cast<std::atomic<bool> *>(userData);
+        return abortRequested &&
+            abortRequested->load(std::memory_order_relaxed);
+    };
+    config.params.abort_callback_user_data = &holder->abortRequested;
+
+    int code = parakeet_full(
+        holder->context,
+        config.params,
+        audio.data(),
+        static_cast<int>(audio.size()));
+    bool isAborted = holder->isAborted();
+
+    if (code != 0 && !isAborted) {
+        throw JsiError("Parakeet transcription failed", code);
+    }
+
+    return buildParakeetTranscribeResult(holder->context, isAborted);
 }
 
 } // namespace
@@ -1924,6 +2186,263 @@ void installJSIBindings(
             }
         });
 
+    auto initParakeetContext = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "parakeetInitContext"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "Parakeet context options must be an object");
+
+            ParakeetContextInitOptions hostOptions;
+            hostOptions.filePath = getStringProperty(runtime, options, "filePath");
+            hostOptions.isBundleAsset =
+                getBoolProperty(runtime, options, "isBundleAsset", false);
+            hostOptions.useGpu = getBoolProperty(runtime, options, "useGpu", true);
+
+            auto initFinished = std::make_shared<std::atomic<bool>>(false);
+            g_parakeetPendingInitTasks.fetch_add(1);
+            auto finishInit = [initFinished]() {
+                bool expected = false;
+                if (initFinished->compare_exchange_strong(
+                        expected,
+                        true,
+                        std::memory_order_relaxed)) {
+                    g_parakeetPendingInitTasks.fetch_sub(1);
+                }
+            };
+
+            try {
+                return createPromiseTask(runtime, callInvoker, [contextId, hostOptions, finishInit]() -> PromiseResultGenerator {
+                    PromiseScopeGuard initGuard(finishInit);
+                    auto result = hostInitParakeetContext(hostOptions);
+                    if (result.context == nullptr) {
+                        LOG_ERROR("parakeetInitContext failed to load model contextId=%d", contextId);
+                        throw JsiError("Failed to load the Parakeet model");
+                    }
+                    if (g_isShuttingDown.load(std::memory_order_relaxed)) {
+                        parakeet_free(result.context);
+                        return [](jsi::Runtime &) {
+                            return jsi::Value::undefined();
+                        };
+                    }
+
+                    auto holder = std::make_shared<ParakeetContextHolder>(contextId);
+                    holder->context = result.context;
+                    holder->gpu = result.gpu;
+                    holder->reasonNoGPU = result.reasonNoGPU;
+                    if (!g_parakeetContexts.addIf(
+                            contextId,
+                            holder,
+                            []() {
+                                return !g_isShuttingDown.load(std::memory_order_relaxed);
+                            })) {
+                        return [](jsi::Runtime &) {
+                            return jsi::Value::undefined();
+                        };
+                    }
+
+                    return [holder](jsi::Runtime &rt) {
+                        return createParakeetContextValue(rt, holder);
+                    };
+                }, contextId, true, finishInit);
+            } catch (...) {
+                finishInit();
+                throw;
+            }
+        });
+
+    auto releaseParakeetContext = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "parakeetReleaseContext"),
+        1,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto holder = g_parakeetContexts.removeAndApply(
+                contextId,
+                [](const std::shared_ptr<ParakeetContextHolder> &context) {
+                    context->beginDetachedReleaseAndAbort();
+                });
+            if (!holder) {
+                throw jsi::JSError(runtime, "Parakeet context not found");
+            }
+            return createPromiseTask(runtime, callInvoker, [holder]() -> PromiseResultGenerator {
+                releaseParakeetHolder(holder, false);
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            }, contextId, false);
+        });
+
+    auto releaseAllParakeetContexts = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "parakeetReleaseAllContexts"),
+        0,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *,
+            size_t) -> jsi::Value {
+            auto holders = g_parakeetContexts.removeAllAndApply(
+                [](const std::shared_ptr<ParakeetContextHolder> &holder) {
+                    holder->beginDetachedReleaseAndAbort();
+                });
+            return createPromiseTask(runtime, callInvoker, [holders = std::move(holders)]() -> PromiseResultGenerator {
+                for (const auto &holder : holders) {
+                    releaseParakeetHolder(holder, false);
+                }
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            }, -1, false);
+        });
+
+    auto parakeetTranscribeFile = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "parakeetTranscribeFile"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            std::string input = requireStringArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "Parakeet transcription input must be a string");
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                2,
+                "Parakeet transcription options must be an object");
+
+            auto holder = g_parakeetContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "Parakeet context not found");
+            }
+            auto config = createParakeetTranscribeConfig(runtime, options);
+            auto operationFinished = std::make_shared<std::atomic<bool>>(false);
+            auto finishOperation = [holder, operationFinished]() {
+                bool expected = false;
+                if (operationFinished->compare_exchange_strong(
+                        expected,
+                        true,
+                        std::memory_order_relaxed)) {
+                    holder->endExclusiveOperation();
+                }
+            };
+            if (!holder->beginExclusiveOperation(config.jobId)) {
+                throw jsi::JSError(runtime, "Parakeet context is already transcribing");
+            }
+
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, config, input, finishOperation]() mutable -> PromiseResultGenerator {
+                    PromiseScopeGuard exclusiveGuard(finishOperation);
+
+                    auto audio = readWaveAudio(input);
+                    if (audio.empty()) {
+                        throw JsiError("Invalid file");
+                    }
+                    auto result = runParakeetTranscription(holder, config, audio);
+                    return [result](jsi::Runtime &rt) {
+                        return createTranscribeResultValue(rt, result);
+                    };
+                }, contextId, true, finishOperation);
+            } catch (...) {
+                finishOperation();
+                throw;
+            }
+        });
+
+    auto parakeetTranscribeData = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "parakeetTranscribeData"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto options = requireObjectArgument(
+                runtime,
+                arguments,
+                count,
+                1,
+                "Parakeet transcription options must be an object");
+            auto audio = requireAudioBufferArgument(runtime, arguments, count, 2);
+
+            auto holder = g_parakeetContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "Parakeet context not found");
+            }
+            auto config = createParakeetTranscribeConfig(runtime, options);
+            auto operationFinished = std::make_shared<std::atomic<bool>>(false);
+            auto finishOperation = [holder, operationFinished]() {
+                bool expected = false;
+                if (operationFinished->compare_exchange_strong(
+                        expected,
+                        true,
+                        std::memory_order_relaxed)) {
+                    holder->endExclusiveOperation();
+                }
+            };
+            if (!holder->beginExclusiveOperation(config.jobId)) {
+                throw jsi::JSError(runtime, "Parakeet context is already transcribing");
+            }
+
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, config, audio, finishOperation]() mutable -> PromiseResultGenerator {
+                    PromiseScopeGuard exclusiveGuard(finishOperation);
+
+                    auto result = runParakeetTranscription(holder, config, audio);
+                    return [result](jsi::Runtime &rt) {
+                        return createTranscribeResultValue(rt, result);
+                    };
+                }, contextId, true, finishOperation);
+            } catch (...) {
+                finishOperation();
+                throw;
+            }
+        });
+
+    auto abortParakeetTranscribe = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "parakeetAbortTranscribe"),
+        2,
+        [](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int jobId = count > 1 && arguments[1].isNumber()
+                ? static_cast<int>(arguments[1].asNumber())
+                : -1;
+            auto holder = g_parakeetContexts.get(contextId);
+            if (holder) {
+                holder->abortActiveJob(jobId);
+            }
+            return createResolvedPromise(runtime);
+        });
+
     auto initVadContext = jsi::Function::createFromHostFunction(
         runtime,
         jsi::PropNameID::forAscii(runtime, "whisperInitVadContext"),
@@ -2202,6 +2721,12 @@ void installJSIBindings(
     runtime.global().setProperty(runtime, "whisperTranscribeData", std::move(transcribeData));
     runtime.global().setProperty(runtime, "whisperAbortTranscribe", std::move(abortTranscribe));
     runtime.global().setProperty(runtime, "whisperBench", std::move(bench));
+    runtime.global().setProperty(runtime, "parakeetInitContext", std::move(initParakeetContext));
+    runtime.global().setProperty(runtime, "parakeetReleaseContext", std::move(releaseParakeetContext));
+    runtime.global().setProperty(runtime, "parakeetReleaseAllContexts", std::move(releaseAllParakeetContexts));
+    runtime.global().setProperty(runtime, "parakeetTranscribeFile", std::move(parakeetTranscribeFile));
+    runtime.global().setProperty(runtime, "parakeetTranscribeData", std::move(parakeetTranscribeData));
+    runtime.global().setProperty(runtime, "parakeetAbortTranscribe", std::move(abortParakeetTranscribe));
     runtime.global().setProperty(runtime, "whisperInitVadContext", std::move(initVadContext));
     runtime.global().setProperty(runtime, "whisperReleaseVadContext", std::move(releaseVadContext));
     runtime.global().setProperty(runtime, "whisperReleaseAllVadContexts", std::move(releaseAllVadContexts));
@@ -2225,13 +2750,28 @@ void cleanupJSIBindings() {
 
     auto whisperHolders = g_whisperContexts.snapshot();
     auto vadHolders = g_vadContexts.snapshot();
+    auto parakeetHolders = g_parakeetContexts.removeAll();
     bool releasedAllContexts = true;
+
+    for (const auto &holder : parakeetHolders) {
+        holder->beginCloseAndAbort();
+    }
 
     for (const auto &holder : whisperHolders) {
         releasedAllContexts = releaseWhisperHolder(holder, false) && releasedAllContexts;
     }
     for (const auto &holder : vadHolders) {
         releasedAllContexts = releaseVadHolder(holder, false) && releasedAllContexts;
+    }
+    for (const auto &holder : parakeetHolders) {
+        releasedAllContexts = releaseParakeetHolder(holder, false) && releasedAllContexts;
+    }
+
+    if (g_parakeetDetachedContexts.load() > 0) {
+        releasedAllContexts = false;
+    }
+    if (g_parakeetPendingInitTasks.load() > 0) {
+        releasedAllContexts = false;
     }
 
     g_whisperContexts.removeAll();
@@ -2242,7 +2782,7 @@ void cleanupJSIBindings() {
     if (releasedAllContexts) {
         getThreadPool().shutdown();
     } else {
-        LOG_ERROR("Skipping ThreadPool shutdown during cleanup because whisper tasks did not drain");
+        LOG_ERROR("Skipping ThreadPool shutdown during cleanup because native tasks did not drain");
     }
 }
 

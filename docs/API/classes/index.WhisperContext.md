@@ -38,7 +38,7 @@
 
 #### Defined in
 
-[index.ts:235](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L235)
+[index.ts:248](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L248)
 
 ## Properties
 
@@ -48,7 +48,7 @@
 
 #### Defined in
 
-[index.ts:231](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L231)
+[index.ts:244](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L244)
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-[index.ts:229](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L229)
+[index.ts:242](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L242)
 
 ___
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-[index.ts:227](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L227)
+[index.ts:240](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L240)
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[index.ts:233](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L233)
+[index.ts:246](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L246)
 
 ## Methods
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-[index.ts:357](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L357)
+[index.ts:370](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L370)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[index.ts:363](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L363)
+[index.ts:376](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L376)
 
 ___
 
@@ -141,7 +141,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:265](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L265)
+[index.ts:278](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L278)
 
 ___
 
@@ -169,4 +169,4 @@ Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
 
 #### Defined in
 
-[index.ts:318](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/index.ts#L318)
+[index.ts:331](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L331)

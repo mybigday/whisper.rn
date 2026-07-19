@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![npm](https://img.shields.io/npm/v/whisper.rn.svg)](https://www.npmjs.com/package/whisper.rn/)
 
-React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
+React Native bindings for Whisper and NVIDIA Parakeet ASR through [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 
 [whisper.cpp](https://github.com/ggerganov/whisper.cpp): High-performance inference of [OpenAI's Whisper](https://github.com/openai/whisper) automatic speech recognition (ASR) model
 
@@ -64,6 +64,41 @@ const { stop, promise } = whisperContext.transcribe(sampleFilePath, options)
 const { result } = await promise
 // result: (The inference text result from audio file)
 ```
+
+## NVIDIA Parakeet TDT
+
+`ParakeetContext` runs NVIDIA's Parakeet TDT 0.6B v3 model through the Parakeet API included in whisper.cpp. The v3 model supports English plus 24 other European languages.
+
+Download a GGUF model from [ggml-org/parakeet-GGUF](https://huggingface.co/ggml-org/parakeet-GGUF) before initializing the context. The example app downloads these models at runtime because they are too large to bundle comfortably:
+
+| Model | Approximate size |
+| --- | ---: |
+| `ggml-parakeet-tdt-0.6b-v3-q4_0.bin` | 356 MB |
+| `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` | 416 MB |
+| `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | 669 MB |
+| `ggml-parakeet-tdt-0.6b-v3-f16.bin` | 1.26 GB |
+
+```typescript
+import { initParakeet } from 'whisper.rn'
+
+const parakeetContext = await initParakeet({
+  filePath: 'file://.../ggml-parakeet-tdt-0.6b-v3-q4_0.bin',
+  useGpu: true,
+})
+
+const { stop, promise } = parakeetContext.transcribe(
+  'file://.../sample.wav',
+  { maxThreads: 4 },
+)
+const { result, segments, isAborted } = await promise
+
+// Cancel an in-flight transcription when needed:
+// await stop()
+
+await parakeetContext.release()
+```
+
+Parakeet file and base64 inputs must be WAV containing 16-bit PCM audio. `transcribeData()` accepts raw signed 16-bit PCM as a base64 string or `ArrayBuffer`; raw audio must be mono at 16 kHz. Compressed formats such as MP3, AAC, and FLAC are not decoded.
 
 ## Voice Activity Detection (VAD)
 
@@ -179,6 +214,22 @@ const transcriber = new RealtimeTranscriber(
 await transcriber.start()
 await transcriber.stop()
 ```
+
+To use Parakeet, provide `parakeetContext` instead of `whisperContext`:
+
+```js
+const parakeetContext = await initParakeet({
+  filePath: 'file://.../ggml-parakeet-tdt-0.6b-v3-q4_0.bin',
+})
+
+const transcriber = new RealtimeTranscriber(
+  { parakeetContext, vadContext, audioStream, fs: RNFS },
+  { transcribeOptions: { maxThreads: 4, audioCtx: 0 } },
+  { onTranscribe: (event) => console.log(event.data?.result) },
+)
+```
+
+`initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
 
 **Dependencies:**
 

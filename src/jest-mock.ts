@@ -7,6 +7,13 @@ const transcribeResult = {
   isAborted: false,
 }
 
+const parakeetTranscribeResult = {
+  language: '',
+  result: ' Parakeet test',
+  segments: [{ text: ' Parakeet test', t0: 0, t1: 1101 }],
+  isAborted: false,
+}
+
 const vadResult = {
   hasSpeech: true,
   segments: [
@@ -52,6 +59,16 @@ global.whisperAbortTranscribe = jest.fn(async () => undefined)
 global.whisperBench = jest.fn(async () =>
   JSON.stringify(['NEON', 1, 1, 1, 1, 1]),
 )
+global.parakeetInitContext = jest.fn(async (contextId: number) => ({
+  contextId,
+  gpu: false,
+  reasonNoGPU: 'Mock Parakeet context',
+}))
+global.parakeetReleaseContext = jest.fn(async () => undefined)
+global.parakeetReleaseAllContexts = jest.fn(async () => undefined)
+global.parakeetTranscribeFile = jest.fn(async () => parakeetTranscribeResult)
+global.parakeetTranscribeData = jest.fn(async () => parakeetTranscribeResult)
+global.parakeetAbortTranscribe = jest.fn(async () => undefined)
 global.whisperInitVadContext = jest.fn(async (contextId: number) => ({
   contextId,
   gpu: false,

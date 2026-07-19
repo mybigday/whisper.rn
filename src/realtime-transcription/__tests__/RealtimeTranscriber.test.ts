@@ -2,6 +2,7 @@ import { RealtimeTranscriber } from '../RealtimeTranscriber'
 import { RingBufferVad } from '../RingBufferVad'
 import { JestAudioStreamAdapter } from '../adapters/JestAudioStreamAdapter'
 import { VAD_PRESETS } from '../types'
+import type { ParakeetTranscribeOptions } from '../../index'
 
 // Mock WavFileWriter
 const mockWavFileWriter = {
@@ -502,6 +503,72 @@ describe('RealtimeTranscriber', () => {
 
       await promptTranscriber.stop()
       await promptTranscriber.release()
+    })
+
+    it('should use Parakeet options without Whisper-only options', async () => {
+      const testAudioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      testAudioStream['startStreaming'] = jest.fn()
+
+      const mockParakeetContext = {
+        transcribeData: jest.fn(
+          (_data: ArrayBuffer, _options: ParakeetTranscribeOptions) => ({
+            stop: jest.fn().mockResolvedValue(undefined),
+            promise: Promise.resolve({
+              isAborted: false,
+              language: '',
+              result: 'Parakeet transcription',
+              segments: [
+                { text: 'Parakeet transcription', t0: 0, t1: 1000 },
+              ],
+            }),
+          }),
+        ),
+      }
+      const onTranscribe = jest.fn()
+      const parakeetTranscriber = new RealtimeTranscriber(
+        {
+          parakeetContext: mockParakeetContext,
+          audioStream: testAudioStream,
+        },
+        {
+          transcribeOptions: { maxThreads: 2, audioCtx: 1500 },
+          initialPrompt: 'This prompt should be ignored',
+          promptPreviousSlices: true,
+        },
+        { onTranscribe },
+      )
+
+      await parakeetTranscriber.start()
+
+      try {
+        testAudioStream.simulateDataChunk(createAudioData(16000))
+        await new Promise(resolve => setTimeout(resolve, 50))
+
+        expect(mockParakeetContext.transcribeData).toHaveBeenCalledTimes(1)
+        expect(mockParakeetContext.transcribeData).toHaveBeenCalledWith(
+          expect.any(ArrayBuffer),
+          expect.objectContaining({ maxThreads: 2, audioCtx: 1500 }),
+        )
+
+        const transcribeOptions =
+          mockParakeetContext.transcribeData.mock.calls[0]![1]
+        expect(transcribeOptions).not.toHaveProperty('prompt')
+        expect(transcribeOptions).not.toHaveProperty('onProgress')
+        expect(onTranscribe).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'transcribe',
+            data: expect.objectContaining({
+              result: 'Parakeet transcription',
+            }),
+          }),
+        )
+      } finally {
+        await parakeetTranscriber.release()
+      }
     })
   })
 

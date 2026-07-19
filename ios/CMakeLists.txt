@@ -79,6 +79,7 @@ add_library(rnwhisper SHARED
     ${SOURCE_DIR}/ggml-quants.c
     ${SOURCE_DIR}/gguf.cpp
     ${SOURCE_DIR}/whisper.cpp
+    ${SOURCE_DIR}/parakeet.cpp
     ${SOURCE_DIR}/rn-whisper.cpp
     ${SOURCE_FILES_ARCH}
     ${SOURCE_FILES_COREML}
@@ -119,4 +120,11 @@ set_source_files_properties(
     ${SOURCE_DIR}/ggml-metal/ggml-metal-context.m
     ${SOURCE_DIR}/ggml-metal/ggml-metal-device.m
     PROPERTIES COMPILE_FLAGS "-fno-objc-arc"
+)
+
+# Xcode applies CLANG_ENABLE_OBJC_ARC at the target level. Other generators
+# need ARC enabled explicitly for the Core ML Objective-C sources.
+set_source_files_properties(
+    ${SOURCE_FILES_COREML}
+    PROPERTIES COMPILE_FLAGS "-fobjc-arc"
 )

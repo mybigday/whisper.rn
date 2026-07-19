@@ -49,7 +49,7 @@ Create a new RingBuffer
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:27](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L27)
+[realtime-transcription/RingBuffer.ts:27](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L27)
 
 ## Methods
 
@@ -65,7 +65,7 @@ Clear the buffer and reset indices
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:102](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L102)
+[realtime-transcription/RingBuffer.ts:102](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L102)
 
 ___
 
@@ -83,7 +83,7 @@ Maximum buffer size in bytes
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:120](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L120)
+[realtime-transcription/RingBuffer.ts:120](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L120)
 
 ___
 
@@ -101,7 +101,7 @@ Number between 0 and 1 representing how full the buffer is
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:144](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L144)
+[realtime-transcription/RingBuffer.ts:144](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L144)
 
 ___
 
@@ -119,7 +119,7 @@ Number of bytes currently in the buffer
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:112](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L112)
+[realtime-transcription/RingBuffer.ts:112](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L112)
 
 ___
 
@@ -137,7 +137,7 @@ true if buffer contains no data
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:128](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L128)
+[realtime-transcription/RingBuffer.ts:128](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L128)
 
 ___
 
@@ -155,26 +155,26 @@ true if buffer has reached capacity
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:136](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L136)
+[realtime-transcription/RingBuffer.ts:136](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L136)
 
 ___
 
 ### read
 
-▸ **read**(): `Uint8Array`
+▸ **read**(): `Uint8Array`<`ArrayBufferLike`\>
 
 Read all available data from the buffer in correct order
 Does NOT clear the buffer (use clear() for that)
 
 #### Returns
 
-`Uint8Array`
+`Uint8Array`<`ArrayBufferLike`\>
 
 Uint8Array containing the buffered data in order
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:75](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L75)
+[realtime-transcription/RingBuffer.ts:75](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L75)
 
 ___
 
@@ -189,7 +189,7 @@ If data exceeds buffer capacity, oldest data is overwritten
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `data` | `Uint8Array` | Audio data to write |
+| `data` | `Uint8Array`<`ArrayBufferLike`\> | Audio data to write |
 
 #### Returns
 
@@ -197,4 +197,4 @@ If data exceeds buffer capacity, oldest data is overwritten
 
 #### Defined in
 
-[realtime-transcription/RingBuffer.ts:37](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/RingBuffer.ts#L37)
+[realtime-transcription/RingBuffer.ts:37](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBuffer.ts#L37)

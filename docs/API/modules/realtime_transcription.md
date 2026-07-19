@@ -23,13 +23,29 @@
 - [RealtimeStatsEvent](../interfaces/realtime_transcription.RealtimeStatsEvent.md)
 - [RealtimeTranscribeEvent](../interfaces/realtime_transcription.RealtimeTranscribeEvent.md)
 - [RealtimeTranscriberCallbacks](../interfaces/realtime_transcription.RealtimeTranscriberCallbacks.md)
-- [RealtimeTranscriberDependencies](../interfaces/realtime_transcription.RealtimeTranscriberDependencies.md)
 - [RealtimeVadEvent](../interfaces/realtime_transcription.RealtimeVadEvent.md)
 - [WavFileWriterFs](../interfaces/realtime_transcription.WavFileWriterFs.md)
+
+### Type Aliases
+
+- [RealtimeTranscriberDependencies](realtime_transcription.md#realtimetranscriberdependencies)
 
 ### Variables
 
 - [VAD\_PRESETS](realtime_transcription.md#vad_presets)
+
+## Type Aliases
+
+### RealtimeTranscriberDependencies
+
+Ƭ **RealtimeTranscriberDependencies**: { `audioStream`: [`AudioStreamInterface`](../interfaces/realtime_transcription.AudioStreamInterface.md) ; `fs?`: [`WavFileWriterFs`](../interfaces/realtime_transcription.WavFileWriterFs.md) ; `vadContext?`: `RealtimeVadContextLike`  } & { `parakeetContext?`: `never` ; `whisperContext`: `WhisperContextLike`  } \| { `parakeetContext`: `ParakeetContextLike` ; `whisperContext?`: `never`  }
+
+Dependencies for realtime transcription. Provide exactly one transcription
+context: `whisperContext` or `parakeetContext`.
+
+#### Defined in
+
+[realtime-transcription/types.ts:321](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L321)
 
 ## Variables
 
@@ -125,4 +141,4 @@ Key Parameters:
 
 #### Defined in
 
-[realtime-transcription/types.ts:62](https://github.com/mybigday/whisper.rn/blob/2d06b36/src/realtime-transcription/types.ts#L62)
+[realtime-transcription/types.ts:67](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L67)
