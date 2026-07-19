@@ -110,11 +110,15 @@ export class RealtimeTranscriber {
         type: 'parakeet',
         context: dependencies.parakeetContext,
       }
-    } else {
+    } else if (dependencies.whisperContext) {
       this.transcriptionContext = {
         type: 'whisper',
         context: dependencies.whisperContext,
       }
+    } else {
+      throw new Error(
+        'RealtimeTranscriber requires either whisperContext or parakeetContext',
+      )
     }
     this.vadContext = dependencies.vadContext
     this.audioStream = dependencies.audioStream

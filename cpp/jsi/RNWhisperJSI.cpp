@@ -2733,7 +2733,6 @@ void installJSIBindings(
     runtime.global().setProperty(runtime, "whisperVadDetectSpeech", std::move(vadDetectSpeech));
     runtime.global().setProperty(runtime, "whisperVadDetectSpeechFile", std::move(vadDetectSpeechFile));
     runtime.global().setProperty(runtime, "whisperToggleNativeLog", std::move(toggleNativeLog));
-
 }
 
 void cleanupJSIBindings() {
@@ -2785,7 +2784,6 @@ void cleanupJSIBindings() {
     } else {
         LOG_ERROR("Skipping ThreadPool shutdown during cleanup because native tasks did not drain");
     }
-
 }
 
 } // namespace rnwhisper_jsi
