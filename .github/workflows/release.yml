@@ -51,18 +51,62 @@ jobs:
 
       - name: Verify iOS frameworks
         run: |
-          FRAMEWORK_BINARIES=(
-            ios/rnwhisper.xcframework/ios-arm64/rnwhisper.framework/rnwhisper
-            ios/rnwhisper.xcframework/ios-arm64_x86_64-simulator/rnwhisper.framework/rnwhisper
-            ios/rnwhisper.xcframework/tvos-arm64/rnwhisper.framework/rnwhisper
-            ios/rnwhisper.xcframework/tvos-arm64_x86_64-simulator/rnwhisper.framework/rnwhisper
+          set -euo pipefail
+
+          # Frameworks missing MinimumOSVersion/CFBundleSupportedPlatforms/DT*
+          # plist keys, or built against a beta SDK, hang forever in TestFlight
+          # processing. Keep in sync with the runs-on macOS/Xcode version.
+          EXPECTED_SDK_MAJOR=26
+
+          SLICES=(
+            "ios-arm64 iPhoneOS"
+            "ios-arm64_x86_64-simulator iPhoneSimulator"
+            "tvos-arm64 AppleTVOS"
+            "tvos-arm64_x86_64-simulator AppleTVSimulator"
           )
 
-          for binary in "${FRAMEWORK_BINARIES[@]}"; do
+          for entry in "${SLICES[@]}"; do
+            slice="${entry% *}"
+            expected_platform="${entry#* }"
+            framework="ios/rnwhisper.xcframework/$slice/rnwhisper.framework"
+            binary="$framework/rnwhisper"
+            plist="$framework/Info.plist"
+
             if [ ! -f "$binary" ]; then
-              echo "Missing framework binary: $binary" >&2
+              echo "[$slice] Missing framework binary: $binary" >&2
               exit 1
             fi
+
+            if ! min_os=$(plutil -extract MinimumOSVersion raw "$plist" 2>/dev/null); then
+              echo "[$slice] Info.plist is missing MinimumOSVersion" >&2
+              exit 1
+            fi
+
+            if ! platform=$(plutil -extract CFBundleSupportedPlatforms.0 raw "$plist" 2>/dev/null); then
+              echo "[$slice] Info.plist is missing CFBundleSupportedPlatforms" >&2
+              exit 1
+            fi
+            if [ "$platform" != "$expected_platform" ]; then
+              echo "[$slice] CFBundleSupportedPlatforms is '$platform', expected '$expected_platform'" >&2
+              exit 1
+            fi
+
+            if ! sdk_name=$(plutil -extract DTSDKName raw "$plist" 2>/dev/null); then
+              echo "[$slice] Info.plist is missing DTSDKName" >&2
+              exit 1
+            fi
+
+            build_sdk=$(otool -l "$binary" | grep -A5 LC_BUILD_VERSION | awk '/^ *sdk /{print $2; exit}')
+            if [ -z "$build_sdk" ]; then
+              echo "[$slice] Could not read sdk from LC_BUILD_VERSION" >&2
+              exit 1
+            fi
+            if [ "${build_sdk%%.*}" != "$EXPECTED_SDK_MAJOR" ]; then
+              echo "[$slice] Built against SDK $build_sdk (DTSDKName=$sdk_name), expected stable $EXPECTED_SDK_MAJOR.x" >&2
+              exit 1
+            fi
+
+            echo "[$slice] OK: MinimumOSVersion=$min_os platform=$platform sdk=$build_sdk ($sdk_name)"
           done
 
       - name: Configure npm authentication

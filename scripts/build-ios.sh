@@ -5,10 +5,14 @@ if ! command -v cmake &> /dev/null; then
   exit 1
 fi
 
+# Xcode generator is required for release builds: it produces frameworks with
+# complete Info.plist metadata (MinimumOSVersion, CFBundleSupportedPlatforms,
+# DT* keys). Frameworks built with "Unix Makefiles" lack these keys and cause
+# App Store Connect to hang in TestFlight processing indefinitely.
 if [ -n "$RNWHISPER_CMAKE_GENERATOR" ]; then
   CMAKE_GENERATOR=$RNWHISPER_CMAKE_GENERATOR
 else
-  CMAKE_GENERATOR="Unix Makefiles"
+  CMAKE_GENERATOR="Xcode"
 fi
 
 function cp_headers() {
