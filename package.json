@@ -50,8 +50,9 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "build": "bob build",
-    "prepack": "yarn docgen && ./scripts/build-ios.sh && yarn build",
+    "prepack": "yarn docgen && yarn build",
     "test": "jest",
+    "release": "release-it",
     "example": "yarn --cwd example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build",
     "build:ios-frameworks": "./scripts/build-ios.sh",
@@ -132,7 +133,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true,
+      "publish": false,
       "skipChecks": true
     },
     "github": {

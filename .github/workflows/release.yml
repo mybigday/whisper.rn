@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Resolve release metadata
+        id: release
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          NPM_TAG=$(node -e '
+            const version = require("./package.json").version
+            const separator = version.indexOf("-")
+            const prerelease = separator === -1
+              ? ""
+              : version.slice(separator + 1).split(/[.+]/, 1)[0]
+            let tag = "latest"
+            if (prerelease) {
+              tag = /^\d+$/.test(prerelease) ? "next" : prerelease
+            }
+            process.stdout.write(tag)
+          ')
+          echo "package_tag=v$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate pushed tag
+        run: |
+          if [ "$GITHUB_REF_NAME" != "${{ steps.release.outputs.package_tag }}" ]; then
+            echo "Git tag $GITHUB_REF_NAME does not match package version tag ${{ steps.release.outputs.package_tag }}" >&2
+            exit 1
+          fi
+
+      - name: Build iOS frameworks
+        run: yarn build:ios-frameworks
+
+      - name: Verify iOS frameworks
+        run: |
+          FRAMEWORK_BINARIES=(
+            ios/rnwhisper.xcframework/ios-arm64/rnwhisper.framework/rnwhisper
+            ios/rnwhisper.xcframework/ios-arm64_x86_64-simulator/rnwhisper.framework/rnwhisper
+            ios/rnwhisper.xcframework/tvos-arm64/rnwhisper.framework/rnwhisper
+            ios/rnwhisper.xcframework/tvos-arm64_x86_64-simulator/rnwhisper.framework/rnwhisper
+          )
+
+          for binary in "${FRAMEWORK_BINARIES[@]}"; do
+            if [ ! -f "$binary" ]; then
+              echo "Missing framework binary: $binary" >&2
+              exit 1
+            fi
+          done
+
+      - name: Configure npm authentication
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_1Y }}
+
+      - name: Publish package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_1Y }}
+        run: npm publish --tag "${{ steps.release.outputs.npm_tag }}"

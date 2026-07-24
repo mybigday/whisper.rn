@@ -87,7 +87,7 @@ Our pre-commit hooks verify that the linter and tests pass when committing.
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
+We use [release-it](https://github.com/release-it/release-it) to bump the version and create the tag and GitHub release. Pushing the release tag triggers GitHub Actions to build the iOS frameworks and publish the package to npm.
 
 To publish new versions, run the following:
 
