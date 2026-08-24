@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,7 @@ namespace {
 JavaVM *g_javaVm = nullptr;
 jobject g_applicationContext = nullptr;
 jobject g_assetManager = nullptr;
+std::mutex g_cacheMutex;
 
 constexpr const char *kTag = "RNWhisperJNI";
 
@@ -504,6 +506,8 @@ std::string downloadToCache(
     JNIEnv *env,
     const std::string &url,
     const std::string &relativePath) {
+    std::lock_guard<std::mutex> lock(g_cacheMutex);
+
     std::string cacheRoot = getCacheRoot(env);
     if (cacheRoot.empty()) {
         return {};
@@ -518,10 +522,29 @@ std::string downloadToCache(
 
     std::filesystem::path target =
         std::filesystem::path(cacheRoot) / std::filesystem::path(filename);
+    std::filesystem::path sourceMarker =
+        std::filesystem::path(cacheRoot) /
+        ".sources" /
+        std::filesystem::path(filename);
+    sourceMarker += ".source";
     std::filesystem::create_directories(target.parent_path());
-    if (std::filesystem::exists(target)) {
-        return target.string();
+    std::filesystem::create_directories(sourceMarker.parent_path());
+
+    if (std::filesystem::exists(target) && std::filesystem::exists(sourceMarker)) {
+        std::ifstream markerInput(sourceMarker, std::ios::binary);
+        std::string cachedSource{
+            std::istreambuf_iterator<char>(markerInput),
+            std::istreambuf_iterator<char>()};
+        if (cachedSource == url) {
+            return target.string();
+        }
     }
+
+    // Metro asset URLs include a content hash. Record the source URL in cache
+    // metadata so an updated asset cannot reuse stale bytes with the same name.
+    std::error_code removeError;
+    std::filesystem::remove(sourceMarker, removeError);
+    std::filesystem::remove(target, removeError);
 
     jclass urlClass = env->FindClass("java/net/URL");
     jstring urlString = env->NewStringUTF(url.c_str());
@@ -543,9 +566,26 @@ std::string downloadToCache(
         return {};
     }
 
-    std::ofstream output(target, std::ios::binary);
-    output.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    std::filesystem::path temporaryTarget = target.string() + ".tmp";
+    std::ofstream output(temporaryTarget, std::ios::binary | std::ios::trunc);
+    output.write(
+        reinterpret_cast<const char *>(bytes.data()),
+        static_cast<std::streamsize>(bytes.size()));
     output.close();
+    if (!output) {
+        std::filesystem::remove(temporaryTarget, removeError);
+        return {};
+    }
+
+    std::error_code renameError;
+    std::filesystem::rename(temporaryTarget, target, renameError);
+    if (renameError) {
+        std::filesystem::remove(temporaryTarget, removeError);
+        return {};
+    }
+
+    std::ofstream markerOutput(sourceMarker, std::ios::binary | std::ios::trunc);
+    markerOutput.write(url.data(), static_cast<std::streamsize>(url.size()));
     return target.string();
 }
 
@@ -745,6 +785,8 @@ std::vector<uint8_t> hostLoadFileBytes(const std::string &path) {
 }
 
 void hostClearCache() {
+    std::lock_guard<std::mutex> lock(g_cacheMutex);
+
     bool needsDetach = false;
     JNIEnv *env = getEnv(&needsDetach);
     if (!env) {

@@ -6,6 +6,7 @@
 #import <TargetConditionals.h>
 
 #include <cstring>
+#include <mutex>
 
 #ifdef RCT_NEW_ARCH_ENABLED
 #import <RNWhisperSpec/RNWhisperSpec.h>
@@ -29,6 +30,17 @@ NSString *ensureDirectoryForFile(NSString *filePath) {
     return filePath;
 }
 
+std::mutex &cacheMutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+NSString *sourceMarkerPath(NSString *baseDirectory, NSString *relativePath) {
+    NSString *markerPath = [[baseDirectory stringByAppendingPathComponent:@".sources"]
+        stringByAppendingPathComponent:relativePath];
+    return [markerPath stringByAppendingString:@".source"];
+}
+
 bool isRemoteUrl(const std::string &path) {
     return path.rfind("http://", 0) == 0 || path.rfind("https://", 0) == 0;
 }
@@ -42,28 +54,44 @@ NSString *toNSString(const std::string &value) {
 }
 
 std::string downloadToCache(const std::string &url, const std::string &relativePath) {
+    std::lock_guard<std::mutex> lock(cacheMutex());
+
     NSString *urlString = toNSString(url);
     NSURL *nsUrl = [NSURL URLWithString:urlString];
     NSString *baseDirectory = cacheDirectoryPath();
-    NSString *targetPath = nil;
+    NSString *targetRelativePath = nil;
 
     if (!relativePath.empty()) {
-        targetPath = [baseDirectory stringByAppendingPathComponent:toNSString(relativePath)];
+        targetRelativePath = toNSString(relativePath);
     } else {
-        NSString *filename = nsUrl.lastPathComponent ?: @"download.bin";
-        targetPath = [baseDirectory stringByAppendingPathComponent:filename];
+        targetRelativePath = nsUrl.lastPathComponent ?: @"download.bin";
     }
 
+    NSString *targetPath = [baseDirectory stringByAppendingPathComponent:targetRelativePath];
+    NSString *markerPath = sourceMarkerPath(baseDirectory, targetRelativePath);
     ensureDirectoryForFile(targetPath);
-    if ([[NSFileManager defaultManager] fileExistsAtPath:targetPath]) {
+    ensureDirectoryForFile(markerPath);
+
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSData *source = [urlString dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *cachedSource = [NSData dataWithContentsOfFile:markerPath];
+    if ([fileManager fileExistsAtPath:targetPath] &&
+        cachedSource &&
+        [cachedSource isEqualToData:source]) {
         return toStdString(targetPath);
     }
 
+    // Metro asset URLs include a content hash. Record the source URL in cache
+    // metadata so an updated asset cannot reuse stale bytes with the same name.
+    [fileManager removeItemAtPath:markerPath error:nil];
+    [fileManager removeItemAtPath:targetPath error:nil];
+
     NSData *data = [NSData dataWithContentsOfURL:nsUrl];
-    if (!data || ![data writeToFile:targetPath atomically:YES]) {
+    if (!data || ![data writeToFile:targetPath options:NSDataWritingAtomic error:nil]) {
         return std::string();
     }
 
+    [source writeToFile:markerPath options:NSDataWritingAtomic error:nil];
     return toStdString(targetPath);
 }
 
@@ -262,6 +290,7 @@ std::vector<uint8_t> hostLoadFileBytes(const std::string &path) {
 }
 
 void hostClearCache() {
+    std::lock_guard<std::mutex> lock(cacheMutex());
     [[NSFileManager defaultManager] removeItemAtPath:cacheDirectoryPath() error:nil];
 }
 
