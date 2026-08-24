@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { StyleSheet, ScrollView, View, Text } from 'react-native'
+import { StyleSheet, ScrollView, View, Text, TextInput } from 'react-native'
 import LiveAudioStream from '@fugood/react-native-audio-pcm-stream'
 import { Buffer } from 'buffer'
 import RNFS from 'react-native-fs'
@@ -24,6 +24,19 @@ const styles = StyleSheet.create({
   buttonClear: { backgroundColor: '#888' },
   buttonText: { fontSize: 14, color: 'white', textAlign: 'center' },
   configTitle: { fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
+  options: { width: '95%', marginVertical: 8 },
+  inputLabel: { fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
+  input: {
+    borderColor: '#888',
+    borderRadius: 4,
+    borderWidth: 1,
+    color: '#333',
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    width: '100%',
+  },
+  promptInput: { minHeight: 64, textAlignVertical: 'top' },
   logContainer: {
     backgroundColor: 'lightgray',
     padding: 8,
@@ -55,6 +68,8 @@ export default function TranscribeData() {
   const recordedDataRef = useRef<Uint8Array | null>(null)
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
   const [downloadProgress, setDownloadProgress] = useState<number>(0)
+  const [language, setLanguage] = useState('en')
+  const [prompt, setPrompt] = useState('')
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -119,7 +134,8 @@ export default function TranscribeData() {
 
       const startTime = Date.now()
       const { promise } = whisperContext.transcribeData(base64Data, {
-        language: 'en',
+        language: language.trim() || undefined,
+        prompt: prompt.trim() || undefined,
         onProgress: (progress) => {
           log(`Transcribing progress: ${progress}%`)
         },
@@ -227,6 +243,26 @@ export default function TranscribeData() {
             }
           }}
         />
+
+        <View style={styles.options}>
+          <Text style={styles.inputLabel}>Language</Text>
+          <TextInput
+            style={styles.input}
+            value={language}
+            onChangeText={setLanguage}
+            placeholder="en or auto"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.inputLabel}>Prompt</Text>
+          <TextInput
+            style={[styles.input, styles.promptInput]}
+            value={prompt}
+            onChangeText={setPrompt}
+            placeholder="Optional initial prompt"
+            multiline
+          />
+        </View>
 
         <View style={styles.buttons}>
           <Button
