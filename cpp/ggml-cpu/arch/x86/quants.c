@@ -1,3 +1,6 @@
+// arch guard (added by scripts/bootstrap.sh)
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_IX86) || defined(_M_X64)
+
 #define WSP_GGML_COMMON_IMPL_C
 #include "ggml-common.h"
 #include "ggml-quants.h"
@@ -4106,3 +4109,5 @@ void wsp_ggml_vec_dot_iq4_xs_q8_K(int n, float * WSP_GGML_RESTRICT s, size_t bs,
     wsp_ggml_vec_dot_iq4_xs_q8_K_generic(n, s, bs, vx, bx, vy, by, nrc);
 #endif
 }
+
+#endif // arch guard

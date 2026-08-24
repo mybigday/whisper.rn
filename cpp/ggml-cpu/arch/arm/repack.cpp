@@ -1,3 +1,6 @@
+// arch guard (added by scripts/bootstrap.sh)
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64)
+
 #define WSP_GGML_COMMON_IMPL_CPP
 #define WSP_GGML_COMMON_DECL_CPP
 #include "ggml-common.h"
@@ -5154,3 +5157,5 @@ void wsp_ggml_gemm_q8_0_4x8_q8_0(int                        n,
 #endif  // defined(__aarch64__) && defined(__ARM_NEON) && defined(__ARM_FEATURE_MATMUL_INT8)
     wsp_ggml_gemm_q8_0_4x8_q8_0_generic(n, s, bs, vx, vy, nr, nc);
 }
+
+#endif // arch guard
