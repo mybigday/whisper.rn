@@ -74,23 +74,6 @@ mkdir -p ./cpp/ggml-cpu/arch
 cp -r ./whisper.cpp/ggml/src/ggml-cpu/arch/arm ./cpp/ggml-cpu/arch/
 cp -r ./whisper.cpp/ggml/src/ggml-cpu/arch/x86 ./cpp/ggml-cpu/arch/
 
-# The iOS from-source build (CocoaPods) compiles every source file for all
-# architecture slices, so arch-specific sources must be wrapped in arch guards
-# to avoid duplicate/undefined symbols across slices.
-# (cpu-feats.cpp already guards itself upstream.)
-guard_arch_file() {
-  local file=$1
-  local guard=$2
-  printf '// arch guard (added by scripts/bootstrap.sh)\n#if %s\n\n' "$guard" | cat - "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-  printf '\n#endif // arch guard\n' >> "$file"
-}
-ARM_GUARD='defined(__aarch64__) || defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64)'
-X86_GUARD='defined(__x86_64__) || defined(__i386__) || defined(_M_IX86) || defined(_M_X64)'
-guard_arch_file ./cpp/ggml-cpu/arch/arm/quants.c "$ARM_GUARD"
-guard_arch_file ./cpp/ggml-cpu/arch/arm/repack.cpp "$ARM_GUARD"
-guard_arch_file ./cpp/ggml-cpu/arch/x86/quants.c "$X86_GUARD"
-guard_arch_file ./cpp/ggml-cpu/arch/x86/repack.cpp "$X86_GUARD"
-
 cp ./whisper.cpp/ggml/src/ggml.c ./cpp/ggml.c
 cp ./whisper.cpp/ggml/src/ggml.cpp ./cpp/ggml.cpp
 cp ./whisper.cpp/ggml/src/ggml-impl.h ./cpp/ggml-impl.h
@@ -276,6 +259,11 @@ patch -p0 -d ./cpp < ./scripts/patches/ggml.c.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.h.patch
 patch -p0 -d ./cpp < ./scripts/patches/whisper.cpp.patch
 patch -p0 -d ./cpp < ./scripts/patches/parakeet.cpp.patch
+# The iOS from-source build (CocoaPods) compiles every source file for all
+# architecture slices, so arch-specific sources must be wrapped in arch guards
+# to avoid duplicate/undefined symbols across slices.
+# (cpu-feats.cpp already guards itself upstream.)
+patch -p0 -d ./cpp < ./scripts/patches/ggml-cpu-arch.patch
 rm -rf ./cpp/*.orig
 
 # Download model for example

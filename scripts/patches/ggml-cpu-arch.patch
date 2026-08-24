@@ -1,0 +1,60 @@
+--- ggml-cpu/arch/arm/quants.c.orig
++++ ggml-cpu/arch/arm/quants.c
+@@ -1,3 +1,6 @@
++// arch guard (added by scripts/patches/ggml-cpu-arch.patch)
++#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64)
++
+ #define WSP_GGML_COMMON_IMPL_C
+ #include "ggml-common.h"
+ #include "ggml-quants.h"
+@@ -4317,3 +4320,5 @@
+ #endif
+ }
+ 
++
++#endif // arch guard
+--- ggml-cpu/arch/arm/repack.cpp.orig
++++ ggml-cpu/arch/arm/repack.cpp
+@@ -1,3 +1,6 @@
++// arch guard (added by scripts/patches/ggml-cpu-arch.patch)
++#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64)
++
+ #define WSP_GGML_COMMON_IMPL_CPP
+ #define WSP_GGML_COMMON_DECL_CPP
+ #include "ggml-common.h"
+@@ -5154,3 +5157,5 @@
+ #endif  // defined(__aarch64__) && defined(__ARM_NEON) && defined(__ARM_FEATURE_MATMUL_INT8)
+     wsp_ggml_gemm_q8_0_4x8_q8_0_generic(n, s, bs, vx, vy, nr, nc);
+ }
++
++#endif // arch guard
+--- ggml-cpu/arch/x86/quants.c.orig
++++ ggml-cpu/arch/x86/quants.c
+@@ -1,3 +1,6 @@
++// arch guard (added by scripts/patches/ggml-cpu-arch.patch)
++#if defined(__x86_64__) || defined(__i386__) || defined(_M_IX86) || defined(_M_X64)
++
+ #define WSP_GGML_COMMON_IMPL_C
+ #include "ggml-common.h"
+ #include "ggml-quants.h"
+@@ -4106,3 +4109,5 @@
+     wsp_ggml_vec_dot_iq4_xs_q8_K_generic(n, s, bs, vx, bx, vy, by, nrc);
+ #endif
+ }
++
++#endif // arch guard
+--- ggml-cpu/arch/x86/repack.cpp.orig
++++ ggml-cpu/arch/x86/repack.cpp
+@@ -1,3 +1,6 @@
++// arch guard (added by scripts/patches/ggml-cpu-arch.patch)
++#if defined(__x86_64__) || defined(__i386__) || defined(_M_IX86) || defined(_M_X64)
++
+ #define WSP_GGML_COMMON_IMPL_CPP
+ #define WSP_GGML_COMMON_DECL_CPP
+ #include "ggml-common.h"
+@@ -6405,3 +6408,5 @@
+ 
+ #endif
+ }
++
++#endif // arch guard

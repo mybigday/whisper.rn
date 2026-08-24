@@ -1,4 +1,4 @@
-// arch guard (added by scripts/bootstrap.sh)
+// arch guard (added by scripts/patches/ggml-cpu-arch.patch)
 #if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64)
 
 #define WSP_GGML_COMMON_IMPL_C
