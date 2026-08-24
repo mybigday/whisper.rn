@@ -855,6 +855,14 @@ struct TranscribeConfig {
     bool tdrzEnable = false;
     JsiFunctionPtr onProgress;
     JsiFunctionPtr onNewSegments;
+
+    // whisper_full_params borrows these strings, so bind them after async copies.
+    void bindStringParams() {
+        params.initial_prompt = prompt.empty() ? nullptr : prompt.c_str();
+        if (!language.empty()) {
+            params.language = language.c_str();
+        }
+    }
 };
 
 TranscribeConfig createTranscribeConfig(
@@ -909,14 +917,7 @@ TranscribeConfig createTranscribeConfig(
     }
 
     config.prompt = getStringProperty(runtime, options, "prompt");
-    if (!config.prompt.empty()) {
-        config.params.initial_prompt = config.prompt.c_str();
-    }
-
     config.language = getStringProperty(runtime, options, "language");
-    if (!config.language.empty()) {
-        config.params.language = config.language.c_str();
-    }
 
     config.params.no_context = true;
     config.params.single_segment = false;
@@ -1912,6 +1913,7 @@ void installJSIBindings(
                 return createPromiseTask(runtime, callInvoker, [holder, config, input, callInvoker, runtimePtr]() mutable -> PromiseResultGenerator {
                     PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
                     PromiseScopeGuard exclusiveGuard([holder]() { holder->endExclusiveOperation(); });
+                    config.bindStringParams();
 
                     auto audio = readWaveAudio(input);
                     if (audio.empty()) {
@@ -2033,6 +2035,7 @@ void installJSIBindings(
                 return createPromiseTask(runtime, callInvoker, [holder, config, audio, callInvoker, runtimePtr]() mutable -> PromiseResultGenerator {
                     PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
                     PromiseScopeGuard exclusiveGuard([holder]() { holder->endExclusiveOperation(); });
+                    config.bindStringParams();
 
                     auto progressState = std::make_shared<JsiCallbackState>();
                     progressState->callInvoker = callInvoker;
