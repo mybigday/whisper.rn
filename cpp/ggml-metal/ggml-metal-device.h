@@ -112,11 +112,12 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_c
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_pool_1d           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op, enum wsp_ggml_op_pool op_pool);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_pool_2d           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op, enum wsp_ggml_op_pool op_pool);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_get_rows          (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tsrc);
-struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_set_rows          (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tidx, enum wsp_ggml_type tdst);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_set_rows          (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_diag              (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_repeat            (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tsrc);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_concat            (wsp_ggml_metal_library_t lib, enum wsp_ggml_type tsrc);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_unary             (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_silu_back         (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_glu               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_sum               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_sum_rows          (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
@@ -124,6 +125,8 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_c
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_cumsum_add        (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_tri               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_soft_max          (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_lightning_indexer (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_dsv4_hc           (wsp_ggml_metal_library_t lib, enum wsp_ggml_op op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_ssm_conv          (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_ssm_conv_batched  (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op, int ssm_conv_bs);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_ssm_scan          (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
@@ -139,6 +142,7 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_m
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_argmax            (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_argsort           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_argsort_merge     (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_fwht              (wsp_ggml_metal_library_t lib, int n);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_top_k             (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_top_k_merge       (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_bin               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op, int32_t n_fuse );
@@ -150,7 +154,10 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_r
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_im2col            (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_transpose_1d (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_transpose_2d (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_col2im_1d         (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_snake             (wsp_ggml_metal_library_t lib, enum wsp_ggml_type type);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_2d           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_2d_dw        (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op, bool tiled);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_3d           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_upscale           (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_pad               (wsp_ggml_metal_library_t lib, const struct wsp_ggml_tensor * op);
@@ -169,6 +176,10 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_f
         bool    has_mask,
         int32_t ncpsg);
 
+struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_attn_ext_kv_f16(
+        wsp_ggml_metal_library_t lib,
+        const struct wsp_ggml_tensor * op);
+
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_attn_ext_blk(
         wsp_ggml_metal_library_t lib,
         const struct wsp_ggml_tensor * op,
@@ -183,7 +194,10 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_f
         bool    has_bias,
         bool    has_scap,
         bool    has_kvpad,
-        int32_t nsg);
+        int32_t nsg,
+        bool    use_kv_f16,
+        int32_t ns10,
+        int32_t ns20);
 
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_attn_ext_vec(
         wsp_ggml_metal_library_t lib,
@@ -194,7 +208,10 @@ struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_f
         bool    has_scap,
         bool    has_kvpad,
         int32_t nsg,
-        int32_t nwg);
+        int32_t nwg,
+        bool    use_kv_f16,
+        int32_t ns10,
+        int32_t ns20);
 
 struct wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_attn_ext_vec_reduce(
         wsp_ggml_metal_library_t lib,
@@ -209,7 +226,7 @@ typedef void * wsp_ggml_metal_rset_t;
 // a collection of residency sets (non-owning)
 typedef struct wsp_ggml_metal_rsets * wsp_ggml_metal_rsets_t;
 
-wsp_ggml_metal_rsets_t wsp_ggml_metal_rsets_init(void);
+wsp_ggml_metal_rsets_t wsp_ggml_metal_rsets_init(wsp_ggml_metal_device_t dev);
 void wsp_ggml_metal_rsets_free(wsp_ggml_metal_rsets_t rsets);
 
 //

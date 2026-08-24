@@ -90,6 +90,8 @@ function(build_library target_name arch cpu_flags)
         target_compile_options(${target_name} PRIVATE -DWSP_GGML_CPU_GENERIC)
     endif ()
 
+    # Expose Linux CPU affinity APIs used by ggml on Android.
+    target_compile_definitions(${target_name} PRIVATE _GNU_SOURCE)
     target_compile_options(${target_name} PRIVATE -DWSP_GGML_USE_CPU -DWSP_GGML_USE_CPU_REPACK -pthread ${cpu_flags})
 
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")

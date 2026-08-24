@@ -13,6 +13,7 @@ extern "C" {
 
 // Quantization
 void wsp_quantize_row_q1_0(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k);
+void wsp_quantize_row_q2_0(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k);
 void wsp_quantize_row_q4_0(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k);
 void wsp_quantize_row_q4_1(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k);
 void wsp_quantize_row_q5_0(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k);
@@ -38,6 +39,7 @@ void wsp_quantize_row_iq4_xs (const float * WSP_GGML_RESTRICT x, void * WSP_GGML
 
 // Dot product
 void wsp_ggml_vec_dot_q1_0_q8_0(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
+void wsp_ggml_vec_dot_q2_0_q8_0(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
 void wsp_ggml_vec_dot_q4_0_q8_0(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
 void wsp_ggml_vec_dot_q4_1_q8_1(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
 void wsp_ggml_vec_dot_q5_0_q8_0(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
@@ -71,6 +73,7 @@ void wsp_quantize_row_q8_0_generic(const float * WSP_GGML_RESTRICT x, void * WSP
 void wsp_quantize_row_q8_1_generic(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT vy, int64_t k);
 void wsp_quantize_row_q8_K_generic(const float * WSP_GGML_RESTRICT x, void * WSP_GGML_RESTRICT y, int64_t k);
 void wsp_ggml_vec_dot_q1_0_q8_0_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
+void wsp_ggml_vec_dot_q2_0_q8_0_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
 void wsp_ggml_vec_dot_q4_0_q8_0_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
 void wsp_ggml_vec_dot_q4_1_q8_1_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);
 void wsp_ggml_vec_dot_q5_0_q8_0_generic(int n, float * WSP_GGML_RESTRICT s, size_t bs, const void * WSP_GGML_RESTRICT vx, size_t bx, const void * WSP_GGML_RESTRICT vy, size_t by, int nrc);

@@ -125,12 +125,13 @@ extern "C" {
     // get ith C string from array with given key_id
     WSP_GGML_API const char * wsp_gguf_get_arr_str (const struct wsp_gguf_context * ctx, int64_t key_id, size_t i);
 
-    WSP_GGML_API int64_t        wsp_gguf_get_n_tensors    (const struct wsp_gguf_context * ctx);
-    WSP_GGML_API int64_t        wsp_gguf_find_tensor      (const struct wsp_gguf_context * ctx, const char * name); // returns -1 if the tensor is not found
-    WSP_GGML_API size_t         wsp_gguf_get_tensor_offset(const struct wsp_gguf_context * ctx, int64_t tensor_id);
-    WSP_GGML_API const char *   wsp_gguf_get_tensor_name  (const struct wsp_gguf_context * ctx, int64_t tensor_id);
-    WSP_GGML_API enum wsp_ggml_type wsp_gguf_get_tensor_type  (const struct wsp_gguf_context * ctx, int64_t tensor_id);
-    WSP_GGML_API size_t         wsp_gguf_get_tensor_size  (const struct wsp_gguf_context * ctx, int64_t tensor_id);
+    WSP_GGML_API int64_t         wsp_gguf_get_n_tensors    (const struct wsp_gguf_context * ctx);
+    WSP_GGML_API int64_t         wsp_gguf_find_tensor      (const struct wsp_gguf_context * ctx, const char * name); // returns -1 if the tensor is not found
+    WSP_GGML_API size_t          wsp_gguf_get_tensor_offset(const struct wsp_gguf_context * ctx, int64_t tensor_id);
+    WSP_GGML_API const char *    wsp_gguf_get_tensor_name  (const struct wsp_gguf_context * ctx, int64_t tensor_id);
+    WSP_GGML_API const int64_t * wsp_gguf_get_tensor_ne    (const struct wsp_gguf_context * ctx, int64_t tensor_id); // returns ne, an array of WSP_GGML_MAX_DIMS elements; ne[dim] is 1 for dim >= n_dims
+    WSP_GGML_API enum wsp_ggml_type  wsp_gguf_get_tensor_type  (const struct wsp_gguf_context * ctx, int64_t tensor_id);
+    WSP_GGML_API size_t          wsp_gguf_get_tensor_size  (const struct wsp_gguf_context * ctx, int64_t tensor_id);
 
     // removes key if it exists, returns id that the key had prior to removal (-1 if it didn't exist)
     WSP_GGML_API int64_t wsp_gguf_remove_key(struct wsp_gguf_context * ctx, const char * key);

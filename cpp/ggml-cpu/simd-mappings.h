@@ -29,13 +29,15 @@ extern "C" {
 // FP16 to FP32 conversion
 
 // 16-bit float
-// on Arm, we use __fp16
+// on Arm, we use __fp16, which requires the IEEE fp16 format: implied on
+// AArch64, selected by -mfp16-format=ieee on 32 bit Arm, where the compiler
+// may otherwise reject the type
 // on x86, we use uint16_t
 //
 // for old CUDA compilers (<= 11), we use uint16_t: ref https://github.com/ggml-org/llama.cpp/pull/10616
 // for     MUSA compilers        , we use uint16_t: ref https://github.com/ggml-org/llama.cpp/pull/11843
 //
-#if defined(__ARM_NEON) && !(defined(__CUDACC__) && __CUDACC_VER_MAJOR__ <= 11) && !defined(__MUSACC__)
+#if defined(__ARM_NEON) && defined(__ARM_FP16_FORMAT_IEEE) && !(defined(__CUDACC__) && __CUDACC_VER_MAJOR__ <= 11) && !defined(__MUSACC__)
     #define WSP_GGML_CPU_COMPUTE_FP16_TO_FP32(x) neon_compute_fp16_to_fp32(x)
     #define WSP_GGML_CPU_COMPUTE_FP32_TO_FP16(x) neon_compute_fp32_to_fp16(x)
 
@@ -120,11 +122,22 @@ extern float wsp_ggml_table_f32_f16[1 << 16];
 // defined in ggml-cpu.c, initialized in wsp_ggml_cpu_init()
 extern float wsp_ggml_table_f32_e8m0_half[1 << 8];
 
+// precomputed f32 table for ue4m3 (1 KB)
+// defined in ggml-cpu.c, initialized in wsp_ggml_cpu_init()
+extern float wsp_ggml_table_f32_ue4m3[1 << 8];
+
 // Use lookup table for E8M0 on x86 (faster than bit manipulation)
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #define WSP_GGML_CPU_E8M0_TO_FP32_HALF(x) wsp_ggml_table_f32_e8m0_half[(uint8_t)(x)]
 #else
 #define WSP_GGML_CPU_E8M0_TO_FP32_HALF(x) WSP_GGML_E8M0_TO_FP32_HALF(x)
+#endif
+
+// Use lookup table for UE4M3 on x86 and ARM (faster than bit manipulation)
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__) || defined(__ARM_NEON)
+#define WSP_GGML_CPU_UE4M3_TO_FP32(x) wsp_ggml_table_f32_ue4m3[(uint8_t)(x)]
+#else
+#define WSP_GGML_CPU_UE4M3_TO_FP32(x) wsp_ggml_ue4m3_to_fp32(x)
 #endif
 
 // On ARM NEON, it's quicker to directly convert x -> x instead of calling into wsp_ggml_lookup_fp16_to_fp32,
@@ -315,7 +328,7 @@ inline static float wsp_ggml_lookup_fp16_to_fp32(wsp_ggml_fp16_t f) {
     #define WSP_GGML_F16_VEC_REDUCE         WSP_GGML_F32Cx4_REDUCE
 #endif
 
-#elif defined(__ARM_NEON) && defined(__ARM_FEATURE_FMA)
+#elif defined(__ARM_NEON) && defined(__ARM_FEATURE_FMA) && defined(__ARM_FP16_FORMAT_IEEE)
 
 #define WSP_GGML_SIMD
 

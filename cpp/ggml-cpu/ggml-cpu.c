@@ -82,6 +82,9 @@ float wsp_ggml_table_f32_f16[1 << 16];
 // precomputed f32 table for e8m0 half (1 KB) (simd-mappings.h)
 float wsp_ggml_table_f32_e8m0_half[1 << 8];
 
+// precomputed f32 table for ue4m3 (1 KB) (simd-mappings.h)
+float wsp_ggml_table_f32_ue4m3[1 << 8];
+
 #if defined(__ARM_ARCH)
 struct wsp_ggml_arm_arch_features_type {
     int sve_cnt;
@@ -224,6 +227,12 @@ static const struct wsp_ggml_type_traits_cpu type_traits_cpu[WSP_GGML_TYPE_COUNT
     [WSP_GGML_TYPE_Q1_0] = {
         .from_float               = wsp_quantize_row_q1_0,
         .vec_dot                  = wsp_ggml_vec_dot_q1_0_q8_0,
+        .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
+        .nrows                    = 1,
+    },
+    [WSP_GGML_TYPE_Q2_0] = {
+        .from_float               = wsp_quantize_row_q2_0,
+        .vec_dot                  = wsp_ggml_vec_dot_q2_0_q8_0,
         .vec_dot_type             = WSP_GGML_TYPE_Q8_0,
         .nrows                    = 1,
     },
@@ -2051,6 +2060,22 @@ static void wsp_ggml_compute_forward(struct wsp_ggml_compute_params * params, st
             {
                 wsp_ggml_compute_forward_gated_delta_net(params, tensor);
             } break;
+        case WSP_GGML_OP_LIGHTNING_INDEXER:
+            {
+                wsp_ggml_compute_forward_lightning_indexer(params, tensor);
+            } break;
+        case WSP_GGML_OP_DSV4_HC_COMB:
+            {
+                wsp_ggml_compute_forward_dsv4_hc_comb(params, tensor);
+            } break;
+        case WSP_GGML_OP_DSV4_HC_PRE:
+            {
+                wsp_ggml_compute_forward_dsv4_hc_pre(params, tensor);
+            } break;
+        case WSP_GGML_OP_DSV4_HC_POST:
+            {
+                wsp_ggml_compute_forward_dsv4_hc_post(params, tensor);
+            } break;
         case WSP_GGML_OP_MAP_CUSTOM1:
             {
                 wsp_ggml_compute_forward_map_custom1(params, tensor);
@@ -2231,6 +2256,9 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
         case WSP_GGML_OP_COUNT_EQUAL:
         case WSP_GGML_OP_SOLVE_TRI:
         case WSP_GGML_OP_GATED_DELTA_NET:
+        case WSP_GGML_OP_DSV4_HC_COMB:
+        case WSP_GGML_OP_DSV4_HC_PRE:
+        case WSP_GGML_OP_DSV4_HC_POST:
             {
                 n_tasks = n_threads;
             } break;
@@ -2371,6 +2399,7 @@ static int wsp_ggml_get_n_tasks(struct wsp_ggml_tensor * node, int n_threads) {
         case WSP_GGML_OP_FLASH_ATTN_BACK:
         case WSP_GGML_OP_SSM_CONV:
         case WSP_GGML_OP_SSM_SCAN:
+        case WSP_GGML_OP_LIGHTNING_INDEXER:
             {
                 n_tasks = n_threads;
             } break;
@@ -2579,7 +2608,7 @@ static bool wsp_ggml_thread_apply_priority(int32_t prio) {
     return true;
 }
 
-#elif defined(__gnu_linux__)
+#elif defined(__linux__)
 // TODO: this may not work on BSD, to be verified
 
 static bool wsp_ggml_thread_apply_affinity(const bool * mask) {
@@ -2766,6 +2795,11 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
     n_threads = 1;
 #endif
 
+#if defined(__wasi__)
+    // WASI doesn't support parallelism yet
+    n_threads = 1;
+#endif
+
     size_t work_size = 0;
 
     struct wsp_ggml_cplan cplan;
@@ -2845,7 +2879,14 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                     } break;
                 case WSP_GGML_OP_OUT_PROD:
                     {
-                        if (wsp_ggml_is_quantized(node->src[0]->type)) {
+                        if (wsp_ggml_is_quantized(node->src[0]->type) ||
+                            node->src[0]->type == WSP_GGML_TYPE_F16) {
+                            cur = wsp_ggml_type_size(WSP_GGML_TYPE_F32) * node->src[0]->ne[0] * n_tasks;
+                        }
+                    } break;
+                case WSP_GGML_OP_SET_ROWS:
+                    {
+                        if (node->src[0]->type == WSP_GGML_TYPE_F16 && node->type != WSP_GGML_TYPE_F16) {
                             cur = wsp_ggml_type_size(WSP_GGML_TYPE_F32) * node->src[0]->ne[0] * n_tasks;
                         }
                     } break;
@@ -2956,6 +2997,12 @@ struct wsp_ggml_cplan wsp_ggml_graph_plan(
                     {
                         WSP_GGML_ABORT("fatal error");
                     }
+                case WSP_GGML_OP_LIGHTNING_INDEXER:
+                    {
+                        // temp buffer for dequantizing lightning indexer keys
+                        const int64_t ne10 = node->src[1]->ne[0];
+                        cur += sizeof(float)*ne10*n_tasks;
+                    } break;
                 default:
                     break;
             }
@@ -3765,6 +3812,14 @@ int wsp_ggml_cpu_has_sme(void) {
 #endif
 }
 
+int wsp_ggml_cpu_has_sme2(void) {
+#if defined(__ARM_ARCH) && defined(__ARM_FEATURE_SME2)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 void wsp_ggml_cpu_init(void) {
     // needed to initialize wsp_ggml_time
     {
@@ -3796,6 +3851,11 @@ void wsp_ggml_cpu_init(void) {
             // initialize E8M0 half table (256 entries)
             for (int i = 0; i < (1 << 8); ++i) {
                 wsp_ggml_table_f32_e8m0_half[i] = WSP_GGML_E8M0_TO_FP32_HALF(i);
+            }
+
+            // initialize UE4M3 table (256 entries)
+            for (int i = 0; i < (1 << 8); ++i) {
+                wsp_ggml_table_f32_ue4m3[i] = wsp_ggml_ue4m3_to_fp32(i);
             }
 
             const uint64_t t_end = wsp_ggml_time_us(); UNUSED(t_end);

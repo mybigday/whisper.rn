@@ -132,6 +132,7 @@ static void wsp_ggml_backend_meta_device_get_props(wsp_ggml_backend_dev_t dev, w
         /* .host_buffer           = */ false, // Not implemented.
         /* .buffer_from_host_ptr  = */ false, // Not implemented.
         /* .events                = */ false, // Not implemented.
+        /* .mmap_support          = */ true,
     };
     for (wsp_ggml_backend_dev_t simple_dev : meta_dev_ctx->simple_devs) {
         wsp_ggml_backend_dev_props tmp_props;
@@ -140,6 +141,7 @@ static void wsp_ggml_backend_meta_device_get_props(wsp_ggml_backend_dev_t dev, w
         props->caps.host_buffer          = props->caps.host_buffer          && tmp_props.caps.host_buffer;
         props->caps.buffer_from_host_ptr = props->caps.buffer_from_host_ptr && tmp_props.caps.buffer_from_host_ptr;
         props->caps.events               = props->caps.events               && tmp_props.caps.events;
+        props->caps.mmap_support         = props->caps.mmap_support         && tmp_props.caps.mmap_support;
     }
 }
 
@@ -984,6 +986,11 @@ static struct wsp_ggml_backend_meta_split_state wsp_ggml_backend_meta_get_split_
             case WSP_GGML_OP_GATED_DELTA_NET: {
                 split_state = handle_gated_delta_net(src_ss);
             } break;
+            case WSP_GGML_OP_DSV4_HC_COMB:
+            case WSP_GGML_OP_DSV4_HC_PRE:
+            case WSP_GGML_OP_DSV4_HC_POST: {
+                split_state = handle_generic(src_ss, /*scalar_only =*/ true);
+            } break;
             case WSP_GGML_OP_UNARY: {
                 split_state = handle_generic(src_ss, /*scalar_only =*/ false);
             } break;
@@ -1144,6 +1151,11 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor_impl(wsp_gg
         wsp_ggml_context          * simple_ctx = stc.ctxs[j].get();
         wsp_ggml_backend_buffer_t   simple_buf = buf_ctx->bufs[j].get();
 
+        if ((simple_buf != nullptr) && wsp_ggml_backend_buffer_is_multi_buffer(simple_buf)) {
+            // see https://github.com/ggml-org/llama.cpp/issues/22197
+            WSP_GGML_ABORT("multi buffers are not supported by the meta backend");
+        }
+
         if (split_dim >= 0 && split_dim < WSP_GGML_MAX_DIMS) {
             // TODO: the following assert fails for llama-parallel even though the results are correct:
             // WSP_GGML_ASSERT(wsp_ggml_is_contiguously_allocated(tensor));
@@ -1245,9 +1257,8 @@ static enum wsp_ggml_status wsp_ggml_backend_meta_buffer_init_tensor(wsp_ggml_ba
 
 static void wsp_ggml_backend_meta_buffer_set_tensor(wsp_ggml_backend_buffer_t buffer, wsp_ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     const size_t n_bufs = wsp_ggml_backend_meta_buffer_n_bufs(buffer);
-    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(tensor));
-
     const wsp_ggml_backend_meta_split_state split_state = wsp_ggml_backend_meta_get_split_state(tensor, /*assume_sync =*/ false);
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(tensor) || split_state.axis == WSP_GGML_BACKEND_SPLIT_AXIS_MIRRORED);
 
     if (split_state.n_segments != 1 || split_state.nr[0] != 1) {
         WSP_GGML_ASSERT(split_state.axis >= 0 && split_state.axis < WSP_GGML_MAX_DIMS);
@@ -1360,9 +1371,8 @@ static void wsp_ggml_backend_meta_buffer_set_tensor(wsp_ggml_backend_buffer_t bu
 
 static void wsp_ggml_backend_meta_buffer_get_tensor(wsp_ggml_backend_buffer_t buffer, const wsp_ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     const size_t n_bufs = wsp_ggml_backend_meta_buffer_n_bufs(buffer);
-    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(tensor));
-
     const wsp_ggml_backend_meta_split_state split_state = wsp_ggml_backend_meta_get_split_state(tensor, /*assume_sync =*/ false);
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(tensor) || split_state.axis == WSP_GGML_BACKEND_SPLIT_AXIS_MIRRORED);
 
     if (split_state.n_segments != 1 || split_state.nr[0] != 1) {
         WSP_GGML_ASSERT(split_state.axis >= 0 && split_state.axis < WSP_GGML_MAX_DIMS);

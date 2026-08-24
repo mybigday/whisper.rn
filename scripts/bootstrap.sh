@@ -1,7 +1,13 @@
 #!/bin/bash -e
 
 git submodule init
-git submodule update --recursive
+
+# Preserve a manually advanced checkout while syncing whisper.cpp. Otherwise,
+# update it to the commit pinned by the parent repository.
+PINNED_WHISPER_COMMIT=$(git rev-parse :whisper.cpp)
+if ! git -C whisper.cpp merge-base --is-ancestor "$PINNED_WHISPER_COMMIT" HEAD 2>/dev/null; then
+  git submodule update --recursive
+fi
 
 # ggml api
 cp ./whisper.cpp/ggml/include/ggml.h ./cpp/ggml.h
@@ -79,6 +85,7 @@ cp ./whisper.cpp/ggml/src/ggml-backend-dl.cpp ./cpp/ggml-backend-dl.cpp
 cp ./whisper.cpp/ggml/src/ggml-backend-impl.h ./cpp/ggml-backend-impl.h
 cp ./whisper.cpp/ggml/src/ggml-backend-reg.cpp ./cpp/ggml-backend-reg.cpp
 cp ./whisper.cpp/ggml/src/ggml-common.h ./cpp/ggml-common.h
+cp ./whisper.cpp/ggml/src/ggml-feats.h ./cpp/ggml-feats.h
 cp ./whisper.cpp/ggml/src/ggml-opt.cpp ./cpp/ggml-opt.cpp
 cp ./whisper.cpp/ggml/src/ggml-quants.h ./cpp/ggml-quants.h
 cp ./whisper.cpp/ggml/src/ggml-quants.c ./cpp/ggml-quants.c
@@ -101,6 +108,7 @@ cp -R ./whisper.cpp/src/coreml/ ./cpp/coreml/
 files=(
   # ggml api
   "./cpp/ggml-common.h"
+  "./cpp/ggml-feats.h"
   "./cpp/ggml.h"
   "./cpp/ggml.c"
   "./cpp/ggml.cpp"
@@ -224,10 +232,24 @@ done
 
 echo "Replacement completed successfully!"
 
-# Parse whisper.cpp/bindings/javascript/package.json version and set to src/version.json
-cd whisper.cpp/bindings/javascript
-node -e "const fs = require('fs'); const package = JSON.parse(fs.readFileSync('package.json')); fs.writeFileSync('../../../src/version.json', JSON.stringify({version: package.version}));"
-cd ../../../
+# Parse the version from whisper.cpp/CMakeLists.txt and set src/version.json
+node <<'NODE'
+const fs = require('fs')
+
+const cmake = fs.readFileSync('./whisper.cpp/CMakeLists.txt', 'utf8')
+const getVersionPart = (part) => {
+  const match = cmake.match(
+    new RegExp(`set\\(WHISPER_VERSION_${part} (\\d+)\\)`)
+  )
+  if (!match) {
+    throw new Error(`Unable to find WHISPER_VERSION_${part}`)
+  }
+  return match[1]
+}
+const version = ['MAJOR', 'MINOR', 'PATCH'].map(getVersionPart).join('.')
+
+fs.writeFileSync('./src/version.json', JSON.stringify({ version }))
+NODE
 
 yarn example
 

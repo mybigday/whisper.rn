@@ -160,11 +160,15 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_get_rows
     return res;
 }
 
-wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_set_rows(wsp_ggml_metal_library_t lib, wsp_ggml_type tidx, wsp_ggml_type tdst) {
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_set_rows(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
     char base[256];
     char name[256];
 
-    snprintf(base, 256, "kernel_set_rows_%s_%s", wsp_ggml_type_name(tdst), wsp_ggml_type_name(tidx));
+    const auto tsrc = op->src[0]->type;
+    const auto tidx = op->src[1]->type;
+    const auto tdst = op->type;
+
+    snprintf(base, 256, "kernel_set_rows_%s_%s_%s", wsp_ggml_type_name(tsrc), wsp_ggml_type_name(tidx), wsp_ggml_type_name(tdst));
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
@@ -469,6 +473,41 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_soft_max
     }
 
     res.smem = 32*sizeof(float);
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_lightning_indexer(
+        wsp_ggml_metal_library_t lib,
+        const wsp_ggml_tensor * op) {
+    WSP_GGML_ASSERT(op->op == WSP_GGML_OP_LIGHTNING_INDEXER);
+
+    char name[256];
+
+    snprintf(name, 256, "kernel_lightning_indexer_%s", wsp_ggml_type_name(op->src[1]->type));
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, name, name, nullptr);
+    }
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_dsv4_hc(wsp_ggml_metal_library_t lib, wsp_ggml_op op) {
+    const char * name = nullptr;
+
+    switch (op) {
+        case WSP_GGML_OP_DSV4_HC_COMB: name = "kernel_dsv4_hc_comb_f32"; break;
+        case WSP_GGML_OP_DSV4_HC_PRE:  name = "kernel_dsv4_hc_pre_f32";  break;
+        case WSP_GGML_OP_DSV4_HC_POST: name = "kernel_dsv4_hc_post_f32"; break;
+        default: WSP_GGML_ABORT("fatal error");
+    }
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, name, name, nullptr);
+    }
 
     return res;
 }
@@ -801,6 +840,11 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_mul_mv(w
                 nsg = N_SG_Q1_0;
                 nr0 = N_R0_Q1_0;
             } break;
+        case WSP_GGML_TYPE_Q2_0:
+            {
+                nsg = N_SG_Q2_0;
+                nr0 = N_R0_Q2_0;
+            } break;
         case WSP_GGML_TYPE_Q4_0:
             {
                 nsg = N_SG_Q4_0;
@@ -908,6 +952,11 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_mul_mv(w
                 nsg = N_SG_IQ4_XS;
                 nr0 = N_R0_IQ4_XS;
                 smem = 32*sizeof(float);
+            } break;
+        case WSP_GGML_TYPE_TQ2_0:
+            {
+                nsg = N_SG_TQ2_0;
+                nr0 = N_R0_TQ2_0;
             } break;
         default:
             {
@@ -1025,6 +1074,11 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_mul_mv_i
                 nsg = N_SG_Q1_0;
                 nr0 = N_R0_Q1_0;
             } break;
+        case WSP_GGML_TYPE_Q2_0:
+            {
+                nsg = N_SG_Q2_0;
+                nr0 = N_R0_Q2_0;
+            } break;
         case WSP_GGML_TYPE_Q4_0:
             {
                 nsg = N_SG_Q4_0;
@@ -1133,6 +1187,11 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_mul_mv_i
                 nr0 = N_R0_IQ4_XS;
                 smem = 32*sizeof(float);
             } break;
+        case WSP_GGML_TYPE_TQ2_0:
+            {
+                nsg = N_SG_TQ2_0;
+                nr0 = N_R0_TQ2_0;
+            } break;
         default:
             {
                 WSP_GGML_LOG_ERROR("Asserting on type %d\n", (int)op->src[2]->type);
@@ -1228,6 +1287,21 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_argsort_
     };
 
     snprintf(base, 256, "kernel_argsort_merge_%s_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->type), order_str);
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    }
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_fwht(wsp_ggml_metal_library_t lib, int n) {
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_fwht_f32_%d", n);
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
@@ -1335,6 +1409,23 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_at
     return res;
 }
 
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_attn_ext_kv_f16(
+        wsp_ggml_metal_library_t lib,
+        const wsp_ggml_tensor * op) {
+    assert(op->op == WSP_GGML_OP_FLASH_ATTN_EXT);
+
+    char base[256];
+
+    snprintf(base, 256, "kernel_flash_attn_ext_kv_%s_f16", wsp_ggml_type_name(op->src[1]->type));
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, base);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, base, nullptr);
+    }
+
+    return res;
+}
+
 wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_attn_ext_blk(
         wsp_ggml_metal_library_t lib,
         const struct wsp_ggml_tensor * op,
@@ -1386,7 +1477,10 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_at
         bool    has_bias,
         bool    has_scap,
         bool    has_kvpad,
-        int32_t nsg) {
+        int32_t nsg,
+        bool    use_kv_f16,
+        int32_t ns10,
+        int32_t ns20) {
     assert(op->op == WSP_GGML_OP_FLASH_ATTN_EXT);
 
     char base[256];
@@ -1395,15 +1489,14 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_at
     const int32_t dk = (int32_t) op->src[1]->ne[0];
     const int32_t dv = (int32_t) op->src[2]->ne[0];
 
-    const int32_t ns10 = op->src[1]->nb[1]/op->src[1]->nb[0];
-    const int32_t ns20 = op->src[2]->nb[1]/op->src[2]->nb[0];
+    const char * type = use_kv_f16 ? "f16" : wsp_ggml_type_name(op->src[1]->type);
 
     // do bounds checks for the mask?
     const bool bc_mask = op->src[3] && (op->src[3]->ne[1] % 8 != 0);
 
     snprintf(base, 256, "kernel_%s_%s_dk%d_dv%d",
             "flash_attn_ext",
-            wsp_ggml_type_name(op->src[1]->type),
+            type,
             dk,
             dv);
 
@@ -1452,7 +1545,10 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_at
         bool    has_scap,
         bool    has_kvpad,
         int32_t nsg,
-        int32_t nwg) {
+        int32_t nwg,
+        bool    use_kv_f16,
+        int32_t ns10,
+        int32_t ns20) {
     assert(op->op == WSP_GGML_OP_FLASH_ATTN_EXT);
 
     char base[256];
@@ -1461,12 +1557,11 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_flash_at
     const int32_t dk = (int32_t) op->src[1]->ne[0];
     const int32_t dv = (int32_t) op->src[2]->ne[0];
 
-    const int32_t ns10 = op->src[1]->nb[1]/op->src[1]->nb[0];
-    const int32_t ns20 = op->src[2]->nb[1]/op->src[2]->nb[0];
+    const char * type = use_kv_f16 ? "f16" : wsp_ggml_type_name(op->src[1]->type);
 
     snprintf(base, 256, "kernel_%s_%s_dk%d_dv%d",
             "flash_attn_ext_vec",
-            wsp_ggml_type_name(op->src[1]->type),
+            type,
             dk,
             dv);
 
@@ -1800,6 +1895,43 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_tra
     return res;
 }
 
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_col2im_1d(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    assert(op->op == WSP_GGML_OP_COL2IM_1D);
+
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous(op->src[0]));
+    WSP_GGML_ASSERT(op->src[0]->type == WSP_GGML_TYPE_F32 || op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_BF16);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_col2im_1d_%s", wsp_ggml_type_name(op->src[0]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    }
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_snake(wsp_ggml_metal_library_t lib, enum wsp_ggml_type type) {
+    WSP_GGML_ASSERT(type == WSP_GGML_TYPE_F32 || type == WSP_GGML_TYPE_F16 || type == WSP_GGML_TYPE_BF16);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_snake_%s", wsp_ggml_type_name(type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    }
+
+    return res;
+}
+
 wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_transpose_2d(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
     assert(op->op == WSP_GGML_OP_CONV_TRANSPOSE_2D);
 
@@ -1835,6 +1967,29 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_2d(
     char name[256];
 
     snprintf(base, 256, "kernel_conv_2d_%s_%s", wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->src[1]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    }
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_conv_2d_dw(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op, bool tiled) {
+    assert(op->op == WSP_GGML_OP_CONV_2D_DW);
+
+    WSP_GGML_ASSERT(op->src[0]->type == WSP_GGML_TYPE_F16 || op->src[0]->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(op->src[1]->type == WSP_GGML_TYPE_F32);
+    WSP_GGML_ASSERT(op->type         == WSP_GGML_TYPE_F32);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_conv_2d_dw%s_%s_%s",
+             tiled ? "_tiled" : "",
+             wsp_ggml_type_name(op->src[0]->type), wsp_ggml_type_name(op->src[1]->type));
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
@@ -2018,6 +2173,23 @@ wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_opt_step
     char name[256];
 
     snprintf(base, 256, "kernel_opt_step_sgd_%s", wsp_ggml_type_name(op->src[0]->type));
+    snprintf(name, 256, "%s", base);
+
+    wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);
+    if (!res.pipeline) {
+        res = wsp_ggml_metal_library_compile_pipeline(lib, base, name, nullptr);
+    }
+
+    return res;
+}
+
+wsp_ggml_metal_pipeline_with_params wsp_ggml_metal_library_get_pipeline_silu_back(wsp_ggml_metal_library_t lib, const wsp_ggml_tensor * op) {
+    assert(op->op == WSP_GGML_OP_SILU_BACK);
+
+    char base[256];
+    char name[256];
+
+    snprintf(base, 256, "kernel_silu_back_%s", wsp_ggml_type_name(op->src[0]->type));
     snprintf(name, 256, "%s", base);
 
     wsp_ggml_metal_pipeline_with_params res = wsp_ggml_metal_library_get_pipeline(lib, name);

@@ -225,6 +225,7 @@ static size_t wsp_ggml_backend_metal_buffer_type_get_alloc_size(wsp_ggml_backend
                 res += wsp_ggml_metal_op_flash_attn_ext_extra_pad(tensor);
                 res += wsp_ggml_metal_op_flash_attn_ext_extra_blk(tensor);
                 res += wsp_ggml_metal_op_flash_attn_ext_extra_tmp(tensor);
+                res += wsp_ggml_metal_op_flash_attn_ext_extra_kv_f16(tensor);
             } break;
         case WSP_GGML_OP_CUMSUM:
         case WSP_GGML_OP_ARGSORT:
@@ -681,6 +682,7 @@ static void wsp_ggml_backend_metal_device_get_props(wsp_ggml_backend_dev_t dev, 
         /* .host_buffer          = */ false,
         /* .buffer_from_host_ptr = */ true,
         /* .events               = */ true,
+        /* .mmap_support         = */ true,
     };
 }
 

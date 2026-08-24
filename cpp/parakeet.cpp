@@ -685,6 +685,34 @@ static void read_safe(parakeet_model_loader * loader, T & dest) {
     BYTESWAP_VALUE(dest);
 }
 
+
+static bool parakeet_validate_hparams(const std::map<parakeet_hparam, int32_t> & hparam_values) {
+    for (const auto & hparam_expected : PARAKEET_HPARAM_MODEL_VALUES) {
+        const parakeet_hparam hparam = hparam_expected.first;
+        const auto hparam_value = hparam_values.find(hparam);
+        if (hparam_value == hparam_values.end()) {
+            PARAKEET_LOG_ERROR("%s: missing Parakeet metadata: %s\n",
+                    __func__, PARAKEET_HPARAM_NAMES.at(hparam));
+            return false;
+        }
+
+        const int32_t actual = hparam_value->second;
+        const int32_t expected = hparam_expected.second;
+        if(actual <=0 || actual > expected){
+            PARAKEET_LOG_ERROR("%s: invalid Parakeet metadata: %s = %d, expected > 0 and <= %d\n. Unsafe parameter loaded. ",
+                __func__, PARAKEET_HPARAM_NAMES.at(hparam), actual, expected);
+            return false;
+        }
+        if(actual != expected){
+            PARAKEET_LOG_WARN("%s: non-standard Parakeet metadata: %s = %d, expected %d\n. Transcription will be affected. ",
+                __func__, PARAKEET_HPARAM_NAMES.at(hparam), actual, expected);
+        }
+
+    }
+
+    return true;
+}
+
 static bool parakeet_lstm_state_init(
                struct parakeet_state & pstate,
                       wsp_ggml_backend_t   backend,
@@ -1003,21 +1031,33 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
     //load hparams
     parakeet_hparams hparams;
     {
-        read_safe(loader, hparams.n_vocab);
-        read_safe(loader, hparams.n_audio_ctx);
-        read_safe(loader, hparams.n_audio_state);
-        read_safe(loader, hparams.n_audio_head);
-        read_safe(loader, hparams.n_audio_layer);
-        read_safe(loader, hparams.n_mels);
+        std::map<parakeet_hparam, int32_t>hparam_values;
+        auto read_hparam = [&] (parakeet_hparam hparam, int32_t &value){
+            read_safe(loader, value);
+            hparam_values[hparam] = value;
+        };
+        read_hparam(PARAKEET_HPARAM_N_VOCAB, hparams.n_vocab);
+        read_hparam(PARAKEET_HPARAM_N_AUDIO_CTX, hparams.n_audio_ctx);
+        read_hparam(PARAKEET_HPARAM_N_AUDIO_STATE, hparams.n_audio_state);
+        read_hparam(PARAKEET_HPARAM_N_AUDIO_HEAD, hparams.n_audio_head);
+        read_hparam(PARAKEET_HPARAM_N_AUDIO_LAYER, hparams.n_audio_layer);
+        read_hparam(PARAKEET_HPARAM_N_MELS, hparams.n_mels);
+        /*
+        ftype just requires the type check already being done in the loading process.
+        */
         read_safe(loader, hparams.ftype);
-        read_safe(loader, hparams.n_fft);
-        read_safe(loader, hparams.subsampling_factor);
-        read_safe(loader, hparams.n_subsampling_channels);
-        read_safe(loader, hparams.n_conv_kernel);
-        read_safe(loader, hparams.n_pred_dim);
-        read_safe(loader, hparams.n_pred_layers);
-        read_safe(loader, hparams.n_tdt_durations);
-        read_safe(loader, hparams.n_max_tokens);
+        read_hparam(PARAKEET_HPARAM_N_FFT, hparams.n_fft);
+        read_hparam(PARAKEET_HPARAM_SUBSAMPLING_FACTOR, hparams.subsampling_factor);
+        read_hparam(PARAKEET_HPARAM_N_SUBSAMPLING_CHANNELS, hparams.n_subsampling_channels);
+        read_hparam(PARAKEET_HPARAM_N_CONV_KERNEL, hparams.n_conv_kernel);
+        read_hparam(PARAKEET_HPARAM_N_PRED_DIM, hparams.n_pred_dim);
+        read_hparam(PARAKEET_HPARAM_N_PRED_LAYERS, hparams.n_pred_layers);
+        read_hparam(PARAKEET_HPARAM_N_TDT_DURATIONS, hparams.n_tdt_durations);
+        read_hparam(PARAKEET_HPARAM_N_MAX_TOKENS, hparams.n_max_tokens);
+
+        if(!parakeet_validate_hparams(hparam_values)) {
+            return false;
+        }
 
         hparams.arch = PARAKEET_ARCH_TDT;
         wctx.model.hparams = hparams;
@@ -1397,6 +1437,11 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
 
             if (loader->eof(loader->context)) {
                 break;
+            }
+
+            if (n_dims < 0 || n_dims > 4) {
+                  PARAKEET_LOG_ERROR("%s: invalid n_dims %d in model file (expected 0 <= n_dims <= 4)\n", __func__, n_dims);
+                  return false;
             }
 
             int32_t nelements = 1;

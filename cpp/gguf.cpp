@@ -557,6 +557,10 @@ static struct wsp_gguf_context * wsp_gguf_init_from_reader(const struct wsp_gguf
                 WSP_GGML_LOG_ERROR("%s: encountered bad_alloc error while reading key %" PRIi64 "\n", __func__, i);
                 ok = false;
             }
+            if (ok && key.empty()) {
+                WSP_GGML_LOG_ERROR("%s: key %" PRIi64 " is empty\n", __func__, i);
+                ok = false;
+            }
             for (size_t j = 0; ok && j < ctx->kv.size(); ++j) {
                 if (key == ctx->kv[j].key) {
                     WSP_GGML_LOG_ERROR("%s: duplicate key '%s' for tensors %zu and %" PRIi64 " \n", __func__, key.c_str(), j, i);
@@ -607,6 +611,13 @@ static struct wsp_gguf_context * wsp_gguf_init_from_reader(const struct wsp_gguf
         WSP_GGML_ASSERT(int64_t(ctx->kv.size()) == n_kv);
 
         const int alignment_idx = wsp_gguf_find_key(ctx, WSP_GGUF_KEY_GENERAL_ALIGNMENT);
+        if (alignment_idx != -1 && wsp_gguf_get_kv_type(ctx, alignment_idx) != WSP_GGUF_TYPE_UINT32) {
+            WSP_GGML_LOG_ERROR("%s: key '%s' must be of type %s but is %s\n",
+                __func__, WSP_GGUF_KEY_GENERAL_ALIGNMENT, wsp_gguf_type_name(WSP_GGUF_TYPE_UINT32),
+                wsp_gguf_type_name(wsp_gguf_get_kv_type(ctx, alignment_idx)));
+            wsp_gguf_free(ctx);
+            return nullptr;
+        }
         ctx->alignment = alignment_idx == -1 ? WSP_GGUF_DEFAULT_ALIGNMENT : wsp_gguf_get_val_u32(ctx, alignment_idx);
 
         if (ctx->alignment == 0 || (ctx->alignment & (ctx->alignment - 1)) != 0) {
@@ -678,9 +689,11 @@ static struct wsp_gguf_context * wsp_gguf_init_from_reader(const struct wsp_gguf
             }
 
             // check that the total number of elements is representable
-            if (ok && ((INT64_MAX/info.t.ne[1] <= info.t.ne[0]) ||
-                       (INT64_MAX/info.t.ne[2] <= info.t.ne[0]*info.t.ne[1]) ||
-                       (INT64_MAX/info.t.ne[3] <= info.t.ne[0]*info.t.ne[1]*info.t.ne[2]))) {
+            // (a zero-element tensor is trivially representable; the guard also avoids a division by zero below)
+            if (ok && wsp_ggml_nelements(&info.t) > 0 &&
+                ((INT64_MAX/info.t.ne[1] <= info.t.ne[0]) ||
+                 (INT64_MAX/info.t.ne[2] <= info.t.ne[0]*info.t.ne[1]) ||
+                 (INT64_MAX/info.t.ne[3] <= info.t.ne[0]*info.t.ne[1]*info.t.ne[2]))) {
 
                 WSP_GGML_LOG_ERROR("%s: total number of elements in tensor '%s' with shape "
                     "(%" PRIi64 ", %" PRIi64 ", %" PRIi64 ", %" PRIi64 ") is >= %" PRIi64 "\n",
@@ -1182,6 +1195,11 @@ const char * wsp_gguf_get_tensor_name(const struct wsp_gguf_context * ctx, int64
     return ctx->info[tensor_id].t.name;
 }
 
+const int64_t * wsp_gguf_get_tensor_ne(const struct wsp_gguf_context * ctx, int64_t tensor_id) {
+    WSP_GGML_ASSERT(tensor_id >= 0 && tensor_id < wsp_gguf_get_n_tensors(ctx));
+    return ctx->info[tensor_id].t.ne;
+}
+
 enum wsp_ggml_type wsp_gguf_get_tensor_type(const struct wsp_gguf_context * ctx, int64_t tensor_id) {
     WSP_GGML_ASSERT(tensor_id >= 0 && tensor_id < wsp_gguf_get_n_tensors(ctx));
     return ctx->info[tensor_id].t.type;
@@ -1415,7 +1433,7 @@ void wsp_gguf_set_tensor_data(struct wsp_gguf_context * ctx, const char * name, 
 struct wsp_gguf_writer_base {
     size_t written_bytes {0u};
 
-    ~wsp_gguf_writer_base(void) = default;
+    virtual ~wsp_gguf_writer_base(void) = default;
 
     // we bet on devirtualization
     virtual void write(int8_t val) = 0;

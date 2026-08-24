@@ -397,6 +397,7 @@ static void wsp_ggml_backend_cpu_device_get_props(wsp_ggml_backend_dev_t dev, st
         /* .host_buffer           = */ false,
         /* .buffer_from_host_ptr  = */ true,
         /* .events                = */ false,
+        /* .mmap_support          = */ true,
     };
 }
 
@@ -462,12 +463,17 @@ static bool wsp_ggml_backend_cpu_device_supports_op(wsp_ggml_backend_dev_t dev, 
             return max_bias == 0.0f;
         }
         case WSP_GGML_OP_IM2COL_BACK:
-            return src0->type == WSP_GGML_TYPE_F32 && src1->type == WSP_GGML_TYPE_F32;
+            return src0->type == WSP_GGML_TYPE_F32 && (src1->type == WSP_GGML_TYPE_F32 || src1->type == WSP_GGML_TYPE_F16);
         case WSP_GGML_OP_GET_ROWS_BACK:
             return src0->type == WSP_GGML_TYPE_F32 || src0->type == WSP_GGML_TYPE_F16;
         case WSP_GGML_OP_OUT_PROD:
-            return (src0->type == WSP_GGML_TYPE_F32 || (wsp_ggml_is_quantized(src0->type) && src0->ne[2] == src1->ne[2] && src0->ne[3] == src1->ne[3])) &&
+            return (src0->type == WSP_GGML_TYPE_F32 ||
+                    ((src0->type == WSP_GGML_TYPE_F16 || wsp_ggml_is_quantized(src0->type)) && src0->ne[2] == src1->ne[2] && src0->ne[3] == src1->ne[3])) &&
                 src1->type == WSP_GGML_TYPE_F32 && op->type == WSP_GGML_TYPE_F32;
+        case WSP_GGML_OP_CONV_2D:
+            return wsp_ggml_is_contiguous(op->src[0]);
+        case WSP_GGML_OP_SSM_SCAN:
+            return wsp_ggml_get_op_params_i32(op, 0) == 1 || op->src[3]->ne[0] == 1;
         default:
             return true;
     }
@@ -593,6 +599,9 @@ static wsp_ggml_backend_feature * wsp_ggml_backend_cpu_get_features(wsp_ggml_bac
         }
         if (wsp_ggml_cpu_has_sme()) {
             features.push_back({ "SME", "1" });
+        }
+        if (wsp_ggml_cpu_has_sme2()) {
+            features.push_back({ "SME2", "1" });
         }
         if (wsp_ggml_cpu_has_riscv_v()) {
             features.push_back({ "RISCV_V", "1" });
