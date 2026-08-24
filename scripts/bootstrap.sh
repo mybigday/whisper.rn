@@ -248,6 +248,11 @@ if [ "$CI" = "true" ]; then
   cp for-tests-silero-v6.2.0-ggml.bin ggml-silero-v6.2.0.bin
   echo "CI: Copied for-tests-ggml-base.bin to ggml-base.bin"
 else
+  # A previous CI bootstrap may have left the dummy model in place. The
+  # downloader skips existing files, so remove it before downloading locally.
+  if cmp -s ggml-base.bin for-tests-ggml-base.bin; then
+    rm ggml-base.bin
+  fi
   ./download-ggml-model.sh base
   ./download-vad-model.sh silero-v6.2.0
 fi
