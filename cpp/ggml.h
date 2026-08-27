@@ -1724,6 +1724,19 @@ extern "C" {
             struct wsp_ggml_tensor  * a,
             int                   n_past);
 
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_clamp(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    // in-place, returns view(a)
+    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_clamp_inplace(
+            struct wsp_ggml_context * ctx,
+            struct wsp_ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max(
             struct wsp_ggml_context * ctx,
             struct wsp_ggml_tensor  * a);
@@ -1989,14 +2002,6 @@ extern "C" {
     WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_set_offset(
             struct wsp_ggml_tensor  * a,
             int                   n_offs);
-
-    // clamp
-    // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_clamp(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            float                 min,
-            float                 max);
 
     // im2col
     // converts data into a format that effectively results in a convolution when combined with matrix multiplication

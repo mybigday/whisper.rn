@@ -4050,6 +4050,41 @@ struct wsp_ggml_tensor * wsp_ggml_diag_mask_zero_inplace(
     return wsp_ggml_diag_mask_zero_impl(ctx, a, n_past, true);
 }
 
+// wsp_ggml_clamp
+
+static struct wsp_ggml_tensor * wsp_ggml_clamp_impl(
+        struct wsp_ggml_context * ctx,
+        struct wsp_ggml_tensor  * a,
+        float                 min,
+        float                 max,
+        bool                  inplace) {
+    struct wsp_ggml_tensor * result = inplace ? wsp_ggml_view_tensor(ctx, a) : wsp_ggml_dup_tensor(ctx, a);
+
+    float params[] = { min, max };
+    wsp_ggml_set_op_params(result, params, sizeof(params));
+
+    result->op     = WSP_GGML_OP_CLAMP;
+    result->src[0] = a;
+
+    return result;
+}
+
+struct wsp_ggml_tensor * wsp_ggml_clamp(
+    struct wsp_ggml_context * ctx,
+    struct wsp_ggml_tensor  * a,
+    float                 min,
+    float                 max) {
+    return wsp_ggml_clamp_impl(ctx, a, min, max, false);
+}
+
+struct wsp_ggml_tensor * wsp_ggml_clamp_inplace(
+    struct wsp_ggml_context * ctx,
+    struct wsp_ggml_tensor  * a,
+    float                 min,
+    float                 max) {
+    return wsp_ggml_clamp_impl(ctx, a, min, max, true);
+}
+
 // wsp_ggml_soft_max
 
 static struct wsp_ggml_tensor * wsp_ggml_soft_max_impl(
@@ -4444,25 +4479,6 @@ struct wsp_ggml_tensor * wsp_ggml_rope_set_offset(
 
     wsp_ggml_set_op_params_i32(a, 15, n_offs);
     return a;
-}
-
-// wsp_ggml_clamp
-
-struct wsp_ggml_tensor * wsp_ggml_clamp(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,
-        float                 min,
-        float                 max) {
-    // TODO: when implement backward, fix this:
-    struct wsp_ggml_tensor * result = wsp_ggml_view_tensor(ctx, a);
-
-    float params[] = { min, max };
-    wsp_ggml_set_op_params(result, params, sizeof(params));
-
-    result->op     = WSP_GGML_OP_CLAMP;
-    result->src[0] = a;
-
-    return result;
 }
 
 static int64_t wsp_ggml_calc_conv_output_size(int64_t ins, int64_t ks, int s, int p, int d) {

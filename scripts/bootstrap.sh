@@ -19,6 +19,7 @@ cp ./whisper.cpp/ggml/include/ggml-opt.h ./cpp/ggml-opt.h
 cp ./whisper.cpp/ggml/include/ggml-metal.h ./cpp/ggml-metal.h
 cp ./whisper.cpp/ggml/include/gguf.h ./cpp/gguf.h
 
+rm -rf ./cpp/ggml-metal
 cp -r ./whisper.cpp/ggml/src/ggml-metal ./cpp/
 rm ./cpp/ggml-metal/CMakeLists.txt
 
@@ -119,18 +120,6 @@ files=(
   "./cpp/ggml-opt.h"
   "./cpp/ggml-opt.cpp"
   "./cpp/ggml-metal.h"
-  "./cpp/ggml-metal/ggml-metal.cpp"
-  "./cpp/ggml-metal/ggml-metal-impl.h"
-  "./cpp/ggml-metal/ggml-metal-common.h"
-  "./cpp/ggml-metal/ggml-metal-common.cpp"
-  "./cpp/ggml-metal/ggml-metal-context.h"
-  "./cpp/ggml-metal/ggml-metal-context.m"
-  "./cpp/ggml-metal/ggml-metal-device.h"
-  "./cpp/ggml-metal/ggml-metal-device.cpp"
-  "./cpp/ggml-metal/ggml-metal-device.m"
-  "./cpp/ggml-metal/ggml-metal-ops.h"
-  "./cpp/ggml-metal/ggml-metal-ops.cpp"
-  "./cpp/ggml-metal/ggml-metal.metal"
   "./cpp/ggml-quants.h"
   "./cpp/ggml-quants.c"
   "./cpp/ggml-alloc.h"
@@ -184,6 +173,18 @@ files=(
   "./cpp/parakeet-arch.h"
   "./cpp/parakeet.h"
   "./cpp/parakeet.cpp"
+)
+
+# Keep every Metal source and its shared headers in the same prefixed namespace.
+# Discover these files so upstream additions are included automatically.
+while IFS= read -r file; do
+  files+=("$file")
+done < <(
+  find ./cpp/ggml-metal -type f \
+    \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' \
+       -o -name '*.h' -o -name '*.hpp' -o -name '*.m' \
+       -o -name '*.mm' -o -name '*.metal' \) \
+    -print | sort
 )
 
 # Loop through each file and run the sed commands

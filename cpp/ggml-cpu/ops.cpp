@@ -1896,15 +1896,12 @@ void wsp_ggml_compute_forward_repeat_back(
 }
 
 // wsp_ggml_compute_forward_concat
-
 static void wsp_ggml_compute_forward_concat_any(
     const wsp_ggml_compute_params * params,
     wsp_ggml_tensor * dst) {
 
     const wsp_ggml_tensor * src0 = dst->src[0];
     const wsp_ggml_tensor * src1 = dst->src[1];
-
-    const size_t len = wsp_ggml_type_size(src0->type);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -1914,31 +1911,38 @@ static void wsp_ggml_compute_forward_concat_any(
     const int32_t dim = wsp_ggml_get_op_params_i32(dst, 0);
 
     WSP_GGML_ASSERT(dim >= 0 && dim < 4);
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(src0));
+    WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(src1));
 
     int64_t o[4] = {0, 0, 0, 0};
+
     if (dim == 0) {
+        WSP_GGML_ASSERT(src0->ne[0] % wsp_ggml_blck_size(src0->type) == 0);
+        WSP_GGML_ASSERT(src1->ne[0] % wsp_ggml_blck_size(src1->type) == 0);
+
         o[dim] = src0->ne[dim]/wsp_ggml_blck_size(src0->type);
     } else {
         o[dim] = src0->ne[dim];
     }
 
-    const char * x;
+    // Region 1: copy rows from src0
+    for (int i3 = 0; i3 < ne03; i3++) {
+        for (int i2 = ith; i2 < ne02; i2 += nth) {
+            for (int i1 = 0; i1 < ne01; i1++) {
+                const char * x = (const char *) src0->data + i1*nb01 + i2*nb02 + i3*nb03;
+                      char * y = (      char *) dst->data  + i1*nb1  + i2*nb2  + i3*nb3;
+                memcpy(y, x, wsp_ggml_row_size(src0->type, ne00));
+            }
+        }
+    }
 
-    // TODO: smarter multi-theading
-    for (int i3 = 0; i3 < ne3; i3++) {
-        for (int i2 = ith; i2 < ne2; i2 += nth) {
-            for (int i1 = 0; i1 < ne1; i1++) {
-                for (int i0 = 0; i0 < ne0/wsp_ggml_blck_size(dst->type); i0++) {
-                    if (i0 < ne00/wsp_ggml_blck_size(src0->type) && i1 < ne01 && i2 < ne02 && i3 < ne03) {
-                        x = (const char *)src0->data + (i0       )*nb00 + (i1       )*nb01 + (i2       )*nb02 + (i3       )*nb03;
-                    } else {
-                        x = (const char *)src1->data + (i0 - o[0])*nb10 + (i1 - o[1])*nb11 + (i2 - o[2])*nb12 + (i3 - o[3])*nb13;
-                    }
-
-                    char * y = (char *)dst->data + i0*nb0 + i1*nb1 + i2*nb2 + i3*nb3;
-
-                    memcpy(y, x, len);
-                }
+    // Region 2: copy rows from src1, offset into dst by o[]
+    for (int i3 = 0; i3 < ne13; i3++) {
+        for (int i2 = ith; i2 < ne12; i2 += nth) {
+            for (int i1 = 0; i1 < ne11; i1++) {
+                const char * x = (const char *) src1->data + i1*nb11         + i2*nb12         + i3*nb13;
+                      char * y = (      char *)  dst->data + (i1 + o[1])*nb1 + (i2 + o[2])*nb2 + (i3 + o[3])*nb3 + o[0]*nb0;
+                memcpy(y, x, wsp_ggml_row_size(src1->type, ne10));
             }
         }
     }
@@ -2078,14 +2082,6 @@ void wsp_ggml_compute_forward_concat(
     wsp_ggml_tensor * dst) {
 
     const wsp_ggml_tensor * src0 = dst->src[0];
-    const wsp_ggml_tensor * src1 = dst->src[1];
-
-    if (wsp_ggml_is_quantized(src0->type)) {
-        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(src0));
-        WSP_GGML_ASSERT(wsp_ggml_is_contiguous_rows(src1));
-        WSP_GGML_ASSERT(src0->ne[0] % wsp_ggml_blck_size(src0->type) == 0);
-        WSP_GGML_ASSERT(src1->ne[0] % wsp_ggml_blck_size(src1->type) == 0);
-    }
 
     switch (src0->type) {
         case WSP_GGML_TYPE_F16:

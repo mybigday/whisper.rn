@@ -5,7 +5,7 @@
  
  const char * parakeet_version(void) {
 -    return PARAKEET_VERSION;
-+    return "1.9.1";
++    return "1.9.3";
  }
  
  WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

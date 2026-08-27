@@ -53,10 +53,13 @@ function build_framework() {
   mv "$framework_path" ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
   mkdir -p ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/Headers
 
-  # Copy headers and metal shader
+  # Copy headers and split Metal kernel sources used for runtime compilation.
+  framework_dir="../ios/rnwhisper.xcframework/$4/rnwhisper.framework"
   cp_headers $4
-  cp ../cpp/ggml-metal/ggml-metal.metal ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/ggml-metal.metal
-  codesign --force --sign - --timestamp=none ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
+  mkdir -p "$framework_dir/kernels"
+  cp ../cpp/ggml-metal/kernels/* "$framework_dir/kernels/"
+  cp ../cpp/ggml-metal/ggml-metal-impl.h ../cpp/ggml-common.h "$framework_dir/"
+  codesign --force --sign - --timestamp=none "$framework_dir"
 
   rm -rf ./*
   cd ..

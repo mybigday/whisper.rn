@@ -3109,7 +3109,9 @@ struct parakeet_context * parakeet_init_from_buffer_with_params_no_state(void * 
 
         size_t size_to_copy = buf->current_offset + read_size < buf->size ? read_size : buf->size - buf->current_offset;
 
-        memcpy(output, buf->buffer + buf->current_offset, size_to_copy);
+        if (size_to_copy > 0 && buf->buffer != nullptr) {
+            memcpy(output, buf->buffer + buf->current_offset, size_to_copy);
+        }
         buf->current_offset += size_to_copy;
 
         return size_to_copy;
@@ -3849,7 +3851,7 @@ void parakeet_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
 }
 
 const char * parakeet_version(void) {
-    return "1.9.1";
+    return "1.9.3";
 }
 
 WSP_GGML_ATTRIBUTE_FORMAT(2, 3)

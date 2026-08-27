@@ -38,7 +38,11 @@ Pod::Spec.new do |s|
   if ENV["RNWHISPER_BUILD_FROM_SOURCE"] == "1"
     s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,cpp,hpp,c,m,mm}"
     s.exclude_files = "cpp/ggml-metal/*.m"
-    s.resources = "cpp/ggml-metal/ggml-metal.metal"
+    s.resources = [
+      "cpp/ggml-metal/kernels",
+      "cpp/ggml-metal/ggml-metal-impl.h",
+      "cpp/ggml-common.h"
+    ]
     base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE"
     header_search_paths << '"$(PODS_TARGET_SRCROOT)/cpp"'
 

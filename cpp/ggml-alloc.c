@@ -40,6 +40,7 @@ bool wsp_ggml_op_can_inplace(enum wsp_ggml_op op) {
         case WSP_GGML_OP_SILU_BACK:
         case WSP_GGML_OP_RMS_NORM:
         case WSP_GGML_OP_RMS_NORM_BACK:
+        case WSP_GGML_OP_CLAMP:
         case WSP_GGML_OP_SOFT_MAX:
         case WSP_GGML_OP_SOFT_MAX_BACK:
             return true;

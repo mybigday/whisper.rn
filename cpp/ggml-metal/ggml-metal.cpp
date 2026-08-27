@@ -6,6 +6,7 @@
 #include "ggml-metal-device.h"
 #include "ggml-metal-context.h"
 #include "ggml-metal-ops.h"
+#include "ggml-metal-tuning.h"
 
 #include <mutex>
 #include <string>
@@ -870,9 +871,54 @@ static wsp_ggml_backend_feature * wsp_ggml_backend_metal_get_features(wsp_ggml_b
     WSP_GGML_UNUSED(reg);
 }
 
+// test/tune-only override for the FA vec (Q, NE) selection, reached via proc_address.
+static void wsp_ggml_backend_metal_tuning_set_fa_vec_override(int Q, int NE) {
+    wsp_ggml_metal_tuning::fa_vec_set_override({ (int8_t) Q, (int8_t) NE });
+}
+
+static void wsp_ggml_backend_metal_tuning_clear_fa_vec_override(void) {
+    wsp_ggml_metal_tuning::fa_vec_clear_override();
+}
+
+static int wsp_ggml_backend_metal_tuning_fa_vec_ne11_bucket(int64_t ne11) {
+    return wsp_ggml_metal_tuning::fa_vec_ne11_bucket(ne11);
+}
+
+static int wsp_ggml_backend_metal_tuning_fa_vec_ne01_bucket(int64_t ne01) {
+    return wsp_ggml_metal_tuning::fa_vec_ne01_bucket(ne01);
+}
+
+static int wsp_ggml_backend_metal_tuning_fa_vec_baseline_ne(int dk, int dv) {
+    return wsp_ggml_metal_tuning::fa_vec_baseline_ne(dk, dv);
+}
+
+static const char * wsp_ggml_backend_metal_tuning_device_token(wsp_ggml_backend_dev_t dev) {
+    wsp_ggml_metal_device_t ctx_dev = (wsp_ggml_metal_device_t)dev->context;
+
+    return wsp_ggml_metal_device_id_token(wsp_ggml_metal_device_get_props(ctx_dev)->device_id);
+}
+
 static void * wsp_ggml_backend_metal_get_proc_address(wsp_ggml_backend_reg_t reg, const char * name) {
     if (strcmp(name, "wsp_ggml_backend_get_features") == 0) {
         return (void *)wsp_ggml_backend_metal_get_features;
+    }
+    if (strcmp(name, "wsp_ggml_backend_metal_tuning_set_fa_vec_override") == 0) {
+        return (void *)wsp_ggml_backend_metal_tuning_set_fa_vec_override;
+    }
+    if (strcmp(name, "wsp_ggml_backend_metal_tuning_clear_fa_vec_override") == 0) {
+        return (void *)wsp_ggml_backend_metal_tuning_clear_fa_vec_override;
+    }
+    if (strcmp(name, "wsp_ggml_backend_metal_tuning_fa_vec_ne11_bucket") == 0) {
+        return (void *)wsp_ggml_backend_metal_tuning_fa_vec_ne11_bucket;
+    }
+    if (strcmp(name, "wsp_ggml_backend_metal_tuning_fa_vec_ne01_bucket") == 0) {
+        return (void *)wsp_ggml_backend_metal_tuning_fa_vec_ne01_bucket;
+    }
+    if (strcmp(name, "wsp_ggml_backend_metal_tuning_fa_vec_baseline_ne") == 0) {
+        return (void *)wsp_ggml_backend_metal_tuning_fa_vec_baseline_ne;
+    }
+    if (strcmp(name, "wsp_ggml_backend_metal_tuning_device_token") == 0) {
+        return (void *)wsp_ggml_backend_metal_tuning_device_token;
     }
 
     return NULL;
@@ -891,7 +937,7 @@ static wsp_ggml_backend_dev_t wsp_ggml_backend_metal_device_init(wsp_ggml_backen
     return new wsp_ggml_backend_device {
         /* .iface   = */ wsp_ggml_backend_metal_device_i,
         /* .reg     = */ reg,
-        /* .context = */ wsp_ggml_metal_device_get(device),
+        /* .context = */ wsp_ggml_metal_device_get(device, g_devices),
     };
 }
 

@@ -74,6 +74,7 @@ add_library(rnwhisper SHARED
     ${SOURCE_DIR}/ggml-metal/ggml-metal-context.m
     ${SOURCE_DIR}/ggml-metal/ggml-metal-device.m
     ${SOURCE_DIR}/ggml-metal/ggml-metal-ops.cpp
+    ${SOURCE_DIR}/ggml-metal/ggml-metal-tuning.cpp
     ${SOURCE_DIR}/ggml-opt.cpp
     ${SOURCE_DIR}/ggml-threading.cpp
     ${SOURCE_DIR}/ggml-quants.c
