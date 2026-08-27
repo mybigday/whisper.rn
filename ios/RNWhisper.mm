@@ -296,6 +296,11 @@ void hostClearCache() {
 
 } // namespace rnwhisper_jsi
 
+@protocol RNWhisperBridgeRuntimeAccess <NSObject>
+@property (nonatomic, readonly) void *runtime;
+@property (nonatomic, readonly) std::shared_ptr<facebook::react::CallInvoker> jsCallInvoker;
+@end
+
 @implementation RNWhisper {
     __unsafe_unretained RCTBridge *_bridge;
 }
@@ -340,12 +345,12 @@ RCT_EXPORT_METHOD(install:(RCTPromiseResolveBlock)resolve
         return;
     }
 
-    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)bridge.batchedBridge;
+    id<RNWhisperBridgeRuntimeAccess> cxxBridge = (id<RNWhisperBridgeRuntimeAccess>)bridge.batchedBridge;
     if (!cxxBridge) {
-        cxxBridge = (RCTCxxBridge *)bridge;
+        cxxBridge = (id<RNWhisperBridgeRuntimeAccess>)bridge;
     }
 
-    auto callInvoker = cxxBridge.jsCallInvoker ?: bridge.jsCallInvoker;
+    auto callInvoker = cxxBridge.jsCallInvoker;
     if (!cxxBridge.runtime) {
         resolve(@false);
         return;
