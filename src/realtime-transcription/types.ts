@@ -186,7 +186,14 @@ export interface RealtimeOptions {
   // Audio settings
   audioSliceSec?: number // default: 25
   audioMinSec?: number // default: 1
-  maxSlicesInMemory?: number // default: 3
+  /** Maximum number of raw audio slices kept in memory. Default: 3. */
+  maxSlicesInMemory?: number
+  /**
+   * Maximum number of per-slice transcription results (transcript + segments) retained for
+   * `getTranscriptionResults()`. Older results are dropped oldest-first once the limit is
+   * reached, which keeps long-running (24/7) sessions bounded. Default: unlimited.
+   */
+  maxResultsInMemory?: number
 
   /** Options for the selected Whisper or Parakeet context. */
   transcribeOptions?: TranscribeOptions | ParakeetTranscribeOptions
@@ -195,6 +202,13 @@ export interface RealtimeOptions {
   initialPrompt?: string
   /** Add previous Whisper results to the next prompt. Ignored for Parakeet. Defaults to true. */
   promptPreviousSlices?: boolean
+  /**
+   * Maximum number of previous slice results appended to the prompt when
+   * `promptPreviousSlices` is enabled (most recent slices win). Whisper only uses the last
+   * ~224 prompt tokens anyway, so a small value avoids re-tokenizing an ever-growing prompt.
+   * Default: unlimited (bounded only by `maxResultsInMemory`).
+   */
+  maxPromptSlices?: number
 
   // File settings (Only used if fs dependency is provided)
   audioOutputPath?: string
