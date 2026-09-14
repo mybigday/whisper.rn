@@ -23,22 +23,34 @@ cleanup() {
 
 trap cleanup EXIT
 
+WHISPER_CPP_DIR="$ROOT_DIR/vendor/whisper.cpp"
+
 copy_headers() {
   local framework_path="$1"
+  local headers="$framework_path/Headers"
 
-  mkdir -p "$framework_path/Headers"
-  cp "$ROOT_DIR"/cpp/*.h "$framework_path/Headers/"
+  # Flat layout: the JSI glue includes these as <rnwhisper/name.h>.
+  mkdir -p "$headers"
+  cp "$ROOT_DIR"/cpp/*.h "$headers/"
+  cp "$WHISPER_CPP_DIR"/include/*.h "$headers/"
+  # ggml public API only; the other ggml/include headers are backends this
+  # framework does not build.
+  local h
+  for h in ggml.h ggml-alloc.h ggml-backend.h ggml-cpu.h ggml-cpp.h ggml-opt.h ggml-metal.h gguf.h; do
+    cp "$WHISPER_CPP_DIR/ggml/include/$h" "$headers/"
+  done
 }
 
 copy_framework_support_files() {
   local framework_path="$1"
+  local ggml_metal="$WHISPER_CPP_DIR/ggml/src/ggml-metal"
 
   copy_headers "$framework_path"
 
   # Split Metal kernel sources used for runtime compilation.
   mkdir -p "$framework_path/kernels"
-  cp "$ROOT_DIR"/cpp/ggml-metal/kernels/* "$framework_path/kernels/"
-  cp "$ROOT_DIR"/cpp/ggml-metal/ggml-metal-impl.h "$ROOT_DIR"/cpp/ggml-common.h "$framework_path/"
+  cp "$ggml_metal"/kernels/* "$framework_path/kernels/"
+  cp "$ggml_metal"/ggml-metal-impl.h "$WHISPER_CPP_DIR"/ggml/src/ggml-common.h "$framework_path/"
 }
 
 # ggml/gguf keep upstream names; they must stay internal to this framework so a

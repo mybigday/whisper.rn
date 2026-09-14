@@ -24,7 +24,8 @@ whisper.rn is a React Native binding for [whisper.cpp](https://github.com/ggerga
 ### Setup and Bootstrap
 ```bash
 yarn                    # Install dependencies
-yarn bootstrap          # Setup project (install deps + build whisper.cpp submodule)
+yarn bootstrap          # Setup example app deps + download example model assets
+yarn sync:vendor        # Re-vendor vendor/whisper.cpp from vendor/VERSIONS + scripts/patches
 ```
 
 ### Code Quality
@@ -91,13 +92,10 @@ whisper.rn has a 4-layer architecture:
    - Audio session management (iOS)
    - Realtime recording (deprecated, use RealtimeTranscriber instead)
 
-4. **C++ Core** (`cpp/`):
-   - `rn-whisper.cpp/h`: Job management, transcription orchestration
-   - `rn-audioutils.cpp/h`: Audio conversion utilities (WAV, PCM)
-   - `whisper.cpp`: Core whisper.cpp library (git submodule)
-   - `parakeet.cpp/h`: NVIDIA Parakeet TDT inference engine (from whisper.cpp)
-   - `ggml*.cpp/h`: GGML tensor library files (from whisper.cpp)
-   - `coreml/`: Core ML integration headers (iOS)
+4. **C++ Core** (`cpp/` + `vendor/`):
+   - `cpp/` holds only whisper.rn's own code: `rn-whisper.cpp/h` (job management, transcription orchestration), `rn-whisper-log.h`, and `jsi/`
+   - whisper.cpp is vendored under `vendor/whisper.cpp/` in its upstream layout (`include/`, `src/` with `whisper.cpp`, `parakeet.cpp` and `coreml/`, `ggml/{include,src}` with the CPU and Metal backends), pinned by `vendor/VERSIONS`, with whisper.rn changes kept as `-p1` patches in `scripts/patches/whisper.cpp/`. No git submodule, no symbol renaming. See `vendor/README.md`.
+   - `cmake/rnwhisper-sources.cmake` is the single source/include list every CMake build uses; `whisper-rn.podspec` mirrors it for CocoaPods
 
 ### Context Management
 
@@ -199,7 +197,7 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 - Files: kebab-case for configs, PascalCase for classes
 - Native modules: RNWhisper prefix (iOS/Android)
 - C++ namespace: `rnwhisper`
-- ggml/whisper.cpp symbols keep their upstream names (`ggml_*`, `whisper_*`); no `WSP_` prefix is applied by bootstrap. Coexistence with other ggml-based libraries (e.g. llama.rn) relies on each library being its own dynamic image (two-level namespace on Apple, `RTLD_LOCAL` plus `-Bsymbolic` on Android). The Objective-C `GGMLMetalClass` is process-global, so it is renamed per library with `-DGGMLMetalClass=RNWhisperGGMLMetalClass`.
+- ggml/whisper.cpp symbols keep their upstream names (`ggml_*`, `whisper_*`); the vendored sources are not renamed. Coexistence with other ggml-based libraries (e.g. llama.rn) relies on each library being its own dynamic image (two-level namespace on Apple, `RTLD_LOCAL` plus `-Bsymbolic` on Android). The Objective-C `GGMLMetalClass` is process-global, so it is renamed per library with `-DGGMLMetalClass=RNWhisperGGMLMetalClass`.
 
 ### Commit Messages
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
@@ -271,11 +269,33 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## Build System
 
+### Vendored sources (`scripts/sync-vendor.sh`)
+
+1. Clones/fetches the whisper.cpp commit pinned in `vendor/VERSIONS` into `~/.cache/whisper.rn/`
+2. Exports the subset whisper.rn builds into `vendor/whisper.cpp/`, unchanged and in upstream layout
+3. Applies `scripts/patches/whisper.cpp/*.patch`
+4. Regenerates `src/version.json` (whisper/ggml versions + commit; the builds pass them as `WHISPER_VERSION` / `PARAKEET_VERSION` / `GGML_VERSION` / `GGML_COMMIT` compile definitions)
+
+Its output is committed. Run it after changing `vendor/VERSIONS` or a patch; running it on a clean tree must produce no diff.
+
+### Patching whisper.cpp
+
+1. Edit the vendored file in place, e.g. `vendor/whisper.cpp/src/whisper.cpp`
+2. Regenerate its patch: `scripts/update-patch.sh src/whisper.cpp` writes `scripts/patches/whisper.cpp/whisper.cpp.patch` (optional second argument names the patch; a file upstream lacks becomes a file-creating patch; text above the first `---` line survives regeneration, use it to say why)
+3. `yarn sync:vendor` must leave `git status` clean
+
+### Bootstrap (`scripts/bootstrap.sh`)
+
+Developer environment only; it never touches `vendor/`:
+
+1. `example/` dependencies
+2. Example model/audio assets into `example/assets/` (dummy models from `vendor/whisper.cpp/models/` when `CI=true`)
+
 ### iOS Framework Build Process
 1. CMake generates Xcode project from `ios/CMakeLists.txt`
 2. Builds for multiple targets: iOS device, iOS simulator, tvOS device, tvOS simulator
 3. Creates universal `rnwhisper.xcframework` with all architectures
-4. Includes Metal shaders and C++ headers
+4. Includes Metal kernel sources (compiled at runtime) and the public C headers
 5. Script: `scripts/build-ios.sh`
 
 ### TypeScript Build
@@ -292,7 +312,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Runtime
 - `react-native`: Core framework
-- `whisper.cpp`: C++ ASR engine (submodule at `whisper.cpp/`)
+- `whisper.cpp`: C++ ASR engine (vendored at `vendor/whisper.cpp/`, see `vendor/README.md`)
 - `safe-buffer`: Buffer polyfill
 
 ### Realtime Transcription

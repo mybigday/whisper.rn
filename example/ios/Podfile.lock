@@ -1959,7 +1959,7 @@ PODS:
     - RNZipArchive/Core (= 7.0.1)
     - SSZipArchive (~> 2.5.5)
   - SSZipArchive (2.5.5)
-  - whisper-rn (0.6.0):
+  - whisper-rn (0.7.4):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1982,9 +1982,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - whisper-rn/no-require-arc (= 0.6.0)
+    - whisper-rn/no-require-arc (= 0.7.4)
     - Yoga
-  - whisper-rn/no-require-arc (0.6.0):
+  - whisper-rn/no-require-arc (0.7.4):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2348,7 +2348,7 @@ SPEC CHECKSUMS:
   RNSound: 314cc5226453ef4a3314a196c65e8a65e5106a7b
   RNZipArchive: f4a5af907d1581e995c879e34799be35c6bc3e21
   SSZipArchive: c69881e8ac5521f0e622291387add5f60f30f3c4
-  whisper-rn: 5fe8d26c3839c6604d1250eb64478d987583a264
+  whisper-rn: e0e388d6dfc08da65542f11335b09393f8194911
   Yoga: c0b3f2c7e8d3e327e450223a2414ca3fa296b9a2
 
 PODFILE CHECKSUM: 65fffc3317dab43f36ae97fe05a71a7462bc6a02

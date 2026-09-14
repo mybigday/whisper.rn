@@ -35,6 +35,8 @@
     "android",
     "cpp",
     "ios",
+    "cmake",
+    "vendor",
     "*.podspec",
     "!lib/typescript/example",
     "!ios/build",
@@ -53,6 +55,7 @@
   ],
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
+    "sync:vendor": "./scripts/sync-vendor.sh",
     "docgen": "typedoc src/index.ts src/realtime-transcription/index.ts --plugin typedoc-plugin-markdown --excludePrivate --readme none --out docs/API",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
@@ -123,7 +126,7 @@
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/",
-      "<rootDir>/whisper.cpp/"
+      "<rootDir>/vendor/"
     ]
   },
   "commitlint": {

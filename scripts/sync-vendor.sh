@@ -1,0 +1,242 @@
+#!/bin/bash
+#
+# Re-vendors vendor/whisper.cpp from the pin in vendor/VERSIONS.
+#
+#   1. clone (once) or fetch upstream into $WHISPER_RN_CACHE_DIR
+#   2. export the subset whisper.rn builds, keeping the upstream directory
+#      layout and file contents untouched
+#   3. apply scripts/patches/whisper.cpp/*.patch (-p1, paths relative to the tree)
+#   4. regenerate src/version.json (whisper/ggml versions upstream derives from
+#      its CMake project; the builds pass them as compile definitions)
+#
+# Everything this script writes is committed. Builds and `yarn bootstrap`
+# never run it, so CI always compiles the tree as checked in. Run it after
+# editing vendor/VERSIONS or scripts/patches/.
+set -eo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENDOR_DIR="$ROOT_DIR/vendor"
+PATCHES_DIR="$ROOT_DIR/scripts/patches"
+CACHE_DIR="${WHISPER_RN_CACHE_DIR:-$HOME/.cache/whisper.rn}"
+
+# shellcheck source=../vendor/VERSIONS
+source "$VENDOR_DIR/VERSIONS"
+
+# ---------------------------------------------------------------------------
+# Subset manifest. Paths are upstream pathspecs; a directory takes everything
+# below it. Prefer listing files where upstream keeps unrelated siblings, so a
+# new upstream file is opted in deliberately and a removed one fails loudly.
+# ---------------------------------------------------------------------------
+
+WHISPER_CPP_PATHS=(
+  LICENSE
+
+  include
+
+  src/whisper.cpp
+  src/whisper-arch.h
+  src/parakeet.cpp
+  src/parakeet-arch.h
+  src/coreml
+
+  ggml/include
+  ggml/src/ggml.c
+  ggml/src/ggml.cpp
+  ggml/src/ggml-alloc.c
+  ggml/src/ggml-backend.cpp
+  ggml/src/ggml-backend-dl.cpp
+  ggml/src/ggml-backend-dl.h
+  ggml/src/ggml-backend-impl.h
+  ggml/src/ggml-backend-meta.cpp
+  ggml/src/ggml-backend-reg.cpp
+  ggml/src/ggml-common.h
+  ggml/src/ggml-feats.h
+  ggml/src/ggml-impl.h
+  ggml/src/ggml-opt.cpp
+  ggml/src/ggml-quants.c
+  ggml/src/ggml-quants.h
+  ggml/src/ggml-threading.cpp
+  ggml/src/ggml-threading.h
+  ggml/src/gguf.cpp
+
+  ggml/src/ggml-cpu/arch-fallback.h
+  ggml/src/ggml-cpu/binary-ops.cpp
+  ggml/src/ggml-cpu/binary-ops.h
+  ggml/src/ggml-cpu/common.h
+  ggml/src/ggml-cpu/ggml-cpu-impl.h
+  ggml/src/ggml-cpu/ggml-cpu.c
+  ggml/src/ggml-cpu/ggml-cpu.cpp
+  ggml/src/ggml-cpu/ops.cpp
+  ggml/src/ggml-cpu/ops.h
+  ggml/src/ggml-cpu/quants.c
+  ggml/src/ggml-cpu/quants.h
+  ggml/src/ggml-cpu/repack.cpp
+  ggml/src/ggml-cpu/repack.h
+  ggml/src/ggml-cpu/simd-gemm.h
+  ggml/src/ggml-cpu/simd-mappings.h
+  ggml/src/ggml-cpu/traits.cpp
+  ggml/src/ggml-cpu/traits.h
+  ggml/src/ggml-cpu/unary-ops.cpp
+  ggml/src/ggml-cpu/unary-ops.h
+  ggml/src/ggml-cpu/vec.cpp
+  ggml/src/ggml-cpu/vec.h
+  ggml/src/ggml-cpu/amx
+  ggml/src/ggml-cpu/arch/arm
+  ggml/src/ggml-cpu/arch/x86
+
+  ggml/src/ggml-metal
+
+  # Example app assets (scripts/bootstrap.sh); the CI build uses the dummy models
+  models/for-tests-ggml-base.bin
+  models/for-tests-silero-v6.2.0-ggml.bin
+  samples/jfk.wav
+)
+
+# Exported by a directory pathspec above but not wanted: upstream build files
+# make no sense for a partial tree.
+WHISPER_CPP_PRUNE=(
+  ggml/src/ggml-metal/CMakeLists.txt
+)
+
+# Files that live inside the tree but are not upstream content. None today;
+# kept so the export loop matches llama.rn's.
+WHISPER_CPP_KEEP=()
+
+# ---------------------------------------------------------------------------
+
+log() { printf '\n==> %s\n' "$*"; }
+
+# Clone once into the cache, then only fetch when the pinned ref is unknown.
+# The old submodule checkout under .git/modules seeds the clone so nothing is
+# downloaded twice.
+ensure_repo() {
+  local name="$1" url="$2" ref="$3"
+  local repo="$CACHE_DIR/$name"
+
+  if [ ! -d "$repo/.git" ]; then
+    log "Cloning $url into $repo"
+    mkdir -p "$CACHE_DIR"
+    local seed="$ROOT_DIR/.git/modules/$name"
+    if [ -d "$seed/objects" ]; then
+      git clone --quiet --no-checkout --reference "$seed" --dissociate "$url" "$repo"
+    else
+      git clone --quiet --no-checkout "$url" "$repo"
+    fi
+  fi
+
+  local commit=""
+  if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+    git -C "$repo" cat-file -e "$ref^{commit}" 2>/dev/null && commit="$ref"
+  else
+    commit="$(git -C "$repo" rev-parse -q --verify "refs/tags/$ref^{commit}" 2>/dev/null || true)"
+  fi
+  if [ -z "$commit" ]; then
+    log "Fetching $ref from $url"
+    git -C "$repo" fetch --quiet origin "$ref"
+    commit="$(git -C "$repo" rev-parse --verify FETCH_HEAD^{commit})"
+  fi
+  RESOLVED_COMMIT="$commit"
+}
+
+# Export the pinned subset into vendor/<name>. Files upstream removed
+# disappear; entries in KEEP survive.
+export_subset() {
+  local name="$1" commit="$2" prefix="$3"
+  local paths_ref="${prefix}_PATHS[@]" prune_ref="${prefix}_PRUNE[@]" keep_ref="${prefix}_KEEP[@]"
+  local paths=("${!paths_ref}") prune=("${!prune_ref}") keep=("${!keep_ref}")
+  local repo="$CACHE_DIR/$name"
+  local dest="$VENDOR_DIR/$name"
+  local tmp
+  tmp="$(mktemp -d)"
+
+  git -C "$repo" archive --format=tar "$commit" "${paths[@]}" | tar -xf - -C "$tmp"
+
+  local p
+  for p in "${prune[@]}"; do
+    rm -rf "${tmp:?}/$p"
+  done
+  local rsync_args=(-a --delete)
+  for p in "${keep[@]}"; do
+    rsync_args+=("--exclude=$p")
+  done
+  mkdir -p "$dest"
+  rsync "${rsync_args[@]}" "$tmp/" "$dest/"
+  rm -rf "$tmp"
+}
+
+apply_patches() {
+  local name="$1"
+  local dest="$VENDOR_DIR/$name"
+  local dir="$PATCHES_DIR/$name"
+  [ -d "$dir" ] || return 0
+
+  local patch_file
+  for patch_file in "$dir"/*.patch; do
+    [ -e "$patch_file" ] || continue
+    echo "  patch: $(basename "$patch_file")"
+    patch -p1 -d "$dest" < "$patch_file"
+  done
+  find "$dest" \( -name '*.orig' -o -name '*.rej' \) -delete
+}
+
+# Rewrite <PREFIX>_COMMIT in VERSIONS so the pin is reproducible even if the
+# ref was a branch or a tag that later moves.
+record_commit() {
+  local prefix="$1" commit="$2"
+  local tmp
+  tmp="$(mktemp)"
+  sed "s/^${prefix}_COMMIT=.*/${prefix}_COMMIT=${commit}/" "$VENDOR_DIR/VERSIONS" > "$tmp"
+  mv "$tmp" "$VENDOR_DIR/VERSIONS"
+}
+
+sync_dep() {
+  local name="$1" prefix="$2"
+  local repo_var="${prefix}_REPO" ref_var="${prefix}_REF"
+
+  log "Syncing $name @ ${!ref_var}"
+  ensure_repo "$name" "${!repo_var}" "${!ref_var}"
+  echo "  commit: $RESOLVED_COMMIT"
+  export_subset "$name" "$RESOLVED_COMMIT" "$prefix"
+  apply_patches "$name"
+  record_commit "$prefix" "$RESOLVED_COMMIT"
+}
+
+# whisper.cpp derives WHISPER_VERSION / PARAKEET_VERSION / GGML_VERSION /
+# GGML_COMMIT from its CMake project and git history and passes them as
+# compile definitions. whisper.rn compiles the sources directly, so record
+# them in src/version.json for the JS API, cmake/rnwhisper-sources.cmake and
+# the podspec.
+generate_version_file() {
+  local repo="$CACHE_DIR/whisper.cpp"
+  local commit
+  commit="$(sed -n 's/^WHISPER_CPP_COMMIT=//p' "$VENDOR_DIR/VERSIONS")"
+
+  local build_commit
+  build_commit="$(git -C "$repo" rev-parse --short=7 "$commit")"
+
+  cmake_version() {  # <CMakeLists.txt path in upstream> <PREFIX>
+    local file="$1" prefix="$2" major minor patch
+    local content
+    content="$(git -C "$repo" show "$commit:$file")"
+    major="$(sed -n "s/^set(${prefix}_VERSION_MAJOR \([0-9][0-9]*\))$/\1/p" <<< "$content")"
+    minor="$(sed -n "s/^set(${prefix}_VERSION_MINOR \([0-9][0-9]*\))$/\1/p" <<< "$content")"
+    patch="$(sed -n "s/^set(${prefix}_VERSION_PATCH \([0-9][0-9]*\))$/\1/p" <<< "$content")"
+    if [ -z "$major" ] || [ -z "$minor" ] || [ -z "$patch" ]; then
+      echo "Failed to read ${prefix}_VERSION_* from upstream $file" >&2
+      exit 1
+    fi
+    echo "$major.$minor.$patch"
+  }
+  local whisper_version ggml_version
+  whisper_version="$(cmake_version CMakeLists.txt WHISPER)"
+  ggml_version="$(cmake_version ggml/CMakeLists.txt GGML)"
+
+  log "Generating src/version.json (whisper $whisper_version, ggml $ggml_version, commit $build_commit)"
+  printf '{"version":"%s","ggmlVersion":"%s","commit":"%s"}\n' \
+    "$whisper_version" "$ggml_version" "$build_commit" > "$ROOT_DIR/src/version.json"
+}
+
+sync_dep whisper.cpp WHISPER_CPP
+generate_version_file
+
+log "Done. Review with: git status vendor src/version.json"
