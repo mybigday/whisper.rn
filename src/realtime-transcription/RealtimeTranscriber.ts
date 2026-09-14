@@ -24,6 +24,22 @@ import type {
 
 const SILENCE_SEGMENT_REGEX = /\[(\s*\w+\s*)]/i
 
+/** Treat undefined / non-positive limits as "unbounded". */
+const normalizeLimit = (value: number | undefined): number =>
+  value && value > 0 ? Math.floor(value) : Infinity
+
+/** Drop the oldest entries (Map insertion order) until the map fits the limit. */
+const trimMapToLimit = (map: Map<number, unknown>, limit: number): void => {
+  const keys = map.keys()
+  let excess = map.size - limit
+  while (excess > 0) {
+    const { value: oldestKey } = keys.next()
+    if (oldestKey === undefined) break
+    map.delete(oldestKey)
+    excess -= 1
+  }
+}
+
 /**
  * RealtimeTranscriber provides real-time audio transcription with VAD support.
  *
@@ -53,9 +69,11 @@ export class RealtimeTranscriber {
     audioSliceSec: number
     audioMinSec: number
     maxSlicesInMemory: number
+    maxResultsInMemory: number
     transcribeOptions: TranscribeOptions | ParakeetTranscribeOptions
     initialPrompt?: string
     promptPreviousSlices: boolean
+    maxPromptSlices: number
     audioOutputPath?: string
     audioStreamConfig?: AudioStreamConfig
     realtimeProcessingPauseMs: number
@@ -88,13 +106,16 @@ export class RealtimeTranscriber {
   // Track last realtime transcription time for throttling
   private lastRealtimeTranscriptionTime = 0
 
-  // Store transcription results by slice index
+  // Store transcription results by slice index. Bounded by maxResultsInMemory so
+  // long-running sessions don't retain every slice's transcript and segments forever.
   private transcriptionResults: Map<
     number,
     { slice: AudioSliceNoData; transcribeEvent: RealtimeTranscribeEvent }
   > = new Map()
 
-  // Store VAD events by slice index for inclusion in transcribe events
+  // Store VAD events by slice index for inclusion in transcribe events. Normally deleted once
+  // the slice's final transcription lands, but a slice that never reaches that point (filtered,
+  // errored, empty) would leak its entry, so the map is also bounded by maxSlicesInMemory.
   private vadEvents: Map<number, RealtimeVadEvent> = new Map()
 
   // Track active async operations
@@ -130,9 +151,11 @@ export class RealtimeTranscriber {
       audioSliceSec: options.audioSliceSec || 30,
       audioMinSec: options.audioMinSec || 1,
       maxSlicesInMemory: options.maxSlicesInMemory || 3,
+      maxResultsInMemory: normalizeLimit(options.maxResultsInMemory),
       transcribeOptions: options.transcribeOptions || {},
       initialPrompt: options.initialPrompt,
       promptPreviousSlices: options.promptPreviousSlices ?? true,
+      maxPromptSlices: normalizeLimit(options.maxPromptSlices),
       audioOutputPath: options.audioOutputPath,
       realtimeProcessingPauseMs: options.realtimeProcessingPauseMs || 200,
       initRealtimeAfterMs: options.initRealtimeAfterMs || 200,
@@ -389,6 +412,7 @@ export class RealtimeTranscriber {
       duration: this.sliceManager.getSliceByIndex(sliceInfo.currentSliceIndex)?.data.length ? this.sliceManager.getSliceByIndex(sliceInfo.currentSliceIndex)!.data.length / 32000 : 0
     }
     this.vadEvents.set(sliceInfo.currentSliceIndex, event)
+    trimMapToLimit(this.vadEvents, this.options.maxSlicesInMemory)
     this.callbacks.onVad?.(event)
   }
 
@@ -436,19 +460,29 @@ export class RealtimeTranscriber {
 
     // Add previous slice results if enabled
     if (this.options.promptPreviousSlices) {
-      // Get transcription results from previous slices (up to the current slice)
-      const previousResults = Array.from(this.transcriptionResults.entries())
-        .filter(([sliceIndex]) => sliceIndex < currentSliceIndex)
-        .sort(([a], [b]) => a - b) // Sort by slice index
-        .map(([, result]) => result.transcribeEvent.data?.result)
-        .filter((result): result is string => Boolean(result)) // Filter out empty results with type guard
-
-      if (previousResults.length > 0) {
-        promptParts.push(...previousResults)
-      }
+      promptParts.push(...this.getPreviousResultTexts(currentSliceIndex))
     }
 
     return promptParts.join(' ') || undefined
+  }
+
+  /**
+   * Texts of the most recent non-empty results before the given slice, oldest first,
+   * limited to maxPromptSlices so the prompt stays bounded regardless of session length.
+   */
+  private getPreviousResultTexts(currentSliceIndex: number): string[] {
+    const previous: Array<[number, string]> = []
+    this.transcriptionResults.forEach((result, sliceIndex) => {
+      const text = result.transcribeEvent.data?.result
+      if (sliceIndex < currentSliceIndex && text) previous.push([sliceIndex, text])
+    })
+    previous.sort(([a], [b]) => a - b)
+
+    const { maxPromptSlices } = this.options
+    if (previous.length > maxPromptSlices) {
+      previous.splice(0, previous.length - maxPromptSlices)
+    }
+    return previous.map(([, text]) => text)
   }
 
   /**
@@ -582,6 +616,7 @@ export class RealtimeTranscriber {
           },
           transcribeEvent,
         })
+        trimMapToLimit(this.transcriptionResults, this.options.maxResultsInMemory)
       }
 
       // Emit transcribe event
@@ -686,7 +721,10 @@ export class RealtimeTranscriber {
   }
 
   /**
-   * Get all transcription results
+   * Get the retained transcription results, oldest first.
+   *
+   * When `maxResultsInMemory` is set this is only the most recent window; callers that need
+   * every result should collect them from the `onTranscribe` callback as they arrive.
    */
   getTranscriptionResults(): Array<{
     slice: AudioSliceNoData

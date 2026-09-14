@@ -725,6 +725,163 @@ describe('RealtimeTranscriber', () => {
     })
   })
 
+  describe('result history retention', () => {
+    // Drives `count` slices through the real pipeline (no VAD): each chunk is shorter than
+    // initRealtimeAfterMs so only the forced, final transcription per slice is queued.
+    const createHistoryHarness = (options: Record<string, unknown> = {}) => {
+      let sliceCounter = 0
+      const whisperContext: any = {
+        transcribeData: jest.fn(() => {
+          const text = `slice ${sliceCounter}`
+          sliceCounter += 1
+          return {
+            stop: jest.fn(),
+            promise: Promise.resolve({
+              isAborted: false,
+              result: text,
+              language: 'en',
+              segments: [{ text, t0: 0, t1: 1000 }],
+            }),
+          }
+        }),
+      }
+      const audioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      audioStream['startStreaming'] = jest.fn()
+      const historyTranscriber = new RealtimeTranscriber(
+        { whisperContext, audioStream },
+        { audioSliceSec: 1, maxSlicesInMemory: 3, ...options },
+      )
+
+      const runFinalSlices = async (count: number) => {
+        for (let i = 0; i < count; i += 1) {
+          audioStream.simulateDataChunk(createAudioData(3200))
+          // eslint-disable-next-line no-await-in-loop
+          await historyTranscriber.nextSlice()
+          // eslint-disable-next-line no-await-in-loop
+          await historyTranscriber['processingPromise']
+        }
+      }
+
+      const lastPrompt = (): string | undefined => {
+        const { calls } = whisperContext.transcribeData.mock
+        return calls[calls.length - 1]?.[1]?.prompt
+      }
+
+      return { transcriber: historyTranscriber, whisperContext, runFinalSlices, lastPrompt }
+    }
+
+    it('keeps every result when maxResultsInMemory is not set', async () => {
+      const { transcriber: t, runFinalSlices } = createHistoryHarness()
+      await t.start()
+      await runFinalSlices(20)
+
+      expect(t.getTranscriptionResults()).toHaveLength(20)
+      await t.release()
+    })
+
+    // 20 / 500 / 2,880 slices ≈ 10 minutes / ~4 hours / 24 hours of 30-second slices.
+    it.each([20, 500, 2880])(
+      'retains only the newest maxResultsInMemory results across %i slices',
+      async (sliceCount) => {
+        const { transcriber: t, runFinalSlices } = createHistoryHarness({
+          maxResultsInMemory: 5,
+        })
+        await t.start()
+        await runFinalSlices(sliceCount)
+
+        const results = t.getTranscriptionResults()
+        expect(results).toHaveLength(5)
+        expect(results.map((r) => r.slice.index)).toEqual(
+          [5, 4, 3, 2, 1].map((back) => sliceCount - back),
+        )
+        expect(results.map((r) => r.transcribeEvent.data?.result)).toEqual(
+          [5, 4, 3, 2, 1].map((back) => `slice ${sliceCount - back}`),
+        )
+        await t.release()
+      },
+      30000,
+    )
+
+    it('keeps a realtime update of a retained slice without growing the window', async () => {
+      const { transcriber: t, runFinalSlices } = createHistoryHarness({
+        maxResultsInMemory: 3,
+      })
+      await t.start()
+      await runFinalSlices(6)
+
+      // A late transcription for a retained slice replaces it in place.
+      t['transcriptionQueue'].push({ sliceIndex: 5, audioData: createAudioData(3200) })
+      await t['processTranscriptionQueue']()
+
+      const results = t.getTranscriptionResults()
+      expect(results.map((r) => r.slice.index)).toEqual([3, 4, 5])
+      expect(results[2]?.transcribeEvent.data?.result).toBe('slice 6')
+      await t.release()
+    })
+
+    it('bounds the previous-slice prompt to maxPromptSlices', async () => {
+      const { transcriber: t, runFinalSlices, lastPrompt } = createHistoryHarness({
+        promptPreviousSlices: true,
+        initialPrompt: 'Init',
+        maxPromptSlices: 2,
+      })
+      await t.start()
+      await runFinalSlices(10)
+
+      expect(lastPrompt()).toBe('Init slice 7 slice 8')
+      await t.release()
+    })
+
+    it.each([20, 500, 2880])(
+      'keeps the prompt size flat across %i slices when maxPromptSlices is set',
+      async (sliceCount) => {
+        const { transcriber: t, runFinalSlices, lastPrompt } = createHistoryHarness({
+          promptPreviousSlices: true,
+          maxPromptSlices: 3,
+          maxResultsInMemory: 5,
+        })
+        await t.start()
+        await runFinalSlices(sliceCount)
+
+        expect(lastPrompt()).toBe(
+          `slice ${sliceCount - 4} slice ${sliceCount - 3} slice ${sliceCount - 2}`,
+        )
+        await t.release()
+      },
+      30000,
+    )
+
+    it('falls back to the retained window for the prompt when maxPromptSlices is not set', async () => {
+      const { transcriber: t, runFinalSlices, lastPrompt } = createHistoryHarness({
+        promptPreviousSlices: true,
+        maxResultsInMemory: 2,
+      })
+      await t.start()
+      await runFinalSlices(10)
+
+      // Only slices 7 and 8 were still retained when slice 9 was transcribed.
+      expect(lastPrompt()).toBe('slice 7 slice 8')
+      await t.release()
+    })
+
+    it('drops VAD events for slices that are no longer in memory', async () => {
+      await transcriber.start()
+
+      for (let i = 0; i < 10; i += 1) {
+        transcriber['emitVadEvent']('speech_start', 1)
+        // eslint-disable-next-line no-await-in-loop
+        await transcriber.nextSlice()
+      }
+
+      expect(transcriber['vadEvents'].size).toBeLessThanOrEqual(3)
+      expect(Math.min(...transcriber['vadEvents'].keys())).toBe(7)
+    })
+  })
+
   describe('error handling', () => {
     it('should handle audio stream errors', async () => {
       await transcriber.start()

@@ -231,6 +231,21 @@ const transcriber = new RealtimeTranscriber(
 
 `initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
 
+**Long-running sessions:** `maxSlicesInMemory` only bounds raw audio. Per-slice results (transcript + segments) returned by `getTranscriptionResults()` are kept until `stop()`/`reset()` by default, so a transcriber that runs for hours or days grows without bound. Set `maxResultsInMemory` to keep only the newest N results (older ones are dropped oldest-first) and, when `promptPreviousSlices` is enabled, `maxPromptSlices` to cap how many previous results are appended to each Whisper prompt. Consumers that need every result should collect them from `onTranscribe` as they arrive.
+
+```js
+const transcriber = new RealtimeTranscriber(
+  { whisperContext, vadContext, audioStream },
+  {
+    maxSlicesInMemory: 5, // raw audio slices
+    maxResultsInMemory: 100, // detailed per-slice results
+    promptPreviousSlices: true,
+    maxPromptSlices: 3, // previous results per prompt
+  },
+  callbacks,
+)
+```
+
 **Dependencies:**
 
 - `@fugood/react-native-audio-pcm-stream` for `AudioPcmStreamAdapter`
