@@ -8,10 +8,10 @@
 extern "C" {
 #endif
 
-struct wsp_ggml_tensor;
-struct wsp_ggml_cgraph;
+struct ggml_tensor;
+struct ggml_cgraph;
 
-enum wsp_ggml_mem_range_type {
+enum ggml_mem_range_type {
     MEM_RANGE_TYPE_SRC = 0,
     MEM_RANGE_TYPE_DST = 1,
 };
@@ -25,27 +25,27 @@ enum wsp_ggml_mem_range_type {
 //   can be added to the set without violating the constraints (i.e. if it can be executed concurrently with the
 //   tasks already in the set)
 //
-typedef struct wsp_ggml_mem_ranges * wsp_ggml_mem_ranges_t;
+typedef struct ggml_mem_ranges * ggml_mem_ranges_t;
 
-wsp_ggml_mem_ranges_t wsp_ggml_mem_ranges_init(int debug);
-void wsp_ggml_mem_ranges_free(wsp_ggml_mem_ranges_t mrs);
+ggml_mem_ranges_t ggml_mem_ranges_init(int debug);
+void ggml_mem_ranges_free(ggml_mem_ranges_t mrs);
 
 // remove all ranges from the set
-void wsp_ggml_mem_ranges_reset(wsp_ggml_mem_ranges_t mrs);
+void ggml_mem_ranges_reset(ggml_mem_ranges_t mrs);
 
 // add src or dst ranges to track
-bool wsp_ggml_mem_ranges_add(wsp_ggml_mem_ranges_t mrs, const struct wsp_ggml_tensor * tensor);
+bool ggml_mem_ranges_add(ggml_mem_ranges_t mrs, const struct ggml_tensor * tensor);
 
 // return false if:
 // - new src range overlaps with any existing dst range
 // - new dst range overlaps with any existing range (src or dst)
-bool wsp_ggml_mem_ranges_check(wsp_ggml_mem_ranges_t mrs, const struct wsp_ggml_tensor * tensor);
+bool ggml_mem_ranges_check(ggml_mem_ranges_t mrs, const struct ggml_tensor * tensor);
 
 // reorder the nodes in the graph to improve concurrency, while respecting fusion
 //
 // note: this implementation is generic and not specific to metal
 //       if it proves to work well, we can start using it for other backends in the future
-void wsp_ggml_graph_optimize(struct wsp_ggml_cgraph * gf);
+void ggml_graph_optimize(struct ggml_cgraph * gf);
 
 #ifdef __cplusplus
 }

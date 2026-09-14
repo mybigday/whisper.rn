@@ -2,7 +2,7 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 base_ld_flags = "-framework Accelerate -framework Foundation -framework Metal -framework MetalKit"
-base_compiler_flags = "-DWSP_GGML_USE_CPU -DWSP_GGML_USE_ACCELERATE -pthread -Wno-shorten-64-to-32"
+base_compiler_flags = "-DGGML_USE_CPU -DGGML_USE_ACCELERATE -pthread -Wno-shorten-64-to-32"
 folly_compiler_flags = "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma"
 
 # Use base_optimizer_flags = "" for debug builds
@@ -17,7 +17,9 @@ if ENV['RNWHISPER_DISABLE_COREML'] != '1' then
 end
 
 if ENV["RNWHISPER_DISABLE_METAL"] != "1" then
-  base_compiler_flags += " -DWSP_GGML_USE_METAL" # -DWSP_GGML_METAL_NDEBUG
+  # GGMLMetalClass is an Objective-C class (process-global name); rename it per
+  # library so whisper-rn and llama-rn can both be built from source in one app.
+  base_compiler_flags += " -DGGML_USE_METAL -DGGMLMetalClass=RNWhisperGGMLMetalClass" # -DGGML_METAL_NDEBUG
 end
 
 Pod::Spec.new do |s|

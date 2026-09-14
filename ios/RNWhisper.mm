@@ -120,7 +120,7 @@ MetalAvailability getMetalAvailability(bool requestedGpu) {
         return availability;
     }
 
-#if defined(WSP_GGML_USE_METAL)
+#if defined(GGML_USE_METAL)
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     bool supportsMetal = false;
 

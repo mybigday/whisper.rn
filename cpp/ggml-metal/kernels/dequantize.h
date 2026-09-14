@@ -2,9 +2,9 @@
 
 #include "common.h"
 
-#define WSP_GGML_COMMON_DECL_METAL
-#define WSP_GGML_COMMON_IMPL_METAL
-#if defined(WSP_GGML_METAL_EMBED_LIBRARY)
+#define GGML_COMMON_DECL_METAL
+#define GGML_COMMON_IMPL_METAL
+#if defined(GGML_METAL_EMBED_LIBRARY)
 __embed_ggml-common.h__
 #else
 #include "ggml-common.h"
@@ -14,39 +14,39 @@ __embed_ggml-common.h__
 
 // NOTE: this is not dequantizing - we are simply fitting the template
 template <typename type4x4>
-void wsp_dewsp_quantize_f32(device const float4x4 * src, short il, thread type4x4 & reg) {
+void dequantize_f32(device const float4x4 * src, short il, thread type4x4 & reg) {
     reg = (type4x4)(*src);
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_f32_t4(device const float4 * src, short il, thread type4 & reg) {
+void dequantize_f32_t4(device const float4 * src, short il, thread type4 & reg) {
     reg = (type4)(*src);
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_f16(device const half4x4 * src, short il, thread type4x4 & reg) {
+void dequantize_f16(device const half4x4 * src, short il, thread type4x4 & reg) {
     reg = (type4x4)(*src);
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_f16_t4(device const half4 * src, short il, thread type4 & reg) {
+void dequantize_f16_t4(device const half4 * src, short il, thread type4 & reg) {
     reg = (type4)(*(src));
 }
 
-#if defined(WSP_GGML_METAL_HAS_BF16)
+#if defined(GGML_METAL_HAS_BF16)
 template <typename type4x4>
-void wsp_dewsp_quantize_bf16(device const bfloat4x4 * src, short il, thread type4x4 & reg) {
+void dequantize_bf16(device const bfloat4x4 * src, short il, thread type4x4 & reg) {
     reg = (type4x4)(*src);
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_bf16_t4(device const bfloat4 * src, short il, thread type4 & reg) {
+void dequantize_bf16_t4(device const bfloat4 * src, short il, thread type4 & reg) {
     reg = (type4)(*(src));
 }
 #endif
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q1_0(device const block_q1_0 * xb, short il, thread type4x4 & reg) {
+void dequantize_q1_0(device const block_q1_0 * xb, short il, thread type4x4 & reg) {
     device const uint8_t * qs = xb->qs;
     const float d = xb->d;
     const float neg_d = -d;
@@ -79,7 +79,7 @@ void wsp_dewsp_quantize_q1_0(device const block_q1_0 * xb, short il, thread type
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q1_0_t4(device const block_q1_0 * xb, short il, thread type4 & reg) {
+void dequantize_q1_0_t4(device const block_q1_0 * xb, short il, thread type4 & reg) {
     const float d = xb->d;
     const float neg_d = -d;
     const int base = il * 4;
@@ -96,7 +96,7 @@ void wsp_dewsp_quantize_q1_0_t4(device const block_q1_0 * xb, short il, thread t
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q2_0(device const block_q2_0 * xb, short il, thread type4x4 & reg) {
+void dequantize_q2_0(device const block_q2_0 * xb, short il, thread type4x4 & reg) {
     device const uint8_t * qs = xb->qs;
     const float d = xb->d;
 
@@ -115,7 +115,7 @@ void wsp_dewsp_quantize_q2_0(device const block_q2_0 * xb, short il, thread type
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q2_0_t4(device const block_q2_0 * xb, short il, thread type4 & reg) {
+void dequantize_q2_0_t4(device const block_q2_0 * xb, short il, thread type4 & reg) {
     const float d = xb->d;
     const uint8_t b = xb->qs[il];
 
@@ -129,7 +129,7 @@ void wsp_dewsp_quantize_q2_0_t4(device const block_q2_0 * xb, short il, thread t
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q4_0(device const block_q4_0 * xb, short il, thread type4x4 & reg) {
+void dequantize_q4_0(device const block_q4_0 * xb, short il, thread type4x4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 1);
     const float d1 = il ? (xb->d / 16.h) : xb->d;
     const float d2 = d1 / 256.f;
@@ -148,7 +148,7 @@ void wsp_dewsp_quantize_q4_0(device const block_q4_0 * xb, short il, thread type
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q4_0_t4(device const block_q4_0 * xb, short il, thread type4 & reg) {
+void dequantize_q4_0_t4(device const block_q4_0 * xb, short il, thread type4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 1);
     const float d1 = (il/4) ? (xb->d / 16.h) : xb->d;
     const float d2 = d1 / 256.f;
@@ -165,7 +165,7 @@ void wsp_dewsp_quantize_q4_0_t4(device const block_q4_0 * xb, short il, thread t
 
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q4_1(device const block_q4_1 * xb, short il, thread type4x4 & reg) {
+void dequantize_q4_1(device const block_q4_1 * xb, short il, thread type4x4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 2);
     const float d1 = il ? (xb->d / 16.h) : xb->d;
     const float d2 = d1 / 256.f;
@@ -184,7 +184,7 @@ void wsp_dewsp_quantize_q4_1(device const block_q4_1 * xb, short il, thread type
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q4_1_t4(device const block_q4_1 * xb, short il, thread type4 & reg) {
+void dequantize_q4_1_t4(device const block_q4_1 * xb, short il, thread type4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 2);
     const float d1 = (il/4) ? (xb->d / 16.h) : xb->d;
     const float d2 = d1 / 256.f;
@@ -199,7 +199,7 @@ void wsp_dewsp_quantize_q4_1_t4(device const block_q4_1 * xb, short il, thread t
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q5_0(device const block_q5_0 * xb, short il, thread type4x4 & reg) {
+void dequantize_q5_0(device const block_q5_0 * xb, short il, thread type4x4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 3);
     const float d = xb->d;
     const float md = -16.h * xb->d;
@@ -231,7 +231,7 @@ void wsp_dewsp_quantize_q5_0(device const block_q5_0 * xb, short il, thread type
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q5_0_t4(device const block_q5_0 * xb, short il, thread type4 & reg) {
+void dequantize_q5_0_t4(device const block_q5_0 * xb, short il, thread type4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 3);
     const float d = xb->d;
     const float md = -16.h * xb->d;
@@ -261,7 +261,7 @@ void wsp_dewsp_quantize_q5_0_t4(device const block_q5_0 * xb, short il, thread t
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q5_1(device const block_q5_1 * xb, short il, thread type4x4 & reg) {
+void dequantize_q5_1(device const block_q5_1 * xb, short il, thread type4x4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 4);
     const float d = xb->d;
     const float m = xb->m;
@@ -293,7 +293,7 @@ void wsp_dewsp_quantize_q5_1(device const block_q5_1 * xb, short il, thread type
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q5_1_t4(device const block_q5_1 * xb, short il, thread type4 & reg) {
+void dequantize_q5_1_t4(device const block_q5_1 * xb, short il, thread type4 & reg) {
     device const uint16_t * qs = ((device const uint16_t *)xb + 4);
     const float d = xb->d;
     const float m = xb->m;
@@ -323,7 +323,7 @@ void wsp_dewsp_quantize_q5_1_t4(device const block_q5_1 * xb, short il, thread t
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q8_0(device const block_q8_0 *xb, short il, thread type4x4 & reg) {
+void dequantize_q8_0(device const block_q8_0 *xb, short il, thread type4x4 & reg) {
     device const packed_char4 * qs = (device const packed_char4 *) xb->qs;
     const float d = xb->d;
 
@@ -337,7 +337,7 @@ void wsp_dewsp_quantize_q8_0(device const block_q8_0 *xb, short il, thread type4
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_q8_0_t4(device const block_q8_0 *xb, short il, thread type4 & reg) {
+void dequantize_q8_0_t4(device const block_q8_0 *xb, short il, thread type4 & reg) {
     device const packed_char4 * qs = (device const packed_char4 *) xb->qs;
     const float d = xb->d;
 
@@ -345,7 +345,7 @@ void wsp_dewsp_quantize_q8_0_t4(device const block_q8_0 *xb, short il, thread ty
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_mxfp4(device const block_mxfp4 * xb, short il, thread type4x4 & reg) {
+void dequantize_mxfp4(device const block_mxfp4 * xb, short il, thread type4x4 & reg) {
     device const uint8_t * q2 = (device const uint8_t *)xb->qs;
 
     const float d = e8m0_to_fp32(xb->e);
@@ -360,7 +360,7 @@ void wsp_dewsp_quantize_mxfp4(device const block_mxfp4 * xb, short il, thread ty
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_mxfp4_t4(device const block_mxfp4 * xb, short il, thread type4 & reg) {
+void dequantize_mxfp4_t4(device const block_mxfp4 * xb, short il, thread type4 & reg) {
     device const uint8_t * q2 = (device const uint8_t *)xb->qs;
 
     const float d = e8m0_to_fp32(xb->e);
@@ -375,7 +375,7 @@ void wsp_dewsp_quantize_mxfp4_t4(device const block_mxfp4 * xb, short il, thread
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q2_K(device const block_q2_K *xb, short il, thread type4x4 & reg) {
+void dequantize_q2_K(device const block_q2_K *xb, short il, thread type4x4 & reg) {
     const float d = xb->d;
     const float min = xb->dmin;
     device const uint8_t * q = (device const uint8_t *)xb->qs;
@@ -394,7 +394,7 @@ void wsp_dewsp_quantize_q2_K(device const block_q2_K *xb, short il, thread type4
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q3_K(device const block_q3_K *xb, short il, thread type4x4 & reg) {
+void dequantize_q3_K(device const block_q3_K *xb, short il, thread type4x4 & reg) {
     const half d_all = xb->d;
     device const uint8_t * q = (device const uint8_t *)xb->qs;
     device const uint8_t * h = (device const uint8_t *)xb->hmask;
@@ -428,7 +428,7 @@ static inline uchar2 get_scale_min_k4_just2(int j, int k, device const uchar * q
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q4_K(device const block_q4_K * xb, short il, thread type4x4 & reg) {
+void dequantize_q4_K(device const block_q4_K * xb, short il, thread type4x4 & reg) {
     device const uchar * q = xb->qs;
 
     short is = (il/4) * 2;
@@ -447,7 +447,7 @@ void wsp_dewsp_quantize_q4_K(device const block_q4_K * xb, short il, thread type
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q5_K(device const block_q5_K *xb, short il, thread type4x4 & reg) {
+void dequantize_q5_K(device const block_q5_K *xb, short il, thread type4x4 & reg) {
     device const uint8_t * q  = xb->qs;
     device const uint8_t * qh = xb->qh;
 
@@ -470,7 +470,7 @@ void wsp_dewsp_quantize_q5_K(device const block_q5_K *xb, short il, thread type4
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_q6_K(device const block_q6_K *xb, short il, thread type4x4 & reg) {
+void dequantize_q6_K(device const block_q6_K *xb, short il, thread type4x4 & reg) {
     const half d_all = xb->d;
     device const uint16_t * ql = (device const uint16_t *)xb->ql;
     device const uint16_t * qh = (device const uint16_t *)xb->qh;
@@ -503,7 +503,7 @@ void wsp_dewsp_quantize_q6_K(device const block_q6_K *xb, short il, thread type4
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq2_xxs(device const block_iq2_xxs * xb, short il, thread type4x4 & reg) {
+void dequantize_iq2_xxs(device const block_iq2_xxs * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const float d = xb->d;
     const int ib32 = il/2;
@@ -528,7 +528,7 @@ void wsp_dewsp_quantize_iq2_xxs(device const block_iq2_xxs * xb, short il, threa
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq2_xs(device const block_iq2_xs * xb, short il, thread type4x4 & reg) {
+void dequantize_iq2_xs(device const block_iq2_xs * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const float d = xb->d;
     const int ib32 = il/2;
@@ -549,7 +549,7 @@ void wsp_dewsp_quantize_iq2_xs(device const block_iq2_xs * xb, short il, thread 
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq3_xxs(device const block_iq3_xxs * xb, short il, thread type4x4 & reg) {
+void dequantize_iq3_xxs(device const block_iq3_xxs * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const float d = xb->d;
     const int ib32 = il/2;
@@ -576,7 +576,7 @@ void wsp_dewsp_quantize_iq3_xxs(device const block_iq3_xxs * xb, short il, threa
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq3_s(device const block_iq3_s * xb, short il, thread type4x4 & reg) {
+void dequantize_iq3_s(device const block_iq3_s * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const float d = xb->d;
     const int ib32 = il/2;
@@ -601,7 +601,7 @@ void wsp_dewsp_quantize_iq3_s(device const block_iq3_s * xb, short il, thread ty
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq2_s(device const block_iq2_s * xb, short il, thread type4x4 & reg) {
+void dequantize_iq2_s(device const block_iq2_s * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const float d = xb->d;
     const int ib32 = il/2;
@@ -620,7 +620,7 @@ void wsp_dewsp_quantize_iq2_s(device const block_iq2_s * xb, short il, thread ty
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq1_s(device const block_iq1_s * xb, short il, thread type4x4 & reg) {
+void dequantize_iq1_s(device const block_iq1_s * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const int ib32 = il/2;
     il = il%2;
@@ -641,7 +641,7 @@ void wsp_dewsp_quantize_iq1_s(device const block_iq1_s * xb, short il, thread ty
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq1_m(device const block_iq1_m * xb, short il, thread type4x4 & reg) {
+void dequantize_iq1_m(device const block_iq1_m * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const int ib32 = il/2;
     il = il%2;
@@ -668,7 +668,7 @@ void wsp_dewsp_quantize_iq1_m(device const block_iq1_m * xb, short il, thread ty
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq4_nl(device const block_iq4_nl * xb, short il, thread type4x4 & reg) {
+void dequantize_iq4_nl(device const block_iq4_nl * xb, short il, thread type4x4 & reg) {
     device const uint16_t * q4 = (device const uint16_t *)xb->qs;
     const float d = xb->d;
     uint32_t aux32;
@@ -683,7 +683,7 @@ void wsp_dewsp_quantize_iq4_nl(device const block_iq4_nl * xb, short il, thread 
 }
 
 template <typename type4>
-void wsp_dewsp_quantize_iq4_nl_t4(device const block_iq4_nl * xb, short il, thread type4 & reg) {
+void dequantize_iq4_nl_t4(device const block_iq4_nl * xb, short il, thread type4 & reg) {
     device const uint16_t * q4 = (device const uint16_t *)xb->qs;
     const float d = xb->d;
     uint32_t aux32;
@@ -696,7 +696,7 @@ void wsp_dewsp_quantize_iq4_nl_t4(device const block_iq4_nl * xb, short il, thre
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_iq4_xs(device const block_iq4_xs * xb, short il, thread type4x4 & reg) {
+void dequantize_iq4_xs(device const block_iq4_xs * xb, short il, thread type4x4 & reg) {
     // il is 0...15 for QK_K = 256 => index of block of 32 is il/2
     const int ib32 = il/2;
     il = il%2;
@@ -716,7 +716,7 @@ void wsp_dewsp_quantize_iq4_xs(device const block_iq4_xs * xb, short il, thread 
 }
 
 template <typename type4x4>
-void wsp_dewsp_quantize_tq2_0(device const block_tq2_0 * xb, short il, thread type4x4 & reg) {
+void dequantize_tq2_0(device const block_tq2_0 * xb, short il, thread type4x4 & reg) {
     device const uint8_t * qs = xb->qs;
     const float d = xb->d;
 

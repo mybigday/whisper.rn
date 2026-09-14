@@ -8,4 +8,4 @@
 +    return "1.9.3";
  }
  
- WSP_GGML_ATTRIBUTE_FORMAT(2, 3)
+ GGML_ATTRIBUTE_FORMAT(2, 3)

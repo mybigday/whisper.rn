@@ -108,36 +108,36 @@ static const std::map<asr_system, std::map<asr_tensor, const char *>> ASR_TENSOR
     },
 };
 
-static const std::map<asr_tensor, wsp_ggml_op> ASR_TENSOR_INFO = {
-    {ASR_TENSOR_ENC_POS_EMBD,          WSP_GGML_OP_ADD},
-    {ASR_TENSOR_DEC_POS_EMBD,          WSP_GGML_OP_GET_ROWS},
-    // Note: ASR_TENSOR_DEC_TOKEN_EMBD_WEIGHT is also used by WSP_GGML_OP_MAT_MUL. Need to figure out a way how to handle
+static const std::map<asr_tensor, ggml_op> ASR_TENSOR_INFO = {
+    {ASR_TENSOR_ENC_POS_EMBD,          GGML_OP_ADD},
+    {ASR_TENSOR_DEC_POS_EMBD,          GGML_OP_GET_ROWS},
+    // Note: ASR_TENSOR_DEC_TOKEN_EMBD_WEIGHT is also used by GGML_OP_MAT_MUL. Need to figure out a way how to handle
     // weight tensors that are used by multiple different operators when extra_buffer_type implementations accelerate
-    // more than just WSP_GGML_OP_MUL_MAT.
-    {ASR_TENSOR_DEC_TOKEN_EMBD_WEIGHT, WSP_GGML_OP_GET_ROWS},
-    {ASR_TENSOR_LN_WEIGHT,             WSP_GGML_OP_MUL},
-    {ASR_TENSOR_LN_BIAS,               WSP_GGML_OP_ADD},
-    {ASR_TENSOR_CONV1_WEIGHT,          WSP_GGML_OP_IM2COL},
-    {ASR_TENSOR_CONV1_BIAS,            WSP_GGML_OP_ADD},
-    {ASR_TENSOR_CONV2_WEIGHT,          WSP_GGML_OP_IM2COL},
-    {ASR_TENSOR_CONV2_BIAS,            WSP_GGML_OP_ADD},
-    {ASR_TENSOR_LN_POST_WEIGHT,        WSP_GGML_OP_MUL},
-    {ASR_TENSOR_LN_POST_BIAS,          WSP_GGML_OP_ADD},
-    {ASR_TENSOR_MLP_LN_WEIGHT,         WSP_GGML_OP_MUL},
-    {ASR_TENSOR_MLP_LN_BIAS,           WSP_GGML_OP_ADD},
-    {ASR_TENSOR_MLP_0_WEIGHT,          WSP_GGML_OP_MUL_MAT},
-    {ASR_TENSOR_MLP_0_BIAS,            WSP_GGML_OP_ADD},
-    {ASR_TENSOR_MLP_2_WEIGHT,          WSP_GGML_OP_MUL_MAT},
-    {ASR_TENSOR_MLP_2_BIAS,            WSP_GGML_OP_ADD},
-    {ASR_TENSOR_ATTN_LN_WEIGHT,        WSP_GGML_OP_MUL},
-    {ASR_TENSOR_ATTN_LN_BIAS,          WSP_GGML_OP_ADD},
-    {ASR_TENSOR_ATTN_QUERY_WEIGHT,     WSP_GGML_OP_MUL_MAT},
-    {ASR_TENSOR_ATTN_QUERY_BIAS,       WSP_GGML_OP_ADD},
-    {ASR_TENSOR_ATTN_KEY_WEIGHT,       WSP_GGML_OP_MUL_MAT},
-    {ASR_TENSOR_ATTN_VALUE_WEIGHT,     WSP_GGML_OP_MUL_MAT},
-    {ASR_TENSOR_ATTN_VALUE_BIAS,       WSP_GGML_OP_ADD},
-    {ASR_TENSOR_ATTN_OUT_WEIGHT,       WSP_GGML_OP_MUL_MAT},
-    {ASR_TENSOR_ATTN_OUT_BIAS,         WSP_GGML_OP_ADD},
+    // more than just GGML_OP_MUL_MAT.
+    {ASR_TENSOR_DEC_TOKEN_EMBD_WEIGHT, GGML_OP_GET_ROWS},
+    {ASR_TENSOR_LN_WEIGHT,             GGML_OP_MUL},
+    {ASR_TENSOR_LN_BIAS,               GGML_OP_ADD},
+    {ASR_TENSOR_CONV1_WEIGHT,          GGML_OP_IM2COL},
+    {ASR_TENSOR_CONV1_BIAS,            GGML_OP_ADD},
+    {ASR_TENSOR_CONV2_WEIGHT,          GGML_OP_IM2COL},
+    {ASR_TENSOR_CONV2_BIAS,            GGML_OP_ADD},
+    {ASR_TENSOR_LN_POST_WEIGHT,        GGML_OP_MUL},
+    {ASR_TENSOR_LN_POST_BIAS,          GGML_OP_ADD},
+    {ASR_TENSOR_MLP_LN_WEIGHT,         GGML_OP_MUL},
+    {ASR_TENSOR_MLP_LN_BIAS,           GGML_OP_ADD},
+    {ASR_TENSOR_MLP_0_WEIGHT,          GGML_OP_MUL_MAT},
+    {ASR_TENSOR_MLP_0_BIAS,            GGML_OP_ADD},
+    {ASR_TENSOR_MLP_2_WEIGHT,          GGML_OP_MUL_MAT},
+    {ASR_TENSOR_MLP_2_BIAS,            GGML_OP_ADD},
+    {ASR_TENSOR_ATTN_LN_WEIGHT,        GGML_OP_MUL},
+    {ASR_TENSOR_ATTN_LN_BIAS,          GGML_OP_ADD},
+    {ASR_TENSOR_ATTN_QUERY_WEIGHT,     GGML_OP_MUL_MAT},
+    {ASR_TENSOR_ATTN_QUERY_BIAS,       GGML_OP_ADD},
+    {ASR_TENSOR_ATTN_KEY_WEIGHT,       GGML_OP_MUL_MAT},
+    {ASR_TENSOR_ATTN_VALUE_WEIGHT,     GGML_OP_MUL_MAT},
+    {ASR_TENSOR_ATTN_VALUE_BIAS,       GGML_OP_ADD},
+    {ASR_TENSOR_ATTN_OUT_WEIGHT,       GGML_OP_MUL_MAT},
+    {ASR_TENSOR_ATTN_OUT_BIAS,         GGML_OP_ADD},
 };
 
 enum vad_tensor {
@@ -158,24 +158,24 @@ enum vad_tensor {
     VAD_TENSOR_FINAL_CONV_BIAS,
 };
 
-static const std::map<vad_tensor, wsp_ggml_op> VAD_TENSOR_OPS = {
-    {VAD_TENSOR_STFT_BASIS,          WSP_GGML_OP_IM2COL},
-    {VAD_TENSOR_ENC_0_WEIGHT,        WSP_GGML_OP_IM2COL},
-    {VAD_TENSOR_ENC_0_BIAS,          WSP_GGML_OP_ADD},
-    {VAD_TENSOR_ENC_1_WEIGHT,        WSP_GGML_OP_IM2COL},
-    {VAD_TENSOR_ENC_1_BIAS,          WSP_GGML_OP_ADD},
-    {VAD_TENSOR_ENC_2_WEIGHT,        WSP_GGML_OP_IM2COL},
-    {VAD_TENSOR_ENC_2_BIAS,          WSP_GGML_OP_ADD},
-    {VAD_TENSOR_ENC_3_WEIGHT,        WSP_GGML_OP_IM2COL},
-    {VAD_TENSOR_ENC_3_BIAS,          WSP_GGML_OP_ADD},
+static const std::map<vad_tensor, ggml_op> VAD_TENSOR_OPS = {
+    {VAD_TENSOR_STFT_BASIS,          GGML_OP_IM2COL},
+    {VAD_TENSOR_ENC_0_WEIGHT,        GGML_OP_IM2COL},
+    {VAD_TENSOR_ENC_0_BIAS,          GGML_OP_ADD},
+    {VAD_TENSOR_ENC_1_WEIGHT,        GGML_OP_IM2COL},
+    {VAD_TENSOR_ENC_1_BIAS,          GGML_OP_ADD},
+    {VAD_TENSOR_ENC_2_WEIGHT,        GGML_OP_IM2COL},
+    {VAD_TENSOR_ENC_2_BIAS,          GGML_OP_ADD},
+    {VAD_TENSOR_ENC_3_WEIGHT,        GGML_OP_IM2COL},
+    {VAD_TENSOR_ENC_3_BIAS,          GGML_OP_ADD},
 
-    {VAD_TENSOR_LSTM_WEIGHT_IH,      WSP_GGML_OP_MUL_MAT},
-    {VAD_TENSOR_LSTM_WEIGHT_HH,      WSP_GGML_OP_MUL_MAT},
-    {VAD_TENSOR_LSTM_BIAS_IH,        WSP_GGML_OP_ADD},
-    {VAD_TENSOR_LSTM_BIAS_HH,        WSP_GGML_OP_ADD},
+    {VAD_TENSOR_LSTM_WEIGHT_IH,      GGML_OP_MUL_MAT},
+    {VAD_TENSOR_LSTM_WEIGHT_HH,      GGML_OP_MUL_MAT},
+    {VAD_TENSOR_LSTM_BIAS_IH,        GGML_OP_ADD},
+    {VAD_TENSOR_LSTM_BIAS_HH,        GGML_OP_ADD},
 
-    {VAD_TENSOR_FINAL_CONV_WEIGHT,   WSP_GGML_OP_IM2COL},
-    {VAD_TENSOR_FINAL_CONV_BIAS,     WSP_GGML_OP_ADD}
+    {VAD_TENSOR_FINAL_CONV_WEIGHT,   GGML_OP_IM2COL},
+    {VAD_TENSOR_FINAL_CONV_BIAS,     GGML_OP_ADD}
 };
 
 static const std::map<vad_tensor, const char *> VAD_TENSOR_NAMES = {

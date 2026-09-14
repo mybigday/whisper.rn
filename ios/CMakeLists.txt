@@ -5,23 +5,27 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # iOS specific settings
-set(CMAKE_OSX_DEPLOYMENT_TARGET 13.0)
+set(CMAKE_OSX_DEPLOYMENT_TARGET 15.0)
 set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE NO)
 
 # Dependencies and compile options
 add_definitions(
     -DNDEBUG
     -DO3
-    -DWSP_GGML_USE_CPU
-    -DWSP_GGML_USE_ACCELERATE
-    -DWSP_GGML_USE_METAL
-    -DWSP_GGML_METAL_USE_BF16
+    -DGGML_USE_CPU
+    -DGGML_USE_ACCELERATE
+    -DGGML_USE_METAL
+    -DGGML_METAL_USE_BF16
+    # ggml-metal's bundle-lookup Objective-C class is process-global; rename it
+    # per library so this framework can coexist with other ggml-based libraries
+    # (e.g. llama.rn) in the same app.
+    -DGGMLMetalClass=RNWhisperGGMLMetalClass
     -DWHISPER_USE_COREML
     -DWHISPER_COREML_ALLOW_FALLBACK
 )
 
 if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64;x86_64")
-    add_definitions(-DWSP_GGML_CPU_GENERIC)
+    add_definitions(-DGGML_CPU_GENERIC)
 endif ()
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../cpp)
@@ -94,6 +98,14 @@ target_include_directories(rnwhisper
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp/coreml>
         $<INSTALL_INTERFACE:include>
 )
+
+# Keep ggml/gguf out of the framework's export table so a second ggml copy in
+# the app (e.g. llama.rn) can never be resolved through this image. Hidden
+# inline visibility also stops dyld from coalescing header-inline functions
+# across the two frameworks.
+target_compile_options(rnwhisper PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-fvisibility-inlines-hidden>)
+target_link_options(rnwhisper PRIVATE
+    "LINKER:-unexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/unexported-symbols.txt")
 
 # Link required frameworks
 target_link_libraries(rnwhisper PRIVATE

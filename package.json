@@ -8,6 +8,13 @@
   "react-native": "src/index",
   "source": "src/index",
   "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "react-native": "./src/index.ts",
+      "types": "./lib/typescript/index.d.ts",
+      "import": "./lib/module/index.js",
+      "require": "./lib/commonjs/index.js"
+    },
     "./*": {
       "react-native": "./src/*.ts",
       "types": "./lib/typescript/*.d.ts",

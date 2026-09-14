@@ -44,28 +44,28 @@ static T byteswap(T value) {
 }
 
 template<typename T>
-static void byteswap_tensor_data(wsp_ggml_tensor * tensor) {
+static void byteswap_tensor_data(ggml_tensor * tensor) {
     T * datum = reinterpret_cast<T *>(tensor->data);
-    for (int i = 0; i < wsp_ggml_nelements(tensor); i++) {
+    for (int i = 0; i < ggml_nelements(tensor); i++) {
         datum[i] = byteswap(datum[i]);
     }
 }
 
-static void byteswap_tensor(wsp_ggml_tensor * tensor) {
+static void byteswap_tensor(ggml_tensor * tensor) {
     switch (tensor->type) {
-        case WSP_GGML_TYPE_I16: {
+        case GGML_TYPE_I16: {
             byteswap_tensor_data<int16_t>(tensor);
             break;
         }
-        case WSP_GGML_TYPE_F16: {
-            byteswap_tensor_data<wsp_ggml_fp16_t>(tensor);
+        case GGML_TYPE_F16: {
+            byteswap_tensor_data<ggml_fp16_t>(tensor);
             break;
         }
-        case WSP_GGML_TYPE_I32: {
+        case GGML_TYPE_I32: {
             byteswap_tensor_data<int32_t>(tensor);
             break;
         }
-        case WSP_GGML_TYPE_F32: {
+        case GGML_TYPE_F32: {
             byteswap_tensor_data<float>(tensor);
             break;
         }
@@ -107,18 +107,18 @@ static void byteswap_tensor(wsp_ggml_tensor * tensor) {
 //
 
 PARAKEET_ATTRIBUTE_FORMAT(2, 3)
-static void parakeet_log_internal        (wsp_ggml_log_level level, const char * format, ...);
-static void parakeet_log_callback_default(wsp_ggml_log_level level, const char * text, void * user_data);
+static void parakeet_log_internal        (ggml_log_level level, const char * format, ...);
+static void parakeet_log_callback_default(ggml_log_level level, const char * text, void * user_data);
 
-#define PARAKEET_LOG_ERROR(...) parakeet_log_internal(WSP_GGML_LOG_LEVEL_ERROR, __VA_ARGS__)
-#define PARAKEET_LOG_WARN(...)  parakeet_log_internal(WSP_GGML_LOG_LEVEL_WARN , __VA_ARGS__)
-#define PARAKEET_LOG_INFO(...)  parakeet_log_internal(WSP_GGML_LOG_LEVEL_INFO , __VA_ARGS__)
+#define PARAKEET_LOG_ERROR(...) parakeet_log_internal(GGML_LOG_LEVEL_ERROR, __VA_ARGS__)
+#define PARAKEET_LOG_WARN(...)  parakeet_log_internal(GGML_LOG_LEVEL_WARN , __VA_ARGS__)
+#define PARAKEET_LOG_INFO(...)  parakeet_log_internal(GGML_LOG_LEVEL_INFO , __VA_ARGS__)
 
 // define this to enable verbose trace logging - useful for debugging purposes
 //#define PARAKEET_DEBUG
 
 #if defined(PARAKEET_DEBUG)
-#define PARAKEET_LOG_DEBUG(...) parakeet_log_internal(WSP_GGML_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#define PARAKEET_LOG_DEBUG(...) parakeet_log_internal(GGML_LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
 #define PARAKEET_LOG_DEBUG(...)
 #endif
@@ -146,10 +146,10 @@ static std::string format(const char * fmt, ...) {
     va_start(ap, fmt);
     va_copy(ap2, ap);
     int size = vsnprintf(NULL, 0, fmt, ap);
-    WSP_GGML_ASSERT(size >= 0 && size < INT_MAX); // NOLINT
+    GGML_ASSERT(size >= 0 && size < INT_MAX); // NOLINT
     std::vector<char> buf(size + 1);
     int size2 = vsnprintf(buf.data(), size + 1, fmt, ap2);
-    WSP_GGML_ASSERT(size2 == size);
+    GGML_ASSERT(size2 == size);
     va_end(ap2);
     va_end(ap);
     return std::string(buf.data(), size);
@@ -159,48 +159,48 @@ static std::string format(const char * fmt, ...) {
 // ggml helpers
 //
 
-static bool wsp_ggml_graph_compute_helper(
-          struct wsp_ggml_cgraph * graph,
+static bool ggml_graph_compute_helper(
+          struct ggml_cgraph * graph,
                          int   n_threads,
-         wsp_ggml_abort_callback   abort_callback,
+         ggml_abort_callback   abort_callback,
                         void * abort_callback_data) {
-    wsp_ggml_backend_ptr backend { wsp_ggml_backend_init_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU, nullptr) };
+    ggml_backend_ptr backend { ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr) };
 
-    auto * reg = wsp_ggml_backend_dev_backend_reg(wsp_ggml_backend_get_device(backend.get()));
+    auto * reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(backend.get()));
 
-    auto * set_abort_callback_fn = (wsp_ggml_backend_set_abort_callback_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_set_abort_callback");
+    auto * set_abort_callback_fn = (ggml_backend_set_abort_callback_t) ggml_backend_reg_get_proc_address(reg, "ggml_backend_set_abort_callback");
     if (set_abort_callback_fn) {
         set_abort_callback_fn(backend.get(), abort_callback, abort_callback_data);
     }
 
-    auto wsp_ggml_backend_set_n_threads_fn = (wsp_ggml_backend_set_n_threads_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_set_n_threads");
-    if (wsp_ggml_backend_set_n_threads_fn) {
-        wsp_ggml_backend_set_n_threads_fn(backend.get(), n_threads);
+    auto ggml_backend_set_n_threads_fn = (ggml_backend_set_n_threads_t) ggml_backend_reg_get_proc_address(reg, "ggml_backend_set_n_threads");
+    if (ggml_backend_set_n_threads_fn) {
+        ggml_backend_set_n_threads_fn(backend.get(), n_threads);
     }
 
-    return wsp_ggml_backend_graph_compute(backend.get(), graph) == WSP_GGML_STATUS_SUCCESS;
+    return ggml_backend_graph_compute(backend.get(), graph) == GGML_STATUS_SUCCESS;
 }
 
-static bool wsp_ggml_graph_compute_helper(
-      wsp_ggml_backend_sched_t   sched,
-        struct wsp_ggml_cgraph * graph,
+static bool ggml_graph_compute_helper(
+      ggml_backend_sched_t   sched,
+        struct ggml_cgraph * graph,
                        int   n_threads,
                       bool   sched_reset = true) {
-    for (int i = 0; i < wsp_ggml_backend_sched_get_n_backends(sched); ++i) {
-        wsp_ggml_backend_t backend = wsp_ggml_backend_sched_get_backend(sched, i);
-        wsp_ggml_backend_dev_t dev = wsp_ggml_backend_get_device(backend);
-        wsp_ggml_backend_reg_t reg = dev ? wsp_ggml_backend_dev_backend_reg(dev) : nullptr;
+    for (int i = 0; i < ggml_backend_sched_get_n_backends(sched); ++i) {
+        ggml_backend_t backend = ggml_backend_sched_get_backend(sched, i);
+        ggml_backend_dev_t dev = ggml_backend_get_device(backend);
+        ggml_backend_reg_t reg = dev ? ggml_backend_dev_backend_reg(dev) : nullptr;
 
-        auto * fn_set_n_threads = (wsp_ggml_backend_set_n_threads_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_set_n_threads");
+        auto * fn_set_n_threads = (ggml_backend_set_n_threads_t) ggml_backend_reg_get_proc_address(reg, "ggml_backend_set_n_threads");
         if (fn_set_n_threads) {
             fn_set_n_threads(backend, n_threads);
         }
     }
 
-    const bool t = (wsp_ggml_backend_sched_graph_compute(sched, graph) == WSP_GGML_STATUS_SUCCESS);
+    const bool t = (ggml_backend_sched_graph_compute(sched, graph) == GGML_STATUS_SUCCESS);
 
     if (!t || sched_reset) {
-        wsp_ggml_backend_sched_reset(sched);
+        ggml_backend_sched_reset(sched);
     }
 
     return t;
@@ -260,9 +260,9 @@ struct parakeet_batch {
     int8_t          *  logits;
 };
 
-// wsp_ggml_backend_sched wrapper for parakeet usage
+// ggml_backend_sched wrapper for parakeet usage
 struct parakeet_sched {
-    wsp_ggml_backend_sched_t sched = nullptr;
+    ggml_backend_sched_t sched = nullptr;
 
     std::vector<uint8_t> meta;
 };
@@ -296,82 +296,82 @@ struct parakeet_hparams {
 };
 
 struct parakeet_layer_encoder {
-    struct wsp_ggml_tensor * norm_ff1_w = nullptr;
-    struct wsp_ggml_tensor * norm_ff1_b = nullptr;
+    struct ggml_tensor * norm_ff1_w = nullptr;
+    struct ggml_tensor * norm_ff1_b = nullptr;
 
-    struct wsp_ggml_tensor * ff1_linear1_w = nullptr;
-    struct wsp_ggml_tensor * ff1_linear2_w = nullptr;
+    struct ggml_tensor * ff1_linear1_w = nullptr;
+    struct ggml_tensor * ff1_linear2_w = nullptr;
 
-    struct wsp_ggml_tensor * norm_conv_w = nullptr;
-    struct wsp_ggml_tensor * norm_conv_b = nullptr;
+    struct ggml_tensor * norm_conv_w = nullptr;
+    struct ggml_tensor * norm_conv_b = nullptr;
 
-    struct wsp_ggml_tensor * conv_pw1_w          = nullptr;  // pointwise_conv1
-    struct wsp_ggml_tensor * conv_dw_w           = nullptr;  // depthwise_conv
-    struct wsp_ggml_tensor * conv_bn_w           = nullptr;  // batch_norm weight
-    struct wsp_ggml_tensor * conv_bn_b           = nullptr;  // batch_norm bias
-    struct wsp_ggml_tensor * conv_bn_mean        = nullptr;  // batch_norm running_mean
-    struct wsp_ggml_tensor * conv_bn_var         = nullptr;  // batch_norm running_var
-    struct wsp_ggml_tensor * conv_bn_num_batches = nullptr;  // batch_norm num_batches_tracked
-    struct wsp_ggml_tensor * conv_pw2_w          = nullptr;  // pointwise_conv2
+    struct ggml_tensor * conv_pw1_w          = nullptr;  // pointwise_conv1
+    struct ggml_tensor * conv_dw_w           = nullptr;  // depthwise_conv
+    struct ggml_tensor * conv_bn_w           = nullptr;  // batch_norm weight
+    struct ggml_tensor * conv_bn_b           = nullptr;  // batch_norm bias
+    struct ggml_tensor * conv_bn_mean        = nullptr;  // batch_norm running_mean
+    struct ggml_tensor * conv_bn_var         = nullptr;  // batch_norm running_var
+    struct ggml_tensor * conv_bn_num_batches = nullptr;  // batch_norm num_batches_tracked
+    struct ggml_tensor * conv_pw2_w          = nullptr;  // pointwise_conv2
 
-    struct wsp_ggml_tensor * norm_attn_w = nullptr;
-    struct wsp_ggml_tensor * norm_attn_b = nullptr;
+    struct ggml_tensor * norm_attn_w = nullptr;
+    struct ggml_tensor * norm_attn_b = nullptr;
 
-    struct wsp_ggml_tensor * attn_pos_bias_u = nullptr;
-    struct wsp_ggml_tensor * attn_pos_bias_v = nullptr;
-    struct wsp_ggml_tensor * attn_q_w        = nullptr;
-    struct wsp_ggml_tensor * attn_k_w        = nullptr;
-    struct wsp_ggml_tensor * attn_v_w        = nullptr;
-    struct wsp_ggml_tensor * attn_out_w      = nullptr;
-    struct wsp_ggml_tensor * attn_pos_w      = nullptr;
+    struct ggml_tensor * attn_pos_bias_u = nullptr;
+    struct ggml_tensor * attn_pos_bias_v = nullptr;
+    struct ggml_tensor * attn_q_w        = nullptr;
+    struct ggml_tensor * attn_k_w        = nullptr;
+    struct ggml_tensor * attn_v_w        = nullptr;
+    struct ggml_tensor * attn_out_w      = nullptr;
+    struct ggml_tensor * attn_pos_w      = nullptr;
 
-    struct wsp_ggml_tensor * norm_ff2_w      = nullptr;
-    struct wsp_ggml_tensor * norm_ff2_b      = nullptr;
+    struct ggml_tensor * norm_ff2_w      = nullptr;
+    struct ggml_tensor * norm_ff2_b      = nullptr;
 
-    struct wsp_ggml_tensor * ff2_linear1_w = nullptr;
-    struct wsp_ggml_tensor * ff2_linear2_w = nullptr;
+    struct ggml_tensor * ff2_linear1_w = nullptr;
+    struct ggml_tensor * ff2_linear2_w = nullptr;
 
-    struct wsp_ggml_tensor * norm_out_w = nullptr;
-    struct wsp_ggml_tensor * norm_out_b = nullptr;
+    struct ggml_tensor * norm_out_w = nullptr;
+    struct ggml_tensor * norm_out_b = nullptr;
 };
 
 struct parakeet_lsmt_layer {
-    struct wsp_ggml_tensor * ih_w = nullptr;  // input-to-hidden weight
-    struct wsp_ggml_tensor * hh_w = nullptr;  // hidden-to-hidden weight
-    struct wsp_ggml_tensor * b_h = nullptr;   // bias (ih folded into hh at conversion time)
+    struct ggml_tensor * ih_w = nullptr;  // input-to-hidden weight
+    struct ggml_tensor * hh_w = nullptr;  // hidden-to-hidden weight
+    struct ggml_tensor * b_h = nullptr;   // bias (ih folded into hh at conversion time)
 };
 
 struct parakeet_prediction_network {
-    struct wsp_ggml_tensor * embed_w = nullptr;
+    struct ggml_tensor * embed_w = nullptr;
 
     std::vector<parakeet_lsmt_layer> lstm_layer;
 };
 
 struct parakeet_joint_network {
-    struct wsp_ggml_tensor * pred_w = nullptr;
-    struct wsp_ggml_tensor * pred_b = nullptr;
-    struct wsp_ggml_tensor * enc_w  = nullptr;
-    struct wsp_ggml_tensor * enc_b  = nullptr;
-    struct wsp_ggml_tensor * net_w  = nullptr;
-    struct wsp_ggml_tensor * net_b  = nullptr;
+    struct ggml_tensor * pred_w = nullptr;
+    struct ggml_tensor * pred_b = nullptr;
+    struct ggml_tensor * enc_w  = nullptr;
+    struct ggml_tensor * enc_b  = nullptr;
+    struct ggml_tensor * net_w  = nullptr;
+    struct ggml_tensor * net_b  = nullptr;
 };
 
 struct parakeet_model {
     parakeet_filters filters;
     parakeet_hparams hparams;
 
-    struct wsp_ggml_tensor * enc_pre_out_w    = nullptr;
-    struct wsp_ggml_tensor * enc_pre_out_b    = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_0_w = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_0_b = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_2_w = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_2_b = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_3_w = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_3_b = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_5_w = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_5_b = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_6_w = nullptr;
-    struct wsp_ggml_tensor * enc_pre_conv_6_b = nullptr;
+    struct ggml_tensor * enc_pre_out_w    = nullptr;
+    struct ggml_tensor * enc_pre_out_b    = nullptr;
+    struct ggml_tensor * enc_pre_conv_0_w = nullptr;
+    struct ggml_tensor * enc_pre_conv_0_b = nullptr;
+    struct ggml_tensor * enc_pre_conv_2_w = nullptr;
+    struct ggml_tensor * enc_pre_conv_2_b = nullptr;
+    struct ggml_tensor * enc_pre_conv_3_w = nullptr;
+    struct ggml_tensor * enc_pre_conv_3_b = nullptr;
+    struct ggml_tensor * enc_pre_conv_5_w = nullptr;
+    struct ggml_tensor * enc_pre_conv_5_b = nullptr;
+    struct ggml_tensor * enc_pre_conv_6_w = nullptr;
+    struct ggml_tensor * enc_pre_conv_6_b = nullptr;
 
     std::vector<parakeet_layer_encoder> layers;
 
@@ -381,17 +381,17 @@ struct parakeet_model {
 
     std::vector<uint32_t> tdt_durations;
 
-    std::vector<wsp_ggml_context *> ctxs;
+    std::vector<ggml_context *> ctxs;
 
-    std::vector<wsp_ggml_backend_buffer_t> buffers;
+    std::vector<ggml_backend_buffer_t> buffers;
 
     int n_loaded = 0;
-    std::map<std::string, struct wsp_ggml_tensor *> tensors;
+    std::map<std::string, struct ggml_tensor *> tensors;
 };
 
 struct parakeet_lstm_state_layer {
-    struct wsp_ggml_tensor * h_state = nullptr;
-    struct wsp_ggml_tensor * c_state = nullptr;
+    struct ggml_tensor * h_state = nullptr;
+    struct ggml_tensor * c_state = nullptr;
 };
 
 struct parakeet_lstm_state {
@@ -399,7 +399,7 @@ struct parakeet_lstm_state {
 
     std::vector<uint8_t> ctx_buf;
 
-    wsp_ggml_backend_buffer_t buffer = nullptr;
+    ggml_backend_buffer_t buffer = nullptr;
 };
 
 struct parakeet_state {
@@ -408,8 +408,8 @@ struct parakeet_state {
     int64_t t_decode_us = 0;
     int64_t t_predict_us = 0;
     int64_t t_predict_build_us   = 0; // time spent building the prediction graph
-    int64_t t_predict_alloc_us   = 0; // time spent in wsp_ggml_backend_sched_alloc_graph
-    int64_t t_predict_compute_us = 0; // time spent in wsp_ggml_graph_compute_helper
+    int64_t t_predict_alloc_us   = 0; // time spent in ggml_backend_sched_alloc_graph
+    int64_t t_predict_compute_us = 0; // time spent in ggml_graph_compute_helper
     int64_t t_mel_us = 0;
 
     int32_t n_sample = 0; // number of tokens sampled
@@ -425,22 +425,22 @@ struct parakeet_state {
 
     int n_frames = 0;
 
-    std::vector<wsp_ggml_backend_t> backends;
+    std::vector<ggml_backend_t> backends;
 
     parakeet_sched sched_encode;
     parakeet_sched sched_decode;
 
     // outputs from encoder stages
-    struct wsp_ggml_tensor * enc_out     = nullptr;
-    struct wsp_ggml_tensor * pred_out    = nullptr;
+    struct ggml_tensor * enc_out     = nullptr;
+    struct ggml_tensor * pred_out    = nullptr;
 
     std::vector<uint8_t> enc_out_buf;
-    wsp_ggml_backend_buffer_t enc_out_buffer = nullptr;
+    ggml_backend_buffer_t enc_out_buffer = nullptr;
 
     std::vector<uint8_t> pred_out_buf;
-    wsp_ggml_backend_buffer_t pred_out_buffer = nullptr;
+    ggml_backend_buffer_t pred_out_buffer = nullptr;
 
-    struct wsp_ggml_tensor * attn_mask = nullptr;
+    struct ggml_tensor * attn_mask = nullptr;
 
     std::vector<float> inp_mel;
     std::vector<float> inp_mask;
@@ -510,8 +510,8 @@ struct parakeet_context {
     int64_t t_load_us  = 0;
     int64_t t_start_us = 0;
 
-    wsp_ggml_type wtype = wsp_ggml_type::WSP_GGML_TYPE_F16;
-    wsp_ggml_type itype = wsp_ggml_type::WSP_GGML_TYPE_F16;
+    ggml_type wtype = ggml_type::GGML_TYPE_F16;
+    ggml_type itype = ggml_type::GGML_TYPE_F16;
 
     parakeet_context_params params;
 
@@ -527,7 +527,7 @@ struct parakeet_context {
 
 struct parakeet_global {
     // We save the log callback globally
-    wsp_ggml_log_callback log_callback = parakeet_log_callback_default;
+    ggml_log_callback log_callback = parakeet_log_callback_default;
     void * log_callback_user_data = nullptr;
 };
 
@@ -637,41 +637,41 @@ static void parakeet_batch_prep_legacy(parakeet_batch & batch, const parakeet_to
 
 static size_t parakeet_sched_size(struct parakeet_sched & allocr) {
     size_t size = allocr.meta.size();
-    for (int i = 0; i < wsp_ggml_backend_sched_get_n_backends(allocr.sched); ++i) {
-        wsp_ggml_backend_t backend = wsp_ggml_backend_sched_get_backend(allocr.sched, i);
-        size += wsp_ggml_backend_sched_get_buffer_size(allocr.sched, backend);
+    for (int i = 0; i < ggml_backend_sched_get_n_backends(allocr.sched); ++i) {
+        ggml_backend_t backend = ggml_backend_sched_get_backend(allocr.sched, i);
+        size += ggml_backend_sched_get_buffer_size(allocr.sched, backend);
     }
     return size;
 }
 
-static bool parakeet_sched_graph_init(struct parakeet_sched & allocr, std::vector<wsp_ggml_backend_t> backends, std::function<struct wsp_ggml_cgraph *()> && get_graph) {
+static bool parakeet_sched_graph_init(struct parakeet_sched & allocr, std::vector<ggml_backend_t> backends, std::function<struct ggml_cgraph *()> && get_graph) {
     auto & sched = allocr.sched;
     auto & meta  = allocr.meta;
 
-    sched = wsp_ggml_backend_sched_new(backends.data(), nullptr, backends.size(), PARAKEET_MAX_NODES, false, true);
+    sched = ggml_backend_sched_new(backends.data(), nullptr, backends.size(), PARAKEET_MAX_NODES, false, true);
 
     if (!sched) {
         PARAKEET_LOG_ERROR("%s: failed to create scheduler\n", __func__);
         return false;
     }
 
-    meta.resize(wsp_ggml_tensor_overhead()*PARAKEET_MAX_NODES + wsp_ggml_graph_overhead());
+    meta.resize(ggml_tensor_overhead()*PARAKEET_MAX_NODES + ggml_graph_overhead());
 
-    if (!wsp_ggml_backend_sched_alloc_graph(sched, get_graph())) {
+    if (!ggml_backend_sched_alloc_graph(sched, get_graph())) {
         PARAKEET_LOG_ERROR("%s: failed to allocate the compute buffer\n", __func__);
-        wsp_ggml_backend_sched_free(sched);
+        ggml_backend_sched_free(sched);
         sched = nullptr;
         return false;
     }
 
-    wsp_ggml_backend_sched_reset(sched);
+    ggml_backend_sched_reset(sched);
 
     return true;
 }
 
 static void parakeet_sched_free(struct parakeet_sched & sched) {
     if (sched.sched) {
-        wsp_ggml_backend_sched_free(sched.sched);
+        ggml_backend_sched_free(sched.sched);
         sched.sched = nullptr;
     }
 
@@ -715,21 +715,21 @@ static bool parakeet_validate_hparams(const std::map<parakeet_hparam, int32_t> &
 
 static bool parakeet_lstm_state_init(
                struct parakeet_state & pstate,
-                      wsp_ggml_backend_t   backend,
+                      ggml_backend_t   backend,
                                  int   n_layer,
                                  int   n_pred_dim) {
     parakeet_lstm_state & lstm_state = pstate.lstm_state;
 
-    lstm_state.ctx_buf.resize(wsp_ggml_tensor_overhead() * n_layer * 2);
+    lstm_state.ctx_buf.resize(ggml_tensor_overhead() * n_layer * 2);
     lstm_state.layer.resize(n_layer);
 
-    struct wsp_ggml_init_params params = {
+    struct ggml_init_params params = {
         /*.mem_size   =*/ lstm_state.ctx_buf.size(),
         /*.mem_buffer =*/ lstm_state.ctx_buf.data(),
         /*.no_alloc   =*/ true,
     };
 
-    struct wsp_ggml_context * ctx = wsp_ggml_init(params);
+    struct ggml_context * ctx = ggml_init(params);
 
     if (!ctx) {
         PARAKEET_LOG_ERROR("%s: failed to allocate memory for the lstm states context\n", __func__);
@@ -738,99 +738,99 @@ static bool parakeet_lstm_state_init(
 
 
     for (int il = 0; il < n_layer; ++il) {
-        lstm_state.layer[il].h_state = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_pred_dim);
-        lstm_state.layer[il].c_state = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_pred_dim);
+        lstm_state.layer[il].h_state = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_pred_dim);
+        lstm_state.layer[il].c_state = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_pred_dim);
     }
 
-    lstm_state.buffer = wsp_ggml_backend_alloc_ctx_tensors(ctx, backend);
+    lstm_state.buffer = ggml_backend_alloc_ctx_tensors(ctx, backend);
     if (!lstm_state.buffer) {
         PARAKEET_LOG_ERROR("%s: failed to allocate memory for the lstm states\n", __func__);
         return false;
     }
 
-    wsp_ggml_backend_buffer_clear(lstm_state.buffer, 0);
+    ggml_backend_buffer_clear(lstm_state.buffer, 0);
 
-    wsp_ggml_free(ctx);
+    ggml_free(ctx);
 
     return true;
 }
 
 static bool parakeet_pred_state_init(
                struct parakeet_state & pstate,
-                      wsp_ggml_backend_t   backend,
+                      ggml_backend_t   backend,
                                  int   n_pred_dim) {
-    pstate.pred_out_buf.resize(wsp_ggml_tensor_overhead());
+    pstate.pred_out_buf.resize(ggml_tensor_overhead());
 
-    struct wsp_ggml_init_params params = {
+    struct ggml_init_params params = {
         /*.mem_size   =*/ pstate.pred_out_buf.size(),
         /*.mem_buffer =*/ pstate.pred_out_buf.data(),
         /*.no_alloc   =*/ true,
     };
 
-    struct wsp_ggml_context * ctx = wsp_ggml_init(params);
+    struct ggml_context * ctx = ggml_init(params);
     if (!ctx) {
         PARAKEET_LOG_ERROR("%s: failed to allocate memory for pred tensor context\n", __func__);
         return false;
     }
 
-    pstate.pred_out = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_pred_dim);
-    pstate.pred_out_buffer = wsp_ggml_backend_alloc_ctx_tensors(ctx, backend);
+    pstate.pred_out = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_pred_dim);
+    pstate.pred_out_buffer = ggml_backend_alloc_ctx_tensors(ctx, backend);
     if (!pstate.pred_out_buffer) {
         PARAKEET_LOG_ERROR("%s: failed to allocate memory for pred tensor\n", __func__);
-        wsp_ggml_free(ctx);
+        ggml_free(ctx);
         return false;
     }
 
-    wsp_ggml_free(ctx);
+    ggml_free(ctx);
 
     return true;
 }
 
 static bool parakeet_enc_state_init(
                struct parakeet_state & pstate,
-                      wsp_ggml_backend_t   backend,
+                      ggml_backend_t   backend,
                                  int   n_audio_state,
                                  int   n_frames_max) {
-    pstate.enc_out_buf.resize(wsp_ggml_tensor_overhead());
+    pstate.enc_out_buf.resize(ggml_tensor_overhead());
 
-    struct wsp_ggml_init_params params = {
+    struct ggml_init_params params = {
         /*.mem_size   =*/ pstate.enc_out_buf.size(),
         /*.mem_buffer =*/ pstate.enc_out_buf.data(),
         /*.no_alloc   =*/ true,
     };
 
-    struct wsp_ggml_context * ctx = wsp_ggml_init(params);
+    struct ggml_context * ctx = ggml_init(params);
     if (!ctx) {
         PARAKEET_LOG_ERROR("%s: failed to allocate memory for enc_out tensor context\n", __func__);
         return false;
     }
 
-    pstate.enc_out = wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_F32, n_audio_state, n_frames_max);
-    pstate.enc_out_buffer = wsp_ggml_backend_alloc_ctx_tensors(ctx, backend);
+    pstate.enc_out = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_audio_state, n_frames_max);
+    pstate.enc_out_buffer = ggml_backend_alloc_ctx_tensors(ctx, backend);
     if (!pstate.enc_out_buffer) {
         PARAKEET_LOG_ERROR("%s: failed to allocate memory for enc_out tensor\n", __func__);
-        wsp_ggml_free(ctx);
+        ggml_free(ctx);
         return false;
     }
 
-    wsp_ggml_free(ctx);
+    ggml_free(ctx);
 
     return true;
 }
 
-static wsp_ggml_backend_t parakeet_backend_init_gpu(const parakeet_context_params & params) {
-    wsp_ggml_log_set(g_state.log_callback, g_state.log_callback_user_data);
+static ggml_backend_t parakeet_backend_init_gpu(const parakeet_context_params & params) {
+    ggml_log_set(g_state.log_callback, g_state.log_callback_user_data);
 
-    wsp_ggml_backend_dev_t dev = nullptr;
+    ggml_backend_dev_t dev = nullptr;
 
     int cnt = 0;
     if (params.use_gpu) {
-        for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
-            wsp_ggml_backend_dev_t dev_cur = wsp_ggml_backend_dev_get(i);
-            enum wsp_ggml_backend_dev_type dev_type = wsp_ggml_backend_dev_type(dev_cur);
-            const char * dev_name = wsp_ggml_backend_dev_name(dev_cur);
+        for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+            ggml_backend_dev_t dev_cur = ggml_backend_dev_get(i);
+            enum ggml_backend_dev_type dev_type = ggml_backend_dev_type(dev_cur);
+            const char * dev_name = ggml_backend_dev_name(dev_cur);
             PARAKEET_LOG_INFO("%s: device %zu: %s (type: %d)\n", __func__, i, dev_name, dev_type);
-            if (dev_type == WSP_GGML_BACKEND_DEVICE_TYPE_GPU || dev_type == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU) {
+            if (dev_type == GGML_BACKEND_DEVICE_TYPE_GPU || dev_type == GGML_BACKEND_DEVICE_TYPE_IGPU) {
                 PARAKEET_LOG_INFO("%s: found GPU device %zu: %s (type: %d, cnt: %d)\n", __func__, i, dev_name, dev_type, cnt);
                 if (cnt == params.gpu_device) {
                     dev = dev_cur;
@@ -848,39 +848,39 @@ static wsp_ggml_backend_t parakeet_backend_init_gpu(const parakeet_context_param
         return nullptr;
     }
 
-    PARAKEET_LOG_INFO("%s: using %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
-    wsp_ggml_backend_t result = wsp_ggml_backend_dev_init(dev, nullptr);
+    PARAKEET_LOG_INFO("%s: using %s backend\n", __func__, ggml_backend_dev_name(dev));
+    ggml_backend_t result = ggml_backend_dev_init(dev, nullptr);
     if (!result) {
-        PARAKEET_LOG_ERROR("%s: failed to initialize %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
+        PARAKEET_LOG_ERROR("%s: failed to initialize %s backend\n", __func__, ggml_backend_dev_name(dev));
     }
 
     return result;
 }
 
-static std::vector<wsp_ggml_backend_t> parakeet_backend_init(const parakeet_context_params & params) {
-    std::vector<wsp_ggml_backend_t> result;
+static std::vector<ggml_backend_t> parakeet_backend_init(const parakeet_context_params & params) {
+    std::vector<ggml_backend_t> result;
 
-    wsp_ggml_backend_t backend_gpu = parakeet_backend_init_gpu(params);
+    ggml_backend_t backend_gpu = parakeet_backend_init_gpu(params);
 
     if (backend_gpu) {
         result.push_back(backend_gpu);
     }
 
     // ACCEL backends
-    for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
-        wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_get(i);
-        if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_ACCEL) {
-            PARAKEET_LOG_INFO("%s: using %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
-            wsp_ggml_backend_t backend = wsp_ggml_backend_dev_init(dev, nullptr);
+    for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_ACCEL) {
+            PARAKEET_LOG_INFO("%s: using %s backend\n", __func__, ggml_backend_dev_name(dev));
+            ggml_backend_t backend = ggml_backend_dev_init(dev, nullptr);
             if (!backend) {
-                PARAKEET_LOG_ERROR("%s: failed to initialize %s backend\n", __func__, wsp_ggml_backend_dev_name(dev));
+                PARAKEET_LOG_ERROR("%s: failed to initialize %s backend\n", __func__, ggml_backend_dev_name(dev));
                 continue;
             }
             result.push_back(backend);
         }
     }
 
-    wsp_ggml_backend_t backend_cpu = wsp_ggml_backend_init_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU, nullptr);
+    ggml_backend_t backend_cpu = ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr);
     if (backend_cpu == nullptr) {
         throw std::runtime_error("failed to initialize CPU backend");
     }
@@ -889,7 +889,7 @@ static std::vector<wsp_ggml_backend_t> parakeet_backend_init(const parakeet_cont
     return result;
 }
 
-using buft_list_t = std::vector<std::pair<wsp_ggml_backend_dev_t, wsp_ggml_backend_buffer_type_t>>;
+using buft_list_t = std::vector<std::pair<ggml_backend_dev_t, ggml_backend_buffer_type_t>>;
 
 static buft_list_t make_buft_list(parakeet_context_params & params) {
     // Prio order: GPU -> CPU Extra -> CPU
@@ -898,11 +898,11 @@ static buft_list_t make_buft_list(parakeet_context_params & params) {
     // GPU
     if (params.use_gpu) {
         int cnt = 0;
-        for (size_t i = 0; i < wsp_ggml_backend_dev_count(); ++i) {
-            wsp_ggml_backend_dev_t dev = wsp_ggml_backend_dev_get(i);
-            if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU || wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU) {
+        for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+            ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+            if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU || ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU) {
                 if (cnt == params.gpu_device) {
-                    auto * buft = wsp_ggml_backend_dev_buffer_type(dev);
+                    auto * buft = ggml_backend_dev_buffer_type(dev);
                     if (buft) {
                         buft_list.emplace_back(dev, buft);
                     }
@@ -916,12 +916,12 @@ static buft_list_t make_buft_list(parakeet_context_params & params) {
     }
 
     // CPU Extra
-    auto * cpu_dev = wsp_ggml_backend_dev_by_type(WSP_GGML_BACKEND_DEVICE_TYPE_CPU);
-    auto * cpu_reg = wsp_ggml_backend_dev_backend_reg(cpu_dev);
-    auto get_extra_bufts_fn = (wsp_ggml_backend_dev_get_extra_bufts_t)
-        wsp_ggml_backend_reg_get_proc_address(cpu_reg, "wsp_ggml_backend_dev_get_extra_bufts");
+    auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+    auto * cpu_reg = ggml_backend_dev_backend_reg(cpu_dev);
+    auto get_extra_bufts_fn = (ggml_backend_dev_get_extra_bufts_t)
+        ggml_backend_reg_get_proc_address(cpu_reg, "ggml_backend_dev_get_extra_bufts");
     if (get_extra_bufts_fn) {
-        wsp_ggml_backend_buffer_type_t * extra_bufts = get_extra_bufts_fn(cpu_dev);
+        ggml_backend_buffer_type_t * extra_bufts = get_extra_bufts_fn(cpu_dev);
         while (extra_bufts && *extra_bufts) {
             buft_list.emplace_back(cpu_dev, *extra_bufts);
             ++extra_bufts;
@@ -929,53 +929,53 @@ static buft_list_t make_buft_list(parakeet_context_params & params) {
     }
 
     // CPU
-    buft_list.emplace_back(cpu_dev, wsp_ggml_backend_cpu_buffer_type());
+    buft_list.emplace_back(cpu_dev, ggml_backend_cpu_buffer_type());
 
     return buft_list;
 }
 
-static bool weight_buft_supported(const parakeet_hparams & hparams, wsp_ggml_tensor * w, wsp_ggml_op op, wsp_ggml_backend_buffer_type_t buft, wsp_ggml_backend_dev_t dev) {
+static bool weight_buft_supported(const parakeet_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
     bool op_supported = true;
 
-    if (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_GPU ||
-        wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_IGPU ||
-        (wsp_ggml_backend_dev_type(dev) == WSP_GGML_BACKEND_DEVICE_TYPE_CPU && buft == wsp_ggml_backend_cpu_buffer_type())) {
+    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
+        ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
+        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
         // GPU and default CPU backend support all operators
         op_supported = true;
     } else {
         switch (op) {
-            // The current extra_buffer_type implementations only support WSP_GGML_OP_MUL_MAT and WSP_GGML_OP_GET_ROWS
-            case WSP_GGML_OP_GET_ROWS:
-            case WSP_GGML_OP_MUL_MAT: {
-                wsp_ggml_init_params params = {
-                    /*.mem_size   =*/ 2 * wsp_ggml_tensor_overhead(),
+            // The current extra_buffer_type implementations only support GGML_OP_MUL_MAT and GGML_OP_GET_ROWS
+            case GGML_OP_GET_ROWS:
+            case GGML_OP_MUL_MAT: {
+                ggml_init_params params = {
+                    /*.mem_size   =*/ 2 * ggml_tensor_overhead(),
                     /*.mem_buffer =*/ nullptr,
                     /*.no_alloc   =*/ true,
                 };
 
-                wsp_ggml_context_ptr ctx_ptr { wsp_ggml_init(params) };
+                ggml_context_ptr ctx_ptr { ggml_init(params) };
                 if (!ctx_ptr) {
                     throw std::runtime_error("failed to create ggml context");
                 }
-                wsp_ggml_context * ctx = ctx_ptr.get();
+                ggml_context * ctx = ctx_ptr.get();
 
-                wsp_ggml_tensor * op_tensor = nullptr;
+                ggml_tensor * op_tensor = nullptr;
 
-                if (op == WSP_GGML_OP_MUL_MAT) {
+                if (op == GGML_OP_MUL_MAT) {
                     int64_t n_ctx = hparams.n_audio_ctx;
-                    wsp_ggml_tensor * b = wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, w->ne[0], n_ctx, w->ne[2], w->ne[3]);
-                    op_tensor = wsp_ggml_mul_mat(ctx, w, b);
-                } else if (op == WSP_GGML_OP_GET_ROWS) {
+                    ggml_tensor * b = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, w->ne[0], n_ctx, w->ne[2], w->ne[3]);
+                    op_tensor = ggml_mul_mat(ctx, w, b);
+                } else if (op == GGML_OP_GET_ROWS) {
                     int64_t num_indices = 8;
-                    wsp_ggml_tensor * indices = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_I32, num_indices);
-                    op_tensor = wsp_ggml_get_rows(ctx, w, indices);
+                    ggml_tensor * indices = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, num_indices);
+                    op_tensor = ggml_get_rows(ctx, w, indices);
                 }
 
                 // create a temporary dummy buffer for the weight so that supports_op can check the buffer type
-                WSP_GGML_ASSERT(w->buffer == nullptr);
-                w->buffer = wsp_ggml_backend_buft_alloc_buffer(buft, 0);
-                op_supported = wsp_ggml_backend_dev_supports_op(dev, op_tensor);
-                wsp_ggml_backend_buffer_free(w->buffer);
+                GGML_ASSERT(w->buffer == nullptr);
+                w->buffer = ggml_backend_buft_alloc_buffer(buft, 0);
+                op_supported = ggml_backend_dev_supports_op(dev, op_tensor);
+                ggml_backend_buffer_free(w->buffer);
                 w->buffer = nullptr;
                 break;
             }
@@ -989,11 +989,11 @@ static bool weight_buft_supported(const parakeet_hparams & hparams, wsp_ggml_ten
     return op_supported;
 }
 
-static wsp_ggml_backend_buffer_type_t select_weight_buft(const parakeet_hparams & hparams, wsp_ggml_tensor * w, wsp_ggml_op op, buft_list_t buft_list) {
-    WSP_GGML_ASSERT(!buft_list.empty());
+static ggml_backend_buffer_type_t select_weight_buft(const parakeet_hparams & hparams, ggml_tensor * w, ggml_op op, buft_list_t buft_list) {
+    GGML_ASSERT(!buft_list.empty());
     for (const auto & p : buft_list) {
-        wsp_ggml_backend_dev_t dev = p.first;
-        wsp_ggml_backend_buffer_type_t buft = p.second;
+        ggml_backend_dev_t dev = p.first;
+        ggml_backend_buffer_type_t buft = p.second;
         if (weight_buft_supported(hparams, w, op, buft, dev)) {
             return buft;
         }
@@ -1011,7 +1011,7 @@ static wsp_ggml_backend_buffer_type_t select_weight_buft(const parakeet_hparams 
 static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_context & wctx) {
     PARAKEET_LOG_INFO("%s: loading model\n", __func__);
 
-    const int64_t t_start_us = wsp_ggml_time_us();
+    const int64_t t_start_us = ggml_time_us();
 
     wctx.t_start_us = t_start_us;
 
@@ -1022,7 +1022,7 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
     {
         uint32_t magic;
         read_safe(loader, magic);
-        if (magic != WSP_GGML_FILE_MAGIC) {
+        if (magic != GGML_FILE_MAGIC) {
             PARAKEET_LOG_ERROR("%s: invalid model data (bad magic)\n", __func__);
             return false;
         }
@@ -1062,14 +1062,14 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
         hparams.arch = PARAKEET_ARCH_TDT;
         wctx.model.hparams = hparams;
 
-        const int32_t qntvr = hparams.ftype / WSP_GGML_QNT_VERSION_FACTOR;
+        const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
 
-        hparams.ftype %= WSP_GGML_QNT_VERSION_FACTOR;
+        hparams.ftype %= GGML_QNT_VERSION_FACTOR;
 
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
-        wctx.wtype = wsp_ggml_ftype_to_wsp_ggml_type((wsp_ggml_ftype) hparams.ftype);
-        if (wctx.wtype == WSP_GGML_TYPE_COUNT) {
+        wctx.wtype = ggml_ftype_to_ggml_type((ggml_ftype) hparams.ftype);
+        if (wctx.wtype == GGML_TYPE_COUNT) {
             PARAKEET_LOG_ERROR("%s: invalid model (bad ftype value %d)\n", __func__, hparams.ftype);
             return false;
         }
@@ -1115,7 +1115,7 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
         wctx.mel_cache.window.resize(n_window);
         loader->read(loader->context, wctx.mel_cache.window.data(), n_window * sizeof(float));
 
-#ifdef WSP_GGML_BIG_ENDIAN
+#ifdef GGML_BIG_ENDIAN
         for (auto & datum : wctx.mel_cache.window) {
             datum = byteswap(datum);
         }
@@ -1200,7 +1200,7 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
             __func__, n_vocab, blank_id, vocab.token_unk, vocab.token_bos, vocab.token_eos);
     }
 
-    const wsp_ggml_type wtype = wctx.wtype;
+    const ggml_type wtype = wctx.wtype;
 
 
     const int n_audio_layer = hparams.n_audio_layer;
@@ -1208,17 +1208,17 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
     // Calculate tensor count: pre_encode (12) + encoder layers (29 per layer) + prediction (9) + joint (6)
     size_t n_tensors = 12 + (29 * n_audio_layer) + 9 + 6;
 
-    std::map<wsp_ggml_backend_buffer_type_t, wsp_ggml_context *> ctx_map;
-    auto get_ctx = [&](wsp_ggml_backend_buffer_type_t buft) -> wsp_ggml_context * {
+    std::map<ggml_backend_buffer_type_t, ggml_context *> ctx_map;
+    auto get_ctx = [&](ggml_backend_buffer_type_t buft) -> ggml_context * {
         auto it = ctx_map.find(buft);
         if (it == ctx_map.end()) {
-            wsp_ggml_init_params params = {
-                /*.mem_size   =*/ n_tensors * wsp_ggml_tensor_overhead(),
+            ggml_init_params params = {
+                /*.mem_size   =*/ n_tensors * ggml_tensor_overhead(),
                 /*.mem_buffer =*/ nullptr,
                 /*.no_alloc   =*/ true,
             };
 
-            wsp_ggml_context * ctx = wsp_ggml_init(params);
+            ggml_context * ctx = ggml_init(params);
             if (!ctx) {
                 throw std::runtime_error("failed to create ggml context");
             }
@@ -1235,16 +1235,16 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
     // Create a list of available bufts, in priority order
     buft_list_t buft_list = make_buft_list(wctx.params);
 
-    auto create_tensor = [&](parakeet_tensor type, wsp_ggml_tensor * meta, int layer = -1) -> wsp_ggml_tensor * {
-        wsp_ggml_op op = PARAKEET_TENSOR_INFO.at(type);
-        wsp_ggml_backend_buffer_type_t buft = select_weight_buft(hparams, meta, op, buft_list);
+    auto create_tensor = [&](parakeet_tensor type, ggml_tensor * meta, int layer = -1) -> ggml_tensor * {
+        ggml_op op = PARAKEET_TENSOR_INFO.at(type);
+        ggml_backend_buffer_type_t buft = select_weight_buft(hparams, meta, op, buft_list);
         if (!buft) {
             throw std::runtime_error(format("failed to find a compatible buffer type for parakeet tensor %s",
                         PARAKEET_TENSOR_NAMES.at(type)));
         }
 
-        wsp_ggml_context * ctx = get_ctx(buft);
-        wsp_ggml_tensor * tensor = wsp_ggml_dup_tensor(ctx, meta);
+        ggml_context * ctx = get_ctx(buft);
+        ggml_tensor * tensor = ggml_dup_tensor(ctx, meta);
 
         std::string tensor_name;
         if (layer >= 0) {
@@ -1260,13 +1260,13 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
 
     // prepare tensors for the weights
 
-    wsp_ggml_init_params params = {
-        /*.mem_size   =*/ n_tensors * wsp_ggml_tensor_overhead(),
+    ggml_init_params params = {
+        /*.mem_size   =*/ n_tensors * ggml_tensor_overhead(),
         /*.mem_buffer =*/ nullptr,
         /*.no_alloc   =*/ true,
     };
 
-    wsp_ggml_context * ctx = wsp_ggml_init(params);
+    ggml_context * ctx = ggml_init(params);
 
     const int n_audio_state = hparams.n_audio_state;
 
@@ -1275,89 +1275,89 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
     // Encoder pre_encode
     const int n_subsampling_channels = hparams.n_subsampling_channels;
     const int n_pre_enc_features     = (hparams.n_mels / hparams.subsampling_factor) * n_subsampling_channels;
-    model.enc_pre_out_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_OUT_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_pre_enc_features, n_audio_state));
-    wsp_ggml_set_name(model.enc_pre_out_w, "enc_pre_out_w");
-    model.enc_pre_out_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_OUT_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state));
-    wsp_ggml_set_name(model.enc_pre_out_b, "enc_pre_out_b");
+    model.enc_pre_out_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_OUT_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_pre_enc_features, n_audio_state));
+    ggml_set_name(model.enc_pre_out_w, "enc_pre_out_w");
+    model.enc_pre_out_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_OUT_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state));
+    ggml_set_name(model.enc_pre_out_b, "enc_pre_out_b");
 
-    model.enc_pre_conv_0_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_0_WEIGHT, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 3, 3, 1, n_subsampling_channels));
-    wsp_ggml_set_name(model.enc_pre_conv_0_w, "enc_pre_conv_0_w");
-    model.enc_pre_conv_0_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_0_BIAS, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
-    wsp_ggml_set_name(model.enc_pre_conv_0_b, "enc_pre_conv_0_b");
+    model.enc_pre_conv_0_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_0_WEIGHT, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 3, 3, 1, n_subsampling_channels));
+    ggml_set_name(model.enc_pre_conv_0_w, "enc_pre_conv_0_w");
+    model.enc_pre_conv_0_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_0_BIAS, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
+    ggml_set_name(model.enc_pre_conv_0_b, "enc_pre_conv_0_b");
 
-    model.enc_pre_conv_2_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_2_WEIGHT, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 3, 3, 1, n_subsampling_channels));
-    wsp_ggml_set_name(model.enc_pre_conv_2_w, "enc_pre_conv_2_w");
-    model.enc_pre_conv_2_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_2_BIAS, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
-    wsp_ggml_set_name(model.enc_pre_conv_2_b, "enc_pre_conv_2_b");
+    model.enc_pre_conv_2_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_2_WEIGHT, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 3, 3, 1, n_subsampling_channels));
+    ggml_set_name(model.enc_pre_conv_2_w, "enc_pre_conv_2_w");
+    model.enc_pre_conv_2_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_2_BIAS, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
+    ggml_set_name(model.enc_pre_conv_2_b, "enc_pre_conv_2_b");
 
-    model.enc_pre_conv_3_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_3_WEIGHT, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, n_subsampling_channels));
-    wsp_ggml_set_name(model.enc_pre_conv_3_w, "enc_pre_conv_3_w");
-    model.enc_pre_conv_3_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_3_BIAS, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
-    wsp_ggml_set_name(model.enc_pre_conv_3_b, "enc_pre_conv_3_b");
+    model.enc_pre_conv_3_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_3_WEIGHT, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, n_subsampling_channels));
+    ggml_set_name(model.enc_pre_conv_3_w, "enc_pre_conv_3_w");
+    model.enc_pre_conv_3_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_3_BIAS, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
+    ggml_set_name(model.enc_pre_conv_3_b, "enc_pre_conv_3_b");
 
-    model.enc_pre_conv_5_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_5_WEIGHT, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 3, 3, 1, n_subsampling_channels));
-    wsp_ggml_set_name(model.enc_pre_conv_5_w, "enc_pre_conv_5_w");
-    model.enc_pre_conv_5_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_5_BIAS, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
-    wsp_ggml_set_name(model.enc_pre_conv_5_b, "enc_pre_conv_5_b");
+    model.enc_pre_conv_5_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_5_WEIGHT, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 3, 3, 1, n_subsampling_channels));
+    ggml_set_name(model.enc_pre_conv_5_w, "enc_pre_conv_5_w");
+    model.enc_pre_conv_5_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_5_BIAS, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
+    ggml_set_name(model.enc_pre_conv_5_b, "enc_pre_conv_5_b");
 
-    model.enc_pre_conv_6_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_6_WEIGHT, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, n_subsampling_channels));
-    wsp_ggml_set_name(model.enc_pre_conv_6_w, "enc_pre_conv_6_w");
-    model.enc_pre_conv_6_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_6_BIAS, wsp_ggml_new_tensor_4d(ctx, WSP_GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
-    wsp_ggml_set_name(model.enc_pre_conv_6_b, "enc_pre_conv_6_b");
+    model.enc_pre_conv_6_w = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_6_WEIGHT, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, n_subsampling_channels));
+    ggml_set_name(model.enc_pre_conv_6_w, "enc_pre_conv_6_w");
+    model.enc_pre_conv_6_b = create_tensor(PARAKEET_TENSOR_ENC_PRE_CONV_6_BIAS, ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 1, 1, n_subsampling_channels, 1));
+    ggml_set_name(model.enc_pre_conv_6_b, "enc_pre_conv_6_b");
 
     // Encoder layers
     for (int i = 0; i < n_audio_layer; ++i) {
         auto & layer = model.layers[i];
 
         // Feed forward 1
-        layer.norm_ff1_w    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF1_WEIGHT, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.norm_ff1_b    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF1_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.ff1_linear1_w = create_tensor(PARAKEET_TENSOR_ENC_FF1_LINEAR1_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, 4*n_audio_state), i);
-        wsp_ggml_format_name(layer.ff1_linear1_w, "enc_%d_ff1_linear1_w", i);
-        layer.ff1_linear2_w = create_tensor(PARAKEET_TENSOR_ENC_FF1_LINEAR2_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, 4*n_audio_state, n_audio_state), i);
-        wsp_ggml_format_name(layer.ff1_linear2_w, "enc_%d_ff1_linear2_w", i);
+        layer.norm_ff1_w    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF1_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.norm_ff1_b    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF1_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.ff1_linear1_w = create_tensor(PARAKEET_TENSOR_ENC_FF1_LINEAR1_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, 4*n_audio_state), i);
+        ggml_format_name(layer.ff1_linear1_w, "enc_%d_ff1_linear1_w", i);
+        layer.ff1_linear2_w = create_tensor(PARAKEET_TENSOR_ENC_FF1_LINEAR2_WEIGHT, ggml_new_tensor_2d(ctx, wtype, 4*n_audio_state, n_audio_state), i);
+        ggml_format_name(layer.ff1_linear2_w, "enc_%d_ff1_linear2_w", i);
 
         // Convolution module
-        layer.norm_conv_w         = create_tensor(PARAKEET_TENSOR_ENC_NORM_CONV_WEIGHT, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        wsp_ggml_format_name(layer.norm_conv_w, "enc_%d_norm_conv_w", i);
-        layer.norm_conv_b         = create_tensor(PARAKEET_TENSOR_ENC_NORM_CONV_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        wsp_ggml_format_name(layer.norm_conv_b, "enc_%d_norm_conv_b", i);
-        layer.conv_pw1_w          = create_tensor(PARAKEET_TENSOR_ENC_CONV_PW1_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, 2*n_audio_state), i);
-        wsp_ggml_format_name(layer.conv_pw1_w, "enc_%d_conv_pw1_w", i);
-        layer.conv_dw_w           = create_tensor(PARAKEET_TENSOR_ENC_CONV_DW_WEIGHT, wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_F32, hparams.n_conv_kernel, n_audio_state), i);
-        wsp_ggml_format_name(layer.conv_dw_w, "enc_%d_conv_dw_w", i);
-        layer.conv_bn_w           = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_WEIGHT, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        wsp_ggml_format_name(layer.conv_bn_w, "enc_%d_conv_bn_w", i);
-        layer.conv_bn_b           = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        wsp_ggml_format_name(layer.conv_bn_b, "enc_%d_conv_bn_b", i);
-        layer.conv_bn_mean        = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_MEAN, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.conv_bn_var         = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_VAR, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        wsp_ggml_format_name(layer.conv_bn_var, "enc_%d_conv_bn_var", i);
-        layer.conv_bn_num_batches = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_NUM_BATCHES, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_I32, 1), i);
-        layer.conv_pw2_w          = create_tensor(PARAKEET_TENSOR_ENC_CONV_PW2_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
-        wsp_ggml_format_name(layer.conv_pw2_w, "enc_%d_conv_pw2_w", i);
+        layer.norm_conv_w         = create_tensor(PARAKEET_TENSOR_ENC_NORM_CONV_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        ggml_format_name(layer.norm_conv_w, "enc_%d_norm_conv_w", i);
+        layer.norm_conv_b         = create_tensor(PARAKEET_TENSOR_ENC_NORM_CONV_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        ggml_format_name(layer.norm_conv_b, "enc_%d_norm_conv_b", i);
+        layer.conv_pw1_w          = create_tensor(PARAKEET_TENSOR_ENC_CONV_PW1_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, 2*n_audio_state), i);
+        ggml_format_name(layer.conv_pw1_w, "enc_%d_conv_pw1_w", i);
+        layer.conv_dw_w           = create_tensor(PARAKEET_TENSOR_ENC_CONV_DW_WEIGHT, ggml_new_tensor_2d(ctx, GGML_TYPE_F32, hparams.n_conv_kernel, n_audio_state), i);
+        ggml_format_name(layer.conv_dw_w, "enc_%d_conv_dw_w", i);
+        layer.conv_bn_w           = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        ggml_format_name(layer.conv_bn_w, "enc_%d_conv_bn_w", i);
+        layer.conv_bn_b           = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        ggml_format_name(layer.conv_bn_b, "enc_%d_conv_bn_b", i);
+        layer.conv_bn_mean        = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_MEAN, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.conv_bn_var         = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_VAR, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        ggml_format_name(layer.conv_bn_var, "enc_%d_conv_bn_var", i);
+        layer.conv_bn_num_batches = create_tensor(PARAKEET_TENSOR_ENC_CONV_BN_NUM_BATCHES, ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 1), i);
+        layer.conv_pw2_w          = create_tensor(PARAKEET_TENSOR_ENC_CONV_PW2_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
+        ggml_format_name(layer.conv_pw2_w, "enc_%d_conv_pw2_w", i);
 
         // Self attention
-        layer.norm_attn_w      = create_tensor(PARAKEET_TENSOR_ENC_NORM_ATTN_WEIGHT, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.norm_attn_b      = create_tensor(PARAKEET_TENSOR_ENC_NORM_ATTN_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.attn_pos_bias_u  = create_tensor(PARAKEET_TENSOR_ENC_ATTN_POS_BIAS_U, wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_F32, hparams.n_audio_state / hparams.n_audio_head, hparams.n_audio_head), i);
-        layer.attn_pos_bias_v  = create_tensor(PARAKEET_TENSOR_ENC_ATTN_POS_BIAS_V, wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_F32, hparams.n_audio_state / hparams.n_audio_head, hparams.n_audio_head), i);
-        layer.attn_q_w         = create_tensor(PARAKEET_TENSOR_ENC_ATTN_Q_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
-        layer.attn_k_w         = create_tensor(PARAKEET_TENSOR_ENC_ATTN_K_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
-        layer.attn_v_w         = create_tensor(PARAKEET_TENSOR_ENC_ATTN_V_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
-        layer.attn_out_w       = create_tensor(PARAKEET_TENSOR_ENC_ATTN_OUT_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
-        layer.attn_pos_w       = create_tensor(PARAKEET_TENSOR_ENC_ATTN_POS_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
-        wsp_ggml_format_name(layer.attn_pos_w, "enc_%d_attn_pos_w", i);
+        layer.norm_attn_w      = create_tensor(PARAKEET_TENSOR_ENC_NORM_ATTN_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.norm_attn_b      = create_tensor(PARAKEET_TENSOR_ENC_NORM_ATTN_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.attn_pos_bias_u  = create_tensor(PARAKEET_TENSOR_ENC_ATTN_POS_BIAS_U, ggml_new_tensor_2d(ctx, GGML_TYPE_F32, hparams.n_audio_state / hparams.n_audio_head, hparams.n_audio_head), i);
+        layer.attn_pos_bias_v  = create_tensor(PARAKEET_TENSOR_ENC_ATTN_POS_BIAS_V, ggml_new_tensor_2d(ctx, GGML_TYPE_F32, hparams.n_audio_state / hparams.n_audio_head, hparams.n_audio_head), i);
+        layer.attn_q_w         = create_tensor(PARAKEET_TENSOR_ENC_ATTN_Q_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
+        layer.attn_k_w         = create_tensor(PARAKEET_TENSOR_ENC_ATTN_K_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
+        layer.attn_v_w         = create_tensor(PARAKEET_TENSOR_ENC_ATTN_V_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
+        layer.attn_out_w       = create_tensor(PARAKEET_TENSOR_ENC_ATTN_OUT_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
+        layer.attn_pos_w       = create_tensor(PARAKEET_TENSOR_ENC_ATTN_POS_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state), i);
+        ggml_format_name(layer.attn_pos_w, "enc_%d_attn_pos_w", i);
 
         // Feed forward 2
-        layer.norm_ff2_w    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF2_WEIGHT, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.norm_ff2_b    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF2_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.ff2_linear1_w = create_tensor(PARAKEET_TENSOR_ENC_FF2_LINEAR1_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, 4*n_audio_state), i);
-        layer.ff2_linear2_w = create_tensor(PARAKEET_TENSOR_ENC_FF2_LINEAR2_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, 4*n_audio_state, n_audio_state), i);
+        layer.norm_ff2_w    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF2_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.norm_ff2_b    = create_tensor(PARAKEET_TENSOR_ENC_NORM_FF2_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.ff2_linear1_w = create_tensor(PARAKEET_TENSOR_ENC_FF2_LINEAR1_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, 4*n_audio_state), i);
+        layer.ff2_linear2_w = create_tensor(PARAKEET_TENSOR_ENC_FF2_LINEAR2_WEIGHT, ggml_new_tensor_2d(ctx, wtype, 4*n_audio_state, n_audio_state), i);
 
         // Output norm
-        layer.norm_out_w = create_tensor(PARAKEET_TENSOR_ENC_NORM_OUT_WEIGHT, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
-        layer.norm_out_b = create_tensor(PARAKEET_TENSOR_ENC_NORM_OUT_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_audio_state), i);
+        layer.norm_out_w = create_tensor(PARAKEET_TENSOR_ENC_NORM_OUT_WEIGHT, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
+        layer.norm_out_b = create_tensor(PARAKEET_TENSOR_ENC_NORM_OUT_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state), i);
     }
 
     // Prediction network (decoder)
@@ -1368,50 +1368,50 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
 
     // The prediction/joint hidden dimension is 640, which is not a multiple of the
     // K-quant block size (256). For K-quant models, we keep these tensors at F32.
-    const int blck         = wsp_ggml_blck_size(wtype);
-    const wsp_ggml_type pred_wtype = (blck > 1 && dec_hidden % blck != 0) ? WSP_GGML_TYPE_F32 : wtype;
-    const wsp_ggml_type join_wtype = pred_wtype;
+    const int blck         = ggml_blck_size(wtype);
+    const ggml_type pred_wtype = (blck > 1 && dec_hidden % blck != 0) ? GGML_TYPE_F32 : wtype;
+    const ggml_type join_wtype = pred_wtype;
 
-    model.prediction.embed_w = create_tensor(PARAKEET_TENSOR_PRED_EMBED_WEIGHT, wsp_ggml_new_tensor_2d(ctx, pred_wtype, dec_hidden, n_pred_embed));
+    model.prediction.embed_w = create_tensor(PARAKEET_TENSOR_PRED_EMBED_WEIGHT, ggml_new_tensor_2d(ctx, pred_wtype, dec_hidden, n_pred_embed));
     model.prediction.lstm_layer.resize(hparams.n_pred_layers);
     for (int i = 0; i < hparams.n_pred_layers; ++i) {
         auto & layer = model.prediction.lstm_layer[i];
-        layer.ih_w = create_tensor(PARAKEET_TENSOR_PRED_LSTM_WEIGHT_IH, wsp_ggml_new_tensor_2d(ctx, pred_wtype, dec_hidden, n_lstm_gates), i);
-        wsp_ggml_format_name(layer.ih_w, "pred_%d_ih_w", i);
+        layer.ih_w = create_tensor(PARAKEET_TENSOR_PRED_LSTM_WEIGHT_IH, ggml_new_tensor_2d(ctx, pred_wtype, dec_hidden, n_lstm_gates), i);
+        ggml_format_name(layer.ih_w, "pred_%d_ih_w", i);
 
-        layer.hh_w = create_tensor(PARAKEET_TENSOR_PRED_LSTM_WEIGHT_HH, wsp_ggml_new_tensor_2d(ctx, pred_wtype, dec_hidden, n_lstm_gates), i);
-        wsp_ggml_format_name(layer.hh_w, "pred_%d_hh_w", i);
+        layer.hh_w = create_tensor(PARAKEET_TENSOR_PRED_LSTM_WEIGHT_HH, ggml_new_tensor_2d(ctx, pred_wtype, dec_hidden, n_lstm_gates), i);
+        ggml_format_name(layer.hh_w, "pred_%d_hh_w", i);
 
-        layer.b_h = create_tensor(PARAKEET_TENSOR_PRED_LSTM_BIAS_H, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_lstm_gates), i);
-        wsp_ggml_format_name(layer.b_h, "pred_%d_b_h", i);
+        layer.b_h = create_tensor(PARAKEET_TENSOR_PRED_LSTM_BIAS_H, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_lstm_gates), i);
+        ggml_format_name(layer.b_h, "pred_%d_b_h", i);
     }
 
     // Joint network
-    model.joint.pred_w = create_tensor(PARAKEET_TENSOR_JOINT_PRED_WEIGHT, wsp_ggml_new_tensor_2d(ctx, join_wtype, dec_hidden, dec_hidden));
-    wsp_ggml_set_name(model.joint.pred_w, "pred_w");
-    model.joint.pred_b = create_tensor(PARAKEET_TENSOR_JOINT_PRED_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, dec_hidden));
-    wsp_ggml_set_name(model.joint.pred_b, "pred_b");
-    model.joint.enc_w  = create_tensor(PARAKEET_TENSOR_JOINT_ENC_WEIGHT, wsp_ggml_new_tensor_2d(ctx, wtype, n_audio_state, dec_hidden));
-    wsp_ggml_set_name(model.joint.enc_w, "enc_w");
-    model.joint.enc_b  = create_tensor(PARAKEET_TENSOR_JOINT_ENC_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, dec_hidden));
-    wsp_ggml_set_name(model.joint.enc_b, "enc_b");
-    model.joint.net_w  = create_tensor(PARAKEET_TENSOR_JOINT_NET_WEIGHT, wsp_ggml_new_tensor_2d(ctx, join_wtype, dec_hidden, n_joint_out));
-    wsp_ggml_set_name(model.joint.net_w, "net_w");
-    model.joint.net_b  = create_tensor(PARAKEET_TENSOR_JOINT_NET_BIAS, wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, n_joint_out));
-    wsp_ggml_set_name(model.joint.net_b, "net_b");
+    model.joint.pred_w = create_tensor(PARAKEET_TENSOR_JOINT_PRED_WEIGHT, ggml_new_tensor_2d(ctx, join_wtype, dec_hidden, dec_hidden));
+    ggml_set_name(model.joint.pred_w, "pred_w");
+    model.joint.pred_b = create_tensor(PARAKEET_TENSOR_JOINT_PRED_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, dec_hidden));
+    ggml_set_name(model.joint.pred_b, "pred_b");
+    model.joint.enc_w  = create_tensor(PARAKEET_TENSOR_JOINT_ENC_WEIGHT, ggml_new_tensor_2d(ctx, wtype, n_audio_state, dec_hidden));
+    ggml_set_name(model.joint.enc_w, "enc_w");
+    model.joint.enc_b  = create_tensor(PARAKEET_TENSOR_JOINT_ENC_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, dec_hidden));
+    ggml_set_name(model.joint.enc_b, "enc_b");
+    model.joint.net_w  = create_tensor(PARAKEET_TENSOR_JOINT_NET_WEIGHT, ggml_new_tensor_2d(ctx, join_wtype, dec_hidden, n_joint_out));
+    ggml_set_name(model.joint.net_w, "net_w");
+    model.joint.net_b  = create_tensor(PARAKEET_TENSOR_JOINT_NET_BIAS, ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_joint_out));
+    ggml_set_name(model.joint.net_b, "net_b");
 
-    wsp_ggml_free(ctx);
+    ggml_free(ctx);
 
     // allocate tensors in the backend buffers
     for (auto & p : ctx_map) {
-        wsp_ggml_backend_buffer_type_t buft = p.first;
-        wsp_ggml_context * ctx = p.second;
-        wsp_ggml_backend_buffer_t buf = wsp_ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
+        ggml_backend_buffer_type_t buft = p.first;
+        ggml_context * ctx = p.second;
+        ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
         if (buf) {
             wctx.model.buffers.emplace_back(buf);
 
-            size_t size_main = wsp_ggml_backend_buffer_get_size(buf);
-            PARAKEET_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, wsp_ggml_backend_buffer_name(buf), size_main / 1e6);
+            size_t size_main = ggml_backend_buffer_get_size(buf);
+            PARAKEET_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
         }
     }
 
@@ -1463,7 +1463,7 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
 
             auto tensor = tensors_map[name.data()];
 
-            if (wsp_ggml_nelements(tensor) != nelements) {
+            if (ggml_nelements(tensor) != nelements) {
                 PARAKEET_LOG_ERROR("%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
                 PARAKEET_LOG_ERROR("%s: shape: [%d, %d, %d], expected: [%d, %d, %d]\n",
                         __func__, ne[0], ne[1], ne[2], (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2]);
@@ -1476,28 +1476,28 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
                 return false;
             }
 
-            const size_t bpe = wsp_ggml_type_size(wsp_ggml_type(ttype));
+            const size_t bpe = ggml_type_size(ggml_type(ttype));
 
-            if ((nelements*bpe)/wsp_ggml_blck_size(tensor->type) != wsp_ggml_nbytes(tensor)) {
+            if ((nelements*bpe)/ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
                 PARAKEET_LOG_ERROR("%s: tensor '%s' has wrong size in model file: got %zu, expected %zu\n",
-                        __func__, name.data(), wsp_ggml_nbytes(tensor), nelements*bpe);
+                        __func__, name.data(), ggml_nbytes(tensor), nelements*bpe);
                 return false;
             }
 
-            if (wsp_ggml_backend_buffer_is_host(tensor->buffer)) {
+            if (ggml_backend_buffer_is_host(tensor->buffer)) {
                 // for the CPU and Metal backend, we can read directly into the tensor
-                loader->read(loader->context, tensor->data, wsp_ggml_nbytes(tensor));
+                loader->read(loader->context, tensor->data, ggml_nbytes(tensor));
                 BYTESWAP_TENSOR(tensor);
             } else {
                 // read into a temporary buffer first, then copy to device memory
-                read_buf.resize(wsp_ggml_nbytes(tensor));
+                read_buf.resize(ggml_nbytes(tensor));
 
                 loader->read(loader->context, read_buf.data(), read_buf.size());
 
-                wsp_ggml_backend_tensor_set(tensor, read_buf.data(), 0, wsp_ggml_nbytes(tensor));
+                ggml_backend_tensor_set(tensor, read_buf.data(), 0, ggml_nbytes(tensor));
             }
 
-            total_size += wsp_ggml_nbytes(tensor);
+            total_size += ggml_nbytes(tensor);
             n_loaded++;
         }
 
@@ -1513,16 +1513,16 @@ static bool parakeet_model_load(struct parakeet_model_loader * loader, parakeet_
 
     auto & buffers = wctx.model.buffers;
     for (auto & buf : buffers) {
-        wsp_ggml_backend_buffer_set_usage(buf, WSP_GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
     }
 
-    wctx.t_load_us = wsp_ggml_time_us() - t_start_us;
+    wctx.t_load_us = ggml_time_us() - t_start_us;
 
     return true;
 }
 
 // conv subsampling + conformer encoder
-static struct wsp_ggml_cgraph * parakeet_build_graph_encode(parakeet_context & pctx, parakeet_state & pstate) {
+static struct ggml_cgraph * parakeet_build_graph_encode(parakeet_context & pctx, parakeet_state & pstate) {
     const auto & model    = pctx.model;
     const auto & hparams  = model.hparams;
     const int n_mel_time  = pstate.n_audio_ctx > 0 ? pstate.n_audio_ctx : hparams.n_audio_ctx;
@@ -1531,73 +1531,73 @@ static struct wsp_ggml_cgraph * parakeet_build_graph_encode(parakeet_context & p
     const int n_state     = hparams.n_audio_state;
     const float fc_factor = 0.5f;
 
-    struct wsp_ggml_init_params params = {
+    struct ggml_init_params params = {
         /*.mem_size   =*/ pstate.sched_encode.meta.size(),
         /*.mem_buffer =*/ pstate.sched_encode.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
-    struct wsp_ggml_context * ctx0 = wsp_ggml_init(params);
-    wsp_ggml_cgraph * gf = wsp_ggml_new_graph_custom(ctx0, PARAKEET_MAX_NODES, false);
+    struct ggml_context * ctx0 = ggml_init(params);
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx0, PARAKEET_MAX_NODES, false);
 
     // Conv subsampling
 
     // [freq, time]
-    struct wsp_ggml_tensor * mel = wsp_ggml_new_tensor_4d(ctx0, WSP_GGML_TYPE_F32, n_mels, n_mel_time, 1, 1);
-    wsp_ggml_set_name(mel, "mel");
-    wsp_ggml_set_input(mel);
+    struct ggml_tensor * mel = ggml_new_tensor_4d(ctx0, GGML_TYPE_F32, n_mels, n_mel_time, 1, 1);
+    ggml_set_name(mel, "mel");
+    ggml_set_input(mel);
 
     // [freq, time, channels, batch]
-    struct wsp_ggml_tensor * cur = wsp_ggml_conv_2d(ctx0, model.enc_pre_conv_0_w, mel, 2, 2, 1, 1, 1, 1);
-    cur = wsp_ggml_add(ctx0, cur, model.enc_pre_conv_0_b);
-    wsp_ggml_set_name(cur, "pre_conv_0");
+    struct ggml_tensor * cur = ggml_conv_2d(ctx0, model.enc_pre_conv_0_w, mel, 2, 2, 1, 1, 1, 1);
+    cur = ggml_add(ctx0, cur, model.enc_pre_conv_0_b);
+    ggml_set_name(cur, "pre_conv_0");
 
-    cur = wsp_ggml_relu(ctx0, cur);
-    wsp_ggml_set_name(cur, "pre_conv_0_relu");
-
-    // [freq, time, channels, batch]
-    cur = wsp_ggml_conv_2d_dw_direct(ctx0, model.enc_pre_conv_2_w, cur, 2, 2, 1, 1, 1, 1);
-    cur = wsp_ggml_add(ctx0, cur, model.enc_pre_conv_2_b);
-    wsp_ggml_set_name(cur, "pre_conv_2");
+    cur = ggml_relu(ctx0, cur);
+    ggml_set_name(cur, "pre_conv_0_relu");
 
     // [freq, time, channels, batch]
-    cur = wsp_ggml_conv_2d(ctx0, model.enc_pre_conv_3_w, cur, 1, 1, 0, 0, 1, 1);
-    cur = wsp_ggml_add(ctx0, cur, model.enc_pre_conv_3_b);
-    wsp_ggml_set_name(cur, "pre_conv_3");
-
-    cur = wsp_ggml_relu(ctx0, cur);
-    wsp_ggml_set_name(cur, "pre_conv_3_relu");
+    cur = ggml_conv_2d_dw_direct(ctx0, model.enc_pre_conv_2_w, cur, 2, 2, 1, 1, 1, 1);
+    cur = ggml_add(ctx0, cur, model.enc_pre_conv_2_b);
+    ggml_set_name(cur, "pre_conv_2");
 
     // [freq, time, channels, batch]
-    cur = wsp_ggml_conv_2d_dw_direct(ctx0, model.enc_pre_conv_5_w, cur, 2, 2, 1, 1, 1, 1);
-    wsp_ggml_set_name(cur, "pre_conv_5_direct");
-    cur = wsp_ggml_add(ctx0, cur, model.enc_pre_conv_5_b);
-    wsp_ggml_set_name(cur, "pre_conv_5");
+    cur = ggml_conv_2d(ctx0, model.enc_pre_conv_3_w, cur, 1, 1, 0, 0, 1, 1);
+    cur = ggml_add(ctx0, cur, model.enc_pre_conv_3_b);
+    ggml_set_name(cur, "pre_conv_3");
+
+    cur = ggml_relu(ctx0, cur);
+    ggml_set_name(cur, "pre_conv_3_relu");
 
     // [freq, time, channels, batch]
-    cur = wsp_ggml_conv_2d(ctx0, model.enc_pre_conv_6_w, cur, 1, 1, 0, 0, 1, 1);
-    cur = wsp_ggml_add(ctx0, cur, model.enc_pre_conv_6_b);
-    wsp_ggml_set_name(cur, "pre_conv_6");
+    cur = ggml_conv_2d_dw_direct(ctx0, model.enc_pre_conv_5_w, cur, 2, 2, 1, 1, 1, 1);
+    ggml_set_name(cur, "pre_conv_5_direct");
+    cur = ggml_add(ctx0, cur, model.enc_pre_conv_5_b);
+    ggml_set_name(cur, "pre_conv_5");
 
-    cur = wsp_ggml_relu(ctx0, cur);
-    wsp_ggml_set_name(cur, "pre_conv_6_relu");
+    // [freq, time, channels, batch]
+    cur = ggml_conv_2d(ctx0, model.enc_pre_conv_6_w, cur, 1, 1, 0, 0, 1, 1);
+    cur = ggml_add(ctx0, cur, model.enc_pre_conv_6_b);
+    ggml_set_name(cur, "pre_conv_6");
+
+    cur = ggml_relu(ctx0, cur);
+    ggml_set_name(cur, "pre_conv_6_relu");
 
     // [freq, time, chan]
-    cur = wsp_ggml_permute(ctx0, cur, 0, 2, 1, 3);
+    cur = ggml_permute(ctx0, cur, 0, 2, 1, 3);
     // [freq, chan, time]
-    cur = wsp_ggml_cont(ctx0, cur);
+    cur = ggml_cont(ctx0, cur);
 
     const int n_freq   = cur->ne[0]; // 16
     const int n_chan   = cur->ne[1]; // 256
     const int n_frames = cur->ne[2]; // time
 
     // [freq, time, chan, batch] -> [(freq * chan), time]
-    cur = wsp_ggml_reshape_2d(ctx0, cur, n_freq * n_chan, n_frames);
+    cur = ggml_reshape_2d(ctx0, cur, n_freq * n_chan, n_frames);
 
-    cur = wsp_ggml_mul_mat(ctx0, model.enc_pre_out_w, cur);
-    cur = wsp_ggml_add(ctx0, cur, model.enc_pre_out_b);
+    cur = ggml_mul_mat(ctx0, model.enc_pre_out_w, cur);
+    cur = ggml_add(ctx0, cur, model.enc_pre_out_b);
 
-    wsp_ggml_set_name(cur, "pre_enc_out");
+    ggml_set_name(cur, "pre_enc_out");
 
     // Encoder
     // cur: [n_state, n_enc_time]
@@ -1611,84 +1611,84 @@ static struct wsp_ggml_cgraph * parakeet_build_graph_encode(parakeet_context & p
     const int  mask_dim    = local_attn ? window_size : n_time;
 
     // mask [key, n_time]
-    struct wsp_ggml_tensor * attn_mask = wsp_ggml_new_tensor_2d(ctx0, WSP_GGML_TYPE_F32, mask_dim, n_time);
-    wsp_ggml_set_name(attn_mask, "attn_mask");
-    wsp_ggml_set_input(attn_mask);
+    struct ggml_tensor * attn_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, mask_dim, n_time);
+    ggml_set_name(attn_mask, "attn_mask");
+    ggml_set_input(attn_mask);
 
-    struct wsp_ggml_tensor * local_mask = nullptr;
+    struct ggml_tensor * local_mask = nullptr;
     if (local_attn) {
         const int chunk = att_left + att_right;
-        local_mask = wsp_ggml_new_tensor_2d(ctx0, WSP_GGML_TYPE_F32, chunk + window_size - 1, chunk);
-        wsp_ggml_set_name(local_mask, "local_mask");
-        wsp_ggml_set_input(local_mask);
+        local_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, chunk + window_size - 1, chunk);
+        ggml_set_name(local_mask, "local_mask");
+        ggml_set_input(local_mask);
     }
 
-    struct wsp_ggml_tensor * pos_freqs = wsp_ggml_new_tensor_1d(ctx0, WSP_GGML_TYPE_F32, d_half);
-    wsp_ggml_set_name(pos_freqs, "pos_freqs");
-    wsp_ggml_set_input(pos_freqs);
+    struct ggml_tensor * pos_freqs = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d_half);
+    ggml_set_name(pos_freqs, "pos_freqs");
+    ggml_set_input(pos_freqs);
 
-    struct wsp_ggml_tensor * rel_positions = wsp_ggml_new_tensor_2d(ctx0, WSP_GGML_TYPE_F32, 1, window_size);
-    wsp_ggml_set_name(rel_positions, "rel_positions");
-    wsp_ggml_set_input(rel_positions);
+    struct ggml_tensor * rel_positions = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, 1, window_size);
+    ggml_set_name(rel_positions, "rel_positions");
+    ggml_set_input(rel_positions);
 
-    struct wsp_ggml_tensor * freqs = wsp_ggml_repeat_4d(ctx0, pos_freqs, d_half, window_size, 1, 1);
-    struct wsp_ggml_tensor * theta = wsp_ggml_mul(ctx0, freqs, rel_positions);
+    struct ggml_tensor * freqs = ggml_repeat_4d(ctx0, pos_freqs, d_half, window_size, 1, 1);
+    struct ggml_tensor * theta = ggml_mul(ctx0, freqs, rel_positions);
 
-    struct wsp_ggml_tensor * sin_t = wsp_ggml_reshape_3d(ctx0, wsp_ggml_sin(ctx0, theta), 1, d_half, window_size);
-    struct wsp_ggml_tensor * cos_t = wsp_ggml_reshape_3d(ctx0, wsp_ggml_cos(ctx0, theta), 1, d_half, window_size);
+    struct ggml_tensor * sin_t = ggml_reshape_3d(ctx0, ggml_sin(ctx0, theta), 1, d_half, window_size);
+    struct ggml_tensor * cos_t = ggml_reshape_3d(ctx0, ggml_cos(ctx0, theta), 1, d_half, window_size);
     // [n_state, window_size]
-    struct wsp_ggml_tensor * pos_emb = wsp_ggml_reshape_2d(ctx0, wsp_ggml_cont(ctx0, wsp_ggml_concat(ctx0, sin_t, cos_t, 0)), n_state, window_size);
-    wsp_ggml_set_name(pos_emb, "pos_emb");
+    struct ggml_tensor * pos_emb = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_concat(ctx0, sin_t, cos_t, 0)), n_state, window_size);
+    ggml_set_name(pos_emb, "pos_emb");
 
     for (int il = 0; il < n_layer; ++il) {
         const auto & layer = model.layers[il];
 
         // FFN1
         {
-            struct wsp_ggml_tensor * residual = cur;
-            wsp_ggml_format_name(cur, "enc_%d_res", il);
+            struct ggml_tensor * residual = cur;
+            ggml_format_name(cur, "enc_%d_res", il);
 
             // norm
-            cur = wsp_ggml_norm(ctx0, cur, hparams.eps);
-            cur = wsp_ggml_add(ctx0, wsp_ggml_mul(ctx0, cur, layer.norm_ff1_w), layer.norm_ff1_b);
-            wsp_ggml_format_name(cur, "enc_%d_ffn_norm_1", il);
+            cur = ggml_norm(ctx0, cur, hparams.eps);
+            cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.norm_ff1_w), layer.norm_ff1_b);
+            ggml_format_name(cur, "enc_%d_ffn_norm_1", il);
 
             // ffn_1
-            cur = wsp_ggml_mul_mat(ctx0, layer.ff1_linear1_w, cur);
-            cur = wsp_ggml_silu(ctx0, cur);
-            wsp_ggml_format_name(cur, "enc_%d_silu", il);
+            cur = ggml_mul_mat(ctx0, layer.ff1_linear1_w, cur);
+            cur = ggml_silu(ctx0, cur);
+            ggml_format_name(cur, "enc_%d_silu", il);
 
-            cur = wsp_ggml_mul_mat(ctx0, layer.ff1_linear2_w, cur);
-            wsp_ggml_format_name(cur, "enc_%d_ffn_1", il);
+            cur = ggml_mul_mat(ctx0, layer.ff1_linear2_w, cur);
+            ggml_format_name(cur, "enc_%d_ffn_1", il);
 
-            cur = wsp_ggml_add(ctx0, residual, wsp_ggml_scale(ctx0, cur, fc_factor));
-            wsp_ggml_format_name(cur, "enc_%d_res_ffn", il);
+            cur = ggml_add(ctx0, residual, ggml_scale(ctx0, cur, fc_factor));
+            ggml_format_name(cur, "enc_%d_res_ffn", il);
         }
 
         // self attention block using relative positional encoding computed in graph.
         {
             // [feat, time_frames, 1, 1]
-            struct wsp_ggml_tensor * residual = cur;
+            struct ggml_tensor * residual = cur;
 
-            cur = wsp_ggml_norm(ctx0, cur, hparams.eps);
-            cur = wsp_ggml_add(ctx0, wsp_ggml_mul(ctx0, cur, layer.norm_attn_w), layer.norm_attn_b);
-            wsp_ggml_format_name(cur, "enc_%d_attn_norm", il);
+            cur = ggml_norm(ctx0, cur, hparams.eps);
+            cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.norm_attn_w), layer.norm_attn_b);
+            ggml_format_name(cur, "enc_%d_attn_norm", il);
 
             const int n_head = hparams.n_audio_head;
             const int d_head = n_state / n_head;
 
             // [feat, time_frames, 1, 1]
-            struct wsp_ggml_tensor * Q_cur = wsp_ggml_mul_mat(ctx0, layer.attn_q_w, cur);
-            struct wsp_ggml_tensor * K_cur = wsp_ggml_mul_mat(ctx0, layer.attn_k_w, cur);
-            struct wsp_ggml_tensor * V_cur = wsp_ggml_mul_mat(ctx0, layer.attn_v_w, cur);
+            struct ggml_tensor * Q_cur = ggml_mul_mat(ctx0, layer.attn_q_w, cur);
+            struct ggml_tensor * K_cur = ggml_mul_mat(ctx0, layer.attn_k_w, cur);
+            struct ggml_tensor * V_cur = ggml_mul_mat(ctx0, layer.attn_v_w, cur);
 
-            Q_cur = wsp_ggml_reshape_3d(ctx0, Q_cur, d_head, n_head, n_time);
-            K_cur = wsp_ggml_reshape_3d(ctx0, K_cur, d_head, n_head, n_time);
-            V_cur = wsp_ggml_reshape_3d(ctx0, V_cur, d_head, n_head, n_time);
+            Q_cur = ggml_reshape_3d(ctx0, Q_cur, d_head, n_head, n_time);
+            K_cur = ggml_reshape_3d(ctx0, K_cur, d_head, n_head, n_time);
+            V_cur = ggml_reshape_3d(ctx0, V_cur, d_head, n_head, n_time);
 
-            struct wsp_ggml_tensor * pos = wsp_ggml_mul_mat(ctx0, layer.attn_pos_w, pos_emb);
-            pos = wsp_ggml_reshape_3d(ctx0, pos, d_head, n_head, window_size);
-            pos = wsp_ggml_cont(ctx0, wsp_ggml_permute(ctx0, pos, 0, 2, 1, 3));
+            struct ggml_tensor * pos = ggml_mul_mat(ctx0, layer.attn_pos_w, pos_emb);
+            pos = ggml_reshape_3d(ctx0, pos, d_head, n_head, window_size);
+            pos = ggml_cont(ctx0, ggml_permute(ctx0, pos, 0, 2, 1, 3));
 
             if (local_attn) {
                 const int  chunk         = att_left + att_right;
@@ -1698,139 +1698,139 @@ static struct wsp_ggml_cgraph * parakeet_build_graph_encode(parakeet_context & p
                 const int  n_kv_dense    = n_kv_chunk * n_group;
                 const bool need_padding  = n_time_padded > n_time;
 
-                Q_cur = wsp_ggml_cont(ctx0, wsp_ggml_permute(ctx0, Q_cur, 0, 2, 1, 3));
-                K_cur = wsp_ggml_cont(ctx0, wsp_ggml_permute(ctx0, K_cur, 0, 2, 1, 3));
-                V_cur = wsp_ggml_cont(ctx0, wsp_ggml_permute(ctx0, V_cur, 0, 2, 1, 3));
+                Q_cur = ggml_cont(ctx0, ggml_permute(ctx0, Q_cur, 0, 2, 1, 3));
+                K_cur = ggml_cont(ctx0, ggml_permute(ctx0, K_cur, 0, 2, 1, 3));
+                V_cur = ggml_cont(ctx0, ggml_permute(ctx0, V_cur, 0, 2, 1, 3));
 
                 // content bias
-                struct wsp_ggml_tensor * bias_u = wsp_ggml_reshape_3d(ctx0, layer.attn_pos_bias_u, d_head, 1, n_head);
-                struct wsp_ggml_tensor * Q_u = wsp_ggml_add(ctx0, Q_cur, bias_u);
+                struct ggml_tensor * bias_u = ggml_reshape_3d(ctx0, layer.attn_pos_bias_u, d_head, 1, n_head);
+                struct ggml_tensor * Q_u = ggml_add(ctx0, Q_cur, bias_u);
 
                 // position bias
-                struct wsp_ggml_tensor * bias_v = wsp_ggml_reshape_3d(ctx0, layer.attn_pos_bias_v, d_head, 1, n_head);
-                struct wsp_ggml_tensor * Q_v = wsp_ggml_add(ctx0, Q_cur, bias_v);
+                struct ggml_tensor * bias_v = ggml_reshape_3d(ctx0, layer.attn_pos_bias_v, d_head, 1, n_head);
+                struct ggml_tensor * Q_v = ggml_add(ctx0, Q_cur, bias_v);
 
                 // right pad the time_frame.
-                struct wsp_ggml_tensor * Q_u_padded = need_padding ?
-                    wsp_ggml_pad_ext(ctx0, Q_u, 0, 0, 0, n_time_padded - n_time, 0, 0, 0, 0) : Q_u;
-                Q_u_padded = wsp_ggml_reshape_4d(ctx0, Q_u_padded, d_head, chunk, n_group, n_head);
+                struct ggml_tensor * Q_u_padded = need_padding ?
+                    ggml_pad_ext(ctx0, Q_u, 0, 0, 0, n_time_padded - n_time, 0, 0, 0, 0) : Q_u;
+                Q_u_padded = ggml_reshape_4d(ctx0, Q_u_padded, d_head, chunk, n_group, n_head);
 
                 // Add padding to front and back (for the first timeframe and the last timeframe).
-                struct wsp_ggml_tensor * K_padded = wsp_ggml_pad_ext(ctx0, K_cur, 0, 0, att_left, att_right, 0, 0, 0, 0);
+                struct ggml_tensor * K_padded = ggml_pad_ext(ctx0, K_cur, 0, 0, att_left, att_right, 0, 0, 0, 0);
 
                 // pad time axis to match n_kv_dense if needed.
                 if (n_kv_dense > K_padded->ne[1]) {
-                    K_padded = wsp_ggml_pad_ext(ctx0, K_padded, 0, 0, 0, n_kv_dense - K_padded->ne[1], 0, 0, 0, 0);
+                    K_padded = ggml_pad_ext(ctx0, K_padded, 0, 0, 0, n_kv_dense - K_padded->ne[1], 0, 0, 0, 0);
                 }
 
                 // Create a 4d tensor where each group spans a wide window of
                 // 512 keys (n_kv_chunk), but moving to the next group (nb[2])
                 // only jumps forward by 256 frames (chunk * nb[1]). This creates
                 // a 256 frame overlap, shared keys in RAM without copies.
-                struct wsp_ggml_tensor * K_chunk = wsp_ggml_view_4d(ctx0, K_padded,
+                struct ggml_tensor * K_chunk = ggml_view_4d(ctx0, K_padded,
                         d_head, n_kv_chunk, n_group, n_head,
                         K_padded->nb[1],
                         (size_t) chunk * K_padded->nb[1],
                         K_padded->nb[2],
                         0);
-                K_chunk = wsp_ggml_cont(ctx0, K_chunk);
+                K_chunk = ggml_cont(ctx0, K_chunk);
 
-                struct wsp_ggml_tensor * content_scores = wsp_ggml_mul_mat(ctx0, K_chunk, Q_u_padded);
+                struct ggml_tensor * content_scores = ggml_mul_mat(ctx0, K_chunk, Q_u_padded);
 
                 // The above mul_mat operation, combined with K_chunk's overlapping
                 // frames, produces a dense matrix. But some of the results in
                 // this matrix were computed for keys that aren't part of that
                 // query's window. So we shift each row to keep only the results
                 // that we want.
-                content_scores = wsp_ggml_view_4d(ctx0, content_scores,
+                content_scores = ggml_view_4d(ctx0, content_scores,
                         window_size, chunk, n_group, n_head,
                         (size_t) (chunk + window_size) * content_scores->nb[0],
                         content_scores->nb[2],
                         content_scores->nb[3],
                         0);
-                content_scores = wsp_ggml_cont(ctx0, content_scores);
+                content_scores = ggml_cont(ctx0, content_scores);
 
                 // ungrouping.
-                content_scores = wsp_ggml_reshape_3d(ctx0, content_scores, window_size, n_time_padded, n_head);
+                content_scores = ggml_reshape_3d(ctx0, content_scores, window_size, n_time_padded, n_head);
 
                 // remove padding if padding was applied (truncating to n_time).
                 if (need_padding) {
-                    content_scores = wsp_ggml_view_3d(ctx0, content_scores,
+                    content_scores = ggml_view_3d(ctx0, content_scores,
                             window_size, n_time, n_head,
                             content_scores->nb[1],
                             content_scores->nb[2],
                             0);
                 }
 
-                struct wsp_ggml_tensor * rel_pos_scores = wsp_ggml_mul_mat(ctx0, pos, Q_v);
+                struct ggml_tensor * rel_pos_scores = ggml_mul_mat(ctx0, pos, Q_v);
 
                 // attention_score = content similarity + relative position scores
-                struct wsp_ggml_tensor * attn_scores = wsp_ggml_add(ctx0, content_scores, rel_pos_scores);
+                struct ggml_tensor * attn_scores = ggml_add(ctx0, content_scores, rel_pos_scores);
 
-                attn_scores = wsp_ggml_soft_max_ext(ctx0, attn_scores, attn_mask, 1.0f / std::sqrt(d_head), 0.0f);
+                attn_scores = ggml_soft_max_ext(ctx0, attn_scores, attn_mask, 1.0f / std::sqrt(d_head), 0.0f);
 
                 // right pad the probabilites.
-                struct wsp_ggml_tensor * probs_padded = need_padding ?
-                    wsp_ggml_pad_ext(ctx0, attn_scores, 0, 0, 0, n_time_padded - n_time, 0, 0, 0, 0) : attn_scores;
+                struct ggml_tensor * probs_padded = need_padding ?
+                    ggml_pad_ext(ctx0, attn_scores, 0, 0, 0, n_time_padded - n_time, 0, 0, 0, 0) : attn_scores;
 
-                probs_padded = wsp_ggml_reshape_4d(ctx0, probs_padded, window_size, chunk, n_group, n_head);
-                probs_padded = wsp_ggml_pad_ext(ctx0, probs_padded, 0, chunk, 0, 0, 0, 0, 0, 0);
-                probs_padded = wsp_ggml_view_4d(ctx0, probs_padded,
+                probs_padded = ggml_reshape_4d(ctx0, probs_padded, window_size, chunk, n_group, n_head);
+                probs_padded = ggml_pad_ext(ctx0, probs_padded, 0, chunk, 0, 0, 0, 0, 0, 0);
+                probs_padded = ggml_view_4d(ctx0, probs_padded,
                         n_kv_chunk, chunk, n_group, n_head,
                         (size_t) n_kv_chunk * probs_padded->nb[0],
                         probs_padded->nb[2],
                         probs_padded->nb[3],
                         0);
-                probs_padded = wsp_ggml_cont(ctx0, probs_padded);
-                probs_padded = wsp_ggml_mul(ctx0, probs_padded, local_mask);
+                probs_padded = ggml_cont(ctx0, probs_padded);
+                probs_padded = ggml_mul(ctx0, probs_padded, local_mask);
 
                 // Add padding to front and back (for the first timeframe and the last timeframe).
-                struct wsp_ggml_tensor * V_padded = wsp_ggml_pad_ext(ctx0, V_cur, 0, 0, att_left, att_right, 0, 0, 0, 0);
+                struct ggml_tensor * V_padded = ggml_pad_ext(ctx0, V_cur, 0, 0, att_left, att_right, 0, 0, 0, 0);
 
                 // pad time axis to match n_kv_dense if needed.
                 if (n_kv_dense > V_padded->ne[1]) {
-                    V_padded = wsp_ggml_pad_ext(ctx0, V_padded, 0, 0, 0, n_kv_dense - V_padded->ne[1], 0, 0, 0, 0);
+                    V_padded = ggml_pad_ext(ctx0, V_padded, 0, 0, 0, n_kv_dense - V_padded->ne[1], 0, 0, 0, 0);
                 }
 
-                V_padded = wsp_ggml_cont(ctx0, wsp_ggml_transpose(ctx0, V_padded));
+                V_padded = ggml_cont(ctx0, ggml_transpose(ctx0, V_padded));
 
-                struct wsp_ggml_tensor * V_chunk = wsp_ggml_view_4d(ctx0, V_padded,
+                struct ggml_tensor * V_chunk = ggml_view_4d(ctx0, V_padded,
                         n_kv_chunk, d_head, n_group, n_head,
                         V_padded->nb[1],
                         (size_t) chunk * V_padded->nb[0],
                         V_padded->nb[2],
                         0);
-                V_chunk = wsp_ggml_cont(ctx0, V_chunk);
+                V_chunk = ggml_cont(ctx0, V_chunk);
 
-                cur = wsp_ggml_mul_mat(ctx0, V_chunk, probs_padded);
+                cur = ggml_mul_mat(ctx0, V_chunk, probs_padded);
                 // ungroup.
-                cur = wsp_ggml_reshape_3d(ctx0, cur, d_head, n_time_padded, n_head);
+                cur = ggml_reshape_3d(ctx0, cur, d_head, n_time_padded, n_head);
                 // unpad
                 if (need_padding) {
-                    cur = wsp_ggml_view_3d(ctx0, cur, d_head, n_time, n_head, cur->nb[1], cur->nb[2], 0);
+                    cur = ggml_view_3d(ctx0, cur, d_head, n_time, n_head, cur->nb[1], cur->nb[2], 0);
                 }
 
-                cur = wsp_ggml_cont(ctx0, wsp_ggml_permute(ctx0, cur, 0, 2, 1, 3));
-                cur = wsp_ggml_reshape_2d(ctx0, cur, n_state, n_time);
-                cur = wsp_ggml_mul_mat(ctx0, layer.attn_out_w, cur);
+                cur = ggml_cont(ctx0, ggml_permute(ctx0, cur, 0, 2, 1, 3));
+                cur = ggml_reshape_2d(ctx0, cur, n_state, n_time);
+                cur = ggml_mul_mat(ctx0, layer.attn_out_w, cur);
             } else {
-                struct wsp_ggml_tensor * Q_u = wsp_ggml_add(ctx0, Q_cur, layer.attn_pos_bias_u);
-                wsp_ggml_format_name(Q_u, "enc_%d_attn_q_u", il);
+                struct ggml_tensor * Q_u = ggml_add(ctx0, Q_cur, layer.attn_pos_bias_u);
+                ggml_format_name(Q_u, "enc_%d_attn_q_u", il);
 
-                struct wsp_ggml_tensor * K_prep = wsp_ggml_permute(ctx0, K_cur, 0, 2, 1, 3);
-                struct wsp_ggml_tensor * Q_prep = wsp_ggml_permute(ctx0, Q_u,   0, 2, 1, 3);
-                struct wsp_ggml_tensor * content_scores = wsp_ggml_mul_mat(ctx0, K_prep, Q_prep);
-                wsp_ggml_format_name(content_scores, "enc_%d_attn_content_scores", il);
+                struct ggml_tensor * K_prep = ggml_permute(ctx0, K_cur, 0, 2, 1, 3);
+                struct ggml_tensor * Q_prep = ggml_permute(ctx0, Q_u,   0, 2, 1, 3);
+                struct ggml_tensor * content_scores = ggml_mul_mat(ctx0, K_prep, Q_prep);
+                ggml_format_name(content_scores, "enc_%d_attn_content_scores", il);
 
-                struct wsp_ggml_tensor * Q_v = wsp_ggml_add(ctx0, Q_cur, layer.attn_pos_bias_v);
-                wsp_ggml_format_name(Q_v, "enc_%d_attn_q_v", il);
+                struct ggml_tensor * Q_v = ggml_add(ctx0, Q_cur, layer.attn_pos_bias_v);
+                ggml_format_name(Q_v, "enc_%d_attn_q_v", il);
 
-                Q_v = wsp_ggml_permute(ctx0, Q_v, 0, 2, 1, 3);
-                Q_v = wsp_ggml_cont(ctx0, Q_v);
-                wsp_ggml_format_name(Q_v, "enc_%d_attn_q_v_perm", il);
+                Q_v = ggml_permute(ctx0, Q_v, 0, 2, 1, 3);
+                Q_v = ggml_cont(ctx0, Q_v);
+                ggml_format_name(Q_v, "enc_%d_attn_q_v_perm", il);
 
-                struct wsp_ggml_tensor * rel_pos_scores = wsp_ggml_mul_mat(ctx0, pos, Q_v);
-                wsp_ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos", il);
+                struct ggml_tensor * rel_pos_scores = ggml_mul_mat(ctx0, pos, Q_v);
+                ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos", il);
 
                 // Relative position shifting is performed in the following block.
                 // Some more details on the operations performed below can be found here:
@@ -1840,133 +1840,133 @@ static struct wsp_ggml_cgraph * parakeet_build_graph_encode(parakeet_context & p
                     const auto n_frame    = rel_pos_scores->ne[1];
                     const auto n_head_cur = rel_pos_scores->ne[2];
 
-                    rel_pos_scores = wsp_ggml_pad(ctx0, rel_pos_scores, 1, 0, 0, 0);
-                    rel_pos_scores = wsp_ggml_roll(ctx0, rel_pos_scores, 1, 0, 0, 0);
+                    rel_pos_scores = ggml_pad(ctx0, rel_pos_scores, 1, 0, 0, 0);
+                    rel_pos_scores = ggml_roll(ctx0, rel_pos_scores, 1, 0, 0, 0);
 
-                    rel_pos_scores = wsp_ggml_reshape_3d(ctx0, rel_pos_scores, n_frame, pos_window + 1, n_head_cur);
-                    wsp_ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos_reshaped", il);
+                    rel_pos_scores = ggml_reshape_3d(ctx0, rel_pos_scores, n_frame, pos_window + 1, n_head_cur);
+                    ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos_reshaped", il);
 
                     int center = pos_window / 2;
                     size_t offset = rel_pos_scores->nb[0] * (center+1);
 
-                    rel_pos_scores = wsp_ggml_view_3d(ctx0, rel_pos_scores,
+                    rel_pos_scores = ggml_view_3d(ctx0, rel_pos_scores,
                                                   n_frame, pos_window, n_head_cur,
                                                   (pos_window) * 4,
                                                   rel_pos_scores->nb[2],
                                                   offset);
 
-                    wsp_ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos_shifted", il);
+                    ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos_shifted", il);
 
-                    rel_pos_scores = wsp_ggml_view_3d(ctx0, rel_pos_scores,
+                    rel_pos_scores = ggml_view_3d(ctx0, rel_pos_scores,
                                                   content_scores->ne[0],
                                                   content_scores->ne[1],
                                                   rel_pos_scores->ne[2],
                                                   rel_pos_scores->nb[1],
                                                   rel_pos_scores->nb[2],
                                                   0);
-                    rel_pos_scores = wsp_ggml_cont(ctx0, rel_pos_scores);
-                    wsp_ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos_shifted_view", il);
+                    rel_pos_scores = ggml_cont(ctx0, rel_pos_scores);
+                    ggml_format_name(rel_pos_scores, "enc_%d_attn_rel_pos_shifted_view", il);
                 }
 
-                struct wsp_ggml_tensor * attn_scores = wsp_ggml_add(ctx0, content_scores, rel_pos_scores);
-                wsp_ggml_format_name(attn_scores, "enc_%d_attn_scores", il);
-                attn_scores = wsp_ggml_scale(ctx0, attn_scores, 1.0f / std::sqrt(d_head));
-                attn_scores = wsp_ggml_add(ctx0, attn_scores, attn_mask);
-                wsp_ggml_format_name(attn_scores, "enc_%d_attn_scores_scaled", il);
+                struct ggml_tensor * attn_scores = ggml_add(ctx0, content_scores, rel_pos_scores);
+                ggml_format_name(attn_scores, "enc_%d_attn_scores", il);
+                attn_scores = ggml_scale(ctx0, attn_scores, 1.0f / std::sqrt(d_head));
+                attn_scores = ggml_add(ctx0, attn_scores, attn_mask);
+                ggml_format_name(attn_scores, "enc_%d_attn_scores_scaled", il);
 
-                struct wsp_ggml_tensor * probs = wsp_ggml_soft_max(ctx0, attn_scores);
-                wsp_ggml_format_name(probs, "enc_%d_attn_probs", il);
+                struct ggml_tensor * probs = ggml_soft_max(ctx0, attn_scores);
+                ggml_format_name(probs, "enc_%d_attn_probs", il);
 
-                V_cur = wsp_ggml_cont(ctx0, wsp_ggml_permute(ctx0, V_cur, 1, 2, 0, 3));
-                wsp_ggml_format_name(V_cur, "enc_%d_attn_v_cur", il);
-                cur = wsp_ggml_mul_mat(ctx0, probs, V_cur);
-                wsp_ggml_format_name(cur, "enc_%d_attn_inp", il);
+                V_cur = ggml_cont(ctx0, ggml_permute(ctx0, V_cur, 1, 2, 0, 3));
+                ggml_format_name(V_cur, "enc_%d_attn_v_cur", il);
+                cur = ggml_mul_mat(ctx0, probs, V_cur);
+                ggml_format_name(cur, "enc_%d_attn_inp", il);
 
-                cur = wsp_ggml_permute(ctx0, cur, 2, 0, 1, 3);
-                cur = wsp_ggml_cont_2d(ctx0, cur, n_state, n_time);
-                cur = wsp_ggml_mul_mat(ctx0, layer.attn_out_w, cur);
+                cur = ggml_permute(ctx0, cur, 2, 0, 1, 3);
+                cur = ggml_cont_2d(ctx0, cur, n_state, n_time);
+                cur = ggml_mul_mat(ctx0, layer.attn_out_w, cur);
             }
-            wsp_ggml_format_name(cur, "enc_%d_attn_out", il);
+            ggml_format_name(cur, "enc_%d_attn_out", il);
 
-            cur = wsp_ggml_add(ctx0, residual, cur);
-            wsp_ggml_format_name(cur, "enc_%d_attn_res", il);
+            cur = ggml_add(ctx0, residual, cur);
+            ggml_format_name(cur, "enc_%d_attn_res", il);
         }
 
         // Convolution
         {
-            struct wsp_ggml_tensor * residual = cur;
-            wsp_ggml_format_name(cur, "enc_%d_residual_conv", il);
+            struct ggml_tensor * residual = cur;
+            ggml_format_name(cur, "enc_%d_residual_conv", il);
 
-            cur = wsp_ggml_norm(ctx0, cur, hparams.eps);
-            cur = wsp_ggml_add(ctx0, wsp_ggml_mul(ctx0, cur, layer.norm_conv_w), layer.norm_conv_b);
-            wsp_ggml_format_name(cur, "enc_%d_norm_conv", il);
+            cur = ggml_norm(ctx0, cur, hparams.eps);
+            cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.norm_conv_w), layer.norm_conv_b);
+            ggml_format_name(cur, "enc_%d_norm_conv", il);
 
             // pointwise 1d convolution: [1024, 138] -> [2048, 138]
-            cur = wsp_ggml_mul_mat(ctx0, layer.conv_pw1_w, cur);
-            wsp_ggml_format_name(cur, "enc_%d_conv_pw1", il);
+            cur = ggml_mul_mat(ctx0, layer.conv_pw1_w, cur);
+            ggml_format_name(cur, "enc_%d_conv_pw1", il);
 
             {
                 int64_t d = cur->ne[0] / 2;
-                struct wsp_ggml_tensor * signal = wsp_ggml_view_2d(ctx0, cur, d, cur->ne[1], cur->nb[1], 0);
-                struct wsp_ggml_tensor * gate   = wsp_ggml_view_2d(ctx0, cur, d, cur->ne[1], cur->nb[1], d * cur->nb[0]);
+                struct ggml_tensor * signal = ggml_view_2d(ctx0, cur, d, cur->ne[1], cur->nb[1], 0);
+                struct ggml_tensor * gate   = ggml_view_2d(ctx0, cur, d, cur->ne[1], cur->nb[1], d * cur->nb[0]);
 
-                cur = wsp_ggml_mul(ctx0, signal, wsp_ggml_sigmoid(ctx0, gate));
-                wsp_ggml_format_name(cur, "enc_%d_conv_glu", il);
+                cur = ggml_mul(ctx0, signal, ggml_sigmoid(ctx0, gate));
+                ggml_format_name(cur, "enc_%d_conv_glu", il);
             }
 
-            cur = wsp_ggml_cont(ctx0, wsp_ggml_transpose(ctx0, cur));
+            cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur));
 
-            // use wsp_ggml_ssm_conv for f32 precision
+            // use ggml_ssm_conv for f32 precision
             const int dw_pad = (hparams.n_conv_kernel - 1) / 2;
-            cur = wsp_ggml_pad(ctx0, cur, dw_pad, 0, 0, 0);
-            cur = wsp_ggml_roll(ctx0, cur, dw_pad, 0, 0, 0);
-            cur = wsp_ggml_pad(ctx0, cur, dw_pad, 0, 0, 0);
-            wsp_ggml_format_name(cur, "enc_%d_conv_dw_pad", il);
+            cur = ggml_pad(ctx0, cur, dw_pad, 0, 0, 0);
+            cur = ggml_roll(ctx0, cur, dw_pad, 0, 0, 0);
+            cur = ggml_pad(ctx0, cur, dw_pad, 0, 0, 0);
+            ggml_format_name(cur, "enc_%d_conv_dw_pad", il);
 
-            cur = wsp_ggml_ssm_conv(ctx0, cur, layer.conv_dw_w);
-            wsp_ggml_format_name(cur, "enc_%d_conv_1d_dw", il);
+            cur = ggml_ssm_conv(ctx0, cur, layer.conv_dw_w);
+            ggml_format_name(cur, "enc_%d_conv_1d_dw", il);
 
-            cur = wsp_ggml_sub(ctx0, cur, layer.conv_bn_mean);
-            struct wsp_ggml_tensor * std = wsp_ggml_sqrt(ctx0, layer.conv_bn_var);
-            cur = wsp_ggml_div(ctx0, cur, std);
-            cur = wsp_ggml_add(ctx0, wsp_ggml_mul(ctx0, cur, layer.conv_bn_w), layer.conv_bn_b);
-            wsp_ggml_format_name(cur, "enc_%d_conv_bn", il);
+            cur = ggml_sub(ctx0, cur, layer.conv_bn_mean);
+            struct ggml_tensor * std = ggml_sqrt(ctx0, layer.conv_bn_var);
+            cur = ggml_div(ctx0, cur, std);
+            cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.conv_bn_w), layer.conv_bn_b);
+            ggml_format_name(cur, "enc_%d_conv_bn", il);
 
-            cur = wsp_ggml_silu(ctx0, cur);
-            wsp_ggml_format_name(cur, "enc_%d_conv_silu", il);
+            cur = ggml_silu(ctx0, cur);
+            ggml_format_name(cur, "enc_%d_conv_silu", il);
 
-            cur = wsp_ggml_mul_mat(ctx0, layer.conv_pw2_w, cur);
-            wsp_ggml_format_name(cur, "enc_%d_conv_pw2", il);
+            cur = ggml_mul_mat(ctx0, layer.conv_pw2_w, cur);
+            ggml_format_name(cur, "enc_%d_conv_pw2", il);
 
-            cur = wsp_ggml_add(ctx0, residual, cur);
-            wsp_ggml_format_name(cur, "enc_%d_conv_res", il);
+            cur = ggml_add(ctx0, residual, cur);
+            ggml_format_name(cur, "enc_%d_conv_res", il);
         }
 
         // FFN2
         {
-            struct wsp_ggml_tensor * residual = cur;
-            cur = wsp_ggml_norm(ctx0, cur, hparams.eps);
-            cur = wsp_ggml_add(ctx0, wsp_ggml_mul(ctx0, cur, layer.norm_ff2_w), layer.norm_ff2_b);
-            wsp_ggml_format_name(cur, "enc_%d_ffn_norm_2", il);
+            struct ggml_tensor * residual = cur;
+            cur = ggml_norm(ctx0, cur, hparams.eps);
+            cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.norm_ff2_w), layer.norm_ff2_b);
+            ggml_format_name(cur, "enc_%d_ffn_norm_2", il);
 
-            cur = wsp_ggml_mul_mat(ctx0, layer.ff2_linear1_w, cur);
-            cur = wsp_ggml_silu(ctx0, cur);
-            cur = wsp_ggml_mul_mat(ctx0, layer.ff2_linear2_w, cur);
-            cur = wsp_ggml_add(ctx0, residual, wsp_ggml_scale(ctx0, cur, 0.5));
-            wsp_ggml_format_name(cur, "enc_%d_ffn_res", il);
+            cur = ggml_mul_mat(ctx0, layer.ff2_linear1_w, cur);
+            cur = ggml_silu(ctx0, cur);
+            cur = ggml_mul_mat(ctx0, layer.ff2_linear2_w, cur);
+            cur = ggml_add(ctx0, residual, ggml_scale(ctx0, cur, 0.5));
+            ggml_format_name(cur, "enc_%d_ffn_res", il);
         }
 
-        cur = wsp_ggml_norm(ctx0, cur, hparams.eps);
-        cur = wsp_ggml_add(ctx0, wsp_ggml_mul(ctx0, cur, layer.norm_out_w), layer.norm_out_b);
+        cur = ggml_norm(ctx0, cur, hparams.eps);
+        cur = ggml_add(ctx0, ggml_mul(ctx0, cur, layer.norm_out_w), layer.norm_out_b);
     }
 
-    wsp_ggml_set_name(cur, "encoder_out");
+    ggml_set_name(cur, "encoder_out");
     pstate.n_frames = cur->ne[1];
 
-    struct wsp_ggml_tensor * enc_out_view = wsp_ggml_view_2d(ctx0, pstate.enc_out, n_state, pstate.n_frames, pstate.enc_out->nb[1], 0);
-    wsp_ggml_build_forward_expand(gf, wsp_ggml_cpy(ctx0, cur, enc_out_view));
+    struct ggml_tensor * enc_out_view = ggml_view_2d(ctx0, pstate.enc_out, n_state, pstate.n_frames, pstate.enc_out->nb[1], 0);
+    ggml_build_forward_expand(gf, ggml_cpy(ctx0, cur, enc_out_view));
 
-    wsp_ggml_free(ctx0);
+    ggml_free(ctx0);
 
     return gf;
 }
@@ -1976,45 +1976,45 @@ static bool parakeet_encode_internal(
           parakeet_state & pstate,
               const int   mel_offset,
               const int   n_threads,
-    wsp_ggml_abort_callback   abort_callback,
+    ggml_abort_callback   abort_callback,
                    void * abort_callback_data) {
-    const int64_t t_start_us = wsp_ggml_time_us();
+    const int64_t t_start_us = ggml_time_us();
 
     auto & sched = pstate.sched_encode.sched;
 
-    wsp_ggml_cgraph * gf = parakeet_build_graph_encode(pctx, pstate);
+    ggml_cgraph * gf = parakeet_build_graph_encode(pctx, pstate);
 
-    if (!wsp_ggml_backend_sched_alloc_graph(sched, gf)) {
+    if (!ggml_backend_sched_alloc_graph(sched, gf)) {
         // should never happen as we pre-allocate the memory
         return false;
     }
 
     // set mel input
     {
-        struct wsp_ggml_tensor * mel = wsp_ggml_graph_get_tensor(gf, "mel");
+        struct ggml_tensor * mel = ggml_graph_get_tensor(gf, "mel");
 
         const auto & mel_inp = pstate.mel;
         const int n_ctx      = pstate.n_audio_ctx > 0 ? pstate.n_audio_ctx : pctx.model.hparams.n_audio_ctx;
 
-        assert(mel->type == WSP_GGML_TYPE_F32);
+        assert(mel->type == GGML_TYPE_F32);
         assert(mel_inp.n_mel == pctx.model.hparams.n_mels);
 
-        pstate.inp_mel.resize(wsp_ggml_nelements(mel));
+        pstate.inp_mel.resize(ggml_nelements(mel));
 
         float * dst = pstate.inp_mel.data();
-        memset(dst, 0, wsp_ggml_nbytes(mel));
+        memset(dst, 0, ggml_nbytes(mel));
 
         const int i0 = std::min(mel_offset,         mel_inp.n_len);
         const int i1 = std::min(mel_offset + n_ctx, mel_inp.n_len);
 
         memcpy(dst, mel_inp.data.data() + i0 * mel_inp.n_mel, (i1 - i0) * mel_inp.n_mel * sizeof(float));
 
-        wsp_ggml_backend_tensor_set(mel, pstate.inp_mel.data(), 0, wsp_ggml_nelements(mel)*sizeof(float));
+        ggml_backend_tensor_set(mel, pstate.inp_mel.data(), 0, ggml_nelements(mel)*sizeof(float));
     }
 
     // set attention mask
     {
-        struct wsp_ggml_tensor * attn_mask = wsp_ggml_graph_get_tensor(gf, "attn_mask");
+        struct ggml_tensor * attn_mask = ggml_graph_get_tensor(gf, "attn_mask");
         const int n_q = attn_mask->ne[1];
         const int n_k = attn_mask->ne[0];
 
@@ -2039,11 +2039,11 @@ static bool parakeet_encode_internal(
                 }
             }
         }
-        wsp_ggml_backend_tensor_set(attn_mask, mask_data.data(), 0, mask_data.size() * sizeof(float));
+        ggml_backend_tensor_set(attn_mask, mask_data.data(), 0, mask_data.size() * sizeof(float));
     }
 
     // set local attention skew mask
-    if (struct wsp_ggml_tensor * local_mask = wsp_ggml_graph_get_tensor(gf, "local_mask")) {
+    if (struct ggml_tensor * local_mask = ggml_graph_get_tensor(gf, "local_mask")) {
         const int n_k = local_mask->ne[0];
         const int n_q = local_mask->ne[1];
 
@@ -2055,12 +2055,12 @@ static bool parakeet_encode_internal(
                 mask_data[q * n_k + k] = (rel >= 0 && rel < window_size) ? 1.0f : 0.0f;
             }
         }
-        wsp_ggml_backend_tensor_set(local_mask, mask_data.data(), 0, mask_data.size() * sizeof(float));
+        ggml_backend_tensor_set(local_mask, mask_data.data(), 0, mask_data.size() * sizeof(float));
     }
 
     // set positional frequency
     {
-        struct wsp_ggml_tensor * pos_freqs_t = wsp_ggml_graph_get_tensor(gf, "pos_freqs");
+        struct ggml_tensor * pos_freqs_t = ggml_graph_get_tensor(gf, "pos_freqs");
         const int d_half      = pos_freqs_t->ne[0];
         const int n_state     = pctx.model.hparams.n_audio_state;
         const float log_10000 = logf(10000.0f);
@@ -2068,12 +2068,12 @@ static bool parakeet_encode_internal(
         for (int k = 0; k < d_half; ++k) {
             freqs[k] = expf(-(float(k * 2) * log_10000 / float(n_state)));
         }
-        wsp_ggml_backend_tensor_set(pos_freqs_t, freqs.data(), 0, freqs.size() * sizeof(float));
+        ggml_backend_tensor_set(pos_freqs_t, freqs.data(), 0, freqs.size() * sizeof(float));
     }
 
     // set relative position offsets
     {
-        struct wsp_ggml_tensor * rel_pos_t = wsp_ggml_graph_get_tensor(gf, "rel_positions");
+        struct ggml_tensor * rel_pos_t = ggml_graph_get_tensor(gf, "rel_positions");
         const int window_size = rel_pos_t->ne[1];
         std::vector<float> pos(window_size);
         if (window_size == PARAKEET_LOCAL_ATTN_WINDOW * 2 + 1) {
@@ -2086,14 +2086,14 @@ static bool parakeet_encode_internal(
                 pos[t] = float(n_time - 1 - t);
             }
         }
-        wsp_ggml_backend_tensor_set(rel_pos_t, pos.data(), 0, pos.size() * sizeof(float));
+        ggml_backend_tensor_set(rel_pos_t, pos.data(), 0, pos.size() * sizeof(float));
     }
 
-    if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+    if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
         return false;
     }
 
-    pstate.t_encode_us += wsp_ggml_time_us() - t_start_us;
+    pstate.t_encode_us += ggml_time_us() - t_start_us;
     pstate.n_encode++;
 
     return !(abort_callback && abort_callback(abort_callback_data));
@@ -2115,7 +2115,7 @@ static bool parakeet_ensure_encode_sched(
     const int subsampl_factor = pctx.model.hparams.subsampling_factor;
     const int n_frames_max = (n_audio_ctx + subsampl_factor - 1) / subsampl_factor;
     if (n_frames_max > pstate.enc_out->ne[1]) {
-        wsp_ggml_backend_buffer_free(pstate.enc_out_buffer);
+        ggml_backend_buffer_free(pstate.enc_out_buffer);
         pstate.enc_out_buffer = nullptr;
         pstate.enc_out = nullptr;
 
@@ -2141,101 +2141,101 @@ static bool parakeet_ensure_encode_sched(
     return true;
 }
 
-static struct wsp_ggml_tensor * parakeet_build_graph_lstm_layer(
-        struct wsp_ggml_context * ctx0,
-         struct wsp_ggml_cgraph * gf,
-         struct wsp_ggml_tensor * x_t,       // the current input token embedding
-         struct wsp_ggml_tensor * w_ih,      // input to hidden weights (4 weight tensors packed)
-         struct wsp_ggml_tensor * w_hh,      // hidden to hidden weights (4 weight tensors packed)
-         struct wsp_ggml_tensor * b_h,       // folded ih+hh bias (4 bias tensors packed)
-         struct wsp_ggml_tensor * h_state,   // this layers hidden state
-         struct wsp_ggml_tensor * c_state,   // this layers cell state
+static struct ggml_tensor * parakeet_build_graph_lstm_layer(
+        struct ggml_context * ctx0,
+         struct ggml_cgraph * gf,
+         struct ggml_tensor * x_t,       // the current input token embedding
+         struct ggml_tensor * w_ih,      // input to hidden weights (4 weight tensors packed)
+         struct ggml_tensor * w_hh,      // hidden to hidden weights (4 weight tensors packed)
+         struct ggml_tensor * b_h,       // folded ih+hh bias (4 bias tensors packed)
+         struct ggml_tensor * h_state,   // this layers hidden state
+         struct ggml_tensor * c_state,   // this layers cell state
                         int   li) {      // layer index (for tensor naming)
 
-    wsp_ggml_format_name(x_t, "lstm_layer_%d_x_t", li);
-    wsp_ggml_format_name(h_state, "lstm_layer_%d_h_state", li);
-    wsp_ggml_format_name(c_state, "lstm_layer_%d_c_state", li);
+    ggml_format_name(x_t, "lstm_layer_%d_x_t", li);
+    ggml_format_name(h_state, "lstm_layer_%d_h_state", li);
+    ggml_format_name(c_state, "lstm_layer_%d_c_state", li);
 
     // The 4 gates (i, f, o, c) are packed in the same weight tensor.
-    struct wsp_ggml_tensor * inp_gates = wsp_ggml_mul_mat(ctx0, w_ih, x_t);
+    struct ggml_tensor * inp_gates = ggml_mul_mat(ctx0, w_ih, x_t);
 
     // Hidden-to-Hidden Projections are also packed in the same weight tensor.
     // b_h holds the folded ih+hh bias (see parakeet_model_load), so it is
     // the only bias that needs to be added here.
-    struct wsp_ggml_tensor * hid_gates = wsp_ggml_mul_mat(ctx0, w_hh, h_state);
-    hid_gates = wsp_ggml_add(ctx0, hid_gates, b_h);
+    struct ggml_tensor * hid_gates = ggml_mul_mat(ctx0, w_hh, h_state);
+    hid_gates = ggml_add(ctx0, hid_gates, b_h);
 
     // Combine the input and hidden contributions of the gates.
-    struct wsp_ggml_tensor * gates = wsp_ggml_add(ctx0, inp_gates, hid_gates);
-    wsp_ggml_format_name(gates, "lstm_layer_%d_gates", li);
+    struct ggml_tensor * gates = ggml_add(ctx0, inp_gates, hid_gates);
+    ggml_format_name(gates, "lstm_layer_%d_gates", li);
 
     const int h_dim = h_state->ne[0];
-    const size_t row_size = wsp_ggml_row_size(gates->type, h_dim);
+    const size_t row_size = ggml_row_size(gates->type, h_dim);
 
     // The gates are packed as [i, f, o, c] (reordered at convert time, see
     // parakeet_model_load), so the three sigmoid-gated outputs (i, f, o) are
-    // contiguous and can be computed with a single wsp_ggml_sigmoid call.
-    struct wsp_ggml_tensor * ifo = wsp_ggml_sigmoid(ctx0, wsp_ggml_view_1d(ctx0, gates, 3 * h_dim, 0));
-    wsp_ggml_format_name(ifo, "lstm_layer_%d_ifo", li);
+    // contiguous and can be computed with a single ggml_sigmoid call.
+    struct ggml_tensor * ifo = ggml_sigmoid(ctx0, ggml_view_1d(ctx0, gates, 3 * h_dim, 0));
+    ggml_format_name(ifo, "lstm_layer_%d_ifo", li);
 
     // 1. Input Gate at time t.
-    struct wsp_ggml_tensor * i_t = wsp_ggml_view_1d(ctx0, ifo, h_dim, 0 * row_size);
-    wsp_ggml_format_name(i_t, "lstm_layer_%d_i_t", li);
+    struct ggml_tensor * i_t = ggml_view_1d(ctx0, ifo, h_dim, 0 * row_size);
+    ggml_format_name(i_t, "lstm_layer_%d_i_t", li);
 
     // Forget gate.
-    struct wsp_ggml_tensor * f_t = wsp_ggml_view_1d(ctx0, ifo, h_dim, 1 * row_size);
-    wsp_ggml_format_name(f_t, "lstm_layer_%d_f_t", li);
+    struct ggml_tensor * f_t = ggml_view_1d(ctx0, ifo, h_dim, 1 * row_size);
+    ggml_format_name(f_t, "lstm_layer_%d_f_t", li);
 
     // Output gate.
-    struct wsp_ggml_tensor * o_t = wsp_ggml_view_1d(ctx0, ifo, h_dim, 2 * row_size);
-    wsp_ggml_format_name(o_t, "lstm_layer_%d_o_t", li);
+    struct ggml_tensor * o_t = ggml_view_1d(ctx0, ifo, h_dim, 2 * row_size);
+    ggml_format_name(o_t, "lstm_layer_%d_o_t", li);
 
     // Cell gate.
-    struct wsp_ggml_tensor * c_t = wsp_ggml_tanh(ctx0, wsp_ggml_view_1d(ctx0, gates, h_dim, 3 * row_size));
-    wsp_ggml_format_name(c_t, "lstm_layer_%d_c_t", li);
+    struct ggml_tensor * c_t = ggml_tanh(ctx0, ggml_view_1d(ctx0, gates, h_dim, 3 * row_size));
+    ggml_format_name(c_t, "lstm_layer_%d_c_t", li);
 
     // Calculate the new cell state.
-    struct wsp_ggml_tensor * c_new = wsp_ggml_add(ctx0,
-        wsp_ggml_mul(ctx0, f_t, c_state), // apply forget gate to cell state.
-        wsp_ggml_mul(ctx0, i_t, c_t));    // apply input gate to cell gate.
-    wsp_ggml_build_forward_expand(gf, wsp_ggml_cpy(ctx0, c_new, c_state));
+    struct ggml_tensor * c_new = ggml_add(ctx0,
+        ggml_mul(ctx0, f_t, c_state), // apply forget gate to cell state.
+        ggml_mul(ctx0, i_t, c_t));    // apply input gate to cell gate.
+    ggml_build_forward_expand(gf, ggml_cpy(ctx0, c_new, c_state));
 
     // Calculate the new hidden state.
-    struct wsp_ggml_tensor * h_new = wsp_ggml_mul(ctx0, o_t, wsp_ggml_tanh(ctx0, c_new));
-    wsp_ggml_set_output(h_new);
-    wsp_ggml_format_name(h_new, "lstm_layer_%d_h_new", li);
-    wsp_ggml_build_forward_expand(gf, wsp_ggml_cpy(ctx0, h_new, h_state));
+    struct ggml_tensor * h_new = ggml_mul(ctx0, o_t, ggml_tanh(ctx0, c_new));
+    ggml_set_output(h_new);
+    ggml_format_name(h_new, "lstm_layer_%d_h_new", li);
+    ggml_build_forward_expand(gf, ggml_cpy(ctx0, h_new, h_state));
 
     return h_new;
 }
 
-static struct wsp_ggml_cgraph * parakeet_build_graph_prediction(
+static struct ggml_cgraph * parakeet_build_graph_prediction(
          parakeet_context & pctx,
            parakeet_state & pstate,
      const parakeet_batch & batch,
                     bool   worst_case) {
-    WSP_GGML_UNUSED(worst_case);
+    GGML_UNUSED(worst_case);
     const auto & model   = pctx.model;
     const auto & hparams = model.hparams;
     const int n_tokens   = batch.n_tokens;
 
-    struct wsp_ggml_init_params params = {
+    struct ggml_init_params params = {
         /*.mem_size   =*/ pstate.sched_decode.meta.size(),
         /*.mem_buffer =*/ pstate.sched_decode.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
-    struct wsp_ggml_context * ctx0 = wsp_ggml_init(params);
-    wsp_ggml_cgraph * gf = wsp_ggml_new_graph_custom(ctx0, PARAKEET_MAX_NODES, false);
+    struct ggml_context * ctx0 = ggml_init(params);
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx0, PARAKEET_MAX_NODES, false);
 
     // Prediction Network
-    struct wsp_ggml_tensor * token = wsp_ggml_new_tensor_1d(ctx0, WSP_GGML_TYPE_I32, n_tokens);
-    wsp_ggml_set_name(token, "token_inp");
-    wsp_ggml_set_input(token);
+    struct ggml_tensor * token = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+    ggml_set_name(token, "token_inp");
+    ggml_set_input(token);
 
-    struct wsp_ggml_tensor * token_embd = wsp_ggml_get_rows(ctx0, model.prediction.embed_w, token);
+    struct ggml_tensor * token_embd = ggml_get_rows(ctx0, model.prediction.embed_w, token);
 
-    struct wsp_ggml_tensor * inpL = token_embd;
+    struct ggml_tensor * inpL = token_embd;
 
     for (int il = 0; il < hparams.n_pred_layers; ++il) {
         inpL = parakeet_build_graph_lstm_layer(ctx0, gf, inpL,
@@ -2247,69 +2247,69 @@ static struct wsp_ggml_cgraph * parakeet_build_graph_prediction(
                 il);
     }
 
-    struct wsp_ggml_tensor * pred_out = inpL;
-    wsp_ggml_format_name(pred_out, "lstm_pred_out");
+    struct ggml_tensor * pred_out = inpL;
+    ggml_format_name(pred_out, "lstm_pred_out");
 
     // Project the prediction network output to the joint network hidden dimension.
-    struct wsp_ggml_tensor * pred = wsp_ggml_mul_mat(ctx0, model.joint.pred_w, pred_out);
-    pred = wsp_ggml_add(ctx0, pred, model.joint.pred_b);
-    wsp_ggml_set_name(pred, "h_pred");
+    struct ggml_tensor * pred = ggml_mul_mat(ctx0, model.joint.pred_w, pred_out);
+    pred = ggml_add(ctx0, pred, model.joint.pred_b);
+    ggml_set_name(pred, "h_pred");
 
-    wsp_ggml_build_forward_expand(gf, wsp_ggml_cpy(ctx0, pred, pstate.pred_out));
+    ggml_build_forward_expand(gf, ggml_cpy(ctx0, pred, pstate.pred_out));
 
-    wsp_ggml_free(ctx0);
+    ggml_free(ctx0);
 
     return gf;
 }
 
-static struct wsp_ggml_cgraph * parakeet_build_graph_joint(
+static struct ggml_cgraph * parakeet_build_graph_joint(
          parakeet_context & pctx,
            parakeet_state & pstate,
      const parakeet_batch & batch,
                      bool   worst_case) {
-    WSP_GGML_UNUSED(worst_case);
+    GGML_UNUSED(worst_case);
     const auto & model   = pctx.model;
     const auto & hparams = model.hparams;
 
-    struct wsp_ggml_init_params params = {
+    struct ggml_init_params params = {
         /*.mem_size   =*/ pstate.sched_decode.meta.size(),
         /*.mem_buffer =*/ pstate.sched_decode.meta.data(),
         /*.no_alloc   =*/ true,
     };
 
-    struct wsp_ggml_context * ctx0 = wsp_ggml_init(params);
-    wsp_ggml_cgraph * gf = wsp_ggml_new_graph_custom(ctx0, PARAKEET_MAX_NODES, false);
+    struct ggml_context * ctx0 = ggml_init(params);
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx0, PARAKEET_MAX_NODES, false);
 
-    struct wsp_ggml_tensor * pred = pstate.pred_out;
-    wsp_ggml_format_name(pred, "pred");
+    struct ggml_tensor * pred = pstate.pred_out;
+    ggml_format_name(pred, "pred");
 
     const int t_idx = batch.i_time[0];
-    struct wsp_ggml_tensor * enc_out = wsp_ggml_view_1d(ctx0, pstate.enc_out, hparams.n_audio_state,
+    struct ggml_tensor * enc_out = ggml_view_1d(ctx0, pstate.enc_out, hparams.n_audio_state,
             (size_t) t_idx * pstate.enc_out->nb[1]);
-    wsp_ggml_format_name(enc_out, "enc_out_view");
+    ggml_format_name(enc_out, "enc_out_view");
 
     // Project the encoder output to the joint network hidden dimension.
-    struct wsp_ggml_tensor * enc  = wsp_ggml_mul_mat(ctx0, model.joint.enc_w, enc_out);
-    enc = wsp_ggml_add(ctx0, enc, model.joint.enc_b);
-    wsp_ggml_set_name(enc, "enc");
+    struct ggml_tensor * enc  = ggml_mul_mat(ctx0, model.joint.enc_w, enc_out);
+    enc = ggml_add(ctx0, enc, model.joint.enc_b);
+    ggml_set_name(enc, "enc");
 
-    struct wsp_ggml_tensor * joint = wsp_ggml_add(ctx0, enc, pred);
-    wsp_ggml_set_name(joint, "joint");
-    joint = wsp_ggml_relu(ctx0, joint);
+    struct ggml_tensor * joint = ggml_add(ctx0, enc, pred);
+    ggml_set_name(joint, "joint");
+    joint = ggml_relu(ctx0, joint);
 
-    struct wsp_ggml_tensor * logits = wsp_ggml_mul_mat(ctx0, model.joint.net_w, joint);
-    logits = wsp_ggml_add(ctx0, logits, model.joint.net_b);
-    wsp_ggml_set_output(logits);
-    wsp_ggml_set_name(logits, "logits");
+    struct ggml_tensor * logits = ggml_mul_mat(ctx0, model.joint.net_w, joint);
+    logits = ggml_add(ctx0, logits, model.joint.net_b);
+    ggml_set_output(logits);
+    ggml_set_name(logits, "logits");
 
-    struct wsp_ggml_tensor * probs = wsp_ggml_soft_max(ctx0, logits);
-    struct wsp_ggml_tensor * log_probs = wsp_ggml_log(ctx0, probs);
-    wsp_ggml_set_output(log_probs);
-    wsp_ggml_format_name(log_probs, "log_probs");
+    struct ggml_tensor * probs = ggml_soft_max(ctx0, logits);
+    struct ggml_tensor * log_probs = ggml_log(ctx0, probs);
+    ggml_set_output(log_probs);
+    ggml_format_name(log_probs, "log_probs");
 
-    wsp_ggml_build_forward_expand(gf, log_probs);
+    ggml_build_forward_expand(gf, log_probs);
 
-    wsp_ggml_free(ctx0);
+    ggml_free(ctx0);
 
     return gf;
 }
@@ -2319,41 +2319,41 @@ static bool parakeet_predict(
           parakeet_state & pstate,
     const parakeet_batch & batch,
                const int   n_threads,
-     wsp_ggml_abort_callback   abort_callback,
+     ggml_abort_callback   abort_callback,
                    void  * abort_callback_data) {
 
     const int n_tokens   = batch.n_tokens;
 
-    const int64_t t_start_us = wsp_ggml_time_us();
+    const int64_t t_start_us = ggml_time_us();
 
     {
         auto & sched = pstate.sched_decode.sched;
 
-        const int64_t t_build_start_us = wsp_ggml_time_us();
-        wsp_ggml_cgraph * gf = parakeet_build_graph_prediction(pctx, pstate, batch, false);
-        pstate.t_predict_build_us += wsp_ggml_time_us() - t_build_start_us;
+        const int64_t t_build_start_us = ggml_time_us();
+        ggml_cgraph * gf = parakeet_build_graph_prediction(pctx, pstate, batch, false);
+        pstate.t_predict_build_us += ggml_time_us() - t_build_start_us;
 
-        const int64_t t_alloc_start_us = wsp_ggml_time_us();
-        if (!wsp_ggml_backend_sched_alloc_graph(sched, gf)) {
+        const int64_t t_alloc_start_us = ggml_time_us();
+        if (!ggml_backend_sched_alloc_graph(sched, gf)) {
             // should never happen as we pre-allocate the memory
             return false;
         }
-        pstate.t_predict_alloc_us += wsp_ggml_time_us() - t_alloc_start_us;
+        pstate.t_predict_alloc_us += ggml_time_us() - t_alloc_start_us;
 
         // set the inputs
         {
-            struct wsp_ggml_tensor * token_inp = wsp_ggml_graph_get_tensor(gf, "token_inp");
-            wsp_ggml_backend_tensor_set(token_inp, batch.token, 0, n_tokens * wsp_ggml_element_size(token_inp));
+            struct ggml_tensor * token_inp = ggml_graph_get_tensor(gf, "token_inp");
+            ggml_backend_tensor_set(token_inp, batch.token, 0, n_tokens * ggml_element_size(token_inp));
         }
 
-        const int64_t t_compute_start_us = wsp_ggml_time_us();
-        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+        const int64_t t_compute_start_us = ggml_time_us();
+        if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
             return false;
         }
-        pstate.t_predict_compute_us += wsp_ggml_time_us() - t_compute_start_us;
+        pstate.t_predict_compute_us += ggml_time_us() - t_compute_start_us;
     }
 
-    pstate.t_predict_us += wsp_ggml_time_us() - t_start_us;
+    pstate.t_predict_us += ggml_time_us() - t_start_us;
     pstate.n_predict++;
 
     return !(abort_callback && abort_callback(abort_callback_data));
@@ -2364,9 +2364,9 @@ static bool parakeet_joint(
            parakeet_state & pstate,
      const parakeet_batch & batch,
                 const int   n_threads,
-      wsp_ggml_abort_callback   abort_callback,
+      ggml_abort_callback   abort_callback,
                      void * abort_callback_data) {
-    const int64_t t_start_us = wsp_ggml_time_us();
+    const int64_t t_start_us = ggml_time_us();
 
     const auto & model   = pctx.model;
     const auto & hparams = model.hparams;
@@ -2374,21 +2374,21 @@ static bool parakeet_joint(
 
     auto & logits_out = pstate.logits;
 
-    struct wsp_ggml_tensor * logits;
+    struct ggml_tensor * logits;
 
     {
         auto & sched = pstate.sched_decode.sched;
 
-        wsp_ggml_cgraph * gf = parakeet_build_graph_joint(pctx, pstate, batch, false);
+        ggml_cgraph * gf = parakeet_build_graph_joint(pctx, pstate, batch, false);
 
-        if (!wsp_ggml_backend_sched_alloc_graph(sched, gf)) {
+        if (!ggml_backend_sched_alloc_graph(sched, gf)) {
             // should never happen as we pre-allocate the memory
             return false;
         }
 
-        logits = wsp_ggml_graph_node(gf, -1);
+        logits = ggml_graph_node(gf, -1);
 
-        if (!wsp_ggml_graph_compute_helper(sched, gf, n_threads)) {
+        if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
             return false;
         }
 
@@ -2400,11 +2400,11 @@ static bool parakeet_joint(
         if (batch.logits[i] == 0) {
             continue;
         }
-        wsp_ggml_backend_tensor_get(logits, logits_out.data() + (n_logits*i), sizeof(float)*(n_logits*i), sizeof(float)*n_logits);
+        ggml_backend_tensor_get(logits, logits_out.data() + (n_logits*i), sizeof(float)*(n_logits*i), sizeof(float)*n_logits);
     }
 
     if (batch.n_tokens == 1) {
-        pstate.t_decode_us += wsp_ggml_time_us() - t_start_us;
+        pstate.t_decode_us += ggml_time_us() - t_start_us;
         pstate.n_decode++;
     }
 
@@ -2550,7 +2550,7 @@ static bool parakeet_decode(
             return false;
         }
 
-        const int64_t t_start_sample_us = wsp_ggml_time_us();
+        const int64_t t_start_sample_us = ggml_time_us();
 
         // find the best token (greedy).
         // TODO: implement beam search?
@@ -2591,7 +2591,7 @@ static bool parakeet_decode(
 
         // Emit non-blank token at current frame t.
         pstate.decoded_tokens.push_back(best_token);
-        pstate.t_sample_us += wsp_ggml_time_us() - t_start_sample_us;
+        pstate.t_sample_us += ggml_time_us() - t_start_sample_us;
         pstate.n_sample++;
 
         parakeet_token_data token_data = create_token_data(
@@ -2802,7 +2802,7 @@ static bool log_mel_spectrogram(
                       const bool   debug,
                     parakeet_mel & mel,
         const parakeet_mel_cache & cache) {
-    const int64_t t_start_us = wsp_ggml_time_us();
+    const int64_t t_start_us = ggml_time_us();
 
     const float * window_func = cache.window.empty() ? cache.hann_window.data() : cache.window.data();
     const int window_size = cache.window.empty() ? cache.n_fft : cache.window.size();
@@ -2887,7 +2887,7 @@ static bool log_mel_spectrogram(
         }
     }
 
-    wstate.t_mel_us += wsp_ggml_time_us() - t_start_us;
+    wstate.t_mel_us += ggml_time_us() - t_start_us;
 
     if (debug) {
         std::ofstream outFile("log_mel_spectrogram.json");
@@ -2968,7 +2968,7 @@ struct parakeet_state * parakeet_init_state(parakeet_context * ctx) {
         }
 
         const size_t mem_enc_ctx = state->enc_out_buf.size();
-        const size_t mem_enc_out_buf = wsp_ggml_backend_buffer_get_size(state->enc_out_buffer);
+        const size_t mem_enc_out_buf = ggml_backend_buffer_get_size(state->enc_out_buffer);
         PARAKEET_LOG_INFO("%s: enc_out state: %7.2f MB (meta) + %7.2f MB (data)\n", __func__,
                 mem_enc_ctx / 1024.0 / 1024.0, mem_enc_out_buf / 1024.0 / 1024.0);
     }
@@ -2994,7 +2994,7 @@ struct parakeet_state * parakeet_init_state(parakeet_context * ctx) {
 
     {
         const size_t mem_lstm_ctx = state->lstm_state.ctx_buf.size();
-        const size_t mem_lstm_buf = wsp_ggml_backend_buffer_get_size(state->lstm_state.buffer);
+        const size_t mem_lstm_buf = ggml_backend_buffer_get_size(state->lstm_state.buffer);
         PARAKEET_LOG_INFO("%s: lstm state: %7.2f MB (meta) + %7.2f MB (data)\n", __func__,
                 mem_lstm_ctx / 1024.0 / 1024.0, mem_lstm_buf / 1024.0 / 1024.0);
     }
@@ -3007,7 +3007,7 @@ struct parakeet_state * parakeet_init_state(parakeet_context * ctx) {
 
     {
         const size_t mem_pred_ctx = state->pred_out_buf.size();
-        const size_t mem_pred_out_buf = wsp_ggml_backend_buffer_get_size(state->pred_out_buffer);
+        const size_t mem_pred_out_buf = ggml_backend_buffer_get_size(state->pred_out_buffer);
         PARAKEET_LOG_INFO("%s: pred state: %7.2f MB (meta) + %7.2f MB (data)\n", __func__,
                 mem_pred_ctx / 1024.0 / 1024.0, mem_pred_out_buf / 1024.0 / 1024.0);
     }
@@ -3129,12 +3129,12 @@ struct parakeet_context * parakeet_init_from_buffer_with_params_no_state(void * 
 }
 
 struct parakeet_context * parakeet_init_with_params_no_state(struct parakeet_model_loader * loader, struct parakeet_context_params params) {
-    wsp_ggml_time_init();
+    ggml_time_init();
 
     PARAKEET_LOG_INFO("%s: use gpu    = %d\n", __func__, params.use_gpu);
     PARAKEET_LOG_INFO("%s: gpu_device = %d\n", __func__, params.gpu_device);
-    PARAKEET_LOG_INFO("%s: devices    = %zu\n", __func__, wsp_ggml_backend_dev_count());
-    PARAKEET_LOG_INFO("%s: backends   = %zu\n", __func__, wsp_ggml_backend_reg_count());
+    PARAKEET_LOG_INFO("%s: devices    = %zu\n", __func__, ggml_backend_dev_count());
+    PARAKEET_LOG_INFO("%s: backends   = %zu\n", __func__, ggml_backend_reg_count());
 
     parakeet_context * ctx = new parakeet_context;
     ctx->params = params;
@@ -3211,9 +3211,9 @@ struct parakeet_context * parakeet_init_with_params(struct parakeet_model_loader
 
 void parakeet_free_state(struct parakeet_state * state) {
     if (state) {
-        wsp_ggml_backend_buffer_free(state->lstm_state.buffer);
-        wsp_ggml_backend_buffer_free(state->pred_out_buffer);
-        wsp_ggml_backend_buffer_free(state->enc_out_buffer);
+        ggml_backend_buffer_free(state->lstm_state.buffer);
+        ggml_backend_buffer_free(state->pred_out_buffer);
+        ggml_backend_buffer_free(state->enc_out_buffer);
 
         parakeet_batch_free(state->batch);
 
@@ -3221,7 +3221,7 @@ void parakeet_free_state(struct parakeet_state * state) {
         parakeet_sched_free(state->sched_decode);
 
         for (auto & backend : state->backends) {
-            wsp_ggml_backend_free(backend);
+            ggml_backend_free(backend);
         }
 
         delete state;
@@ -3230,12 +3230,12 @@ void parakeet_free_state(struct parakeet_state * state) {
 
 void parakeet_free(struct parakeet_context * ctx) {
     if (ctx) {
-        for (wsp_ggml_context * context : ctx->model.ctxs) {
-            wsp_ggml_free(context);
+        for (ggml_context * context : ctx->model.ctxs) {
+            ggml_free(context);
         }
 
-        for (wsp_ggml_backend_buffer_t buf : ctx->model.buffers) {
-            wsp_ggml_backend_buffer_free(buf);
+        for (ggml_backend_buffer_t buf : ctx->model.buffers) {
+            ggml_backend_buffer_free(buf);
         }
 
         parakeet_free_state(ctx->state);
@@ -3444,7 +3444,7 @@ struct parakeet_timings * parakeet_get_timings(struct parakeet_context * ctx) {
 }
 
 void parakeet_print_timings(struct parakeet_context * ctx) {
-    const int64_t t_end_us = wsp_ggml_time_us();
+    const int64_t t_end_us = ggml_time_us();
 
     PARAKEET_LOG_INFO("\n");
     PARAKEET_LOG_INFO("%s:     load time = %8.2f ms\n", __func__, ctx->t_load_us / 1000.0f);
@@ -3470,7 +3470,7 @@ void parakeet_print_timings(struct parakeet_context * ctx) {
 }
 
 void parakeet_reset_timings(struct parakeet_context * ctx) {
-    ctx->t_start_us = wsp_ggml_time_us();
+    ctx->t_start_us = ggml_time_us();
     if (ctx->state != nullptr) {
         ctx->state->t_mel_us = 0;
         ctx->state->t_sample_us = 0;
@@ -3494,12 +3494,12 @@ const char * parakeet_print_system_info(void) {
     s  = "";
     s += "PARAKEET : ";
 
-    for (size_t i = 0; i < wsp_ggml_backend_reg_count(); i++) {
-        auto * reg = wsp_ggml_backend_reg_get(i);
-        auto * get_features_fn = (wsp_ggml_backend_get_features_t) wsp_ggml_backend_reg_get_proc_address(reg, "wsp_ggml_backend_get_features");
+    for (size_t i = 0; i < ggml_backend_reg_count(); i++) {
+        auto * reg = ggml_backend_reg_get(i);
+        auto * get_features_fn = (ggml_backend_get_features_t) ggml_backend_reg_get_proc_address(reg, "ggml_backend_get_features");
         if (get_features_fn) {
-            wsp_ggml_backend_feature * features = get_features_fn(reg);
-            s += wsp_ggml_backend_reg_name(reg);
+            ggml_backend_feature * features = get_features_fn(reg);
+            s += ggml_backend_reg_name(reg);
             s += " : ";
             for (; features->name; features++) {
                 s += features->name;
@@ -3556,7 +3556,7 @@ static void parakeet_reset_state(struct parakeet_state * state) {
     state->decoded_token_data.clear();
 
     if (state->lstm_state.buffer) {
-        wsp_ggml_backend_buffer_clear(state->lstm_state.buffer, 0);
+        ggml_backend_buffer_clear(state->lstm_state.buffer, 0);
     }
 
 }
@@ -3844,18 +3844,18 @@ float parakeet_full_get_token_p(struct parakeet_context * ctx, int i_segment, in
     return ctx->state->result_all[i_segment].tokens[i_token].p;
 }
 
-void parakeet_log_set(wsp_ggml_log_callback log_callback, void * user_data) {
+void parakeet_log_set(ggml_log_callback log_callback, void * user_data) {
     g_state.log_callback = log_callback ? log_callback : parakeet_log_callback_default;
     g_state.log_callback_user_data = user_data;
-    wsp_ggml_log_set(g_state.log_callback, g_state.log_callback_user_data);
+    ggml_log_set(g_state.log_callback, g_state.log_callback_user_data);
 }
 
 const char * parakeet_version(void) {
     return "1.9.3";
 }
 
-WSP_GGML_ATTRIBUTE_FORMAT(2, 3)
-static void parakeet_log_internal(wsp_ggml_log_level level, const char * format, ...) {
+GGML_ATTRIBUTE_FORMAT(2, 3)
+static void parakeet_log_internal(ggml_log_level level, const char * format, ...) {
     va_list args;
     va_start(args, format);
     char buffer[1024];
@@ -3872,11 +3872,11 @@ static void parakeet_log_internal(wsp_ggml_log_level level, const char * format,
     va_end(args);
 }
 
-static void parakeet_log_callback_default(wsp_ggml_log_level level, const char * text, void * user_data) {
+static void parakeet_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
     (void) level;
     (void) user_data;
 #ifndef PARAKEET_DEBUG
-    if (level == WSP_GGML_LOG_LEVEL_DEBUG) {
+    if (level == GGML_LOG_LEVEL_DEBUG) {
         return;
     }
 #endif

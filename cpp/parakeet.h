@@ -261,7 +261,7 @@ extern "C" {
         void * encoder_begin_callback_user_data;
 
         // called each time before ggml computation starts
-        wsp_ggml_abort_callback abort_callback;
+        ggml_abort_callback abort_callback;
         void * abort_callback_user_data;
     };
 
@@ -333,7 +333,7 @@ extern "C" {
 
     // Control logging output; default behavior is to print to stderr
 
-    PARAKEET_API void parakeet_log_set(wsp_ggml_log_callback log_callback, void * user_data);
+    PARAKEET_API void parakeet_log_set(ggml_log_callback log_callback, void * user_data);
 
 #ifdef __cplusplus
 }

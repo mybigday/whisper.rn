@@ -14,26 +14,26 @@
 
 // ggml
 
-struct wsp_ggml_context_deleter { void operator()(wsp_ggml_context * ctx) { wsp_ggml_free(ctx); } };
-struct wsp_gguf_context_deleter { void operator()(wsp_gguf_context * ctx) { wsp_gguf_free(ctx); } };
+struct ggml_context_deleter { void operator()(ggml_context * ctx) { ggml_free(ctx); } };
+struct gguf_context_deleter { void operator()(gguf_context * ctx) { gguf_free(ctx); } };
 
-typedef std::unique_ptr<wsp_ggml_context, wsp_ggml_context_deleter> wsp_ggml_context_ptr;
-typedef std::unique_ptr<wsp_gguf_context, wsp_gguf_context_deleter> wsp_gguf_context_ptr;
+typedef std::unique_ptr<ggml_context, ggml_context_deleter> ggml_context_ptr;
+typedef std::unique_ptr<gguf_context, gguf_context_deleter> gguf_context_ptr;
 
 // ggml-alloc
 
-struct wsp_ggml_gallocr_deleter { void operator()(wsp_ggml_gallocr_t galloc) { wsp_ggml_gallocr_free(galloc); } };
+struct ggml_gallocr_deleter { void operator()(ggml_gallocr_t galloc) { ggml_gallocr_free(galloc); } };
 
-typedef std::unique_ptr<wsp_ggml_gallocr, wsp_ggml_gallocr_deleter> wsp_ggml_gallocr_ptr;
+typedef std::unique_ptr<ggml_gallocr, ggml_gallocr_deleter> ggml_gallocr_ptr;
 
 // ggml-backend
 
-struct wsp_ggml_backend_deleter        { void operator()(wsp_ggml_backend_t backend)       { wsp_ggml_backend_free(backend); } };
-struct wsp_ggml_backend_buffer_deleter { void operator()(wsp_ggml_backend_buffer_t buffer) { wsp_ggml_backend_buffer_free(buffer); } };
-struct wsp_ggml_backend_event_deleter  { void operator()(wsp_ggml_backend_event_t event)   { wsp_ggml_backend_event_free(event); } };
-struct wsp_ggml_backend_sched_deleter  { void operator()(wsp_ggml_backend_sched_t sched)   { wsp_ggml_backend_sched_free(sched); } };
+struct ggml_backend_deleter        { void operator()(ggml_backend_t backend)       { ggml_backend_free(backend); } };
+struct ggml_backend_buffer_deleter { void operator()(ggml_backend_buffer_t buffer) { ggml_backend_buffer_free(buffer); } };
+struct ggml_backend_event_deleter  { void operator()(ggml_backend_event_t event)   { ggml_backend_event_free(event); } };
+struct ggml_backend_sched_deleter  { void operator()(ggml_backend_sched_t sched)   { ggml_backend_sched_free(sched); } };
 
-typedef std::unique_ptr<wsp_ggml_backend,        wsp_ggml_backend_deleter>        wsp_ggml_backend_ptr;
-typedef std::unique_ptr<wsp_ggml_backend_buffer, wsp_ggml_backend_buffer_deleter> wsp_ggml_backend_buffer_ptr;
-typedef std::unique_ptr<wsp_ggml_backend_event,  wsp_ggml_backend_event_deleter>  wsp_ggml_backend_event_ptr;
-typedef std::unique_ptr<wsp_ggml_backend_sched,  wsp_ggml_backend_sched_deleter>  wsp_ggml_backend_sched_ptr;
+typedef std::unique_ptr<ggml_backend,        ggml_backend_deleter>        ggml_backend_ptr;
+typedef std::unique_ptr<ggml_backend_buffer, ggml_backend_buffer_deleter> ggml_backend_buffer_ptr;
+typedef std::unique_ptr<ggml_backend_event,  ggml_backend_event_deleter>  ggml_backend_event_ptr;
+typedef std::unique_ptr<ggml_backend_sched,  ggml_backend_sched_deleter>  ggml_backend_sched_ptr;
