@@ -1,0 +1,34 @@
+Honour whisper_context_params.use_coreml (see whisper.h.patch) when loading the
+Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple targets.
+--- a/src/whisper.cpp
++++ b/src/whisper.cpp
+@@ -3500,10 +3500,12 @@
+             return nullptr;
+         }
+         const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
+-        WHISPER_LOG_INFO("%s: alignment heads masks size = %ld B\n", __func__, memory_size);
++        WHISPER_LOG_INFO("%s: alignment heads masks size = %zu B\n", __func__, memory_size);
+     }
++
+ 
+ #ifdef WHISPER_USE_COREML
++    if (ctx->params.use_coreml) {
+     const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
+ 
+     WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
+@@ -3519,6 +3521,7 @@
+     } else {
+         WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
+     }
++    }
+ #endif
+ 
+ #ifdef WHISPER_USE_VITISAI
+@@ -3687,6 +3690,7 @@
+ struct whisper_context_params whisper_context_default_params() {
+     struct whisper_context_params result = {
+         /*.use_gpu              =*/ true,
++        /*.use_coreml           =*/ false,
+         /*.flash_attn           =*/ true,
+         /*.gpu_device           =*/ 0,
+ 

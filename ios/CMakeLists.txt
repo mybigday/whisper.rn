@@ -28,74 +28,36 @@ if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64;x86_64")
     add_definitions(-DGGML_CPU_GENERIC)
 endif ()
 
-set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../cpp)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/rnwhisper-sources.cmake)
 
 if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
     set(SOURCE_FILES_ARCH
-        ${SOURCE_DIR}/ggml-cpu/arch/arm/quants.c
-        ${SOURCE_DIR}/ggml-cpu/arch/arm/repack.cpp
+        ${RNWHISPER_GGML_CPU_ARCH_DIR}/arm/quants.c
+        ${RNWHISPER_GGML_CPU_ARCH_DIR}/arm/repack.cpp
     )
 endif ()
 
-# CoreML source files
-set(SOURCE_FILES_COREML
-    ${SOURCE_DIR}/coreml/whisper-encoder.mm
-    ${SOURCE_DIR}/coreml/whisper-encoder-impl.m
-    ${SOURCE_DIR}/coreml/whisper-decoder-impl.m
-    ${SOURCE_DIR}/coreml/whisper-compat.m
-)
-
 # Define public headers
 set(PUBLIC_HEADERS
-    ${SOURCE_DIR}/rn-whisper.h
-    ${SOURCE_DIR}/whisper.h
-    ${SOURCE_DIR}/ggml.h
+    ${RNWHISPER_CPP_DIR}/rn-whisper.h
+    ${RNWHISPER_WHISPER_CPP_DIR}/include/whisper.h
+    ${RNWHISPER_WHISPER_CPP_DIR}/ggml/include/ggml.h
 )
 
 # Create library target
 add_library(rnwhisper SHARED
-    ${SOURCE_DIR}/ggml.c
-    ${SOURCE_DIR}/ggml.cpp
-    ${SOURCE_DIR}/ggml-alloc.c
-    ${SOURCE_DIR}/ggml-backend.cpp
-    ${SOURCE_DIR}/ggml-backend-meta.cpp
-    ${SOURCE_DIR}/ggml-backend-reg.cpp
-    ${SOURCE_DIR}/ggml-backend-dl.cpp
-    ${SOURCE_DIR}/ggml-cpu/amx/amx.cpp
-    ${SOURCE_DIR}/ggml-cpu/amx/mmq.cpp
-    ${SOURCE_DIR}/ggml-cpu/ggml-cpu.c
-    ${SOURCE_DIR}/ggml-cpu/ggml-cpu.cpp
-    ${SOURCE_DIR}/ggml-cpu/quants.c
-    ${SOURCE_DIR}/ggml-cpu/traits.cpp
-    ${SOURCE_DIR}/ggml-cpu/repack.cpp
-    ${SOURCE_DIR}/ggml-cpu/unary-ops.cpp
-    ${SOURCE_DIR}/ggml-cpu/binary-ops.cpp
-    ${SOURCE_DIR}/ggml-cpu/vec.cpp
-    ${SOURCE_DIR}/ggml-cpu/ops.cpp
-    ${SOURCE_DIR}/ggml-metal/ggml-metal.cpp
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-common.cpp
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-device.cpp
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-context.m
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-device.m
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-ops.cpp
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-tuning.cpp
-    ${SOURCE_DIR}/ggml-opt.cpp
-    ${SOURCE_DIR}/ggml-threading.cpp
-    ${SOURCE_DIR}/ggml-quants.c
-    ${SOURCE_DIR}/gguf.cpp
-    ${SOURCE_DIR}/whisper.cpp
-    ${SOURCE_DIR}/parakeet.cpp
-    ${SOURCE_DIR}/rn-whisper.cpp
+    ${RNWHISPER_CORE_SOURCES}
+    ${RNWHISPER_GGML_METAL_SOURCES}
+    ${RNWHISPER_COREML_SOURCES}
     ${SOURCE_FILES_ARCH}
-    ${SOURCE_FILES_COREML}
 )
+
+target_compile_definitions(rnwhisper PRIVATE ${RNWHISPER_VERSION_DEFINITIONS})
 
 # Setup include directories
 target_include_directories(rnwhisper
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp/ggml-cpu>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cpp/coreml>
+        "$<BUILD_INTERFACE:${RNWHISPER_INCLUDE_DIRS}>"
         $<INSTALL_INTERFACE:include>
 )
 
@@ -133,14 +95,13 @@ set_target_properties(rnwhisper PROPERTIES
 
 # Disable ARC for Metal Objective-C files (they don't support ARC)
 set_source_files_properties(
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-context.m
-    ${SOURCE_DIR}/ggml-metal/ggml-metal-device.m
+    ${RNWHISPER_GGML_METAL_OBJC_SOURCES}
     PROPERTIES COMPILE_FLAGS "-fno-objc-arc"
 )
 
 # Xcode applies CLANG_ENABLE_OBJC_ARC at the target level. Other generators
 # need ARC enabled explicitly for the Core ML Objective-C sources.
 set_source_files_properties(
-    ${SOURCE_FILES_COREML}
+    ${RNWHISPER_COREML_SOURCES}
     PROPERTIES COMPILE_FLAGS "-fobjc-arc"
 )

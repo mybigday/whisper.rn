@@ -1,9 +1,8 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 
 project(whisper.rn)
 
 set(CMAKE_CXX_STANDARD 17)
-set(RNWHISPER_LIB_DIR ${CMAKE_SOURCE_DIR}/../../../cpp)
 
 # Configure STL to be compatible with ReactAndroid JSI libraries
 set(CMAKE_ANDROID_STL_TYPE c++_shared)
@@ -12,40 +11,17 @@ set(CMAKE_ANDROID_STL_TYPE c++_shared)
 find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/rnwhisper-sources.cmake)
+
 include_directories(
-    ${RNWHISPER_LIB_DIR}
-    ${RNWHISPER_LIB_DIR}/ggml-cpu
-    ${RNWHISPER_LIB_DIR}/jsi
+    ${RNWHISPER_INCLUDE_DIRS}
+    ${RNWHISPER_CPP_DIR}/jsi
 )
 
 set(
     SOURCE_FILES
-    ${RNWHISPER_LIB_DIR}/ggml.c
-    ${RNWHISPER_LIB_DIR}/ggml.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-alloc.c
-    ${RNWHISPER_LIB_DIR}/ggml-backend.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-backend-meta.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-backend-reg.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-backend-dl.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/amx.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/amx/mmq.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/ggml-cpu.c
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/ggml-cpu.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/quants.c
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/traits.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/repack.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/unary-ops.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/binary-ops.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/vec.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-cpu/ops.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-opt.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-threading.cpp
-    ${RNWHISPER_LIB_DIR}/ggml-quants.c
-    ${RNWHISPER_LIB_DIR}/gguf.cpp
-    ${RNWHISPER_LIB_DIR}/whisper.cpp
-    ${RNWHISPER_LIB_DIR}/parakeet.cpp
-    ${RNWHISPER_LIB_DIR}/rn-whisper.cpp
-    ${RNWHISPER_LIB_DIR}/jsi/RNWhisperJSI.cpp
+    ${RNWHISPER_CORE_SOURCES}
+    ${RNWHISPER_CPP_DIR}/jsi/RNWhisperJSI.cpp
     ${CMAKE_SOURCE_DIR}/jni.cpp
 )
 
@@ -54,8 +30,8 @@ find_library(LOG_LIB log)
 function(build_library target_name arch cpu_flags)
     if (NOT ${arch} STREQUAL "generic")
         set(SOURCE_FILES_ARCH
-            ${RNWHISPER_LIB_DIR}/ggml-cpu/arch/${arch}/quants.c
-            ${RNWHISPER_LIB_DIR}/ggml-cpu/arch/${arch}/repack.cpp
+            ${RNWHISPER_GGML_CPU_ARCH_DIR}/${arch}/quants.c
+            ${RNWHISPER_GGML_CPU_ARCH_DIR}/${arch}/repack.cpp
         )
     endif ()
 
@@ -91,7 +67,7 @@ function(build_library target_name arch cpu_flags)
     endif ()
 
     # Expose Linux CPU affinity APIs used by ggml on Android.
-    target_compile_definitions(${target_name} PRIVATE _GNU_SOURCE)
+    target_compile_definitions(${target_name} PRIVATE _GNU_SOURCE ${RNWHISPER_VERSION_DEFINITIONS})
     target_compile_options(${target_name} PRIVATE -DGGML_USE_CPU -DGGML_USE_CPU_REPACK -pthread ${cpu_flags})
 
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
@@ -126,6 +102,3 @@ elseif (${ANDROID_ABI} STREQUAL "x86_64")
     # x86_64 target
     build_library("rnwhisper_x86_64" "x86" "-march=x86-64" "-mtune=intel" "-msse4.2" "-mpopcnt")
 endif ()
-
-
-include_directories(${RNWHISPER_LIB_DIR})
