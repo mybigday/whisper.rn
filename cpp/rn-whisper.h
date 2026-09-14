@@ -30,6 +30,13 @@ struct job {
     void abort();
 };
 
+// Installs ggml's abort handler. The JSI glue is compiled into the host app and
+// linked against this library as a dynamic framework; if another ggml-based
+// framework (e.g. llama.rn) is in the same app, an app-level reference to a ggml
+// symbol binds to whichever framework the linker sees first. The glue therefore
+// goes through this rnwhisper-namespaced wrapper instead of calling ggml directly.
+ggml_abort_callback_t set_ggml_abort_callback(ggml_abort_callback_t callback);
+
 void job_abort_all();
 job* job_new(int job_id, struct whisper_full_params params);
 void job_remove(int job_id);

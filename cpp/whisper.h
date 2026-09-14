@@ -572,7 +572,7 @@ extern "C" {
         void * encoder_begin_callback_user_data;
 
         // called each time before ggml computation starts
-        wsp_ggml_abort_callback abort_callback;
+        ggml_abort_callback abort_callback;
         void * abort_callback_user_data;
 
         // called by each decoder to filter obtained logits
@@ -756,12 +756,12 @@ extern "C" {
 
     WHISPER_API int          whisper_bench_memcpy          (int n_threads);
     WHISPER_API const char * whisper_bench_memcpy_str      (int n_threads);
-    WHISPER_API int          whisper_bench_wsp_ggml_mul_mat    (int n_threads);
-    WHISPER_API const char * whisper_bench_wsp_ggml_mul_mat_str(int n_threads);
+    WHISPER_API int          whisper_bench_ggml_mul_mat    (int n_threads);
+    WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads);
 
     // Control logging output; default behavior is to print to stderr
 
-    WHISPER_API void whisper_log_set(wsp_ggml_log_callback log_callback, void * user_data);
+    WHISPER_API void whisper_log_set(ggml_log_callback log_callback, void * user_data);
 
     // Get the no_speech probability for the specified segment
     WHISPER_API float whisper_full_get_segment_no_speech_prob           (struct whisper_context * ctx, int i_segment);

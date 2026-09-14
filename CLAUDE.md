@@ -199,6 +199,7 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 - Files: kebab-case for configs, PascalCase for classes
 - Native modules: RNWhisper prefix (iOS/Android)
 - C++ namespace: `rnwhisper`
+- ggml/whisper.cpp symbols keep their upstream names (`ggml_*`, `whisper_*`); no `WSP_` prefix is applied by bootstrap. Coexistence with other ggml-based libraries (e.g. llama.rn) relies on each library being its own dynamic image (two-level namespace on Apple, `RTLD_LOCAL` plus `-Bsymbolic` on Android). The Objective-C `GGMLMetalClass` is process-global, so it is renamed per library with `-DGGMLMetalClass=RNWhisperGGMLMetalClass`.
 
 ### Commit Messages
 Follow [Conventional Commits](https://www.conventionalcommits.org/):

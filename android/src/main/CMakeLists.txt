@@ -87,12 +87,12 @@ function(build_library target_name arch cpu_flags)
     endif ()
 
     if (${arch} STREQUAL "generic")
-        target_compile_options(${target_name} PRIVATE -DWSP_GGML_CPU_GENERIC)
+        target_compile_options(${target_name} PRIVATE -DGGML_CPU_GENERIC)
     endif ()
 
     # Expose Linux CPU affinity APIs used by ggml on Android.
     target_compile_definitions(${target_name} PRIVATE _GNU_SOURCE)
-    target_compile_options(${target_name} PRIVATE -DWSP_GGML_USE_CPU -DWSP_GGML_USE_CPU_REPACK -pthread ${cpu_flags})
+    target_compile_options(${target_name} PRIVATE -DGGML_USE_CPU -DGGML_USE_CPU_REPACK -pthread ${cpu_flags})
 
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         target_compile_options(${target_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
@@ -107,6 +107,10 @@ function(build_library target_name arch cpu_flags)
 
         target_link_options(${target_name} PRIVATE -Wl,--gc-sections)
         target_link_options(${target_name} PRIVATE -Wl,--exclude-libs,ALL)
+        # ggml/whisper symbols keep upstream names. Bind this library's own
+        # references at link time so a second ggml copy in the process (e.g.
+        # llama.rn) can never be picked up via the dynamic linker's global lookup.
+        target_link_options(${target_name} PRIVATE -Wl,-Bsymbolic)
         target_link_options(${target_name} PRIVATE -flto)
     # endif ()
 endfunction()

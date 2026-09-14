@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include "rn-whisper.h"
+#include "ggml.h"
 
 #define DEFAULT_MAX_AUDIO_SEC 30;
 
@@ -12,17 +13,17 @@ namespace rnwhisper {
 const char * system_info(void) {
   static std::string s;
   s = "";
-  if (wsp_ggml_cpu_has_avx() == 1) s += "AVX ";
-  if (wsp_ggml_cpu_has_avx2() == 1) s += "AVX2 ";
-  if (wsp_ggml_cpu_has_avx512() == 1) s += "AVX512 ";
-  if (wsp_ggml_cpu_has_fma() == 1) s += "FMA ";
-  if (wsp_ggml_cpu_has_neon() == 1) s += "NEON ";
-  if (wsp_ggml_cpu_has_arm_fma() == 1) s += "ARM_FMA ";
-  if (wsp_ggml_cpu_has_f16c() == 1) s += "F16C ";
-  if (wsp_ggml_cpu_has_fp16_va() == 1) s += "FP16_VA ";
-  if (wsp_ggml_cpu_has_sse3() == 1) s += "SSE3 ";
-  if (wsp_ggml_cpu_has_ssse3() == 1) s += "SSSE3 ";
-  if (wsp_ggml_cpu_has_vsx() == 1) s += "VSX ";
+  if (ggml_cpu_has_avx() == 1) s += "AVX ";
+  if (ggml_cpu_has_avx2() == 1) s += "AVX2 ";
+  if (ggml_cpu_has_avx512() == 1) s += "AVX512 ";
+  if (ggml_cpu_has_fma() == 1) s += "FMA ";
+  if (ggml_cpu_has_neon() == 1) s += "NEON ";
+  if (ggml_cpu_has_arm_fma() == 1) s += "ARM_FMA ";
+  if (ggml_cpu_has_f16c() == 1) s += "F16C ";
+  if (ggml_cpu_has_fp16_va() == 1) s += "FP16_VA ";
+  if (ggml_cpu_has_sse3() == 1) s += "SSE3 ";
+  if (ggml_cpu_has_ssse3() == 1) s += "SSSE3 ";
+  if (ggml_cpu_has_vsx() == 1) s += "VSX ";
 #ifdef WHISPER_USE_COREML
   s += "COREML ";
 #endif
@@ -107,6 +108,10 @@ job::~job() {
 
 std::unordered_map<int, job*> job_map;
 std::mutex job_map_mutex;
+
+ggml_abort_callback_t set_ggml_abort_callback(ggml_abort_callback_t callback) {
+    return ggml_set_abort_callback(callback);
+}
 
 void job_abort_all() {
     std::lock_guard<std::mutex> lock(job_map_mutex);

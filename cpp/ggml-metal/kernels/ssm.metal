@@ -1,8 +1,8 @@
 #include "common.h"
 
-// ref: ggml.c:wsp_ggml_compute_forward_ssm_conv_f32
+// ref: ggml.c:ggml_compute_forward_ssm_conv_f32
 kernel void kernel_ssm_conv_f32_f32(
-        constant wsp_ggml_metal_kargs_ssm_conv & args,
+        constant ggml_metal_kargs_ssm_conv & args,
         device const  void * src0,
         device const  void * src1,
         device       float * dst,
@@ -33,7 +33,7 @@ kernel void kernel_ssm_conv_f32_f32(
 }
 
 kernel void kernel_ssm_conv_f32_f32_4(
-        constant wsp_ggml_metal_kargs_ssm_conv & args,
+        constant ggml_metal_kargs_ssm_conv & args,
         device const  void * src0,
         device const  void * src1,
         device       float * dst,
@@ -68,7 +68,7 @@ constant short FC_ssm_conv_bs   [[function_constant(FC_SSM_CONV + 0)]];
 // Batched version: each threadgroup processes multiple tokens for better efficiency
 // Thread layout: each thread handles one token, threadgroup covers BATCH_SIZE tokens
 kernel void kernel_ssm_conv_f32_f32_batched(
-        constant wsp_ggml_metal_kargs_ssm_conv & args,
+        constant ggml_metal_kargs_ssm_conv & args,
         device const  void * src0,
         device const  void * src1,
         device       float * dst,
@@ -113,7 +113,7 @@ kernel void kernel_ssm_conv_f32_f32_batched(
 }
 
 kernel void kernel_ssm_conv_f32_f32_batched_4(
-        constant wsp_ggml_metal_kargs_ssm_conv & args,
+        constant ggml_metal_kargs_ssm_conv & args,
         device const  void * src0,
         device const  void * src1,
         device       float * dst,
@@ -157,10 +157,10 @@ kernel void kernel_ssm_conv_f32_f32_batched_4(
     x[0] = sumf;
 }
 
-// ref: ggml.c:wsp_ggml_compute_forward_ssm_scan_f32, Mamba-2 part
+// ref: ggml.c:ggml_compute_forward_ssm_scan_f32, Mamba-2 part
 // Optimized version: reduces redundant memory loads by having one thread load shared values
 kernel void kernel_ssm_scan_f32(
-        constant wsp_ggml_metal_kargs_ssm_scan & args,
+        constant ggml_metal_kargs_ssm_scan & args,
         device const void * src0,
         device const void * src1,
         device const void * src2,

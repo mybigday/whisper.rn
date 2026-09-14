@@ -15,6 +15,20 @@ else
   CMAKE_GENERATOR="Xcode"
 fi
 
+# ggml/gguf keep upstream names; they must stay internal to this framework so a
+# second ggml-based framework in the same app never resolves through it (see
+# ios/unexported-symbols.txt).
+function assert_no_ggml_exports() {
+  local binary="$1"
+  local leaked
+  leaked="$(nm -gU "$binary" | awk '{print $3}' | grep -E '^_(ggml|gguf|quantize|dequantize|iq2xs|iq3xs)_|^__Z[A-Z]*[0-9]+(ggml|gguf)_|^__Z[A-Z]*N4ggml' || true)"
+  if [ -n "$leaked" ]; then
+    echo "ggml symbols exported from $binary:" >&2
+    echo "$leaked" | head -20 >&2
+    exit 1
+  fi
+}
+
 function cp_headers() {
   mkdir -p ../ios/rnwhisper.xcframework/$1/rnwhisper.framework/Headers
   cp ../cpp/*.h ../ios/rnwhisper.xcframework/$1/rnwhisper.framework/Headers/
@@ -50,6 +64,7 @@ function build_framework() {
   if [ ! -d "$framework_path" ]; then
     framework_path="rnwhisper.framework"
   fi
+  assert_no_ggml_exports "$framework_path/rnwhisper"
   mv "$framework_path" ../ios/rnwhisper.xcframework/$4/rnwhisper.framework
   mkdir -p ../ios/rnwhisper.xcframework/$4/rnwhisper.framework/Headers
 

@@ -1511,22 +1511,22 @@ jsi::Value createParakeetContextValue(
 }
 
 void defaultWhisperLogCallback(
-    enum wsp_ggml_log_level level,
+    enum ggml_log_level level,
     const char *text,
     void *) {
 #if defined(__ANDROID__)
-    if (level == WSP_GGML_LOG_LEVEL_ERROR) {
+    if (level == GGML_LOG_LEVEL_ERROR) {
         __android_log_print(ANDROID_LOG_ERROR, "RNWhisper", "%s", text);
-    } else if (level == WSP_GGML_LOG_LEVEL_WARN) {
+    } else if (level == GGML_LOG_LEVEL_WARN) {
         __android_log_print(ANDROID_LOG_WARN, "RNWhisper", "%s", text);
-    } else if (level == WSP_GGML_LOG_LEVEL_INFO) {
+    } else if (level == GGML_LOG_LEVEL_INFO) {
         __android_log_print(ANDROID_LOG_INFO, "RNWhisper", "%s", text);
     } else {
         __android_log_print(ANDROID_LOG_DEBUG, "RNWhisper", "%s", text);
     }
 #else
 #ifndef WHISPER_DEBUG
-    if (level == WSP_GGML_LOG_LEVEL_DEBUG) {
+    if (level == GGML_LOG_LEVEL_DEBUG) {
         return;
     }
 #endif
@@ -1535,7 +1535,7 @@ void defaultWhisperLogCallback(
 #endif
 }
 
-void forwardLogToJs(enum wsp_ggml_log_level level, const char *text, void *) {
+void forwardLogToJs(enum ggml_log_level level, const char *text, void *) {
     defaultWhisperLogCallback(level, text, nullptr);
 
     std::shared_ptr<react::CallInvoker> invoker;
@@ -1553,9 +1553,9 @@ void forwardLogToJs(enum wsp_ggml_log_level level, const char *text, void *) {
     }
 
     std::string levelText = "info";
-    if (level == WSP_GGML_LOG_LEVEL_ERROR) {
+    if (level == GGML_LOG_LEVEL_ERROR) {
         levelText = "error";
-    } else if (level == WSP_GGML_LOG_LEVEL_WARN) {
+    } else if (level == GGML_LOG_LEVEL_WARN) {
         levelText = "warn";
     }
 
@@ -1722,7 +1722,7 @@ namespace rnwhisper_jsi {
 void installJSIBindings(
     jsi::Runtime &runtime,
     std::shared_ptr<react::CallInvoker> callInvoker) {
-    wsp_ggml_set_abort_callback(ggmlAbortLogCallback);
+    rnwhisper::set_ggml_abort_callback(ggmlAbortLogCallback);
     g_isShuttingDown.store(false, std::memory_order_relaxed);
     TaskManager::getInstance().reset();
 
@@ -2739,7 +2739,7 @@ void installJSIBindings(
 }
 
 void cleanupJSIBindings() {
-    wsp_ggml_set_abort_callback(nullptr);
+    rnwhisper::set_ggml_abort_callback(nullptr);
     g_isShuttingDown.store(true, std::memory_order_relaxed);
     TaskManager::getInstance().beginShutdown();
 

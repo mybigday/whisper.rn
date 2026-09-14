@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-void wsp_quantize_q1_0(device const float * src, device block_q1_0 & dst) {
+void quantize_q1_0(device const float * src, device block_q1_0 & dst) {
     float sum_abs = 0.0f;
     for (int j = 0; j < QK1_0; j++) {
         sum_abs += fabs(src[j]);
@@ -19,7 +19,7 @@ void wsp_quantize_q1_0(device const float * src, device block_q1_0 & dst) {
     }
 }
 
-void wsp_quantize_q2_0(device const float * src, device block_q2_0 & dst) {
+void quantize_q2_0(device const float * src, device block_q2_0 & dst) {
     float amax = 0.0f;
     for (int j = 0; j < QK2_0; j++) {
         float a = fabs(src[j]);
@@ -40,7 +40,7 @@ void wsp_quantize_q2_0(device const float * src, device block_q2_0 & dst) {
     }
 }
 
-void wsp_quantize_q4_0(device const float * src, device block_q4_0 & dst) {
+void quantize_q4_0(device const float * src, device block_q4_0 & dst) {
 #pragma METAL fp math_mode(safe)
     float amax = 0.0f; // absolute max
     float max  = 0.0f;
@@ -70,7 +70,7 @@ void wsp_quantize_q4_0(device const float * src, device block_q4_0 & dst) {
     }
 }
 
-void wsp_quantize_q4_1(device const float * src, device block_q4_1 & dst) {
+void quantize_q4_1(device const float * src, device block_q4_1 & dst) {
 #pragma METAL fp math_mode(safe)
     float min = FLT_MAX;
     float max = -FLT_MAX;
@@ -99,7 +99,7 @@ void wsp_quantize_q4_1(device const float * src, device block_q4_1 & dst) {
     }
 }
 
-void wsp_quantize_q5_0(device const float * src, device block_q5_0 & dst) {
+void quantize_q5_0(device const float * src, device block_q5_0 & dst) {
 #pragma METAL fp math_mode(safe)
     float amax = 0.0f; // absolute max
     float max  = 0.0f;
@@ -137,7 +137,7 @@ void wsp_quantize_q5_0(device const float * src, device block_q5_0 & dst) {
     }
 }
 
-void wsp_quantize_q5_1(device const float * src, device block_q5_1 & dst) {
+void quantize_q5_1(device const float * src, device block_q5_1 & dst) {
 #pragma METAL fp math_mode(safe)
     float max = src[0];
     float min = src[0];
@@ -174,7 +174,7 @@ void wsp_quantize_q5_1(device const float * src, device block_q5_1 & dst) {
     }
 }
 
-void wsp_quantize_q8_0(device const float * src, device block_q8_0 & dst) {
+void quantize_q8_0(device const float * src, device block_q8_0 & dst) {
 #pragma METAL fp math_mode(safe)
     float amax = 0.0f; // absolute max
 
@@ -195,7 +195,7 @@ void wsp_quantize_q8_0(device const float * src, device block_q8_0 & dst) {
     }
 }
 
-void wsp_quantize_iq4_nl(device const float * src, device block_iq4_nl & dst) {
+void quantize_iq4_nl(device const float * src, device block_iq4_nl & dst) {
 #pragma METAL fp math_mode(safe)
     float amax = 0.0f; // absolute max
     float max  = 0.0f;
@@ -233,7 +233,7 @@ void wsp_quantize_iq4_nl(device const float * src, device block_iq4_nl & dst) {
     dst.d = sumq2 > 0 ? sumqx/sumq2 : d;
 }
 
-void wsp_quantize_tq2_0(device const float * src, device block_tq2_0 & dst) {
+void quantize_tq2_0(device const float * src, device block_tq2_0 & dst) {
 #pragma METAL fp math_mode(safe)
     float amax = 0.0f; // absolute max
 

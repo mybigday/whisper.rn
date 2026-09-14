@@ -1,12 +1,12 @@
 #include "ggml-threading.h"
 #include <mutex>
 
-std::mutex wsp_ggml_critical_section_mutex;
+std::mutex ggml_critical_section_mutex;
 
-void wsp_ggml_critical_section_start() {
-    wsp_ggml_critical_section_mutex.lock();
+void ggml_critical_section_start() {
+    ggml_critical_section_mutex.lock();
 }
 
-void wsp_ggml_critical_section_end(void) {
-    wsp_ggml_critical_section_mutex.unlock();
+void ggml_critical_section_end(void) {
+    ggml_critical_section_mutex.unlock();
 }

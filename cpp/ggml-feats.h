@@ -81,7 +81,7 @@
 
 #endif
 
-typedef struct wsp_ggml_feats_arch64_runtime {
+typedef struct ggml_feats_arch64_runtime {
     bool has_dotprod;
     bool has_fp16;
     bool has_sve;
@@ -90,10 +90,10 @@ typedef struct wsp_ggml_feats_arch64_runtime {
     bool has_sme;
     bool has_sme2;
     int sve_cnt;
-} wsp_ggml_feats_arch64_runtime_t;
+} ggml_feats_arch64_runtime_t;
 
-static inline wsp_ggml_feats_arch64_runtime_t wsp_ggml_feats_get_arch64_runtime(void) {
-    wsp_ggml_feats_arch64_runtime_t runtime_feat = {};
+static inline ggml_feats_arch64_runtime_t ggml_feats_get_arch64_runtime(void) {
+    ggml_feats_arch64_runtime_t runtime_feat = {};
 
 #if defined(__linux__)
     const unsigned long hwcap  = getauxval(AT_HWCAP);

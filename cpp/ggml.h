@@ -32,22 +32,22 @@
 // For example, here we define the function: f(x) = a*x^2 + b
 //
 //   {
-//       struct wsp_ggml_init_params params = {
+//       struct ggml_init_params params = {
 //           .mem_size   = 16*1024*1024,
 //           .mem_buffer = NULL,
 //       };
 //
 //       // memory allocation happens here
-//       struct wsp_ggml_context * ctx = wsp_ggml_init(params);
+//       struct ggml_context * ctx = ggml_init(params);
 //
-//       struct wsp_ggml_tensor * x = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, 1);
+//       struct ggml_tensor * x = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1);
 //
-//       wsp_ggml_set_param(ctx, x); // x is an input variable
+//       ggml_set_param(ctx, x); // x is an input variable
 //
-//       struct wsp_ggml_tensor * a  = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, 1);
-//       struct wsp_ggml_tensor * b  = wsp_ggml_new_tensor_1d(ctx, WSP_GGML_TYPE_F32, 1);
-//       struct wsp_ggml_tensor * x2 = wsp_ggml_mul(ctx, x, x);
-//       struct wsp_ggml_tensor * f  = wsp_ggml_add(ctx, wsp_ggml_mul(ctx, a, x2), b);
+//       struct ggml_tensor * a  = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1);
+//       struct ggml_tensor * b  = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1);
+//       struct ggml_tensor * x2 = ggml_mul(ctx, x, x);
+//       struct ggml_tensor * f  = ggml_add(ctx, ggml_mul(ctx, a, x2), b);
 //
 //       ...
 //   }
@@ -58,34 +58,34 @@
 //   {
 //       ...
 //
-//       struct wsp_ggml_cgraph * gf = wsp_ggml_new_graph(ctx);
-//       wsp_ggml_build_forward_expand(gf, f);
+//       struct ggml_cgraph * gf = ggml_new_graph(ctx);
+//       ggml_build_forward_expand(gf, f);
 //
 //       // set the input variable and parameter values
-//       wsp_ggml_set_f32(x, 2.0f);
-//       wsp_ggml_set_f32(a, 3.0f);
-//       wsp_ggml_set_f32(b, 4.0f);
+//       ggml_set_f32(x, 2.0f);
+//       ggml_set_f32(a, 3.0f);
+//       ggml_set_f32(b, 4.0f);
 //
-//       wsp_ggml_graph_compute_with_ctx(ctx, &gf, n_threads);
+//       ggml_graph_compute_with_ctx(ctx, &gf, n_threads);
 //
-//       printf("f = %f\n", wsp_ggml_get_f32_1d(f, 0));
+//       printf("f = %f\n", ggml_get_f32_1d(f, 0));
 //
 //       ...
 //   }
 //
-// The actual computation is performed in the wsp_ggml_graph_compute() function.
+// The actual computation is performed in the ggml_graph_compute() function.
 //
-// The wsp_ggml_new_tensor_...() functions create new tensors. They are allocated in the memory buffer provided to the
-// wsp_ggml_init() function. You have to be careful not to exceed the memory buffer size. Therefore, you have to know
+// The ggml_new_tensor_...() functions create new tensors. They are allocated in the memory buffer provided to the
+// ggml_init() function. You have to be careful not to exceed the memory buffer size. Therefore, you have to know
 // in advance how much memory you need for your computation. Alternatively, you can allocate a large enough memory
-// and after defining the computation graph, call the wsp_ggml_used_mem() function to find out how much memory was
+// and after defining the computation graph, call the ggml_used_mem() function to find out how much memory was
 // actually needed.
 //
-// The wsp_ggml_set_param() function marks a tensor as an input variable. This is used by the automatic
+// The ggml_set_param() function marks a tensor as an input variable. This is used by the automatic
 // differentiation and optimization algorithms.
 //
 // The described approach allows to define the function graph once and then compute its forward or backward graphs
-// multiple times. All computations will use the same memory buffer allocated in the wsp_ggml_init() function. This way
+// multiple times. All computations will use the same memory buffer allocated in the ggml_init() function. This way
 // the user can avoid the memory allocation overhead at runtime.
 //
 // The library supports multi-dimensional tensors - up to 4 dimensions. The FP16 and FP32 data types are first class
@@ -96,9 +96,9 @@
 // clear that the library needs to support more complex operations. The way to support these operations is not clear
 // yet, but a few examples are demonstrated in the following operations:
 //
-//   - wsp_ggml_permute()
-//   - wsp_ggml_conv_1d_1s()
-//   - wsp_ggml_conv_1d_2s()
+//   - ggml_permute()
+//   - ggml_conv_1d_1s()
+//   - ggml_conv_1d_2s()
 //
 // For each tensor operator, the library implements a forward and backward computation function. The forward function
 // computes the output tensor value given the input tensor values. The backward function computes the adjoint of the
@@ -109,20 +109,20 @@
 //   https://www.youtube.com/watch?v=wG_nF1awSSY
 //
 //
-// ## Tensor data (struct wsp_ggml_tensor)
+// ## Tensor data (struct ggml_tensor)
 //
-// The tensors are stored in memory via the wsp_ggml_tensor struct. The structure provides information about the size of
+// The tensors are stored in memory via the ggml_tensor struct. The structure provides information about the size of
 // the tensor, the data type, and the memory buffer where the tensor data is stored. Additionally, it contains
 // pointers to the "source" tensors - i.e. the tensors that were used to compute the current tensor. For example:
 //
 //   {
-//       struct wsp_ggml_tensor * c = wsp_ggml_add(ctx, a, b);
+//       struct ggml_tensor * c = ggml_add(ctx, a, b);
 //
 //       assert(c->src[0] == a);
 //       assert(c->src[1] == b);
 //   }
 //
-// The multi-dimensional tensors are stored in row-major order. The wsp_ggml_tensor struct contains fields for the
+// The multi-dimensional tensors are stored in row-major order. The ggml_tensor struct contains fields for the
 // number of elements in each dimension ("ne") as well as the number of bytes ("nb", a.k.a. stride). This allows
 // to store tensors that are not contiguous in memory, which is useful for operations such as transposition and
 // permutation. All tensor operations have to take the stride into account and not assume that the tensor is
@@ -134,7 +134,7 @@
 //       const int nx = 2;
 //       const int ny = 3;
 //
-//       struct wsp_ggml_tensor * a = wsp_ggml_new_tensor_2d(ctx, WSP_GGML_TYPE_F32, nx, ny);
+//       struct ggml_tensor * a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, nx, ny);
 //
 //       for (int y = 0; y < ny; y++) {
 //           for (int x = 0; x < nx; x++) {
@@ -145,9 +145,9 @@
 //       ...
 //   }
 //
-// Alternatively, there are helper functions, such as wsp_ggml_get_f32_1d() and wsp_ggml_set_f32_1d() that can be used.
+// Alternatively, there are helper functions, such as ggml_get_f32_1d() and ggml_set_f32_1d() that can be used.
 //
-// ## The matrix multiplication operator (wsp_ggml_mul_mat)
+// ## The matrix multiplication operator (ggml_mul_mat)
 //
 // TODO
 //
@@ -173,35 +173,35 @@
 //
 //
 
-#ifdef WSP_GGML_SHARED
+#ifdef GGML_SHARED
 #    if defined(_WIN32) && !defined(__MINGW32__)
-#        ifdef WSP_GGML_BUILD
-#            define WSP_GGML_API __declspec(dllexport) extern
+#        ifdef GGML_BUILD
+#            define GGML_API __declspec(dllexport) extern
 #        else
-#            define WSP_GGML_API __declspec(dllimport) extern
+#            define GGML_API __declspec(dllimport) extern
 #        endif
 #    else
-#        define WSP_GGML_API __attribute__ ((visibility ("default"))) extern
+#        define GGML_API __attribute__ ((visibility ("default"))) extern
 #    endif
 #else
-#    define WSP_GGML_API extern
+#    define GGML_API extern
 #endif
 
 // TODO: support for clang
 #ifdef __GNUC__
-#    define WSP_GGML_DEPRECATED(func, hint) func __attribute__((deprecated(hint)))
+#    define GGML_DEPRECATED(func, hint) func __attribute__((deprecated(hint)))
 #elif defined(_MSC_VER)
-#    define WSP_GGML_DEPRECATED(func, hint) __declspec(deprecated(hint)) func
+#    define GGML_DEPRECATED(func, hint) __declspec(deprecated(hint)) func
 #else
-#    define WSP_GGML_DEPRECATED(func, hint) func
+#    define GGML_DEPRECATED(func, hint) func
 #endif
 
 #ifndef __GNUC__
-#    define WSP_GGML_ATTRIBUTE_FORMAT(...)
+#    define GGML_ATTRIBUTE_FORMAT(...)
 #elif defined(__MINGW32__) && !defined(__clang__)
-#    define WSP_GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(gnu_printf, __VA_ARGS__)))
+#    define GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(gnu_printf, __VA_ARGS__)))
 #else
-#    define WSP_GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(printf, __VA_ARGS__)))
+#    define GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(printf, __VA_ARGS__)))
 #endif
 
 #if defined(_WIN32) && !defined(_WIN32_WINNT)
@@ -213,456 +213,456 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define WSP_GGML_FILE_MAGIC   0x67676d6c // "ggml"
-#define WSP_GGML_FILE_VERSION 2
+#define GGML_FILE_MAGIC   0x67676d6c // "ggml"
+#define GGML_FILE_VERSION 2
 
-#define WSP_GGML_QNT_VERSION        2    // bump this on quantization format changes
-#define WSP_GGML_QNT_VERSION_FACTOR 1000 // do not change this
+#define GGML_QNT_VERSION        2    // bump this on quantization format changes
+#define GGML_QNT_VERSION_FACTOR 1000 // do not change this
 
-#define WSP_GGML_MAX_DIMS           4
-#define WSP_GGML_MAX_PARAMS         2048
-#define WSP_GGML_MAX_SRC            10
-#define WSP_GGML_MAX_N_THREADS      512
-#define WSP_GGML_MAX_OP_PARAMS      64
+#define GGML_MAX_DIMS           4
+#define GGML_MAX_PARAMS         2048
+#define GGML_MAX_SRC            10
+#define GGML_MAX_N_THREADS      512
+#define GGML_MAX_OP_PARAMS      64
 
-#ifndef WSP_GGML_MAX_NAME
-#   define WSP_GGML_MAX_NAME        64
+#ifndef GGML_MAX_NAME
+#   define GGML_MAX_NAME        64
 #endif
 
-#define WSP_GGML_DEFAULT_N_THREADS  4
-#define WSP_GGML_DEFAULT_GRAPH_SIZE 2048
+#define GGML_DEFAULT_N_THREADS  4
+#define GGML_DEFAULT_GRAPH_SIZE 2048
 
 #if UINTPTR_MAX == 0xFFFFFFFF
-    #define WSP_GGML_MEM_ALIGN 4
+    #define GGML_MEM_ALIGN 4
 #elif defined(__EMSCRIPTEN__)
-// emscripten uses max_align_t == 8, so we need WSP_GGML_MEM_ALIGN == 8 for 64-bit wasm.
-// (for 32-bit wasm, the first conditional is true and WSP_GGML_MEM_ALIGN stays 4.)
+// emscripten uses max_align_t == 8, so we need GGML_MEM_ALIGN == 8 for 64-bit wasm.
+// (for 32-bit wasm, the first conditional is true and GGML_MEM_ALIGN stays 4.)
 // ref: https://github.com/ggml-org/llama.cpp/pull/18628
-    #define WSP_GGML_MEM_ALIGN 8
+    #define GGML_MEM_ALIGN 8
 #else
-    #define WSP_GGML_MEM_ALIGN 16
+    #define GGML_MEM_ALIGN 16
 #endif
 
-#define WSP_GGML_EXIT_SUCCESS 0
-#define WSP_GGML_EXIT_ABORTED 1
+#define GGML_EXIT_SUCCESS 0
+#define GGML_EXIT_ABORTED 1
 
 // TODO: convert to enum https://github.com/ggml-org/llama.cpp/pull/16187#discussion_r2388538726
-#define WSP_GGML_ROPE_TYPE_NORMAL 0
-#define WSP_GGML_ROPE_TYPE_NEOX   2
-#define WSP_GGML_ROPE_TYPE_MROPE  8
-#define WSP_GGML_ROPE_TYPE_VISION 24
-#define WSP_GGML_ROPE_TYPE_IMROPE 40 // binary: 101000
+#define GGML_ROPE_TYPE_NORMAL 0
+#define GGML_ROPE_TYPE_NEOX   2
+#define GGML_ROPE_TYPE_MROPE  8
+#define GGML_ROPE_TYPE_VISION 24
+#define GGML_ROPE_TYPE_IMROPE 40 // binary: 101000
 
-#define WSP_GGML_MROPE_SECTIONS   4
+#define GGML_MROPE_SECTIONS   4
 
-#define WSP_GGML_UNUSED(x) (void)(x)
+#define GGML_UNUSED(x) (void)(x)
 #ifdef __CUDACC__
 template<typename... Args>
-__host__ __device__ constexpr inline void wsp_ggml_unused_vars_impl(Args&&...) noexcept {}
-#define WSP_GGML_UNUSED_VARS(...) wsp_ggml_unused_vars_impl(__VA_ARGS__)
+__host__ __device__ constexpr inline void ggml_unused_vars_impl(Args&&...) noexcept {}
+#define GGML_UNUSED_VARS(...) ggml_unused_vars_impl(__VA_ARGS__)
 #else
-#define WSP_GGML_UNUSED_VARS(...) do { (void)sizeof((__VA_ARGS__, 0)); } while(0)
+#define GGML_UNUSED_VARS(...) do { (void)sizeof((__VA_ARGS__, 0)); } while(0)
 #endif // __CUDACC__
 
-#define WSP_GGML_PAD(x, n) (((x) + (n) - 1) & ~((n) - 1))
+#define GGML_PAD(x, n) (((x) + (n) - 1) & ~((n) - 1))
 
 #ifndef NDEBUG
-#   define WSP_GGML_UNREACHABLE() do { fprintf(stderr, "statement should be unreachable\n"); abort(); } while(0)
+#   define GGML_UNREACHABLE() do { fprintf(stderr, "statement should be unreachable\n"); abort(); } while(0)
 #elif defined(__GNUC__)
-#   define WSP_GGML_UNREACHABLE() __builtin_unreachable()
+#   define GGML_UNREACHABLE() __builtin_unreachable()
 #elif defined(_MSC_VER)
-#   define WSP_GGML_UNREACHABLE() __assume(0)
+#   define GGML_UNREACHABLE() __assume(0)
 #else
-#   define WSP_GGML_UNREACHABLE() ((void) 0)
+#   define GGML_UNREACHABLE() ((void) 0)
 #endif
 
 #ifdef __cplusplus
-#   define WSP_GGML_NORETURN [[noreturn]]
+#   define GGML_NORETURN [[noreturn]]
 #elif defined(_MSC_VER)
-#   define WSP_GGML_NORETURN __declspec(noreturn)
+#   define GGML_NORETURN __declspec(noreturn)
 #else
-#   define WSP_GGML_NORETURN _Noreturn
+#   define GGML_NORETURN _Noreturn
 #endif
 
-#define WSP_GGML_ABORT(...) wsp_ggml_abort(__FILE__, __LINE__, __VA_ARGS__)
-#define WSP_GGML_ASSERT(x) if (!(x)) WSP_GGML_ABORT("WSP_GGML_ASSERT(%s) failed", #x)
+#define GGML_ABORT(...) ggml_abort(__FILE__, __LINE__, __VA_ARGS__)
+#define GGML_ASSERT(x) if (!(x)) GGML_ABORT("GGML_ASSERT(%s) failed", #x)
 
 // used to copy the number of elements and stride in bytes of tensors into local variables.
 // main purpose is to reduce code duplication and improve readability.
 //
 // example:
 //
-//    WSP_GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
-//    WSP_GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb);
+//    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
+//    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb);
 //
-#define WSP_GGML_TENSOR_LOCALS_1(type, prefix, pointer, array) \
+#define GGML_TENSOR_LOCALS_1(type, prefix, pointer, array) \
     const type prefix##0 = (pointer) ? (pointer)->array[0] : 0; \
-    WSP_GGML_UNUSED(prefix##0);
-#define WSP_GGML_TENSOR_LOCALS_2(type, prefix, pointer, array) \
-    WSP_GGML_TENSOR_LOCALS_1    (type, prefix, pointer, array) \
+    GGML_UNUSED(prefix##0);
+#define GGML_TENSOR_LOCALS_2(type, prefix, pointer, array) \
+    GGML_TENSOR_LOCALS_1    (type, prefix, pointer, array) \
     const type prefix##1 = (pointer) ? (pointer)->array[1] : 0; \
-    WSP_GGML_UNUSED(prefix##1);
-#define WSP_GGML_TENSOR_LOCALS_3(type, prefix, pointer, array) \
-    WSP_GGML_TENSOR_LOCALS_2    (type, prefix, pointer, array) \
+    GGML_UNUSED(prefix##1);
+#define GGML_TENSOR_LOCALS_3(type, prefix, pointer, array) \
+    GGML_TENSOR_LOCALS_2    (type, prefix, pointer, array) \
     const type prefix##2 = (pointer) ? (pointer)->array[2] : 0; \
-    WSP_GGML_UNUSED(prefix##2);
-#define WSP_GGML_TENSOR_LOCALS(type, prefix, pointer, array) \
-    WSP_GGML_TENSOR_LOCALS_3  (type, prefix, pointer, array) \
+    GGML_UNUSED(prefix##2);
+#define GGML_TENSOR_LOCALS(type, prefix, pointer, array) \
+    GGML_TENSOR_LOCALS_3  (type, prefix, pointer, array) \
     const type prefix##3 = (pointer) ? (pointer)->array[3] : 0; \
-    WSP_GGML_UNUSED(prefix##3);
+    GGML_UNUSED(prefix##3);
 
-#define WSP_GGML_TENSOR_UNARY_OP_LOCALS \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
+#define GGML_TENSOR_UNARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
 
-#define WSP_GGML_TENSOR_BINARY_OP_LOCALS \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
+#define GGML_TENSOR_BINARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
 
-#define WSP_GGML_TENSOR_TERNARY_OP_LOCALS \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne2, src2, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb2, src2, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
+#define GGML_TENSOR_TERNARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne2, src2, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb2, src2, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb)
 
-#define WSP_GGML_TENSOR_BINARY_OP_LOCALS01 \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
-    WSP_GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
-    WSP_GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb)
+#define GGML_TENSOR_BINARY_OP_LOCALS01 \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb) \
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne) \
+    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb)
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
     // Function type used in fatal error callbacks
-    typedef void (*wsp_ggml_abort_callback_t)(const char * error_message);
+    typedef void (*ggml_abort_callback_t)(const char * error_message);
 
     // Set the abort callback (passing null will restore original abort functionality: printing a message to stdout)
     // Returns the old callback for chaining
-    WSP_GGML_API wsp_ggml_abort_callback_t wsp_ggml_set_abort_callback(wsp_ggml_abort_callback_t callback);
+    GGML_API ggml_abort_callback_t ggml_set_abort_callback(ggml_abort_callback_t callback);
 
-    WSP_GGML_NORETURN WSP_GGML_ATTRIBUTE_FORMAT(3, 4)
-    WSP_GGML_API void wsp_ggml_abort(const char * file, int line, const char * fmt, ...);
+    GGML_NORETURN GGML_ATTRIBUTE_FORMAT(3, 4)
+    GGML_API void ggml_abort(const char * file, int line, const char * fmt, ...);
 
-    enum wsp_ggml_status {
-        WSP_GGML_STATUS_ALLOC_FAILED = -2,
-        WSP_GGML_STATUS_FAILED = -1,
-        WSP_GGML_STATUS_SUCCESS = 0,
-        WSP_GGML_STATUS_ABORTED = 1,
+    enum ggml_status {
+        GGML_STATUS_ALLOC_FAILED = -2,
+        GGML_STATUS_FAILED = -1,
+        GGML_STATUS_SUCCESS = 0,
+        GGML_STATUS_ABORTED = 1,
     };
 
-    // get wsp_ggml_status name string
-    WSP_GGML_API const char * wsp_ggml_status_to_string(enum wsp_ggml_status status);
+    // get ggml_status name string
+    GGML_API const char * ggml_status_to_string(enum ggml_status status);
 
     // ieee 754-2008 half-precision float16
     // todo: make this not an integral type
-    typedef uint16_t wsp_ggml_fp16_t;
-    WSP_GGML_API float       wsp_ggml_fp16_to_fp32(wsp_ggml_fp16_t);
-    WSP_GGML_API wsp_ggml_fp16_t wsp_ggml_fp32_to_fp16(float);
-    WSP_GGML_API void        wsp_ggml_fp16_to_fp32_row(const wsp_ggml_fp16_t *, float *, int64_t);
-    WSP_GGML_API void        wsp_ggml_fp32_to_fp16_row(const float *, wsp_ggml_fp16_t *, int64_t);
+    typedef uint16_t ggml_fp16_t;
+    GGML_API float       ggml_fp16_to_fp32(ggml_fp16_t);
+    GGML_API ggml_fp16_t ggml_fp32_to_fp16(float);
+    GGML_API void        ggml_fp16_to_fp32_row(const ggml_fp16_t *, float *, int64_t);
+    GGML_API void        ggml_fp32_to_fp16_row(const float *, ggml_fp16_t *, int64_t);
 
     // google brain half-precision bfloat16
-    typedef struct { uint16_t bits; } wsp_ggml_bf16_t;
-    WSP_GGML_API wsp_ggml_bf16_t wsp_ggml_fp32_to_bf16(float);
-    WSP_GGML_API float       wsp_ggml_bf16_to_fp32(wsp_ggml_bf16_t);  // consider just doing << 16
-    WSP_GGML_API void        wsp_ggml_bf16_to_fp32_row(const wsp_ggml_bf16_t *, float *, int64_t);
-    WSP_GGML_API void        wsp_ggml_fp32_to_bf16_row_ref(const float *, wsp_ggml_bf16_t *, int64_t);
-    WSP_GGML_API void        wsp_ggml_fp32_to_bf16_row(const float *, wsp_ggml_bf16_t *, int64_t);
+    typedef struct { uint16_t bits; } ggml_bf16_t;
+    GGML_API ggml_bf16_t ggml_fp32_to_bf16(float);
+    GGML_API float       ggml_bf16_to_fp32(ggml_bf16_t);  // consider just doing << 16
+    GGML_API void        ggml_bf16_to_fp32_row(const ggml_bf16_t *, float *, int64_t);
+    GGML_API void        ggml_fp32_to_bf16_row_ref(const float *, ggml_bf16_t *, int64_t);
+    GGML_API void        ggml_fp32_to_bf16_row(const float *, ggml_bf16_t *, int64_t);
 
-    struct wsp_ggml_object;
-    struct wsp_ggml_context;
-    struct wsp_ggml_cgraph;
+    struct ggml_object;
+    struct ggml_context;
+    struct ggml_cgraph;
 
     // NOTE: always add types at the end of the enum to keep backward compatibility
-    enum wsp_ggml_type {
-        WSP_GGML_TYPE_F32     = 0,
-        WSP_GGML_TYPE_F16     = 1,
-        WSP_GGML_TYPE_Q4_0    = 2,
-        WSP_GGML_TYPE_Q4_1    = 3,
-        // WSP_GGML_TYPE_Q4_2 = 4, support has been removed
-        // WSP_GGML_TYPE_Q4_3 = 5, support has been removed
-        WSP_GGML_TYPE_Q5_0    = 6,
-        WSP_GGML_TYPE_Q5_1    = 7,
-        WSP_GGML_TYPE_Q8_0    = 8,
-        WSP_GGML_TYPE_Q8_1    = 9,
-        WSP_GGML_TYPE_Q2_K    = 10,
-        WSP_GGML_TYPE_Q3_K    = 11,
-        WSP_GGML_TYPE_Q4_K    = 12,
-        WSP_GGML_TYPE_Q5_K    = 13,
-        WSP_GGML_TYPE_Q6_K    = 14,
-        WSP_GGML_TYPE_Q8_K    = 15,
-        WSP_GGML_TYPE_IQ2_XXS = 16,
-        WSP_GGML_TYPE_IQ2_XS  = 17,
-        WSP_GGML_TYPE_IQ3_XXS = 18,
-        WSP_GGML_TYPE_IQ1_S   = 19,
-        WSP_GGML_TYPE_IQ4_NL  = 20,
-        WSP_GGML_TYPE_IQ3_S   = 21,
-        WSP_GGML_TYPE_IQ2_S   = 22,
-        WSP_GGML_TYPE_IQ4_XS  = 23,
-        WSP_GGML_TYPE_I8      = 24,
-        WSP_GGML_TYPE_I16     = 25,
-        WSP_GGML_TYPE_I32     = 26,
-        WSP_GGML_TYPE_I64     = 27,
-        WSP_GGML_TYPE_F64     = 28,
-        WSP_GGML_TYPE_IQ1_M   = 29,
-        WSP_GGML_TYPE_BF16    = 30,
-        // WSP_GGML_TYPE_Q4_0_4_4 = 31, support has been removed from gguf files
-        // WSP_GGML_TYPE_Q4_0_4_8 = 32,
-        // WSP_GGML_TYPE_Q4_0_8_8 = 33,
-        WSP_GGML_TYPE_TQ1_0   = 34,
-        WSP_GGML_TYPE_TQ2_0   = 35,
-        // WSP_GGML_TYPE_IQ4_NL_4_4 = 36,
-        // WSP_GGML_TYPE_IQ4_NL_4_8 = 37,
-        // WSP_GGML_TYPE_IQ4_NL_8_8 = 38,
-        WSP_GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
-        WSP_GGML_TYPE_NVFP4   = 40, // NVFP4 (4 blocks, E4M3 scale)
-        WSP_GGML_TYPE_Q1_0    = 41,
-        WSP_GGML_TYPE_Q2_0    = 42,
-        WSP_GGML_TYPE_COUNT   = 43,
+    enum ggml_type {
+        GGML_TYPE_F32     = 0,
+        GGML_TYPE_F16     = 1,
+        GGML_TYPE_Q4_0    = 2,
+        GGML_TYPE_Q4_1    = 3,
+        // GGML_TYPE_Q4_2 = 4, support has been removed
+        // GGML_TYPE_Q4_3 = 5, support has been removed
+        GGML_TYPE_Q5_0    = 6,
+        GGML_TYPE_Q5_1    = 7,
+        GGML_TYPE_Q8_0    = 8,
+        GGML_TYPE_Q8_1    = 9,
+        GGML_TYPE_Q2_K    = 10,
+        GGML_TYPE_Q3_K    = 11,
+        GGML_TYPE_Q4_K    = 12,
+        GGML_TYPE_Q5_K    = 13,
+        GGML_TYPE_Q6_K    = 14,
+        GGML_TYPE_Q8_K    = 15,
+        GGML_TYPE_IQ2_XXS = 16,
+        GGML_TYPE_IQ2_XS  = 17,
+        GGML_TYPE_IQ3_XXS = 18,
+        GGML_TYPE_IQ1_S   = 19,
+        GGML_TYPE_IQ4_NL  = 20,
+        GGML_TYPE_IQ3_S   = 21,
+        GGML_TYPE_IQ2_S   = 22,
+        GGML_TYPE_IQ4_XS  = 23,
+        GGML_TYPE_I8      = 24,
+        GGML_TYPE_I16     = 25,
+        GGML_TYPE_I32     = 26,
+        GGML_TYPE_I64     = 27,
+        GGML_TYPE_F64     = 28,
+        GGML_TYPE_IQ1_M   = 29,
+        GGML_TYPE_BF16    = 30,
+        // GGML_TYPE_Q4_0_4_4 = 31, support has been removed from gguf files
+        // GGML_TYPE_Q4_0_4_8 = 32,
+        // GGML_TYPE_Q4_0_8_8 = 33,
+        GGML_TYPE_TQ1_0   = 34,
+        GGML_TYPE_TQ2_0   = 35,
+        // GGML_TYPE_IQ4_NL_4_4 = 36,
+        // GGML_TYPE_IQ4_NL_4_8 = 37,
+        // GGML_TYPE_IQ4_NL_8_8 = 38,
+        GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
+        GGML_TYPE_NVFP4   = 40, // NVFP4 (4 blocks, E4M3 scale)
+        GGML_TYPE_Q1_0    = 41,
+        GGML_TYPE_Q2_0    = 42,
+        GGML_TYPE_COUNT   = 43,
     };
 
     // precision
-    enum wsp_ggml_prec {
-        WSP_GGML_PREC_DEFAULT =  0, // stored as wsp_ggml_tensor.op_params, 0 by default
-        WSP_GGML_PREC_F32     = 10,
+    enum ggml_prec {
+        GGML_PREC_DEFAULT =  0, // stored as ggml_tensor.op_params, 0 by default
+        GGML_PREC_F32     = 10,
     };
 
     // op hint
-    enum wsp_ggml_op_hint {
-        WSP_GGML_HINT_NONE             = 0,
-        WSP_GGML_HINT_SRC0_IS_HADAMARD = 1,
+    enum ggml_op_hint {
+        GGML_HINT_NONE             = 0,
+        GGML_HINT_SRC0_IS_HADAMARD = 1,
     };
 
     // model file types
-    enum wsp_ggml_ftype {
-        WSP_GGML_FTYPE_UNKNOWN        = -1,
-        WSP_GGML_FTYPE_ALL_F32        = 0,
-        WSP_GGML_FTYPE_MOSTLY_F16     = 1,  // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q4_0    = 2,  // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q4_1    = 3,  // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q4_1_SOME_F16 = 4, // tok_embeddings.weight and output.weight are F16
-        WSP_GGML_FTYPE_MOSTLY_Q8_0    = 7,  // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q5_0    = 8,  // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q5_1    = 9,  // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q2_K    = 10, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q3_K    = 11, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q4_K    = 12, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q5_K    = 13, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q6_K    = 14, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ2_XXS = 15, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ2_XS  = 16, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ3_XXS = 17, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ1_S   = 18, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ4_NL  = 19, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ3_S   = 20, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ2_S   = 21, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ4_XS  = 22, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_IQ1_M   = 23, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_BF16    = 24, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_MXFP4   = 25, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_NVFP4   = 26, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q1_0    = 27, // except 1d tensors
-        WSP_GGML_FTYPE_MOSTLY_Q2_0    = 28, // except 1d tensors
+    enum ggml_ftype {
+        GGML_FTYPE_UNKNOWN        = -1,
+        GGML_FTYPE_ALL_F32        = 0,
+        GGML_FTYPE_MOSTLY_F16     = 1,  // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q4_0    = 2,  // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q4_1    = 3,  // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q4_1_SOME_F16 = 4, // tok_embeddings.weight and output.weight are F16
+        GGML_FTYPE_MOSTLY_Q8_0    = 7,  // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q5_0    = 8,  // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q5_1    = 9,  // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q2_K    = 10, // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q3_K    = 11, // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q4_K    = 12, // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q5_K    = 13, // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q6_K    = 14, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ2_XXS = 15, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ2_XS  = 16, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ3_XXS = 17, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ1_S   = 18, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ4_NL  = 19, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ3_S   = 20, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ2_S   = 21, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ4_XS  = 22, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ1_M   = 23, // except 1d tensors
+        GGML_FTYPE_MOSTLY_BF16    = 24, // except 1d tensors
+        GGML_FTYPE_MOSTLY_MXFP4   = 25, // except 1d tensors
+        GGML_FTYPE_MOSTLY_NVFP4   = 26, // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q1_0    = 27, // except 1d tensors
+        GGML_FTYPE_MOSTLY_Q2_0    = 28, // except 1d tensors
     };
 
     // available tensor operations:
-    enum wsp_ggml_op {
-        WSP_GGML_OP_NONE = 0,
+    enum ggml_op {
+        GGML_OP_NONE = 0,
 
-        WSP_GGML_OP_DUP,
-        WSP_GGML_OP_ADD,
-        WSP_GGML_OP_ADD_ID,
-        WSP_GGML_OP_ADD1,
-        WSP_GGML_OP_ACC,
-        WSP_GGML_OP_SUB,
-        WSP_GGML_OP_MUL,
-        WSP_GGML_OP_DIV,
-        WSP_GGML_OP_SQR,
-        WSP_GGML_OP_SQRT,
-        WSP_GGML_OP_LOG,
-        WSP_GGML_OP_SIN,
-        WSP_GGML_OP_COS,
-        WSP_GGML_OP_SUM,
-        WSP_GGML_OP_SUM_ROWS,
-        WSP_GGML_OP_CUMSUM,
-        WSP_GGML_OP_MEAN,
-        WSP_GGML_OP_ARGMAX,
-        WSP_GGML_OP_COUNT_EQUAL,
-        WSP_GGML_OP_REPEAT,
-        WSP_GGML_OP_REPEAT_BACK,
-        WSP_GGML_OP_CONCAT,
-        WSP_GGML_OP_SILU_BACK,
-        WSP_GGML_OP_NORM, // normalize
-        WSP_GGML_OP_RMS_NORM,
-        WSP_GGML_OP_RMS_NORM_BACK,
-        WSP_GGML_OP_GROUP_NORM,
-        WSP_GGML_OP_L2_NORM,
+        GGML_OP_DUP,
+        GGML_OP_ADD,
+        GGML_OP_ADD_ID,
+        GGML_OP_ADD1,
+        GGML_OP_ACC,
+        GGML_OP_SUB,
+        GGML_OP_MUL,
+        GGML_OP_DIV,
+        GGML_OP_SQR,
+        GGML_OP_SQRT,
+        GGML_OP_LOG,
+        GGML_OP_SIN,
+        GGML_OP_COS,
+        GGML_OP_SUM,
+        GGML_OP_SUM_ROWS,
+        GGML_OP_CUMSUM,
+        GGML_OP_MEAN,
+        GGML_OP_ARGMAX,
+        GGML_OP_COUNT_EQUAL,
+        GGML_OP_REPEAT,
+        GGML_OP_REPEAT_BACK,
+        GGML_OP_CONCAT,
+        GGML_OP_SILU_BACK,
+        GGML_OP_NORM, // normalize
+        GGML_OP_RMS_NORM,
+        GGML_OP_RMS_NORM_BACK,
+        GGML_OP_GROUP_NORM,
+        GGML_OP_L2_NORM,
 
-        WSP_GGML_OP_MUL_MAT,
-        WSP_GGML_OP_MUL_MAT_ID,
-        WSP_GGML_OP_OUT_PROD,
+        GGML_OP_MUL_MAT,
+        GGML_OP_MUL_MAT_ID,
+        GGML_OP_OUT_PROD,
 
-        WSP_GGML_OP_SCALE,
-        WSP_GGML_OP_SET,
-        WSP_GGML_OP_CPY,
-        WSP_GGML_OP_CONT,
-        WSP_GGML_OP_RESHAPE,
-        WSP_GGML_OP_VIEW,
-        WSP_GGML_OP_PERMUTE,
-        WSP_GGML_OP_TRANSPOSE,
-        WSP_GGML_OP_GET_ROWS,
-        WSP_GGML_OP_GET_ROWS_BACK,
-        WSP_GGML_OP_SET_ROWS,
-        WSP_GGML_OP_DIAG,
-        WSP_GGML_OP_DIAG_MASK_INF,
-        WSP_GGML_OP_DIAG_MASK_ZERO,
-        WSP_GGML_OP_SOFT_MAX,
-        WSP_GGML_OP_SOFT_MAX_BACK,
-        WSP_GGML_OP_ROPE,
-        WSP_GGML_OP_ROPE_BACK,
-        WSP_GGML_OP_CLAMP,
-        WSP_GGML_OP_CONV_TRANSPOSE_1D,
-        WSP_GGML_OP_IM2COL,
-        WSP_GGML_OP_IM2COL_BACK,
-        WSP_GGML_OP_IM2COL_3D,
-        WSP_GGML_OP_COL2IM_1D,
-        WSP_GGML_OP_CONV_2D,
-        WSP_GGML_OP_CONV_3D,
-        WSP_GGML_OP_CONV_2D_DW,
-        WSP_GGML_OP_CONV_TRANSPOSE_2D,
-        WSP_GGML_OP_POOL_1D,
-        WSP_GGML_OP_POOL_2D,
-        WSP_GGML_OP_POOL_2D_BACK,
-        WSP_GGML_OP_UPSCALE,
-        WSP_GGML_OP_PAD,
-        WSP_GGML_OP_PAD_REFLECT_1D,
-        WSP_GGML_OP_ROLL,
-        WSP_GGML_OP_ARANGE,
-        WSP_GGML_OP_TIMESTEP_EMBEDDING,
-        WSP_GGML_OP_ARGSORT,
-        WSP_GGML_OP_TOP_K,
-        WSP_GGML_OP_LEAKY_RELU,
-        WSP_GGML_OP_TRI,
-        WSP_GGML_OP_FILL,
+        GGML_OP_SCALE,
+        GGML_OP_SET,
+        GGML_OP_CPY,
+        GGML_OP_CONT,
+        GGML_OP_RESHAPE,
+        GGML_OP_VIEW,
+        GGML_OP_PERMUTE,
+        GGML_OP_TRANSPOSE,
+        GGML_OP_GET_ROWS,
+        GGML_OP_GET_ROWS_BACK,
+        GGML_OP_SET_ROWS,
+        GGML_OP_DIAG,
+        GGML_OP_DIAG_MASK_INF,
+        GGML_OP_DIAG_MASK_ZERO,
+        GGML_OP_SOFT_MAX,
+        GGML_OP_SOFT_MAX_BACK,
+        GGML_OP_ROPE,
+        GGML_OP_ROPE_BACK,
+        GGML_OP_CLAMP,
+        GGML_OP_CONV_TRANSPOSE_1D,
+        GGML_OP_IM2COL,
+        GGML_OP_IM2COL_BACK,
+        GGML_OP_IM2COL_3D,
+        GGML_OP_COL2IM_1D,
+        GGML_OP_CONV_2D,
+        GGML_OP_CONV_3D,
+        GGML_OP_CONV_2D_DW,
+        GGML_OP_CONV_TRANSPOSE_2D,
+        GGML_OP_POOL_1D,
+        GGML_OP_POOL_2D,
+        GGML_OP_POOL_2D_BACK,
+        GGML_OP_UPSCALE,
+        GGML_OP_PAD,
+        GGML_OP_PAD_REFLECT_1D,
+        GGML_OP_ROLL,
+        GGML_OP_ARANGE,
+        GGML_OP_TIMESTEP_EMBEDDING,
+        GGML_OP_ARGSORT,
+        GGML_OP_TOP_K,
+        GGML_OP_LEAKY_RELU,
+        GGML_OP_TRI,
+        GGML_OP_FILL,
 
-        WSP_GGML_OP_FLASH_ATTN_EXT,
-        WSP_GGML_OP_FLASH_ATTN_BACK,
-        WSP_GGML_OP_SSM_CONV,
-        WSP_GGML_OP_SSM_SCAN,
-        WSP_GGML_OP_WIN_PART,
-        WSP_GGML_OP_WIN_UNPART,
-        WSP_GGML_OP_GET_REL_POS,
-        WSP_GGML_OP_ADD_REL_POS,
-        WSP_GGML_OP_RWKV_WKV6,
-        WSP_GGML_OP_GATED_LINEAR_ATTN,
-        WSP_GGML_OP_RWKV_WKV7,
-        WSP_GGML_OP_SOLVE_TRI,
-        WSP_GGML_OP_GATED_DELTA_NET,
-        WSP_GGML_OP_LIGHTNING_INDEXER,
-        WSP_GGML_OP_DSV4_HC_COMB,
-        WSP_GGML_OP_DSV4_HC_PRE,
-        WSP_GGML_OP_DSV4_HC_POST,
+        GGML_OP_FLASH_ATTN_EXT,
+        GGML_OP_FLASH_ATTN_BACK,
+        GGML_OP_SSM_CONV,
+        GGML_OP_SSM_SCAN,
+        GGML_OP_WIN_PART,
+        GGML_OP_WIN_UNPART,
+        GGML_OP_GET_REL_POS,
+        GGML_OP_ADD_REL_POS,
+        GGML_OP_RWKV_WKV6,
+        GGML_OP_GATED_LINEAR_ATTN,
+        GGML_OP_RWKV_WKV7,
+        GGML_OP_SOLVE_TRI,
+        GGML_OP_GATED_DELTA_NET,
+        GGML_OP_LIGHTNING_INDEXER,
+        GGML_OP_DSV4_HC_COMB,
+        GGML_OP_DSV4_HC_PRE,
+        GGML_OP_DSV4_HC_POST,
 
-        WSP_GGML_OP_UNARY,
+        GGML_OP_UNARY,
 
-        WSP_GGML_OP_MAP_CUSTOM1,
-        WSP_GGML_OP_MAP_CUSTOM2,
-        WSP_GGML_OP_MAP_CUSTOM3,
+        GGML_OP_MAP_CUSTOM1,
+        GGML_OP_MAP_CUSTOM2,
+        GGML_OP_MAP_CUSTOM3,
 
-        WSP_GGML_OP_CUSTOM,
+        GGML_OP_CUSTOM,
 
-        WSP_GGML_OP_CROSS_ENTROPY_LOSS,
-        WSP_GGML_OP_CROSS_ENTROPY_LOSS_BACK,
-        WSP_GGML_OP_OPT_STEP_ADAMW,
-        WSP_GGML_OP_OPT_STEP_SGD,
+        GGML_OP_CROSS_ENTROPY_LOSS,
+        GGML_OP_CROSS_ENTROPY_LOSS_BACK,
+        GGML_OP_OPT_STEP_ADAMW,
+        GGML_OP_OPT_STEP_SGD,
 
-        WSP_GGML_OP_GLU,
+        GGML_OP_GLU,
 
-        WSP_GGML_OP_COUNT,
+        GGML_OP_COUNT,
     };
 
-    enum wsp_ggml_unary_op {
-        WSP_GGML_UNARY_OP_ABS,
-        WSP_GGML_UNARY_OP_SGN,
-        WSP_GGML_UNARY_OP_NEG,
-        WSP_GGML_UNARY_OP_STEP,
-        WSP_GGML_UNARY_OP_TANH,
-        WSP_GGML_UNARY_OP_ELU,
-        WSP_GGML_UNARY_OP_RELU,
-        WSP_GGML_UNARY_OP_SIGMOID,
-        WSP_GGML_UNARY_OP_GELU,
-        WSP_GGML_UNARY_OP_GELU_QUICK,
-        WSP_GGML_UNARY_OP_SILU,
-        WSP_GGML_UNARY_OP_HARDSWISH,
-        WSP_GGML_UNARY_OP_HARDSIGMOID,
-        WSP_GGML_UNARY_OP_EXP,
-        WSP_GGML_UNARY_OP_EXPM1,
-        WSP_GGML_UNARY_OP_SOFTPLUS,
-        WSP_GGML_UNARY_OP_GELU_ERF,
-        WSP_GGML_UNARY_OP_XIELU,
-        WSP_GGML_UNARY_OP_FLOOR,
-        WSP_GGML_UNARY_OP_CEIL,
-        WSP_GGML_UNARY_OP_ROUND,
-        WSP_GGML_UNARY_OP_TRUNC,
+    enum ggml_unary_op {
+        GGML_UNARY_OP_ABS,
+        GGML_UNARY_OP_SGN,
+        GGML_UNARY_OP_NEG,
+        GGML_UNARY_OP_STEP,
+        GGML_UNARY_OP_TANH,
+        GGML_UNARY_OP_ELU,
+        GGML_UNARY_OP_RELU,
+        GGML_UNARY_OP_SIGMOID,
+        GGML_UNARY_OP_GELU,
+        GGML_UNARY_OP_GELU_QUICK,
+        GGML_UNARY_OP_SILU,
+        GGML_UNARY_OP_HARDSWISH,
+        GGML_UNARY_OP_HARDSIGMOID,
+        GGML_UNARY_OP_EXP,
+        GGML_UNARY_OP_EXPM1,
+        GGML_UNARY_OP_SOFTPLUS,
+        GGML_UNARY_OP_GELU_ERF,
+        GGML_UNARY_OP_XIELU,
+        GGML_UNARY_OP_FLOOR,
+        GGML_UNARY_OP_CEIL,
+        GGML_UNARY_OP_ROUND,
+        GGML_UNARY_OP_TRUNC,
 
-        WSP_GGML_UNARY_OP_COUNT,
+        GGML_UNARY_OP_COUNT,
     };
 
-    enum wsp_ggml_glu_op {
-        WSP_GGML_GLU_OP_REGLU,
-        WSP_GGML_GLU_OP_GEGLU,
-        WSP_GGML_GLU_OP_SWIGLU,
-        WSP_GGML_GLU_OP_SWIGLU_OAI,
-        WSP_GGML_GLU_OP_GEGLU_ERF,
-        WSP_GGML_GLU_OP_GEGLU_QUICK,
+    enum ggml_glu_op {
+        GGML_GLU_OP_REGLU,
+        GGML_GLU_OP_GEGLU,
+        GGML_GLU_OP_SWIGLU,
+        GGML_GLU_OP_SWIGLU_OAI,
+        GGML_GLU_OP_GEGLU_ERF,
+        GGML_GLU_OP_GEGLU_QUICK,
 
-        WSP_GGML_GLU_OP_COUNT,
+        GGML_GLU_OP_COUNT,
     };
 
-    enum wsp_ggml_object_type {
-        WSP_GGML_OBJECT_TYPE_TENSOR,
-        WSP_GGML_OBJECT_TYPE_GRAPH,
-        WSP_GGML_OBJECT_TYPE_WORK_BUFFER
+    enum ggml_object_type {
+        GGML_OBJECT_TYPE_TENSOR,
+        GGML_OBJECT_TYPE_GRAPH,
+        GGML_OBJECT_TYPE_WORK_BUFFER
     };
 
-    enum wsp_ggml_log_level {
-        WSP_GGML_LOG_LEVEL_NONE  = 0,
-        WSP_GGML_LOG_LEVEL_DEBUG = 1,
-        WSP_GGML_LOG_LEVEL_INFO  = 2,
-        WSP_GGML_LOG_LEVEL_WARN  = 3,
-        WSP_GGML_LOG_LEVEL_ERROR = 4,
-        WSP_GGML_LOG_LEVEL_CONT  = 5, // continue previous log
+    enum ggml_log_level {
+        GGML_LOG_LEVEL_NONE  = 0,
+        GGML_LOG_LEVEL_DEBUG = 1,
+        GGML_LOG_LEVEL_INFO  = 2,
+        GGML_LOG_LEVEL_WARN  = 3,
+        GGML_LOG_LEVEL_ERROR = 4,
+        GGML_LOG_LEVEL_CONT  = 5, // continue previous log
     };
 
     // this tensor...
-    enum wsp_ggml_tensor_flag {
-        WSP_GGML_TENSOR_FLAG_INPUT   =  1, // ...is an input for the GGML compute graph
-        WSP_GGML_TENSOR_FLAG_OUTPUT  =  2, // ...is an output for the GGML compute graph
-        WSP_GGML_TENSOR_FLAG_PARAM   =  4, // ...contains trainable parameters
-        WSP_GGML_TENSOR_FLAG_LOSS    =  8, // ...defines loss for numerical optimization (multiple loss tensors add up)
-        WSP_GGML_TENSOR_FLAG_COMPUTE = 16, // ...must be computed
+    enum ggml_tensor_flag {
+        GGML_TENSOR_FLAG_INPUT   =  1, // ...is an input for the GGML compute graph
+        GGML_TENSOR_FLAG_OUTPUT  =  2, // ...is an output for the GGML compute graph
+        GGML_TENSOR_FLAG_PARAM   =  4, // ...contains trainable parameters
+        GGML_TENSOR_FLAG_LOSS    =  8, // ...defines loss for numerical optimization (multiple loss tensors add up)
+        GGML_TENSOR_FLAG_COMPUTE = 16, // ...must be computed
     };
 
-    enum wsp_ggml_tri_type {
-        WSP_GGML_TRI_TYPE_UPPER_DIAG = 0,
-        WSP_GGML_TRI_TYPE_UPPER      = 1,
-        WSP_GGML_TRI_TYPE_LOWER_DIAG = 2,
-        WSP_GGML_TRI_TYPE_LOWER      = 3
+    enum ggml_tri_type {
+        GGML_TRI_TYPE_UPPER_DIAG = 0,
+        GGML_TRI_TYPE_UPPER      = 1,
+        GGML_TRI_TYPE_LOWER_DIAG = 2,
+        GGML_TRI_TYPE_LOWER      = 3
     };
 
-    struct wsp_ggml_init_params {
+    struct ggml_init_params {
         // memory pool
         size_t mem_size;   // bytes
         void * mem_buffer; // if NULL, memory will be allocated internally
@@ -670,46 +670,46 @@ extern "C" {
     };
 
     // n-dimensional tensor
-    struct wsp_ggml_tensor {
-        enum wsp_ggml_type type;
+    struct ggml_tensor {
+        enum ggml_type type;
 
-        struct wsp_ggml_backend_buffer * buffer;
+        struct ggml_backend_buffer * buffer;
 
-        int64_t ne[WSP_GGML_MAX_DIMS]; // number of elements
-        size_t  nb[WSP_GGML_MAX_DIMS]; // stride in bytes:
-                                   // nb[0] = wsp_ggml_type_size(type)
-                                   // nb[1] = nb[0]   * (ne[0] / wsp_ggml_blck_size(type)) + padding
+        int64_t ne[GGML_MAX_DIMS]; // number of elements
+        size_t  nb[GGML_MAX_DIMS]; // stride in bytes:
+                                   // nb[0] = ggml_type_size(type)
+                                   // nb[1] = nb[0]   * (ne[0] / ggml_blck_size(type)) + padding
                                    // nb[i] = nb[i-1] * ne[i-1]
 
         // compute data
-        enum wsp_ggml_op op;
+        enum ggml_op op;
 
         // op params - allocated as int32_t for alignment
-        int32_t op_params[WSP_GGML_MAX_OP_PARAMS / sizeof(int32_t)];
+        int32_t op_params[GGML_MAX_OP_PARAMS / sizeof(int32_t)];
 
         int32_t flags;
 
-        struct wsp_ggml_tensor * src[WSP_GGML_MAX_SRC];
+        struct ggml_tensor * src[GGML_MAX_SRC];
 
         // source tensor and offset for views
-        struct wsp_ggml_tensor * view_src;
+        struct ggml_tensor * view_src;
         size_t               view_offs;
 
         void * data;
 
-        char name[WSP_GGML_MAX_NAME];
+        char name[GGML_MAX_NAME];
 
         void * extra; // extra things e.g. for ggml-cuda.cu
 
         char padding[8];
     };
 
-    static const size_t WSP_GGML_TENSOR_SIZE = sizeof(struct wsp_ggml_tensor);
+    static const size_t GGML_TENSOR_SIZE = sizeof(struct ggml_tensor);
 
     // Abort callback
     // If not NULL, called before ggml computation
     // If it returns true, the computation is aborted
-    typedef bool (*wsp_ggml_abort_callback)(void * data);
+    typedef bool (*ggml_abort_callback)(void * data);
 
 
     //
@@ -717,537 +717,537 @@ extern "C" {
     //
 
     // GUID types
-    typedef uint8_t wsp_ggml_guid[16];
-    typedef wsp_ggml_guid * wsp_ggml_guid_t;
+    typedef uint8_t ggml_guid[16];
+    typedef ggml_guid * ggml_guid_t;
 
-    WSP_GGML_API bool wsp_ggml_guid_matches(wsp_ggml_guid_t guid_a, wsp_ggml_guid_t guid_b);
+    GGML_API bool ggml_guid_matches(ggml_guid_t guid_a, ggml_guid_t guid_b);
 
     // misc
 
-    WSP_GGML_API const char * wsp_ggml_version(void);
-    WSP_GGML_API const char * wsp_ggml_commit(void);
+    GGML_API const char * ggml_version(void);
+    GGML_API const char * ggml_commit(void);
 
-    WSP_GGML_API void    wsp_ggml_time_init(void); // call this once at the beginning of the program
-    WSP_GGML_API int64_t wsp_ggml_time_ms(void);
-    WSP_GGML_API int64_t wsp_ggml_time_us(void);
-    WSP_GGML_API int64_t wsp_ggml_cycles(void);
-    WSP_GGML_API int64_t wsp_ggml_cycles_per_ms(void);
+    GGML_API void    ggml_time_init(void); // call this once at the beginning of the program
+    GGML_API int64_t ggml_time_ms(void);
+    GGML_API int64_t ggml_time_us(void);
+    GGML_API int64_t ggml_cycles(void);
+    GGML_API int64_t ggml_cycles_per_ms(void);
 
     // accepts a UTF-8 path, even on Windows
-    WSP_GGML_API FILE *  wsp_ggml_fopen(const char * fname, const char * mode);
+    GGML_API FILE *  ggml_fopen(const char * fname, const char * mode);
 
-    WSP_GGML_API void    wsp_ggml_print_object (const struct wsp_ggml_object * obj);
-    WSP_GGML_API void    wsp_ggml_print_objects(const struct wsp_ggml_context * ctx);
+    GGML_API void    ggml_print_object (const struct ggml_object * obj);
+    GGML_API void    ggml_print_objects(const struct ggml_context * ctx);
 
-    WSP_GGML_API int64_t wsp_ggml_nelements (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API int64_t wsp_ggml_nrows     (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API size_t  wsp_ggml_nbytes    (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API size_t  wsp_ggml_nbytes_pad(const struct wsp_ggml_tensor * tensor); // same as wsp_ggml_nbytes() but padded to WSP_GGML_MEM_ALIGN
+    GGML_API int64_t ggml_nelements (const struct ggml_tensor * tensor);
+    GGML_API int64_t ggml_nrows     (const struct ggml_tensor * tensor);
+    GGML_API size_t  ggml_nbytes    (const struct ggml_tensor * tensor);
+    GGML_API size_t  ggml_nbytes_pad(const struct ggml_tensor * tensor); // same as ggml_nbytes() but padded to GGML_MEM_ALIGN
 
-    WSP_GGML_API int64_t wsp_ggml_blck_size(enum wsp_ggml_type type);
-    WSP_GGML_API size_t  wsp_ggml_type_size(enum wsp_ggml_type type);             // size in bytes for all elements in a block
-    WSP_GGML_API size_t  wsp_ggml_row_size (enum wsp_ggml_type type, int64_t ne); // size in bytes for all elements in a row
+    GGML_API int64_t ggml_blck_size(enum ggml_type type);
+    GGML_API size_t  ggml_type_size(enum ggml_type type);             // size in bytes for all elements in a block
+    GGML_API size_t  ggml_row_size (enum ggml_type type, int64_t ne); // size in bytes for all elements in a row
 
-    WSP_GGML_DEPRECATED(
-    WSP_GGML_API double wsp_ggml_type_sizef(enum wsp_ggml_type type), // wsp_ggml_type_size()/wsp_ggml_blck_size() as float
-    "use wsp_ggml_row_size() instead");
+    GGML_DEPRECATED(
+    GGML_API double ggml_type_sizef(enum ggml_type type), // ggml_type_size()/ggml_blck_size() as float
+    "use ggml_row_size() instead");
 
-    WSP_GGML_API const char * wsp_ggml_type_name(enum wsp_ggml_type type);
-    WSP_GGML_API const char * wsp_ggml_op_name  (enum wsp_ggml_op   op);
-    WSP_GGML_API const char * wsp_ggml_op_symbol(enum wsp_ggml_op   op);
+    GGML_API const char * ggml_type_name(enum ggml_type type);
+    GGML_API const char * ggml_op_name  (enum ggml_op   op);
+    GGML_API const char * ggml_op_symbol(enum ggml_op   op);
 
-    WSP_GGML_API const char * wsp_ggml_unary_op_name(enum wsp_ggml_unary_op op);
-    WSP_GGML_API const char * wsp_ggml_glu_op_name(enum wsp_ggml_glu_op op);
-    WSP_GGML_API const char * wsp_ggml_op_desc(const struct wsp_ggml_tensor * t); // unary or op name
+    GGML_API const char * ggml_unary_op_name(enum ggml_unary_op op);
+    GGML_API const char * ggml_glu_op_name(enum ggml_glu_op op);
+    GGML_API const char * ggml_op_desc(const struct ggml_tensor * t); // unary or op name
 
-    WSP_GGML_API size_t  wsp_ggml_element_size(const struct wsp_ggml_tensor * tensor);
+    GGML_API size_t  ggml_element_size(const struct ggml_tensor * tensor);
 
-    WSP_GGML_API bool    wsp_ggml_is_quantized(enum wsp_ggml_type type);
+    GGML_API bool    ggml_is_quantized(enum ggml_type type);
 
     // TODO: temporary until model loading of ggml examples is refactored
-    WSP_GGML_API enum wsp_ggml_type wsp_ggml_ftype_to_wsp_ggml_type(enum wsp_ggml_ftype ftype);
+    GGML_API enum ggml_type ggml_ftype_to_ggml_type(enum ggml_ftype ftype);
 
-    WSP_GGML_API bool wsp_ggml_is_transposed(const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_permuted  (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_empty     (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_view      (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_scalar    (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_vector    (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_matrix    (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_3d        (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API int  wsp_ggml_n_dims       (const struct wsp_ggml_tensor * tensor); // returns 1 for scalars
+    GGML_API bool ggml_is_transposed(const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_permuted  (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_empty     (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_view      (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_scalar    (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_vector    (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_matrix    (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_3d        (const struct ggml_tensor * tensor);
+    GGML_API int  ggml_n_dims       (const struct ggml_tensor * tensor); // returns 1 for scalars
 
     // returns whether the tensor elements can be iterated over with a flattened index (no gaps, no permutation)
-    WSP_GGML_API bool wsp_ggml_is_contiguous  (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API bool wsp_ggml_is_contiguous_0(const struct wsp_ggml_tensor * tensor); // same as wsp_ggml_is_contiguous()
-    WSP_GGML_API bool wsp_ggml_is_contiguous_1(const struct wsp_ggml_tensor * tensor); // contiguous for dims >= 1
-    WSP_GGML_API bool wsp_ggml_is_contiguous_2(const struct wsp_ggml_tensor * tensor); // contiguous for dims >= 2
+    GGML_API bool ggml_is_contiguous  (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_contiguous_0(const struct ggml_tensor * tensor); // same as ggml_is_contiguous()
+    GGML_API bool ggml_is_contiguous_1(const struct ggml_tensor * tensor); // contiguous for dims >= 1
+    GGML_API bool ggml_is_contiguous_2(const struct ggml_tensor * tensor); // contiguous for dims >= 2
 
-    WSP_GGML_API bool wsp_ggml_is_contiguous_to_1(const struct wsp_ggml_tensor * tensor); // contiguous for dims < 1
-    WSP_GGML_API bool wsp_ggml_is_contiguous_to_2(const struct wsp_ggml_tensor * tensor); // contiguous for dims < 2
-    WSP_GGML_API bool wsp_ggml_is_contiguous_to_3(const struct wsp_ggml_tensor * tensor); // contiguous for dims < 3
+    GGML_API bool ggml_is_contiguous_to_1(const struct ggml_tensor * tensor); // contiguous for dims < 1
+    GGML_API bool ggml_is_contiguous_to_2(const struct ggml_tensor * tensor); // contiguous for dims < 2
+    GGML_API bool ggml_is_contiguous_to_3(const struct ggml_tensor * tensor); // contiguous for dims < 3
 
     // returns whether the tensor elements are allocated as one contiguous block of memory (no gaps, but permutation ok)
-    WSP_GGML_API bool wsp_ggml_is_contiguously_allocated(const struct wsp_ggml_tensor * tensor);
+    GGML_API bool ggml_is_contiguously_allocated(const struct ggml_tensor * tensor);
 
     // true for tensor that is stored in memory as CxWxHxN and has been permuted to WxHxCxN
-    WSP_GGML_API bool wsp_ggml_is_contiguous_channels(const struct wsp_ggml_tensor * tensor);
+    GGML_API bool ggml_is_contiguous_channels(const struct ggml_tensor * tensor);
 
     // true if the elements in dimension 0 are contiguous, or there is just 1 block of elements
-    WSP_GGML_API bool wsp_ggml_is_contiguous_rows(const struct wsp_ggml_tensor * tensor);
+    GGML_API bool ggml_is_contiguous_rows(const struct ggml_tensor * tensor);
 
-    WSP_GGML_API bool wsp_ggml_are_same_shape (const struct wsp_ggml_tensor * t0, const struct wsp_ggml_tensor * t1);
-    WSP_GGML_API bool wsp_ggml_are_same_stride(const struct wsp_ggml_tensor * t0, const struct wsp_ggml_tensor * t1);
+    GGML_API bool ggml_are_same_shape (const struct ggml_tensor * t0, const struct ggml_tensor * t1);
+    GGML_API bool ggml_are_same_stride(const struct ggml_tensor * t0, const struct ggml_tensor * t1);
 
-    WSP_GGML_API bool wsp_ggml_can_repeat(const struct wsp_ggml_tensor * t0, const struct wsp_ggml_tensor * t1);
+    GGML_API bool ggml_can_repeat(const struct ggml_tensor * t0, const struct ggml_tensor * t1);
 
     // use this to compute the memory overhead of a tensor
-    WSP_GGML_API size_t wsp_ggml_tensor_overhead(void);
+    GGML_API size_t ggml_tensor_overhead(void);
 
-    WSP_GGML_API bool wsp_ggml_validate_row_data(enum wsp_ggml_type type, const void * data, size_t nbytes);
+    GGML_API bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbytes);
 
     // main
 
-    WSP_GGML_API struct wsp_ggml_context * wsp_ggml_init (struct wsp_ggml_init_params params);
-    WSP_GGML_API void                  wsp_ggml_reset(struct wsp_ggml_context * ctx);
-    WSP_GGML_API void                  wsp_ggml_free (struct wsp_ggml_context * ctx);
+    GGML_API struct ggml_context * ggml_init (struct ggml_init_params params);
+    GGML_API void                  ggml_reset(struct ggml_context * ctx);
+    GGML_API void                  ggml_free (struct ggml_context * ctx);
 
-    WSP_GGML_API size_t  wsp_ggml_used_mem(const struct wsp_ggml_context * ctx);
+    GGML_API size_t  ggml_used_mem(const struct ggml_context * ctx);
 
-    WSP_GGML_API bool    wsp_ggml_get_no_alloc(struct wsp_ggml_context * ctx);
-    WSP_GGML_API void    wsp_ggml_set_no_alloc(struct wsp_ggml_context * ctx, bool no_alloc);
+    GGML_API bool    ggml_get_no_alloc(struct ggml_context * ctx);
+    GGML_API void    ggml_set_no_alloc(struct ggml_context * ctx, bool no_alloc);
 
-    WSP_GGML_API void *  wsp_ggml_get_mem_buffer     (const struct wsp_ggml_context * ctx);
-    WSP_GGML_API size_t  wsp_ggml_get_mem_size       (const struct wsp_ggml_context * ctx);
-    WSP_GGML_API size_t  wsp_ggml_get_max_tensor_size(const struct wsp_ggml_context * ctx);
+    GGML_API void *  ggml_get_mem_buffer     (const struct ggml_context * ctx);
+    GGML_API size_t  ggml_get_mem_size       (const struct ggml_context * ctx);
+    GGML_API size_t  ggml_get_max_tensor_size(const struct ggml_context * ctx);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_new_tensor(
-            struct wsp_ggml_context * ctx,
-            enum   wsp_ggml_type type,
+    GGML_API struct ggml_tensor * ggml_new_tensor(
+            struct ggml_context * ctx,
+            enum   ggml_type type,
             int    n_dims,
             const int64_t *ne);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_new_tensor_1d(
-            struct wsp_ggml_context * ctx,
-            enum   wsp_ggml_type type,
+    GGML_API struct ggml_tensor * ggml_new_tensor_1d(
+            struct ggml_context * ctx,
+            enum   ggml_type type,
             int64_t ne0);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_new_tensor_2d(
-            struct wsp_ggml_context * ctx,
-            enum   wsp_ggml_type type,
+    GGML_API struct ggml_tensor * ggml_new_tensor_2d(
+            struct ggml_context * ctx,
+            enum   ggml_type type,
             int64_t ne0,
             int64_t ne1);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_new_tensor_3d(
-            struct wsp_ggml_context * ctx,
-            enum   wsp_ggml_type type,
+    GGML_API struct ggml_tensor * ggml_new_tensor_3d(
+            struct ggml_context * ctx,
+            enum   ggml_type type,
             int64_t ne0,
             int64_t ne1,
             int64_t ne2);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_new_tensor_4d(
-            struct wsp_ggml_context * ctx,
-            enum   wsp_ggml_type type,
+    GGML_API struct ggml_tensor * ggml_new_tensor_4d(
+            struct ggml_context * ctx,
+            enum   ggml_type type,
             int64_t ne0,
             int64_t ne1,
             int64_t ne2,
             int64_t ne3);
 
-    WSP_GGML_API void * wsp_ggml_new_buffer(struct wsp_ggml_context * ctx, size_t nbytes);
+    GGML_API void * ggml_new_buffer(struct ggml_context * ctx, size_t nbytes);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_dup_tensor (struct wsp_ggml_context * ctx, const struct wsp_ggml_tensor * src);
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_view_tensor(struct wsp_ggml_context * ctx, struct wsp_ggml_tensor * src);
+    GGML_API struct ggml_tensor * ggml_dup_tensor (struct ggml_context * ctx, const struct ggml_tensor * src);
+    GGML_API struct ggml_tensor * ggml_view_tensor(struct ggml_context * ctx, struct ggml_tensor * src);
 
     // Context tensor enumeration and lookup
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_first_tensor(const struct wsp_ggml_context * ctx);
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_next_tensor (const struct wsp_ggml_context * ctx, struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_tensor(struct wsp_ggml_context * ctx, const char * name);
+    GGML_API struct ggml_tensor * ggml_get_first_tensor(const struct ggml_context * ctx);
+    GGML_API struct ggml_tensor * ggml_get_next_tensor (const struct ggml_context * ctx, struct ggml_tensor * tensor);
+    GGML_API struct ggml_tensor * ggml_get_tensor(struct ggml_context * ctx, const char * name);
 
     // Converts a flat index into coordinates
-    WSP_GGML_API void wsp_ggml_unravel_index(const struct wsp_ggml_tensor * tensor, int64_t i, int64_t * i0, int64_t * i1, int64_t * i2, int64_t * i3);
+    GGML_API void ggml_unravel_index(const struct ggml_tensor * tensor, int64_t i, int64_t * i0, int64_t * i1, int64_t * i2, int64_t * i3);
 
-    WSP_GGML_API enum wsp_ggml_unary_op wsp_ggml_get_unary_op(const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API enum wsp_ggml_glu_op wsp_ggml_get_glu_op(const struct wsp_ggml_tensor * tensor);
+    GGML_API enum ggml_unary_op ggml_get_unary_op(const struct ggml_tensor * tensor);
+    GGML_API enum ggml_glu_op ggml_get_glu_op(const struct ggml_tensor * tensor);
 
-    WSP_GGML_API void *  wsp_ggml_get_data    (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API float * wsp_ggml_get_data_f32(const struct wsp_ggml_tensor * tensor);
+    GGML_API void *  ggml_get_data    (const struct ggml_tensor * tensor);
+    GGML_API float * ggml_get_data_f32(const struct ggml_tensor * tensor);
 
-    WSP_GGML_API const char *         wsp_ggml_get_name   (const struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_name   (      struct wsp_ggml_tensor * tensor, const char * name);
-    WSP_GGML_ATTRIBUTE_FORMAT(2, 3)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_format_name(      struct wsp_ggml_tensor * tensor, const char * fmt, ...);
+    GGML_API const char *         ggml_get_name   (const struct ggml_tensor * tensor);
+    GGML_API struct ggml_tensor * ggml_set_name   (      struct ggml_tensor * tensor, const char * name);
+    GGML_ATTRIBUTE_FORMAT(2, 3)
+    GGML_API struct ggml_tensor * ggml_format_name(      struct ggml_tensor * tensor, const char * fmt, ...);
 
     // Tensor flags
-    WSP_GGML_API void wsp_ggml_set_input(struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API void wsp_ggml_set_output(struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API void wsp_ggml_set_param(struct wsp_ggml_tensor * tensor);
-    WSP_GGML_API void wsp_ggml_set_loss(struct wsp_ggml_tensor * tensor);
+    GGML_API void ggml_set_input(struct ggml_tensor * tensor);
+    GGML_API void ggml_set_output(struct ggml_tensor * tensor);
+    GGML_API void ggml_set_param(struct ggml_tensor * tensor);
+    GGML_API void ggml_set_loss(struct ggml_tensor * tensor);
 
     //
     // operations on tensors with backpropagation
     //
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_dup(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_dup(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_dup_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_dup_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_add(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_add_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add_cast(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            enum   wsp_ggml_type      type);
+    GGML_API struct ggml_tensor * ggml_add_cast(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            enum   ggml_type      type);
 
     // dst[i0, i1, i2] = a[i0, i1, i2] + b[i0, ids[i1, i2]]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add_id(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * ids);
+    GGML_API struct ggml_tensor * ggml_add_id(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * ids);
 
-    WSP_GGML_DEPRECATED(WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add1(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b),
-        "use wsp_ggml_add instead");
+    GGML_DEPRECATED(GGML_API struct ggml_tensor * ggml_add1(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b),
+        "use ggml_add instead");
 
-    WSP_GGML_DEPRECATED(WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add1_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b),
-        "use wsp_ggml_add_inplace instead");
+    GGML_DEPRECATED(GGML_API struct ggml_tensor * ggml_add1_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b),
+        "use ggml_add_inplace instead");
 
     // dst = a
     // view(dst, nb1, nb2, nb3, offset) += b
     // return dst
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_acc(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_acc(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                nb1,
             size_t                nb2,
             size_t                nb3,
             size_t                offset);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_acc_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_acc_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                nb1,
             size_t                nb2,
             size_t                nb3,
             size_t                offset);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sub(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_sub(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sub_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_sub_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mul(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_mul(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mul_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_mul_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_div(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_div(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_div_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_div_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sqr(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sqr(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sqr_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sqr_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sqrt(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sqrt(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sqrt_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sqrt_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_log(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_log(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_log_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_log_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_expm1(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_expm1(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_expm1_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_expm1_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_softplus(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_softplus(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_softplus_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_softplus_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sin(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sin(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sin_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sin_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cos(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_cos(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cos_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_cos_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // return scalar
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sum(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sum(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // sums along rows, with input shape [a,b,c,d] return shape [1,b,c,d]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sum_rows(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sum_rows(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cumsum(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_cumsum(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a);
 
     // mean along rows
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mean(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_mean(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // argmax along rows
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_argmax(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_argmax(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // count number of equal elements in a and b
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_count_equal(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_count_equal(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // if a is the same shape as b, and a is not parameter, return a
     // otherwise, return a new tensor: repeat(a) to fit in b
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_repeat(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_repeat(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // repeat a to the specified shape
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_repeat_4d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_repeat_4d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
                        int64_t    ne0,
                        int64_t    ne1,
                        int64_t    ne2,
                        int64_t    ne3);
 
     // sums repetitions in a into shape of b
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_repeat_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b); // sum up values that are adjacent in dims > 0 instead of repeated with same stride
+    GGML_API struct ggml_tensor * ggml_repeat_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b); // sum up values that are adjacent in dims > 0 instead of repeated with same stride
 
     // concat a and b along dim
     // used in stable-diffusion
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_concat(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_concat(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   dim);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_abs(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_abs(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_abs_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_abs_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sgn(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sgn(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sgn_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sgn_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_neg(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_neg(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_neg_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_neg_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_step(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_step(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_step_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_step_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_tanh(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_tanh(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_tanh_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_tanh_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_elu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_elu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_elu_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_elu_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_relu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_relu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_leaky_relu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a, float negative_slope, bool inplace);
+    GGML_API struct ggml_tensor * ggml_leaky_relu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a, float negative_slope, bool inplace);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_relu_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_relu_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sigmoid(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sigmoid(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_sigmoid_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_sigmoid_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_gelu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_gelu_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // GELU using erf (error function) when possible
     // some backends may fallback to approximation based on Abramowitz and Stegun formula
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu_erf(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_gelu_erf(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu_erf_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_gelu_erf_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu_quick(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_gelu_quick(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gelu_quick_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_gelu_quick_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_silu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_silu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_silu_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_silu_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // a - dy
     // b - x
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_silu_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_silu_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // hardswish(x) = x * relu6(x + 3) / 6
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_hardswish(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_hardswish(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // hardsigmoid(x) = relu6(x + 3) / 6
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_hardsigmoid(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_hardsigmoid(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_exp(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_exp(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_exp_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_exp_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_floor(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_floor(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_floor_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_floor_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_ceil(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_ceil(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_ceil_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_ceil_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_round(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_round(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_round_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_round_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
      /**
      * Truncates the fractional part of each element in the tensor (towards zero).
@@ -1255,13 +1255,13 @@ extern "C" {
      * Similar to std::trunc in C/C++.
      */
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_trunc(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_trunc(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_trunc_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_trunc_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
 
 
@@ -1269,9 +1269,9 @@ extern "C" {
     // x = x * (c_a(alpha_n) + c_b(alpha_p, beta) * sigmoid(beta * x)) + eps * (x > 0)
     // where c_a = softplus and c_b(a, b) = softplus(a) + b are constraining functions
     // that constrain the positive and negative source alpha values respectively
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_xielu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_xielu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float alpha_n,
             float alpha_p,
             float beta,
@@ -1281,296 +1281,296 @@ extern "C" {
     // A: n columns, r rows,
     // result is n / 2 columns, r rows,
     // expects gate in second half of row, unless swapped is true
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_glu(
-            struct wsp_ggml_context * ctx,
-             struct wsp_ggml_tensor * a,
-             enum wsp_ggml_glu_op     op,
+    GGML_API struct ggml_tensor * ggml_glu(
+            struct ggml_context * ctx,
+             struct ggml_tensor * a,
+             enum ggml_glu_op     op,
              bool                 swapped);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reglu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_reglu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reglu_swapped(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_reglu_swapped(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_geglu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_swapped(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_geglu_swapped(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_swiglu(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_swiglu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_swiglu_swapped(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_swiglu_swapped(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_erf(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_geglu_erf(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_erf_swapped(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_geglu_erf_swapped(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_quick(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_geglu_quick(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_quick_swapped(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_geglu_quick_swapped(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // A: n columns, r rows,
     // B: n columns, r rows,
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_glu_split(
-            struct wsp_ggml_context * ctx,
-             struct wsp_ggml_tensor * a,
-             struct wsp_ggml_tensor * b,
-             enum wsp_ggml_glu_op     op);
+    GGML_API struct ggml_tensor * ggml_glu_split(
+            struct ggml_context * ctx,
+             struct ggml_tensor * a,
+             struct ggml_tensor * b,
+             enum ggml_glu_op     op);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reglu_split(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_reglu_split(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_split(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_geglu_split(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_swiglu_split(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_swiglu_split(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_erf_split(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_geglu_erf_split(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_geglu_quick_split(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_geglu_quick_split(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_swiglu_oai(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_swiglu_oai(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             float                 alpha,
             float                 limit);
 
     // normalize along rows
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_norm(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_norm(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 eps);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_norm_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_norm_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 eps);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rms_norm(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_rms_norm(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 eps);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rms_norm_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_rms_norm_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 eps);
 
     // group normalize along ne0*ne1*n_groups
     // used in stable-diffusion
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_group_norm(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_group_norm(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   n_groups,
             float                 eps);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_group_norm_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_group_norm_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   n_groups,
             float                 eps);
 
     // l2 normalize along rows
     // used in rwkv v7
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_l2_norm(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_l2_norm(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 eps);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_l2_norm_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_l2_norm_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 eps);
 
     // a - x
     // b - dy
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rms_norm_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_rms_norm_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             float                 eps);
 
     // A: k columns, n rows => [ne03, ne02, n, k]
     // B: k columns, m rows  (i.e. we transpose it internally) => [ne03 * x, ne02 * y, m, k]
     // result is n columns, m rows => [ne03 * x, ne02 * y, m, n]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mul_mat(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_mul_mat(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // change the precision of a matrix multiplication
-    // set to WSP_GGML_PREC_F32 for higher precision (useful for phi-2)
-    WSP_GGML_API void wsp_ggml_mul_mat_set_prec(
-            struct wsp_ggml_tensor * a,
-            enum wsp_ggml_prec       prec);
+    // set to GGML_PREC_F32 for higher precision (useful for phi-2)
+    GGML_API void ggml_mul_mat_set_prec(
+            struct ggml_tensor * a,
+            enum ggml_prec       prec);
 
     // change the hint of a matrix multiplication
-    WSP_GGML_API void wsp_ggml_mul_mat_set_hint(
-            struct wsp_ggml_tensor * a,
-            enum wsp_ggml_op_hint    hint);
+    GGML_API void ggml_mul_mat_set_hint(
+            struct ggml_tensor * a,
+            enum ggml_op_hint    hint);
 
     // indirect matrix multiplication
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_mul_mat_id(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * as,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * ids);
+    GGML_API struct ggml_tensor * ggml_mul_mat_id(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * as,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * ids);
 
     // A: m columns, n rows,
     // B: p columns, n rows,
     // result is m columns, p rows
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_out_prod(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_out_prod(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     //
     // operations on tensors without backpropagation
     //
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_scale(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_scale(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 s);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_scale_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_scale_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 s);
 
     // x = s * a + b
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_scale_bias(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_scale_bias(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
         float                 s,
         float                 b);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_scale_bias_inplace(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_scale_bias_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
         float                 s,
         float                 b);
 
     // b -> view(a,offset,nb1,nb2,3), return modified a
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_set(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                nb1,
             size_t                nb2,
             size_t                nb3,
             size_t                offset); // in bytes
 
     // b -> view(a,offset,nb1,nb2,3), return view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_set_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                nb1,
             size_t                nb2,
             size_t                nb3,
             size_t                offset); // in bytes
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_set_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                offset); // in bytes
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_1d_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_set_1d_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                offset); // in bytes
 
     // b -> view(a,offset,nb1,nb2,3), return modified a
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_2d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_set_2d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                nb1,
             size_t                offset); // in bytes
 
     // b -> view(a,offset,nb1,nb2,3), return view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_2d_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_set_2d_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             size_t                nb1,
             size_t                offset); // in bytes
 
     // a -> b, return view(b)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cpy(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_cpy(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // note: casting from f32 to i32 will discard the fractional part
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cast(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            enum   wsp_ggml_type      type);
+    GGML_API struct ggml_tensor * ggml_cast(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            enum   ggml_type      type);
 
     // make contiguous
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cont(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_cont(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // make contiguous, with new shape
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cont_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_cont_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cont_2d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_cont_2d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cont_3d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_cont_3d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cont_4d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_cont_4d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2,
@@ -1578,59 +1578,59 @@ extern "C" {
 
     // return view(a), b specifies the new shape
     // TODO: when we start computing gradient, make a copy instead of view
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reshape(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_reshape(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // return view(a)
     // TODO: when we start computing gradient, make a copy instead of view
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reshape_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_reshape_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reshape_2d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_reshape_2d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1);
 
     // return view(a)
     // TODO: when we start computing gradient, make a copy instead of view
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reshape_3d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_reshape_3d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_reshape_4d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_reshape_4d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2,
             int64_t               ne3);
 
     // offset in bytes
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_view_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_view_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             size_t                offset);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_view_2d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_view_2d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             size_t                nb1, // row stride in bytes
             size_t                offset);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_view_3d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_view_3d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2,
@@ -1638,9 +1638,9 @@ extern "C" {
             size_t                nb2, // slice stride in bytes
             size_t                offset);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_view_4d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_view_4d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2,
@@ -1650,34 +1650,34 @@ extern "C" {
             size_t                nb3,
             size_t                offset);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_permute(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_permute(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   axis0,
             int                   axis1,
             int                   axis2,
             int                   axis3);
 
-    // alias for wsp_ggml_permute(ctx, a, 1, 0, 2, 3)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_transpose(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    // alias for ggml_permute(ctx, a, 1, 0, 2, 3)
+    GGML_API struct ggml_tensor * ggml_transpose(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // supports 4D a:
     // a     [n_embd, ne1, ne2, ne3]
     // b I32 [n_rows, ne2, ne3, 1]
     //
     // return [n_embd, n_rows, ne2, ne3]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_rows(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // data
-            struct wsp_ggml_tensor  * b); // row indices
+    GGML_API struct ggml_tensor * ggml_get_rows(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // data
+            struct ggml_tensor  * b); // row indices
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_rows_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // gradients of wsp_ggml_get_rows result
-            struct wsp_ggml_tensor  * b,  // row indices
-            struct wsp_ggml_tensor  * c); // data for wsp_ggml_get_rows, only used for its shape
+    GGML_API struct ggml_tensor * ggml_get_rows_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // gradients of ggml_get_rows result
+            struct ggml_tensor  * b,  // row indices
+            struct ggml_tensor  * c); // data for ggml_get_rows, only used for its shape
 
     // a TD  [n_embd, ne1,    ne2,    ne3]
     // b TS  [n_embd, n_rows, ne02,   ne03] | ne02 == ne2, ne03 == ne3
@@ -1690,61 +1690,61 @@ extern "C" {
     //   ne3 % ne12 == 0
     //
     // return view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_rows(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // destination
-            struct wsp_ggml_tensor  * b,  // source
-            struct wsp_ggml_tensor  * c); // row indices
+    GGML_API struct ggml_tensor * ggml_set_rows(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // destination
+            struct ggml_tensor  * b,  // source
+            struct ggml_tensor  * c); // row indices
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_diag(
-        struct wsp_ggml_context     * ctx,
-        struct wsp_ggml_tensor      * a);
+    GGML_API struct ggml_tensor * ggml_diag(
+        struct ggml_context     * ctx,
+        struct ggml_tensor      * a);
 
     // set elements above the diagonal to -INF
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_diag_mask_inf(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_diag_mask_inf(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   n_past);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_diag_mask_inf_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_diag_mask_inf_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   n_past);
 
     // set elements above the diagonal to 0
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_diag_mask_zero(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_diag_mask_zero(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   n_past);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_diag_mask_zero_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_diag_mask_zero_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   n_past);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_clamp(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_clamp(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 min,
             float                 max);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_clamp_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_clamp_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 min,
             float                 max);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_soft_max(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a);
+    GGML_API struct ggml_tensor * ggml_soft_max_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
     // a    [ne0, ne01, ne02, ne03]
     // mask [ne0, ne11, ne12, ne13] | ne11 >= ne01, F16 or F32, optional
@@ -1755,56 +1755,56 @@ extern "C" {
     //
     // fused soft_max(a*scale + mask*(ALiBi slope))
     // max_bias = 0.0f for no ALiBi
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_ext(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * mask,
+    GGML_API struct ggml_tensor * ggml_soft_max_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * mask,
             float                 scale,
             float                 max_bias);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_ext_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * mask,
+    GGML_API struct ggml_tensor * ggml_soft_max_ext_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * mask,
             float                 scale,
             float                 max_bias);
 
-    WSP_GGML_API void wsp_ggml_soft_max_add_sinks(
-            struct wsp_ggml_tensor * a,
-            struct wsp_ggml_tensor * sinks);
+    GGML_API void ggml_soft_max_add_sinks(
+            struct ggml_tensor * a,
+            struct ggml_tensor * sinks);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_ext_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_soft_max_ext_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             float                 scale,
             float                 max_bias);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_soft_max_ext_back_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_soft_max_ext_back_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             float                 scale,
             float                 max_bias);
 
     // rotary position embedding
     // if (mode & 1) - skip n_past elements (NOT SUPPORTED)
-    // if (mode & WSP_GGML_ROPE_TYPE_NEOX) - GPT-NeoX style
+    // if (mode & GGML_ROPE_TYPE_NEOX) - GPT-NeoX style
     //
     // b is an int32 vector with size a->ne[2], it contains the positions
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_rope(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   n_dims,
             int                   mode);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_rope_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   n_dims,
             int                   mode);
 
@@ -1812,7 +1812,7 @@ extern "C" {
     // a is the input tensor to apply RoPE to, shape [n_embd, n_head, n_token]
     // b is an int32 vector with size n_token
     // c is freq factors (e.g. phi3-128k), (optional)
-    // mode can be WSP_GGML_ROPE_TYPE_NORMAL or NEOX; for MROPE and VISION mode, use wsp_ggml_rope_multi
+    // mode can be GGML_ROPE_TYPE_NORMAL or NEOX; for MROPE and VISION mode, use ggml_rope_multi
     //
     // pseudo-code for computing theta:
     //   for i in [0, n_dims/2):
@@ -1830,15 +1830,15 @@ extern "C" {
     // example:
     //   (marking: c = cos, s = sin, 0 = unrotated)
     //   given a single head with size = 8 --> [00000000]
-    //   WSP_GGML_ROPE_TYPE_NORMAL  n_dims = 4 --> [cscs0000]
-    //   WSP_GGML_ROPE_TYPE_NORMAL  n_dims = 8 --> [cscscscs]
-    //   WSP_GGML_ROPE_TYPE_NEOX    n_dims = 4 --> [ccss0000]
-    //   WSP_GGML_ROPE_TYPE_NEOX    n_dims = 8 --> [ccccssss]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_ext(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * c,
+    //   GGML_ROPE_TYPE_NORMAL  n_dims = 4 --> [cscs0000]
+    //   GGML_ROPE_TYPE_NORMAL  n_dims = 8 --> [cscscscs]
+    //   GGML_ROPE_TYPE_NEOX    n_dims = 4 --> [ccss0000]
+    //   GGML_ROPE_TYPE_NEOX    n_dims = 8 --> [ccccssss]
+    GGML_API struct ggml_tensor * ggml_rope_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * c,
             int                   n_dims,
             int                   mode,
             int                   n_ctx_orig,
@@ -1855,37 +1855,37 @@ extern "C" {
     //   section length is equivalent to number of cos/sin pairs, NOT the number of dims
     //   (i.e. sum of 4 sections are expected to be n_dims/2)
     //   last sections can be 0, means ignored
-    // all other options are identical to wsp_ggml_rope_ext
+    // all other options are identical to ggml_rope_ext
     //
     // important note:
     //   - NEOX ordering is automatically applied and cannot be disabled for MROPE and VISION
     //     if you need normal ordering, there are 2 methods:
-    //     (1) split the tensor manually using wsp_ggml_view
+    //     (1) split the tensor manually using ggml_view
     //     (2) permute the weight upon conversion
     //   - for VISION, n_dims must be head_size/2
     //
     // example M-RoPE:
     //  given sections = [t=4, y=2, x=2, 0]
     //  given a single head with size = 18 --> [000000000000000000]
-    //  WSP_GGML_ROPE_TYPE_MROPE   n_dims = 16 --> [ttttyyxxttttyyxx00] (cos/sin are applied in NEOX ordering)
-    //  WSP_GGML_ROPE_TYPE_IMROPE  n_dims = 16 --> [ttyxttyxttyxttyx00] (interleaved M-RoPE, still NEOX ordering)
-    //  note: the theta for each dim is computed the same way as wsp_ggml_rope_ext, no matter the section
+    //  GGML_ROPE_TYPE_MROPE   n_dims = 16 --> [ttttyyxxttttyyxx00] (cos/sin are applied in NEOX ordering)
+    //  GGML_ROPE_TYPE_IMROPE  n_dims = 16 --> [ttyxttyxttyxttyx00] (interleaved M-RoPE, still NEOX ordering)
+    //  note: the theta for each dim is computed the same way as ggml_rope_ext, no matter the section
     //        in other words, idx used for theta: [0123456789... until n_dims/2], not reset for each section
     //
     // example vision RoPE:
     //  given sections = [y=4, x=4, 0, 0] (last 2 sections are ignored)
     //  given a single head with size = 8 --> [00000000]
-    //  WSP_GGML_ROPE_TYPE_VISION  n_dims = 4 --> [yyyyxxxx]
+    //  GGML_ROPE_TYPE_VISION  n_dims = 4 --> [yyyyxxxx]
     //  other values of n_dims are untested and is undefined behavior
     //  note: unlike MROPE, the theta for each dim is computed differently for each section
     //        in other words, idx used for theta: [0123] for y section, then [0123] for x section
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_multi(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * c,
+    GGML_API struct ggml_tensor * ggml_rope_multi(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * c,
             int                   n_dims,
-            int                   sections[WSP_GGML_MROPE_SECTIONS],
+            int                   sections[GGML_MROPE_SECTIONS],
             int                   mode,
             int                   n_ctx_orig,
             float                 freq_base,
@@ -1896,11 +1896,11 @@ extern "C" {
             float                 beta_slow);
 
     // in-place, returns view(a)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_ext_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * c,
+    GGML_API struct ggml_tensor * ggml_rope_ext_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * c,
             int                   n_dims,
             int                   mode,
             int                   n_ctx_orig,
@@ -1911,13 +1911,13 @@ extern "C" {
             float                 beta_fast,
             float                 beta_slow);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_multi_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * c,
+    GGML_API struct ggml_tensor * ggml_rope_multi_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * c,
             int                   n_dims,
-            int                   sections[WSP_GGML_MROPE_SECTIONS],
+            int                   sections[GGML_MROPE_SECTIONS],
             int                   mode,
             int                   n_ctx_orig,
             float                 freq_base,
@@ -1927,10 +1927,10 @@ extern "C" {
             float                 beta_fast,
             float                 beta_slow);
 
-    WSP_GGML_DEPRECATED(WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_custom(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_DEPRECATED(GGML_API struct ggml_tensor * ggml_rope_custom(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   n_dims,
             int                   mode,
             int                   n_ctx_orig,
@@ -1940,12 +1940,12 @@ extern "C" {
             float                 attn_factor,
             float                 beta_fast,
             float                 beta_slow),
-        "use wsp_ggml_rope_ext instead");
+        "use ggml_rope_ext instead");
 
-    WSP_GGML_DEPRECATED(WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_custom_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_DEPRECATED(GGML_API struct ggml_tensor * ggml_rope_custom_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   n_dims,
             int                   mode,
             int                   n_ctx_orig,
@@ -1955,19 +1955,19 @@ extern "C" {
             float                 attn_factor,
             float                 beta_fast,
             float                 beta_slow),
-        "use wsp_ggml_rope_ext_inplace instead");
+        "use ggml_rope_ext_inplace instead");
 
     // compute correction dims for YaRN RoPE scaling
-    WSP_GGML_API void wsp_ggml_rope_yarn_corr_dims(
+    GGML_API void ggml_rope_yarn_corr_dims(
         int n_dims, int n_ctx_orig, float freq_base, float beta_fast, float beta_slow, float dims[2]);
 
     // rotary position embedding backward, i.e compute dx from dy
     // a - dy
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_ext_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a, // gradients of wsp_ggml_rope result
-            struct wsp_ggml_tensor  * b, // positions
-            struct wsp_ggml_tensor  * c, // freq factors
+    GGML_API struct ggml_tensor * ggml_rope_ext_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a, // gradients of ggml_rope result
+            struct ggml_tensor  * b, // positions
+            struct ggml_tensor  * c, // freq factors
             int                   n_dims,
             int                   mode,
             int                   n_ctx_orig,
@@ -1978,11 +1978,11 @@ extern "C" {
             float                 beta_fast,
             float                 beta_slow);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_multi_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * c,
+    GGML_API struct ggml_tensor * ggml_rope_multi_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * c,
             int                   n_dims,
             int                   sections[4],
             int                   mode,
@@ -1995,20 +1995,20 @@ extern "C" {
             float                 beta_slow);
 
     // set the offset dims for RoPE
-    // a must be WSP_GGML_OP_ROPE or WSP_GGML_OP_ROPE_BACK
+    // a must be GGML_OP_ROPE or GGML_OP_ROPE_BACK
     // vision RoPE is not supported
     // example: (marking: x = rotated, 0 = unrotated)
     //     n_embd = 10, n_dims = 4, offset = 2 --> [00xxxx0000]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rope_set_offset(
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_rope_set_offset(
+            struct ggml_tensor  * a,
             int                   n_offs);
 
     // im2col
     // converts data into a format that effectively results in a convolution when combined with matrix multiplication
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_im2col(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // convolution kernel
-            struct wsp_ggml_tensor  * b,  // data
+    GGML_API struct ggml_tensor * ggml_im2col(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // convolution kernel
+            struct ggml_tensor  * b,  // data
             int                   s0, // stride dimension 0
             int                   s1, // stride dimension 1
             int                   p0, // padding dimension 0
@@ -2016,12 +2016,12 @@ extern "C" {
             int                   d0, // dilation dimension 0
             int                   d1, // dilation dimension 1
             bool                  is_2D,
-            enum wsp_ggml_type        dst_type);
+            enum ggml_type        dst_type);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_im2col_back(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,  // convolution kernel
-        struct wsp_ggml_tensor  * b,  // gradient of im2col output
+    GGML_API struct ggml_tensor * ggml_im2col_back(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,  // convolution kernel
+        struct ggml_tensor  * b,  // gradient of im2col output
         int64_t             * ne, // shape of im2col input
         int                   s0, // stride dimension 0
         int                   s1, // stride dimension 1
@@ -2034,59 +2034,59 @@ extern "C" {
     // col2im_1d: scatter-add GEMM columns back to 1D signal
     // a: [K*OC, T_in]  (columns from matmul, K = a->ne[0]/OC)
     // result: [T_out, OC]  where T_out = (T_in - 1)*s0 + K - 2*p0
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_col2im_1d(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,   // columns [K*OC, T_in]
+    GGML_API struct ggml_tensor * ggml_col2im_1d(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,   // columns [K*OC, T_in]
         int                   s0,  // stride
         int                   oc,  // output channels
         int                   p0); // padding to crop from both sides
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // convolution kernel
-            struct wsp_ggml_tensor  * b,   // data
+    GGML_API struct ggml_tensor * ggml_conv_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel
+            struct ggml_tensor  * b,   // data
             int                   s0,  // stride
             int                   p0,  // padding
             int                   d0); // dilation
 
     // conv_1d with padding = half
-    // alias for wsp_ggml_conv_1d(a, b, s, a->ne[0]/2, d)
-    WSP_GGML_API struct wsp_ggml_tensor* wsp_ggml_conv_1d_ph(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // convolution kernel
-            struct wsp_ggml_tensor  * b,  // data
+    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, d)
+    GGML_API struct ggml_tensor* ggml_conv_1d_ph(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // convolution kernel
+            struct ggml_tensor  * b,  // data
             int                   s,  // stride
             int                   d); // dilation
 
     // depthwise
     // TODO: this is very likely wrong for some cases! - needs more testing
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_1d_dw(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // convolution kernel
-            struct wsp_ggml_tensor  * b,   // data
+    GGML_API struct ggml_tensor * ggml_conv_1d_dw(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel
+            struct ggml_tensor  * b,   // data
             int                   s0,  // stride
             int                   p0,  // padding
             int                   d0); // dilation
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_1d_dw_ph(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // convolution kernel
-            struct wsp_ggml_tensor  * b,   // data
+    GGML_API struct ggml_tensor * ggml_conv_1d_dw_ph(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel
+            struct ggml_tensor  * b,   // data
             int                   s0,  // stride
             int                   d0); // dilation
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_transpose_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // convolution kernel
-            struct wsp_ggml_tensor  * b,   // data
+    GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel
+            struct ggml_tensor  * b,   // data
             int                   s0,  // stride
             int                   p0,  // padding
             int                   d0); // dilation
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_2d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // convolution kernel
-            struct wsp_ggml_tensor  * b,   // data
+    GGML_API struct ggml_tensor * ggml_conv_2d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel
+            struct ggml_tensor  * b,   // data
             int                   s0,  // stride dimension 0
             int                   s1,  // stride dimension 1
             int                   p0,  // padding dimension 0
@@ -2094,10 +2094,10 @@ extern "C" {
             int                   d0,  // dilation dimension 0
             int                   d1); // dilation dimension 1
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_im2col_3d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_im2col_3d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int64_t               IC,
             int                   s0, // stride width
             int                   s1, // stride height
@@ -2108,15 +2108,15 @@ extern "C" {
             int                   d0, // dilation width
             int                   d1, // dilation height
             int                   d2, // dilation depth
-            enum wsp_ggml_type        dst_type);
+            enum ggml_type        dst_type);
 
     // a: [OC*IC, KD, KH, KW]
     // b: [N*IC, ID, IH, IW]
     // result: [N*OC, OD, OH, OW]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_3d(
-                struct wsp_ggml_context * ctx,
-                struct wsp_ggml_tensor  * a,
-                struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_conv_3d(
+                struct ggml_context * ctx,
+                struct ggml_tensor  * a,
+                struct ggml_tensor  * b,
                 int64_t               IC,
                 int                   s0, // stride width
                 int                   s1, // stride height
@@ -2137,10 +2137,10 @@ extern "C" {
     // b:   1024 1024    3    1
     // res:   64   64  768    1
     // used in sam
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_2d_sk_p0(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_conv_2d_sk_p0(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // kernel size is a->ne[0] x a->ne[1]
     // stride is 1
@@ -2150,16 +2150,16 @@ extern "C" {
     // b:     64   64    256    1
     // res:   64   64    256    1
     // used in sam
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_2d_s1_ph(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b);
+    GGML_API struct ggml_tensor * ggml_conv_2d_s1_ph(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     // depthwise (via im2col and mul_mat)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_2d_dw(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // convolution kernel
-            struct wsp_ggml_tensor  * b,  // data
+    GGML_API struct ggml_tensor * ggml_conv_2d_dw(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // convolution kernel
+            struct ggml_tensor  * b,  // data
             int                  s0,  // stride dimension 0
             int                  s1,  // stride dimension 1
             int                  p0,  // padding dimension 0
@@ -2168,14 +2168,14 @@ extern "C" {
             int                  d1); // dilation dimension 1
 
     // Depthwise 2D convolution
-    // may be faster than wsp_ggml_conv_2d_dw, but not available in all backends
+    // may be faster than ggml_conv_2d_dw, but not available in all backends
     // a:   KW    KH    1    C    convolution kernel
     // b:   W     H     C    N    input data
     // res: W_out H_out C    N
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_2d_dw_direct(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_conv_2d_dw_direct(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   stride0,
             int                   stride1,
             int                   pad0,
@@ -2183,16 +2183,16 @@ extern "C" {
             int                   dilation0,
             int                   dilation1);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_transpose_2d_p0(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_conv_transpose_2d_p0(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
             int                   stride);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_2d_direct(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // convolution kernel [KW, KH, IC, OC]
-            struct wsp_ggml_tensor  * b,   // input data [W, H, C, N]
+    GGML_API struct ggml_tensor * ggml_conv_2d_direct(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel [KW, KH, IC, OC]
+            struct ggml_tensor  * b,   // input data [W, H, C, N]
             int                   s0,  // stride dimension 0
             int                   s1,  // stride dimension 1
             int                   p0,  // padding dimension 0
@@ -2200,10 +2200,10 @@ extern "C" {
             int                   d0,  // dilation dimension 0
             int                   d1); // dilation dimension 1
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_conv_3d_direct(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,   // kernel [KW, KH, KD, IC * OC]
-            struct wsp_ggml_tensor  * b,   // input  [W, H, D, C * N]
+    GGML_API struct ggml_tensor * ggml_conv_3d_direct(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // kernel [KW, KH, KD, IC * OC]
+            struct ggml_tensor  * b,   // input  [W, H, D, C * N]
             int                   s0,  // stride
             int                   s1,
             int                   s2,
@@ -2217,26 +2217,26 @@ extern "C" {
             int                   n_batch,
             int                   n_channels_out);
 
-    enum wsp_ggml_op_pool {
-        WSP_GGML_OP_POOL_MAX,
-        WSP_GGML_OP_POOL_AVG,
-        WSP_GGML_OP_POOL_COUNT,
+    enum ggml_op_pool {
+        GGML_OP_POOL_MAX,
+        GGML_OP_POOL_AVG,
+        GGML_OP_POOL_COUNT,
     };
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pool_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            enum wsp_ggml_op_pool     op,
+    GGML_API struct ggml_tensor * ggml_pool_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            enum ggml_op_pool     op,
             int                   k0, // kernel size
             int                   s0, // stride
             int                   p0); // padding
 
     // the result will have 2*p0 padding for the first dimension
     // and 2*p1 padding for the second dimension
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pool_2d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            enum wsp_ggml_op_pool     op,
+    GGML_API struct ggml_tensor * ggml_pool_2d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            enum ggml_op_pool     op,
             int                   k0,
             int                   k1,
             int                   s0,
@@ -2244,11 +2244,11 @@ extern "C" {
             float                 p0,
             float                 p1);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pool_2d_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * af, // "a"/input used in forward pass
-            enum wsp_ggml_op_pool     op,
+    GGML_API struct ggml_tensor * ggml_pool_2d_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * af, // "a"/input used in forward pass
+            enum ggml_op_pool     op,
             int                   k0,
             int                   k1,
             int                   s0,
@@ -2256,71 +2256,71 @@ extern "C" {
             float                 p0,
             float                 p1);
 
-    enum wsp_ggml_scale_mode {
-        WSP_GGML_SCALE_MODE_NEAREST  = 0,
-        WSP_GGML_SCALE_MODE_BILINEAR = 1,
-        WSP_GGML_SCALE_MODE_BICUBIC  = 2,
+    enum ggml_scale_mode {
+        GGML_SCALE_MODE_NEAREST  = 0,
+        GGML_SCALE_MODE_BILINEAR = 1,
+        GGML_SCALE_MODE_BICUBIC  = 2,
 
-        WSP_GGML_SCALE_MODE_COUNT
+        GGML_SCALE_MODE_COUNT
     };
 
-    enum wsp_ggml_scale_flag {
-        WSP_GGML_SCALE_FLAG_ALIGN_CORNERS = (1 << 8),
-        WSP_GGML_SCALE_FLAG_ANTIALIAS     = (1 << 9),
+    enum ggml_scale_flag {
+        GGML_SCALE_FLAG_ALIGN_CORNERS = (1 << 8),
+        GGML_SCALE_FLAG_ANTIALIAS     = (1 << 9),
     };
 
     // interpolate
     // multiplies ne0 and ne1 by scale factor
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_upscale(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_upscale(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   scale_factor,
-            enum wsp_ggml_scale_mode  mode);
+            enum ggml_scale_mode  mode);
 
     // interpolate
     // interpolate scale to specified dimensions
-    WSP_GGML_DEPRECATED(WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_upscale_ext(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_DEPRECATED(GGML_API struct ggml_tensor * ggml_upscale_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   ne0,
             int                   ne1,
             int                   ne2,
             int                   ne3,
-            enum wsp_ggml_scale_mode  mode),
-        "use wsp_ggml_interpolate instead");
+            enum ggml_scale_mode  mode),
+        "use ggml_interpolate instead");
 
     // Up- or downsamples the input to the specified size.
     // 2D scale modes (eg. bilinear) are applied to the first two dimensions.
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_interpolate(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_interpolate(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2,
             int64_t               ne3,
-            uint32_t              mode); // wsp_ggml_scale_mode [ | wsp_ggml_scale_flag...]
+            uint32_t              mode); // ggml_scale_mode [ | ggml_scale_flag...]
 
     // pad each dimension with zeros: [x, ..., x] -> [x, ..., x, 0, ..., 0]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_pad(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                  p0,
             int                  p1,
             int                  p2,
             int                  p3);
 
     // pad each dimension with values on the other side of the torus (looping around)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_circular(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_pad_circular(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   p0,
             int                   p1,
             int                   p2,
             int                   p3);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_ext(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_pad_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                  lp0,
             int                  rp0,
             int                  lp1,
@@ -2332,9 +2332,9 @@ extern "C" {
             );
 
     // pad each dimension with values on the other side of the torus (looping around)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_ext_circular(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_pad_ext_circular(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   lp0,
             int                   rp0,
             int                   lp1,
@@ -2345,17 +2345,17 @@ extern "C" {
             int                   rp3);
 
     // pad each dimension with reflection: [a, b, c, d] -> [b, a, b, c, d, c]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_pad_reflect_1d(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_pad_reflect_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   p0,
             int                   p1);
 
     // Move tensor elements by an offset given for each dimension. Elements that
     // are shifted beyond the last position are wrapped around to the beginning.
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_roll(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_roll(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   shift0,
             int                   shift1,
             int                   shift2,
@@ -2363,57 +2363,57 @@ extern "C" {
 
     // Convert matrix into a triangular one (upper, strict upper, lower or strict lower) by writing
     // zeroes everywhere outside the masked area
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_tri(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            enum wsp_ggml_tri_type    type);
+    GGML_API struct ggml_tensor * ggml_tri(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            enum ggml_tri_type    type);
 
     // Fill tensor a with constant c
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_fill(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_fill(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 c);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_fill_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_fill_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             float                 c);
 
     // Ref: https://github.com/CompVis/stable-diffusion/blob/main/ldm/modules/diffusionmodules/util.py#L151
     // timesteps: [N,]
     // return: [N, dim]
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_timestep_embedding(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * timesteps,
+    GGML_API struct ggml_tensor * ggml_timestep_embedding(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * timesteps,
             int                   dim,
             int                   max_period);
 
     // sort rows
-    enum wsp_ggml_sort_order {
-        WSP_GGML_SORT_ORDER_ASC,
-        WSP_GGML_SORT_ORDER_DESC,
+    enum ggml_sort_order {
+        GGML_SORT_ORDER_ASC,
+        GGML_SORT_ORDER_DESC,
     };
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_argsort(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            enum wsp_ggml_sort_order  order);
+    GGML_API struct ggml_tensor * ggml_argsort(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            enum ggml_sort_order  order);
 
-    // similar to wsp_ggml_top_k but implemented as `argsort` + `view`
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_argsort_top_k(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    // similar to ggml_top_k but implemented as `argsort` + `view`
+    GGML_API struct ggml_tensor * ggml_argsort_top_k(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   k);
 
     // top k elements per row
     // note: the resulting top k indices are in no particular order
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_top_k(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_top_k(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   k);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_arange(
-            struct wsp_ggml_context * ctx,
+    GGML_API struct ggml_tensor * ggml_arange(
+            struct ggml_context * ctx,
             float                 start,
             float                 stop,
             float                 step);
@@ -2429,50 +2429,50 @@ extern "C" {
     //   n_head % ne32      == 0
     //   ne3    % ne33      == 0
     //
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_flash_attn_ext(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * q,
-            struct wsp_ggml_tensor  * k,
-            struct wsp_ggml_tensor  * v,
-            struct wsp_ggml_tensor  * mask,
+    GGML_API struct ggml_tensor * ggml_flash_attn_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * q,
+            struct ggml_tensor  * k,
+            struct ggml_tensor  * v,
+            struct ggml_tensor  * mask,
             float                 scale,
             float                 max_bias,
             float                 logit_softcap);
 
-    WSP_GGML_API void wsp_ggml_flash_attn_ext_set_prec(
-            struct wsp_ggml_tensor * a,
-            enum wsp_ggml_prec       prec);
+    GGML_API void ggml_flash_attn_ext_set_prec(
+            struct ggml_tensor * a,
+            enum ggml_prec       prec);
 
-    WSP_GGML_API enum wsp_ggml_prec wsp_ggml_flash_attn_ext_get_prec(
-            const struct wsp_ggml_tensor * a);
+    GGML_API enum ggml_prec ggml_flash_attn_ext_get_prec(
+            const struct ggml_tensor * a);
 
-    WSP_GGML_API void wsp_ggml_flash_attn_ext_add_sinks(
-            struct wsp_ggml_tensor * a,
-            struct wsp_ggml_tensor * sinks);
+    GGML_API void ggml_flash_attn_ext_add_sinks(
+            struct ggml_tensor * a,
+            struct ggml_tensor * sinks);
 
-    // TODO: needs to be adapted to wsp_ggml_flash_attn_ext
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_flash_attn_back(
-           struct wsp_ggml_context * ctx,
-           struct wsp_ggml_tensor  * q,
-           struct wsp_ggml_tensor  * k,
-           struct wsp_ggml_tensor  * v,
-           struct wsp_ggml_tensor  * d,
+    // TODO: needs to be adapted to ggml_flash_attn_ext
+    GGML_API struct ggml_tensor * ggml_flash_attn_back(
+           struct ggml_context * ctx,
+           struct ggml_tensor  * q,
+           struct ggml_tensor  * k,
+           struct ggml_tensor  * v,
+           struct ggml_tensor  * d,
            bool                  masked);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_ssm_conv(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * sx,
-            struct wsp_ggml_tensor  * c);
+    GGML_API struct ggml_tensor * ggml_ssm_conv(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * sx,
+            struct ggml_tensor  * c);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_ssm_scan(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * s,
-            struct wsp_ggml_tensor  * x,
-            struct wsp_ggml_tensor  * dt,
-            struct wsp_ggml_tensor  * A,
-            struct wsp_ggml_tensor  * B,
-            struct wsp_ggml_tensor  * C,
-            struct wsp_ggml_tensor  * ids,
+    GGML_API struct ggml_tensor * ggml_ssm_scan(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * s,
+            struct ggml_tensor  * x,
+            struct ggml_tensor  * dt,
+            struct ggml_tensor  * A,
+            struct ggml_tensor  * B,
+            struct ggml_tensor  * C,
+            struct ggml_tensor  * ids,
             int64_t               K);
 
     // partition into non-overlapping windows with padding if needed
@@ -2481,77 +2481,77 @@ extern "C" {
     // w:    14
     // res: 768   14   14    25
     // used in sam
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_win_part(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_win_part(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   w);
 
-    // reverse of wsp_ggml_win_part
+    // reverse of ggml_win_part
     // used in sam
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_win_unpart(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_win_unpart(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   w0,
             int                   h0,
             int                   w);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_unary(
-            struct wsp_ggml_context * ctx,
-             struct wsp_ggml_tensor * a,
-             enum wsp_ggml_unary_op op);
+    GGML_API struct ggml_tensor * ggml_unary(
+            struct ggml_context * ctx,
+             struct ggml_tensor * a,
+             enum ggml_unary_op op);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_unary_inplace(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,
-        enum wsp_ggml_unary_op op);
+    GGML_API struct ggml_tensor * ggml_unary_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        enum ggml_unary_op op);
 
     // used in sam
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_get_rel_pos(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
+    GGML_API struct ggml_tensor * ggml_get_rel_pos(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
             int                   qh,
             int                   kh);
 
     // used in sam
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add_rel_pos(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * pw,
-            struct wsp_ggml_tensor  * ph);
+    GGML_API struct ggml_tensor * ggml_add_rel_pos(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * pw,
+            struct ggml_tensor  * ph);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_add_rel_pos_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * pw,
-            struct wsp_ggml_tensor  * ph);
+    GGML_API struct ggml_tensor * ggml_add_rel_pos_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * pw,
+            struct ggml_tensor  * ph);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rwkv_wkv6(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * k,
-            struct wsp_ggml_tensor  * v,
-            struct wsp_ggml_tensor  * r,
-            struct wsp_ggml_tensor  * tf,
-            struct wsp_ggml_tensor  * td,
-            struct wsp_ggml_tensor  * state);
+    GGML_API struct ggml_tensor * ggml_rwkv_wkv6(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * k,
+            struct ggml_tensor  * v,
+            struct ggml_tensor  * r,
+            struct ggml_tensor  * tf,
+            struct ggml_tensor  * td,
+            struct ggml_tensor  * state);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gated_linear_attn(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * k,
-            struct wsp_ggml_tensor  * v,
-            struct wsp_ggml_tensor  * q,
-            struct wsp_ggml_tensor  * g,
-            struct wsp_ggml_tensor  * state,
+    GGML_API struct ggml_tensor * ggml_gated_linear_attn(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * k,
+            struct ggml_tensor  * v,
+            struct ggml_tensor  * q,
+            struct ggml_tensor  * g,
+            struct ggml_tensor  * state,
             float scale);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_rwkv_wkv7(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * r,
-            struct wsp_ggml_tensor  * w,
-            struct wsp_ggml_tensor  * k,
-            struct wsp_ggml_tensor  * v,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * b,
-            struct wsp_ggml_tensor  * state);
+    GGML_API struct ggml_tensor * ggml_rwkv_wkv7(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * r,
+            struct ggml_tensor  * w,
+            struct ggml_tensor  * k,
+            struct ggml_tensor  * v,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            struct ggml_tensor  * state);
 
     /* Solves a specific equation of the form Ax=B, where A is a triangular matrix
     *  without zeroes on the diagonal (i.e. invertible).
@@ -2566,15 +2566,15 @@ extern "C" {
     *
     *  TODO: currently only lower, right, non-unitriangular variant is implemented
     */
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_solve_tri(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * a,
-        struct wsp_ggml_tensor  * b,
+    GGML_API struct ggml_tensor * ggml_solve_tri(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b,
         bool                  left,
         bool                  lower,
         bool                  uni);
 
-    // TODO: add wsp_ggml_gated_delta_net_set_bcast() to be able to configure Q, K broadcast type: tiled vs interleaved [TAG_WSP_GGML_GDN_BCAST]
+    // TODO: add ggml_gated_delta_net_set_bcast() to be able to configure Q, K broadcast type: tiled vs interleaved [TAG_GGML_GDN_BCAST]
     // ref: https://github.com/ggml-org/llama.cpp/pull/19468#discussion_r2786394306
     //
     // tensor shapes (S_k == S_v, H_v % H_k == 0):
@@ -2587,14 +2587,14 @@ extern "C" {
     // the output packs the attention scores [S_v, H_v, n_tokens, n_seqs] followed by K state
     // snapshots, most-recent first (slot 0 = final state, slot s = state s tokens back). K == 1
     // keeps only the final state; when n_tokens < K only slots 0..n_tokens-1 are written.
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_gated_delta_net(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * q,
-            struct wsp_ggml_tensor  * k,
-            struct wsp_ggml_tensor  * v,
-            struct wsp_ggml_tensor  * g,
-            struct wsp_ggml_tensor  * beta,
-            struct wsp_ggml_tensor  * state,
+    GGML_API struct ggml_tensor * ggml_gated_delta_net(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * q,
+            struct ggml_tensor  * k,
+            struct ggml_tensor  * v,
+            struct ggml_tensor  * g,
+            struct ggml_tensor  * beta,
+            struct ggml_tensor  * state,
             int64_t               K);
 
     // DSA lightning indexer
@@ -2608,12 +2608,12 @@ extern "C" {
     // broadcast:
     //   ne3 % ne33 == 0
     //
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_lightning_indexer(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor  * q,
-        struct wsp_ggml_tensor  * k,
-        struct wsp_ggml_tensor  * weights,
-        struct wsp_ggml_tensor  * mask);
+    GGML_API struct ggml_tensor * ggml_lightning_indexer(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * q,
+        struct ggml_tensor  * k,
+        struct ggml_tensor  * weights,
+        struct ggml_tensor  * mask);
 
     // DeepSeek V4 hyper-connections (ref. https://arxiv.org/pdf/2512.24880)
     // In short these operations are replacements for the original residual connection (x = transformer(x) + x)
@@ -2625,21 +2625,21 @@ extern "C" {
     //                         + base[2*hc + dst + hc*src]
     // Softmax over dst, add eps, normalize over src, then repeat normalization
     // over dst followed by src for iterations 1 through n_iter - 1.
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_dsv4_hc_comb(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * mixes,
-            struct wsp_ggml_tensor  * scale,
-            struct wsp_ggml_tensor  * base,
+    GGML_API struct ggml_tensor * ggml_dsv4_hc_comb(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * mixes,
+            struct ggml_tensor  * scale,
+            struct ggml_tensor  * base,
             float                 eps,
             int32_t               n_iter);
 
     // hc_pre: x [n_embd, hc, n_tokens], weights [hc, n_tokens] -> [n_embd, n_tokens]
     //   result[i, t] = sum_h x[i, h, t]*weights[h, t]
     //
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_dsv4_hc_pre(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * x,
-            struct wsp_ggml_tensor  * weights);
+    GGML_API struct ggml_tensor * ggml_dsv4_hc_pre(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * x,
+            struct ggml_tensor  * weights);
 
     // hc_post: x [n_embd, n_tokens], residual [n_embd, hc, n_tokens],
     //          post [hc, n_tokens], comb [dst_hc, src_hc, n_tokens]
@@ -2647,124 +2647,124 @@ extern "C" {
     //   result[i, dst, t] = x[i, t]*post[dst, t]
     //                       + sum_src residual[i, src, t]*comb[dst, src, t]
     //
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_dsv4_hc_post(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * x,
-            struct wsp_ggml_tensor  * residual,
-            struct wsp_ggml_tensor  * post,
-            struct wsp_ggml_tensor  * comb);
+    GGML_API struct ggml_tensor * ggml_dsv4_hc_post(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * x,
+            struct ggml_tensor  * residual,
+            struct ggml_tensor  * post,
+            struct ggml_tensor  * comb);
 
     // custom operators
 
-    typedef void (*wsp_ggml_custom1_op_t)(struct wsp_ggml_tensor * dst , const struct wsp_ggml_tensor * a, int ith, int nth, void * userdata);
-    typedef void (*wsp_ggml_custom2_op_t)(struct wsp_ggml_tensor * dst , const struct wsp_ggml_tensor * a, const struct wsp_ggml_tensor * b, int ith, int nth, void * userdata);
-    typedef void (*wsp_ggml_custom3_op_t)(struct wsp_ggml_tensor * dst , const struct wsp_ggml_tensor * a, const struct wsp_ggml_tensor * b, const struct wsp_ggml_tensor * c, int ith, int nth, void * userdata);
+    typedef void (*ggml_custom1_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, int nth, void * userdata);
+    typedef void (*ggml_custom2_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
+    typedef void (*ggml_custom3_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, const struct ggml_tensor * b, const struct ggml_tensor * c, int ith, int nth, void * userdata);
 
-#define WSP_GGML_N_TASKS_MAX (-1)
-    // n_tasks == WSP_GGML_N_TASKS_MAX means to use max number of tasks
+#define GGML_N_TASKS_MAX (-1)
+    // n_tasks == GGML_N_TASKS_MAX means to use max number of tasks
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_map_custom1(
-            struct wsp_ggml_context   * ctx,
-            struct wsp_ggml_tensor    * a,
-            wsp_ggml_custom1_op_t       fun,
+    GGML_API struct ggml_tensor * ggml_map_custom1(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            ggml_custom1_op_t       fun,
             int                     n_tasks,
             void                  * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_map_custom1_inplace(
-            struct wsp_ggml_context   * ctx,
-            struct wsp_ggml_tensor    * a,
-            wsp_ggml_custom1_op_t       fun,
+    GGML_API struct ggml_tensor * ggml_map_custom1_inplace(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            ggml_custom1_op_t       fun,
             int                     n_tasks,
             void                  * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_map_custom2(
-            struct wsp_ggml_context   * ctx,
-            struct wsp_ggml_tensor    * a,
-            struct wsp_ggml_tensor    * b,
-            wsp_ggml_custom2_op_t       fun,
+    GGML_API struct ggml_tensor * ggml_map_custom2(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            ggml_custom2_op_t       fun,
             int                     n_tasks,
             void                  * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_map_custom2_inplace(
-            struct wsp_ggml_context   * ctx,
-            struct wsp_ggml_tensor    * a,
-            struct wsp_ggml_tensor    * b,
-            wsp_ggml_custom2_op_t       fun,
+    GGML_API struct ggml_tensor * ggml_map_custom2_inplace(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            ggml_custom2_op_t       fun,
             int                     n_tasks,
             void                  * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_map_custom3(
-            struct wsp_ggml_context   * ctx,
-            struct wsp_ggml_tensor    * a,
-            struct wsp_ggml_tensor    * b,
-            struct wsp_ggml_tensor    * c,
-            wsp_ggml_custom3_op_t       fun,
+    GGML_API struct ggml_tensor * ggml_map_custom3(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            struct ggml_tensor    * c,
+            ggml_custom3_op_t       fun,
             int                     n_tasks,
             void                  * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_map_custom3_inplace(
-            struct wsp_ggml_context   * ctx,
-            struct wsp_ggml_tensor    * a,
-            struct wsp_ggml_tensor    * b,
-            struct wsp_ggml_tensor    * c,
-            wsp_ggml_custom3_op_t       fun,
+    GGML_API struct ggml_tensor * ggml_map_custom3_inplace(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            struct ggml_tensor    * c,
+            ggml_custom3_op_t       fun,
             int                     n_tasks,
             void                  * userdata);
 
-    typedef void (*wsp_ggml_custom_op_t)(struct wsp_ggml_tensor * dst , int ith, int nth, void * userdata);
+    typedef void (*ggml_custom_op_t)(struct ggml_tensor * dst , int ith, int nth, void * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_custom_4d(
-            struct wsp_ggml_context * ctx,
-            enum wsp_ggml_type        type,
+    GGML_API struct ggml_tensor * ggml_custom_4d(
+            struct ggml_context * ctx,
+            enum ggml_type        type,
             int64_t               ne0,
             int64_t               ne1,
             int64_t               ne2,
             int64_t               ne3,
-            struct wsp_ggml_tensor ** args,
+            struct ggml_tensor ** args,
             int                   n_args,
-            wsp_ggml_custom_op_t      fun,
+            ggml_custom_op_t      fun,
             int                   n_tasks,
             void                * userdata);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_custom_inplace(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor ** args,
+    GGML_API struct ggml_tensor * ggml_custom_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor ** args,
             int                   n_args,
-            wsp_ggml_custom_op_t      fun,
+            ggml_custom_op_t      fun,
             int                   n_tasks,
             void                * userdata);
 
     // loss function
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cross_entropy_loss(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // logits
-            struct wsp_ggml_tensor  * b); // labels
+    GGML_API struct ggml_tensor * ggml_cross_entropy_loss(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // logits
+            struct ggml_tensor  * b); // labels
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_cross_entropy_loss_back(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,  // logits
-            struct wsp_ggml_tensor  * b,  // labels
-            struct wsp_ggml_tensor  * c); // gradients of cross_entropy_loss result
+    GGML_API struct ggml_tensor * ggml_cross_entropy_loss_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,  // logits
+            struct ggml_tensor  * b,  // labels
+            struct ggml_tensor  * c); // gradients of cross_entropy_loss result
 
     // AdamW optimizer step
     // Paper: https://arxiv.org/pdf/1711.05101v3.pdf
     // PyTorch: https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_step_adamw(
-            struct wsp_ggml_context * ctx,
-            struct wsp_ggml_tensor  * a,
-            struct wsp_ggml_tensor  * grad,
-            struct wsp_ggml_tensor  * m,
-            struct wsp_ggml_tensor  * v,
-            struct wsp_ggml_tensor  * adamw_params); // parameters such as the learning rate
+    GGML_API struct ggml_tensor * ggml_opt_step_adamw(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * grad,
+            struct ggml_tensor  * m,
+            struct ggml_tensor  * v,
+            struct ggml_tensor  * adamw_params); // parameters such as the learning rate
 
     // stochastic gradient descent step (with weight decay)
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_opt_step_sgd(
-        struct wsp_ggml_context * ctx,
-        struct wsp_ggml_tensor *  a,
-        struct wsp_ggml_tensor *  grad,
-        struct wsp_ggml_tensor *  sgd_params); // alpha, weight decay
+    GGML_API struct ggml_tensor * ggml_opt_step_sgd(
+        struct ggml_context * ctx,
+        struct ggml_tensor *  a,
+        struct ggml_tensor *  grad,
+        struct ggml_tensor *  sgd_params); // alpha, weight decay
 
     // build forward multiple tensors and select one of them for computing
     // this is useful for creating graphs that have constant topology but compute different things based on the input
@@ -2777,12 +2777,12 @@ extern "C" {
     //    |  |  ...  c  ...  |
     //    |  |  ...  c  ...  |
     //    |  |  ...  c  ...  |
-    //   [0  1  ... idx ...  n-1]        <-- wsp_ggml_build_forward_select(..., n, idx)
+    //   [0  1  ... idx ...  n-1]        <-- ggml_build_forward_select(..., n, idx)
     //               c
     //               c
     //
     // example:
-    //   struct wsp_ggml_tensor * curs[3];
+    //   struct ggml_tensor * curs[3];
     //
     //   curs[0]  = compute0(...);
     //   curs[1]  = compute1(...);
@@ -2790,89 +2790,89 @@ extern "C" {
     //
     //   int idx = select_branch(some_input);
     //
-    //   struct wsp_ggml_tensor * out = wsp_ggml_build_forward_select(cgraph, curs, 3, idx);
+    //   struct ggml_tensor * out = ggml_build_forward_select(cgraph, curs, 3, idx);
     //
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_build_forward_select(
-            struct wsp_ggml_cgraph  * cgraph,
-            struct wsp_ggml_tensor ** tensors,
+    GGML_API struct ggml_tensor * ggml_build_forward_select(
+            struct ggml_cgraph  * cgraph,
+            struct ggml_tensor ** tensors,
             int                   n_tensors,
             int                   idx);
 
-    WSP_GGML_API void wsp_ggml_build_forward_expand(
-            struct wsp_ggml_cgraph * cgraph,
-            struct wsp_ggml_tensor * tensor);
+    GGML_API void ggml_build_forward_expand(
+            struct ggml_cgraph * cgraph,
+            struct ggml_tensor * tensor);
 
     // add the tensor and its parents to the graph without marking them for compute
     // the flag is set later, when the tensor is reached from a node that computes
-    WSP_GGML_API void wsp_ggml_build_forward_order(
-            struct wsp_ggml_cgraph * cgraph,
-            struct wsp_ggml_tensor * tensor);
+    GGML_API void ggml_build_forward_order(
+            struct ggml_cgraph * cgraph,
+            struct ggml_tensor * tensor);
 
-    WSP_GGML_API void wsp_ggml_build_backward_expand(
-        struct wsp_ggml_context *  ctx,        // context for gradient computation
-        struct wsp_ggml_cgraph  *  cgraph,
-        struct wsp_ggml_tensor  ** grad_accs);
+    GGML_API void ggml_build_backward_expand(
+        struct ggml_context *  ctx,        // context for gradient computation
+        struct ggml_cgraph  *  cgraph,
+        struct ggml_tensor  ** grad_accs);
 
     // graph allocation in a context
-    WSP_GGML_API struct wsp_ggml_cgraph * wsp_ggml_new_graph       (struct wsp_ggml_context * ctx); // size = WSP_GGML_DEFAULT_GRAPH_SIZE, grads = false
-    WSP_GGML_API struct wsp_ggml_cgraph * wsp_ggml_new_graph_custom(struct wsp_ggml_context * ctx, size_t size, bool grads);
-    WSP_GGML_API struct wsp_ggml_cgraph * wsp_ggml_graph_dup       (struct wsp_ggml_context * ctx, struct wsp_ggml_cgraph * cgraph, bool force_grads);
-    WSP_GGML_API void                 wsp_ggml_graph_cpy       (struct wsp_ggml_cgraph * src, struct wsp_ggml_cgraph * dst);
-    WSP_GGML_API void                 wsp_ggml_graph_reset     (struct wsp_ggml_cgraph * cgraph); // set regular grads + optimizer momenta to 0, set loss grad to 1
-    WSP_GGML_API void                 wsp_ggml_graph_clear     (struct wsp_ggml_cgraph * cgraph);
+    GGML_API struct ggml_cgraph * ggml_new_graph       (struct ggml_context * ctx); // size = GGML_DEFAULT_GRAPH_SIZE, grads = false
+    GGML_API struct ggml_cgraph * ggml_new_graph_custom(struct ggml_context * ctx, size_t size, bool grads);
+    GGML_API struct ggml_cgraph * ggml_graph_dup       (struct ggml_context * ctx, struct ggml_cgraph * cgraph, bool force_grads);
+    GGML_API void                 ggml_graph_cpy       (struct ggml_cgraph * src, struct ggml_cgraph * dst);
+    GGML_API void                 ggml_graph_reset     (struct ggml_cgraph * cgraph); // set regular grads + optimizer momenta to 0, set loss grad to 1
+    GGML_API void                 ggml_graph_clear     (struct ggml_cgraph * cgraph);
 
-    WSP_GGML_API int                   wsp_ggml_graph_size   (struct wsp_ggml_cgraph * cgraph);
-    WSP_GGML_API struct wsp_ggml_tensor *  wsp_ggml_graph_node   (struct wsp_ggml_cgraph * cgraph, int i); // if i < 0, returns nodes[n_nodes + i]
-    WSP_GGML_API struct wsp_ggml_tensor ** wsp_ggml_graph_nodes  (struct wsp_ggml_cgraph * cgraph);
-    WSP_GGML_API int                   wsp_ggml_graph_n_nodes(struct wsp_ggml_cgraph * cgraph);
+    GGML_API int                   ggml_graph_size   (struct ggml_cgraph * cgraph);
+    GGML_API struct ggml_tensor *  ggml_graph_node   (struct ggml_cgraph * cgraph, int i); // if i < 0, returns nodes[n_nodes + i]
+    GGML_API struct ggml_tensor ** ggml_graph_nodes  (struct ggml_cgraph * cgraph);
+    GGML_API int                   ggml_graph_n_nodes(struct ggml_cgraph * cgraph);
 
-    WSP_GGML_API void   wsp_ggml_graph_add_node(struct wsp_ggml_cgraph * cgraph, struct wsp_ggml_tensor * tensor);
+    GGML_API void   ggml_graph_add_node(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor);
 
-    WSP_GGML_API size_t wsp_ggml_graph_overhead(void);
-    WSP_GGML_API size_t wsp_ggml_graph_overhead_custom(size_t size, bool grads);
+    GGML_API size_t ggml_graph_overhead(void);
+    GGML_API size_t ggml_graph_overhead_custom(size_t size, bool grads);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_graph_get_tensor  (const struct wsp_ggml_cgraph * cgraph, const char * name);
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_graph_get_grad    (const struct wsp_ggml_cgraph * cgraph, const struct wsp_ggml_tensor * node);
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_graph_get_grad_acc(const struct wsp_ggml_cgraph * cgraph, const struct wsp_ggml_tensor * node);
+    GGML_API struct ggml_tensor * ggml_graph_get_tensor  (const struct ggml_cgraph * cgraph, const char * name);
+    GGML_API struct ggml_tensor * ggml_graph_get_grad    (const struct ggml_cgraph * cgraph, const struct ggml_tensor * node);
+    GGML_API struct ggml_tensor * ggml_graph_get_grad_acc(const struct ggml_cgraph * cgraph, const struct ggml_tensor * node);
 
     // print info and performance information for the graph
-    WSP_GGML_API void wsp_ggml_graph_print(const struct wsp_ggml_cgraph * cgraph);
+    GGML_API void ggml_graph_print(const struct ggml_cgraph * cgraph);
 
     // dump the graph into a file using the dot format
-    WSP_GGML_API void wsp_ggml_graph_dump_dot(const struct wsp_ggml_cgraph * gb, const struct wsp_ggml_cgraph * cgraph, const char * filename);
+    GGML_API void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph * cgraph, const char * filename);
 
     // TODO these functions were sandwiched in the old optimization interface, is there a better place for them?
-    typedef void (*wsp_ggml_log_callback)(enum wsp_ggml_log_level level, const char * text, void * user_data);
+    typedef void (*ggml_log_callback)(enum ggml_log_level level, const char * text, void * user_data);
 
     // Set callback for all future logging events.
     // If this is not called, or NULL is supplied, everything is output on stderr.
-    WSP_GGML_API void wsp_ggml_log_get(wsp_ggml_log_callback * log_callback, void ** user_data);
-    WSP_GGML_API void wsp_ggml_log_set(wsp_ggml_log_callback   log_callback, void *  user_data);
+    GGML_API void ggml_log_get(ggml_log_callback * log_callback, void ** user_data);
+    GGML_API void ggml_log_set(ggml_log_callback   log_callback, void *  user_data);
 
-    WSP_GGML_API struct wsp_ggml_tensor * wsp_ggml_set_zero(struct wsp_ggml_tensor * tensor);
+    GGML_API struct ggml_tensor * ggml_set_zero(struct ggml_tensor * tensor);
 
     //
     // quantization
     //
 
-    // - wsp_ggml_wsp_quantize_init can be called multiple times with the same type
-    //   it will only initialize the quantization tables for the first call or after wsp_ggml_wsp_quantize_free
-    //   automatically called by wsp_ggml_wsp_quantize_chunk for convenience
+    // - ggml_quantize_init can be called multiple times with the same type
+    //   it will only initialize the quantization tables for the first call or after ggml_quantize_free
+    //   automatically called by ggml_quantize_chunk for convenience
     //
-    // - wsp_ggml_wsp_quantize_free will free any memory allocated by wsp_ggml_wsp_quantize_init
+    // - ggml_quantize_free will free any memory allocated by ggml_quantize_init
     //   call this at the end of the program to avoid memory leaks
     //
     // note: these are thread-safe
     //
-    WSP_GGML_API void wsp_ggml_wsp_quantize_init(enum wsp_ggml_type type);
-    WSP_GGML_API void wsp_ggml_wsp_quantize_free(void);
+    GGML_API void ggml_quantize_init(enum ggml_type type);
+    GGML_API void ggml_quantize_free(void);
 
     // some quantization type cannot be used without an importance matrix
-    WSP_GGML_API bool wsp_ggml_wsp_quantize_requires_imatrix(enum wsp_ggml_type type);
+    GGML_API bool ggml_quantize_requires_imatrix(enum ggml_type type);
 
-    // calls wsp_ggml_wsp_quantize_init internally (i.e. can allocate memory)
-    WSP_GGML_API size_t wsp_ggml_wsp_quantize_chunk(
-            enum wsp_ggml_type   type,
+    // calls ggml_quantize_init internally (i.e. can allocate memory)
+    GGML_API size_t ggml_quantize_chunk(
+            enum ggml_type   type,
                const float * src,
                       void * dst,
                    int64_t   start,
@@ -2883,67 +2883,67 @@ extern "C" {
 #ifdef __cplusplus
     // restrict not standard in C++
 #    if defined(__GNUC__)
-#        define WSP_GGML_RESTRICT __restrict__
+#        define GGML_RESTRICT __restrict__
 #    elif defined(__clang__)
-#        define WSP_GGML_RESTRICT __restrict
+#        define GGML_RESTRICT __restrict
 #    elif defined(_MSC_VER)
-#        define WSP_GGML_RESTRICT __restrict
+#        define GGML_RESTRICT __restrict
 #    else
-#        define WSP_GGML_RESTRICT
+#        define GGML_RESTRICT
 #    endif
 #else
 #    if defined (_MSC_VER) && (__STDC_VERSION__ < 201112L)
-#        define WSP_GGML_RESTRICT __restrict
+#        define GGML_RESTRICT __restrict
 #    else
-#        define WSP_GGML_RESTRICT restrict
+#        define GGML_RESTRICT restrict
 #    endif
 #endif
-    typedef void (*wsp_ggml_to_float_t)  (const void  * WSP_GGML_RESTRICT x, float * WSP_GGML_RESTRICT y, int64_t k);
-    typedef void (*wsp_ggml_from_float_t)(const float * WSP_GGML_RESTRICT x, void  * WSP_GGML_RESTRICT y, int64_t k);
+    typedef void (*ggml_to_float_t)  (const void  * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k);
+    typedef void (*ggml_from_float_t)(const float * GGML_RESTRICT x, void  * GGML_RESTRICT y, int64_t k);
 
-    struct wsp_ggml_type_traits {
+    struct ggml_type_traits {
         const char             * type_name;
         int64_t                  blck_size;
         int64_t                  blck_size_interleave; // interleave elements in blocks
         size_t                   type_size;
         bool                     is_quantized;
-        wsp_ggml_to_float_t          to_float;
-        wsp_ggml_from_float_t        from_float_ref;
+        ggml_to_float_t          to_float;
+        ggml_from_float_t        from_float_ref;
     };
 
-    WSP_GGML_API const struct wsp_ggml_type_traits * wsp_ggml_get_type_traits(enum wsp_ggml_type type);
+    GGML_API const struct ggml_type_traits * ggml_get_type_traits(enum ggml_type type);
 
     // ggml threadpool
     // TODO: currently, only a few functions are in the base ggml API, while the rest are in the CPU backend
     // the goal should be to create an API that other backends can use move everything to the ggml base
 
     // scheduling priorities
-    enum wsp_ggml_sched_priority {
-        WSP_GGML_SCHED_PRIO_LOW = -1,
-        WSP_GGML_SCHED_PRIO_NORMAL,
-        WSP_GGML_SCHED_PRIO_MEDIUM,
-        WSP_GGML_SCHED_PRIO_HIGH,
-        WSP_GGML_SCHED_PRIO_REALTIME
+    enum ggml_sched_priority {
+        GGML_SCHED_PRIO_LOW = -1,
+        GGML_SCHED_PRIO_NORMAL,
+        GGML_SCHED_PRIO_MEDIUM,
+        GGML_SCHED_PRIO_HIGH,
+        GGML_SCHED_PRIO_REALTIME
     };
 
     // threadpool params
-    // Use wsp_ggml_threadpool_params_default() or wsp_ggml_threadpool_params_init() to populate the defaults
-    struct wsp_ggml_threadpool_params {
-        bool                cpumask[WSP_GGML_MAX_N_THREADS]; // mask of cpu cores (all-zeros means use default affinity settings)
+    // Use ggml_threadpool_params_default() or ggml_threadpool_params_init() to populate the defaults
+    struct ggml_threadpool_params {
+        bool                cpumask[GGML_MAX_N_THREADS]; // mask of cpu cores (all-zeros means use default affinity settings)
         int                 n_threads;                   // number of threads
-        enum wsp_ggml_sched_priority prio;                   // thread priority
+        enum ggml_sched_priority prio;                   // thread priority
         uint32_t            poll;                        // polling level (0 - no polling, 100 - aggressive polling)
         bool                strict_cpu;                  // strict cpu placement
         bool                paused;                      // start in paused state
     };
 
-    struct wsp_ggml_threadpool;     // forward declaration, see ggml.c
+    struct ggml_threadpool;     // forward declaration, see ggml.c
 
-    typedef struct wsp_ggml_threadpool * wsp_ggml_threadpool_t;
+    typedef struct ggml_threadpool * ggml_threadpool_t;
 
-    WSP_GGML_API struct wsp_ggml_threadpool_params wsp_ggml_threadpool_params_default(int n_threads);
-    WSP_GGML_API void                          wsp_ggml_threadpool_params_init   (struct wsp_ggml_threadpool_params * p, int n_threads);
-    WSP_GGML_API bool                          wsp_ggml_threadpool_params_match  (const struct wsp_ggml_threadpool_params * p0, const struct wsp_ggml_threadpool_params * p1);
+    GGML_API struct ggml_threadpool_params ggml_threadpool_params_default(int n_threads);
+    GGML_API void                          ggml_threadpool_params_init   (struct ggml_threadpool_params * p, int n_threads);
+    GGML_API bool                          ggml_threadpool_params_match  (const struct ggml_threadpool_params * p0, const struct ggml_threadpool_params * p1);
 
 #ifdef  __cplusplus
 }

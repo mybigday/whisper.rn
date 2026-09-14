@@ -5,11 +5,11 @@
  #define _USE_MATH_DEFINES // For M_PI on MSVC
 +
 +// GGML build info
-+#ifndef WSP_GGML_VERSION
-+#define WSP_GGML_VERSION "unknown"
++#ifndef GGML_VERSION
++#define GGML_VERSION "unknown"
 +#endif
-+#ifndef WSP_GGML_COMMIT
-+#define WSP_GGML_COMMIT "unknown"
++#ifndef GGML_COMMIT
++#define GGML_COMMIT "unknown"
 +#endif
 
  #include "ggml-backend.h"
