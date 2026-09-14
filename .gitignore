@@ -78,10 +78,11 @@ build-arm64/
 build-armeabi-v7a/
 build-x86_64/
 jniLibs/
-build-ios/
-build-tvos/
+.build-ios-xcframework/
 
 ios/rnwhisper.xcframework/**/*.framework
+ios/rnwhisper.xcframework/**/dSYMs/
+ios/rnwhisper.xcframework/**/*.bcsymbolmap
 
 local-plan/
 local-plan-done/
