@@ -416,9 +416,9 @@ static const std::map<whisper_alignment_heads_preset, whisper_aheads> g_aheads {
 static std::vector<uint32_t> get_alignment_heads_by_layer(const whisper_context_params & cparams, int il, int32_t n_text_layer, int32_t n_head);
 
 struct whisper_mel {
-    int n_len;
-    int n_len_org;
-    int n_mel;
+    int n_len     = 0;
+    int n_len_org = 0;
+    int n_mel     = 0;
 
     std::vector<float> data;
 };
@@ -866,7 +866,7 @@ struct whisper_state {
 
     whisper_mel mel;
 
-    whisper_batch batch;
+    whisper_batch batch = {}; // freed by whisper_free_state, also on early init failures
 
     whisper_decoder decoders[WHISPER_MAX_DECODERS];
 
@@ -1414,10 +1414,8 @@ static buft_list_t make_buft_list(whisper_context_params & params) {
 static bool weight_buft_supported(const whisper_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
     bool op_supported = true;
 
-    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
-        ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
-        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
-        // GPU and default CPU backend support all operators
+    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type()) {
+        // default CPU backend supports all operators
         op_supported = true;
     } else {
         switch (op) {
@@ -1457,7 +1455,9 @@ static bool weight_buft_supported(const whisper_hparams & hparams, ggml_tensor *
                 break;
             }
             default: {
-                op_supported = false;
+                // ops other than MUL_MAT / GET_ROWS are assumed supported on GPU-type devices (as before); CPU extra bufts only do those two
+                op_supported = ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
+                               ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU;
                 break;
             }
         };
@@ -1858,12 +1858,15 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
         ggml_backend_buffer_type_t buft = p.first;
         ggml_context * ctx = p.second;
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
-        if (buf) {
-            model.buffers.emplace_back(buf);
-
-            size_t size_main = ggml_backend_buffer_get_size(buf);
-            WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
+        if (!buf) {
+            WHISPER_LOG_ERROR("%s: failed to allocate %s buffer\n", __func__, ggml_backend_buft_name(buft));
+            return false;
         }
+        model.buffers.emplace_back(buf);
+        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+
+        size_t size_main = ggml_backend_buffer_get_size(buf);
+        WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
     }
 
     // load weights
@@ -1958,10 +1961,6 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             WHISPER_LOG_ERROR("%s: ERROR not all tensors loaded from model file - expected %zu, got %d\n", __func__, model.tensors.size(), model.n_loaded);
             return false;
         }
-    }
-
-    for (auto & buf : model.buffers) {
-        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
     }
 
     wctx.t_load_us = ggml_time_us() - t_start_us;
@@ -2094,6 +2093,14 @@ static struct ggml_cgraph * whisper_build_graph_encoder(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
+    // flash-attn: K/V of the current layer are written into the padded KV with SET_ROWS (row i <- token i)
+    struct ggml_tensor * kv_pad_idxs = nullptr;
+    if (wctx.params.flash_attn) {
+        kv_pad_idxs = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_ctx);
+        ggml_set_name(kv_pad_idxs, "kv_pad_idxs");
+        ggml_set_input(kv_pad_idxs);
+    }
+
     ggml_cgraph * gf = ggml_new_graph_custom(ctx0, WHISPER_MAX_NODES, false);
 
     struct ggml_tensor * cur = ggml_view_tensor(ctx0, wstate.embd_conv);
@@ -2171,8 +2178,12 @@ static struct ggml_cgraph * whisper_build_graph_encoder(
                         0, 2, 1, 3);
 
             if (wctx.params.flash_attn) {
-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, ggml_view_1d(ctx0, kv_pad.k, n_ctx*n_state, 0)));
-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, ggml_view_1d(ctx0, kv_pad.v, n_ctx*n_state, 0)));
+                ggml_build_forward_expand(gf, ggml_set_rows(ctx0,
+                            ggml_view_2d(ctx0, kv_pad.k, n_state, n_ctx_pad, ggml_element_size(kv_pad.k)*n_state, 0),
+                            Kcur, kv_pad_idxs));
+                ggml_build_forward_expand(gf, ggml_set_rows(ctx0,
+                            ggml_view_2d(ctx0, kv_pad.v, n_state, n_ctx_pad, ggml_element_size(kv_pad.v)*n_state, 0),
+                            Vcur, kv_pad_idxs));
 
                 struct ggml_tensor * K =
                     ggml_view_3d(ctx0, kv_pad.k,
@@ -2323,6 +2334,14 @@ static struct ggml_cgraph * whisper_build_graph_cross(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
+    // flash-attn: cross K/V are written with SET_ROWS (row i <- encoder position i)
+    struct ggml_tensor * cross_idxs = nullptr;
+    if (wctx.params.flash_attn) {
+        cross_idxs = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_ctx);
+        ggml_set_name(cross_idxs, "cross_idxs");
+        ggml_set_input(cross_idxs);
+    }
+
     ggml_cgraph * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * cur = ggml_view_tensor(ctx0, wstate.embd_enc);
@@ -2352,10 +2371,12 @@ static struct ggml_cgraph * whisper_build_graph_cross(
         struct ggml_tensor * v;
 
         if (wctx.params.flash_attn) {
-            k = ggml_view_1d(ctx0, wstate.kv_cross.k, n_state*n_ctx,
+            k = ggml_view_2d(ctx0, wstate.kv_cross.k, n_state, n_ctx_pad,
+                    ggml_element_size(wstate.kv_cross.k)*n_state,
                     (ggml_element_size(wstate.kv_cross.k)*n_state)*(il*n_ctx_pad));
 
-            v = ggml_view_1d(ctx0, wstate.kv_cross.v, n_state*n_ctx,
+            v = ggml_view_2d(ctx0, wstate.kv_cross.v, n_state, n_ctx_pad,
+                    ggml_element_size(wstate.kv_cross.v)*n_state,
                     (ggml_element_size(wstate.kv_cross.v)*n_state)*(il*n_ctx_pad));
         } else {
             Vcross = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, Vcross, n_state, n_ctx));
@@ -2368,8 +2389,13 @@ static struct ggml_cgraph * whisper_build_graph_cross(
                     (il*n_ctx)*ggml_element_size(wstate.kv_cross.v)*n_state);
         }
 
-        ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcross, k));
-        ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcross, v));
+        if (wctx.params.flash_attn) {
+            ggml_build_forward_expand(gf, ggml_set_rows(ctx0, k, Kcross, cross_idxs));
+            ggml_build_forward_expand(gf, ggml_set_rows(ctx0, v, Vcross, cross_idxs));
+        } else {
+            ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcross, k));
+            ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcross, v));
+        }
     }
 
     //ggml_graph_print(gf);
@@ -2477,6 +2503,13 @@ static bool whisper_encode_internal(
             return false;
         }
 
+        if (wctx.params.flash_attn) {
+            struct ggml_tensor * idxs = ggml_graph_get_tensor(gf, "kv_pad_idxs");
+            std::vector<int32_t> rows(ggml_nelements(idxs));
+            for (size_t i = 0; i < rows.size(); ++i) { rows[i] = (int32_t) i; }
+            ggml_backend_tensor_set(idxs, rows.data(), 0, ggml_nbytes(idxs));
+        }
+
         if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
             return false;
         }
@@ -2491,6 +2524,13 @@ static bool whisper_encode_internal(
         if (!ggml_backend_sched_alloc_graph(sched, gf)) {
             // should never happen as we pre-allocate the memory
             return false;
+        }
+
+        if (wctx.params.flash_attn) {
+            struct ggml_tensor * idxs = ggml_graph_get_tensor(gf, "cross_idxs");
+            std::vector<int32_t> rows(ggml_nelements(idxs));
+            for (size_t i = 0; i < rows.size(); ++i) { rows[i] = (int32_t) i; }
+            ggml_backend_tensor_set(idxs, rows.data(), 0, ggml_nbytes(idxs));
         }
 
         if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
@@ -2551,6 +2591,14 @@ static struct ggml_cgraph * whisper_build_graph_decoder(
     struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
     ggml_set_name(position, "position");
     ggml_set_input(position);
+
+    // flash-attn: self-attention K/V are written into the cache with SET_ROWS (row kv_head + i <- token i)
+    struct ggml_tensor * kv_idxs = nullptr;
+    if (wctx.params.flash_attn) {
+        kv_idxs = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        ggml_set_name(kv_idxs, "kv_idxs");
+        ggml_set_input(kv_idxs);
+    }
 
     const float KQscale = pow(float(n_state_head), -0.25);
 
@@ -2619,11 +2667,13 @@ static struct ggml_cgraph * whisper_build_graph_decoder(
                 struct ggml_tensor * v;
 
                 if (wctx.params.flash_attn) {
-                    k = ggml_view_1d(ctx0, kv_self.k, n_tokens*n_state,
-                            (ggml_element_size(kv_self.k)*n_state)*(il*n_ctx + kv_head));
+                    k = ggml_view_2d(ctx0, kv_self.k, n_state, n_ctx,
+                            ggml_element_size(kv_self.k)*n_state,
+                            (ggml_element_size(kv_self.k)*n_state)*(il*n_ctx));
 
-                    v = ggml_view_1d(ctx0, kv_self.v, n_tokens*n_state,
-                            (ggml_element_size(kv_self.v)*n_state)*(il*n_ctx + kv_head));
+                    v = ggml_view_2d(ctx0, kv_self.v, n_state, n_ctx,
+                            ggml_element_size(kv_self.v)*n_state,
+                            (ggml_element_size(kv_self.v)*n_state)*(il*n_ctx));
                 } else {
                     Vcur = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, Vcur, n_state, n_tokens));
 
@@ -2635,8 +2685,13 @@ static struct ggml_cgraph * whisper_build_graph_decoder(
                             (il*n_ctx)*ggml_element_size(kv_self.v)*n_state + kv_head*ggml_element_size(kv_self.v));
                 }
 
-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
+                if (wctx.params.flash_attn) {
+                    ggml_build_forward_expand(gf, ggml_set_rows(ctx0, k, Kcur, kv_idxs));
+                    ggml_build_forward_expand(gf, ggml_set_rows(ctx0, v, Vcur, kv_idxs));
+                } else {
+                    ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
+                    ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
+                }
             }
 
             // ------
@@ -2947,6 +3002,13 @@ static bool whisper_decode_internal(
         }
 
         {
+            if (wctx.params.flash_attn) {
+                struct ggml_tensor * kv_idxs = ggml_graph_get_tensor(gf, "kv_idxs");
+                std::vector<int32_t> rows(n_tokens);
+                for (int i = 0; i < n_tokens; ++i) { rows[i] = (int32_t) (wstate.kv_self.head + i); }
+                ggml_backend_tensor_set(kv_idxs, rows.data(), 0, ggml_nbytes(kv_idxs));
+            }
+
             struct ggml_tensor * position = ggml_graph_get_tensor(gf, "position");
             for (int i = 0; i < n_tokens; ++i) {
                 const int32_t val = batch.pos[i];
@@ -3824,7 +3886,8 @@ struct whisper_context * whisper_init_with_params_no_state(struct whisper_model_
     if (!model_loaded) {
         loader->close(loader->context);
         WHISPER_LOG_ERROR("%s: failed to load model\n", __func__);
-        delete ctx;
+        // also release the buffers allocated before the failure
+        whisper_free(ctx);
         return nullptr;
     }
 
@@ -4576,10 +4639,8 @@ static int64_t samples_to_cs(int samples) {
 static bool weight_buft_supported(const whisper_vad_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
     bool op_supported = true;
 
-    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
-        ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
-        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
-        // GPU and default CPU backend support all operators
+    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type()) {
+        // default CPU backend supports all operators
         op_supported = true;
     } else {
         switch (op) {
@@ -4612,7 +4673,9 @@ static bool weight_buft_supported(const whisper_vad_hparams & hparams, ggml_tens
                 break;
             }
             default: {
-                op_supported = false;
+                // ops other than MUL_MAT / GET_ROWS are assumed supported on GPU-type devices (as before); CPU extra bufts only do those two
+                op_supported = ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
+                               ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU;
                 break;
             }
         };
@@ -5097,12 +5160,16 @@ struct whisper_vad_context * whisper_vad_init_with_params(
         ggml_backend_buffer_type_t buft = p.first;
         ggml_context * ctx = p.second;
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
-        if (buf) {
-            model.buffers.emplace_back(buf);
-
-            size_t size_main = ggml_backend_buffer_get_size(buf);
-            WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
+        if (!buf) {
+            WHISPER_LOG_ERROR("%s: failed to allocate %s buffer\n", __func__, ggml_backend_buft_name(buft));
+            whisper_vad_free(vctx);
+            return nullptr;
         }
+        model.buffers.emplace_back(buf);
+        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+
+        size_t size_main = ggml_backend_buffer_get_size(buf);
+        WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
     }
 
     // load weights
@@ -6942,6 +7009,13 @@ int whisper_full_with_state(
     if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
         std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
 
+        if (params.encoder_begin_callback) {
+            if (params.encoder_begin_callback(ctx, state, params.encoder_begin_callback_user_data) == false) {
+                WHISPER_LOG_ERROR("%s: encoder_begin_callback returned false - aborting\n", __func__);
+                return -3;
+            }
+        }
+
         const auto lang_id = whisper_lang_auto_detect_with_state(ctx, state, 0, params.n_threads, probs.data());
         if (lang_id < 0) {
             WHISPER_LOG_ERROR("%s: failed to auto-detect language\n", __func__);
@@ -7009,6 +7083,13 @@ int whisper_full_with_state(
         WHISPER_LOG_ERROR("%s: too many decoders requested (%d), max = %d\n", __func__, n_decoders, WHISPER_MAX_DECODERS);
         return -4;
     }
+
+    // decoder 0 is seeded once in whisper_init_state and skipped by the loop below, so its
+    // generator carries over between calls for the whole lifetime of the state. It is only read
+    // in the temperature > 0 branch, i.e. on the temperature fallback path, which makes the
+    // output a function of how many calls the state has already served: the same audio, decoded
+    // twice, can yield different text. Re-seed it here like every other decoder.
+    state->decoders[0].rng = std::mt19937(0);
 
     // TAGS: WHISPER_DECODER_INIT
     for (int j = 1; j < n_decoders; j++) {
@@ -9288,7 +9369,9 @@ static void whisper_log_callback_default(ggml_log_level level, const char * text
     (void) level;
     (void) user_data;
 #ifndef WHISPER_DEBUG
-    if (level == GGML_LOG_LEVEL_DEBUG) {
+    // experimental: WHISPER_LOG_DEBUG=1 lets backend debug/profile lines (e.g. GGML_HEXAGON_PROFILE) through
+    static const bool pass_debug = getenv("WHISPER_LOG_DEBUG") != nullptr;
+    if (level == GGML_LOG_LEVEL_DEBUG && !pass_debug) {
         return;
     }
 #endif

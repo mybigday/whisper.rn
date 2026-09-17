@@ -12,6 +12,8 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+      <!-- Hexagon NPU: lets whisper.rn dlopen the vendor's FastRPC loader (CPU fallback without it) -->
+      <uses-native-library android:name="libcdsprpc.so" android:required="false" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

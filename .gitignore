@@ -86,3 +86,9 @@ ios/rnwhisper.xcframework/**/*.bcsymbolmap
 
 local-plan/
 local-plan-done/
+
+# Hexagon HTP artifacts (scripts/build-hexagon-htp.sh)
+bin/
+build-hexagon-htp/
+vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/v73/
+example/android/app/src/main/assets/ggml-hexagon/

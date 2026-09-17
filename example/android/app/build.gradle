@@ -2,6 +2,45 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// whisper.rn builds its Hexagon (NPU) variant only when the Hexagon SDK is
+// present on the build host (see ../../../android/build.gradle). The DSP-side
+// libraries that variant loads at runtime come from scripts/build-hexagon-htp.sh
+// (Docker on macOS); build them here so whisper.rn can sync them into this
+// app's assets.
+def repoRootDir = new File(rootProject.projectDir, "../..").canonicalFile
+def hexagonSdkRoot = System.getenv("HEXAGON_SDK_ROOT") ?: "${System.getProperty('user.home')}/.hexagon-sdk/6.4.0.2"
+
+if (file(hexagonSdkRoot).exists()) {
+    def htpScript = new File(repoRootDir, "scripts/build-hexagon-htp.sh")
+    def htpSourceDir = new File(repoRootDir, "vendor/whisper.cpp/ggml/src/ggml-hexagon/htp")
+    def htpInputs = files(
+        htpScript,
+        new File(htpSourceDir, "CMakeLists.txt"),
+        new File(htpSourceDir, "htp_iface.idl"),
+    )
+    def htpArtifacts = files(
+        new File(repoRootDir, "bin/arm64-v8a/libggml-htp-v73.so"),
+        new File(repoRootDir, "bin/arm64-v8a/libggml-htp-v75.so"),
+        new File(repoRootDir, "bin/arm64-v8a/libggml-htp-v79.so"),
+        new File(repoRootDir, "bin/arm64-v8a/libggml-htp-v81.so"),
+        new File(htpSourceDir, "v73/htp_iface.h"),
+        new File(htpSourceDir, "v73/htp_iface_stub.c"),
+    )
+
+    tasks.register("prepareHTP", Exec) {
+        group = "build"
+        description = "Builds the Hexagon HTP libraries and the FastRPC stub whisper.rn compiles against."
+        workingDir(repoRootDir)
+        commandLine(htpScript.absolutePath)
+        inputs.files(htpInputs)
+        outputs.files(htpArtifacts)
+    }
+
+    tasks.named("preBuild").configure {
+        dependsOn("prepareHTP")
+    }
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.

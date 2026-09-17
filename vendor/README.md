@@ -6,7 +6,7 @@ build (CocoaPods, the CMake projects) compiles these files in place.
 
 | Directory | Upstream | What is vendored |
 | --- | --- | --- |
-| `whisper.cpp/` | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `include/`, `src/` (whisper, parakeet, `coreml/`), `ggml/{include,src}` (CPU and Metal backends), `LICENSE`, plus the dummy test models and `samples/jfk.wav` the example app uses |
+| `whisper.cpp/` | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `include/`, `src/` (whisper, parakeet, `coreml/`), `ggml/{include,src}` (CPU, Metal and Hexagon backends), `LICENSE`, plus the dummy test models and `samples/jfk.wav` the example app uses |
 
 `VERSIONS` pins the upstream ref and resolved commit. The exact file list
 lives in `scripts/sync-vendor.sh`.

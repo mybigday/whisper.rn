@@ -3,12 +3,11 @@ require "json"
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 # Written by scripts/sync-vendor.sh; whisper.cpp passes these as compile
 # definitions from its own CMake project (see cmake/rnwhisper-sources.cmake).
+# ggml's GGML_VERSION / GGML_COMMIT come from the generated ggml-version.h.
 version_info = JSON.parse(File.read(File.join(__dir__, "src", "version.json")))
 version_flags = {
   "WHISPER_VERSION" => version_info["version"],
   "PARAKEET_VERSION" => version_info["version"],
-  "GGML_VERSION" => version_info["ggmlVersion"],
-  "GGML_COMMIT" => version_info["commit"],
 }.map { |name, value| "-D#{name}=\\\"#{value}\\\"" }.join(" ")
 
 base_ld_flags = "-framework Accelerate -framework Foundation -framework Metal -framework MetalKit"

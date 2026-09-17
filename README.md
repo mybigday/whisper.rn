@@ -40,6 +40,23 @@ Add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
 
 It's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
+##### Hexagon NPU (Experimental)
+
+On Snapdragon devices with a Hexagon Tensor Processor (SM8450 / 8 Gen 1 and newer), `whisper.rn` can run the whisper model on the NPU through ggml's Hexagon backend. It is used automatically when `useGpu` is on (the default) and the device qualifies; check `WhisperContext.gpu` / `reasonNoGPU` after `initWhisper`. The NPU path always uses flash attention. VAD and Parakeet contexts stay on the CPU.
+
+The backend needs two things the plain build does not have:
+
+1. The Hexagon SDK on the build machine, at `~/.hexagon-sdk/6.4.0.2` or `HEXAGON_SDK_ROOT`. When it is present, `whisper.rn`'s Gradle build compiles the extra `rnwhisper_v8fp16_va_2_hexagon` variant; without it the build is CPU-only.
+2. The DSP-side libraries `libggml-htp-*.so`, built with `yarn build:hexagon-htp` (Docker, using the `ghcr.io/snapdragon-toolchain/arm64-android` image). They land in `bin/arm64-v8a/` and `whisper.rn`'s Gradle build copies them into your app's `src/main/assets/ggml-hexagon/`; the library extracts them at runtime and points the DSP loader at them.
+
+Then add the FastRPC loader to your app manifest so the library can open it at runtime:
+
+```xml
+<uses-native-library android:name="libcdsprpc.so" android:required="false" />
+```
+
+The example app does all of this in `example/android/app/build.gradle` (`prepareHTP`) and its manifest.
+
 #### Expo
 
 You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
@@ -111,7 +128,7 @@ import { initWhisperVad } from 'whisper.rn'
 
 const vadContext = await initWhisperVad({
   filePath: require('./assets/ggml-silero-v6.2.0.bin'), // VAD model file
-  useGpu: true, // Use GPU acceleration (iOS only)
+  useGpu: true, // Use GPU acceleration (iOS only, VAD stays on the CPU on Android)
   nThreads: 4, // Number of threads for processing
 })
 ```

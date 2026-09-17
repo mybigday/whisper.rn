@@ -1,0 +1,24 @@
+hvx_mv_2d (the gemv for non-repacked weights such as whisper's F16 decoder
+matrices) adds the fused bias with hvx_add_f32_uaa, which requires both
+sources 128-byte aligned. Its per-thread row split is not rounded to 32 rows
+like the repacked gemv's, so vtcm_src2 + src0_start_row is misaligned for
+every thread but the first and the release build (asserts off) adds a shifted
+bias. Greedy decoding (n_tokens == 1 steps, MUL_MAT+ADD fused) then produced
+garbage logits. Use the alignment-dispatching hvx_add_f32 instead.
+--- a/ggml/src/ggml-hexagon/htp/matmul-ops.c
++++ b/ggml/src/ggml-hexagon/htp/matmul-ops.c
+@@ -957,10 +957,10 @@
+     if (copy_cnt > 0) {
+         htp_trace_event_start(tr, HTP_TRACE_EVT_HVX_COMP, src0_end_row);
+         if (src2) {
+-            hvx_add_f32_uaa((uint8_t *) &dst_col[src0_start_row],
+-                            (const uint8_t *) tmp,
+-                            (const uint8_t *) ((const float *) mmctx->vtcm_src2 + src0_start_row),
+-                            copy_cnt);
++            hvx_add_f32((uint8_t *) &dst_col[src0_start_row],
++                        (const uint8_t *) tmp,
++                        (const uint8_t *) ((const float *) mmctx->vtcm_src2 + src0_start_row),
++                        copy_cnt);
+         } else {
+             hvx_copy_f32_ua((uint8_t *) &dst_col[src0_start_row], (uint8_t *) tmp, copy_cnt);
+         }

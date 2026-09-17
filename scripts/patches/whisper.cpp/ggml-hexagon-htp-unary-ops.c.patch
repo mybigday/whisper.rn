@@ -1,0 +1,34 @@
+Hexagon's HTP_OP_UNARY_GELU computes x*sigmoid(1.702x) (the GELU_QUICK
+approximation) while ggml's GELU is the tanh form. whisper's encoder/decoder
+FFN uses plain ggml_gelu; the quick form makes large-v3-turbo diverge. Use the
+same tanh-form expression the fused GEGLU kernel already uses.
+--- a/ggml/src/ggml-hexagon/htp/unary-ops.c
++++ b/ggml/src/ggml-hexagon/htp/unary-ops.c
+@@ -460,7 +460,12 @@
+         const uint8_t * restrict src_local = (const uint8_t *)src + (ir * src0_row_size_aligned);
+         uint8_t * restrict dst_local       = (uint8_t *)dst + (ir * dst_row_size_aligned);
+ 
+-        hvx_mul_scalar_f32(dst_local, src_local, 1.702f, ne0);
++        /* experimental: tanh-form GELU, 0.5 x (1 + tanh(sqrt(2/pi) (x + 0.044715 x^3))) = x sigmoid(2 sqrt(2/pi) (x + 0.044715 x^3)) */
++        hvx_mul_f32_aaa(dst_local, src_local, src_local, ne0);
++        hvx_mul_scalar_f32(dst_local, dst_local, 0.044715f, ne0);
++        hvx_add_scalar_f32(dst_local, dst_local, 1.0f, ne0);
++        hvx_mul_f32_aaa(dst_local, src_local, dst_local, ne0);
++        hvx_mul_scalar_f32(dst_local, dst_local, 1.5957691216f, ne0);
+         hvx_sigmoid_f32_aa(dst_local, dst_local, ne0);
+         hvx_mul_f32_aaa(dst_local, src_local, dst_local, ne0);
+     }
+@@ -995,7 +1000,12 @@
+ 
+ // gelu(x) = x * sigmoid(1.702 * x)  (quick/sigmoid approximation, matches CPU GELU_QUICK reference)
+ static inline void tile_gelu_f32(uint8_t * dst_vtcm, const uint8_t * src_vtcm, uint32_t tw) {
+-    hvx_mul_scalar_f32(dst_vtcm, src_vtcm, 1.702f, tw);
++    /* experimental: tanh-form GELU (see gelu_f32) */
++    hvx_mul_f32_aaa(dst_vtcm, src_vtcm, src_vtcm, tw);
++    hvx_mul_scalar_f32(dst_vtcm, dst_vtcm, 0.044715f, tw);
++    hvx_add_scalar_f32(dst_vtcm, dst_vtcm, 1.0f, tw);
++    hvx_mul_f32_aaa(dst_vtcm, src_vtcm, dst_vtcm, tw);
++    hvx_mul_scalar_f32(dst_vtcm, dst_vtcm, 1.5957691216f, tw);
+     hvx_sigmoid_f32_aa(dst_vtcm, dst_vtcm, tw);
+     hvx_mul_f32_aaa(dst_vtcm, src_vtcm, dst_vtcm, tw);
+ }
