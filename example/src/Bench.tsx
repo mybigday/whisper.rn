@@ -291,7 +291,8 @@ export default function Bench() {
                 log(`${modelName} not found, skipping`)
                 return
               }
-              const useGpu = Platform.OS === 'ios'
+              // Metal on iOS, Hexagon NPU on supported Android devices (CPU otherwise)
+              const useGpu = true
               const ctx = await initWhisper({
                 filePath,
                 useCoreMLIos: false,
@@ -299,6 +300,7 @@ export default function Bench() {
                 useFlashAttn: useGpu,
               })
               const fa = useGpu ? '1' : '0'
+              log(`${modelName}: ${ctx.gpu ? 'GPU' : `CPU${ctx.reasonNoGPU ? ` (${ctx.reasonNoGPU})` : ''}`}`)
               try {
                 const result = await ctx.bench(-1)
                 const {

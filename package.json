@@ -56,6 +56,7 @@
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
     "sync:vendor": "./scripts/sync-vendor.sh",
+    "build:hexagon-htp": "./scripts/build-hexagon-htp.sh",
     "docgen": "typedoc src/index.ts src/realtime-transcription/index.ts --plugin typedoc-plugin-markdown --excludePrivate --readme none --out docs/API",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",

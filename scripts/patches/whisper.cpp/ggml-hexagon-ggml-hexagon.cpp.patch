@@ -1,0 +1,18 @@
+whisper.cpp probes ops with src0->buffer == nullptr to pick a weight buffer
+type (weight_buft_supported). For quantized types the Hexagon buffer repacks
+the rows on upload, and repacked rows cannot be gathered by GET_ROWS, so the
+probe must answer false or the token embedding lands in HTP memory and the
+decoder reads garbage. llama.cpp never hits this because its loader pins
+token_embd to the CPU.
+--- a/ggml/src/ggml-hexagon/ggml-hexagon.cpp
++++ b/ggml/src/ggml-hexagon/ggml-hexagon.cpp
+@@ -4913,6 +4913,9 @@
+         if (extra->flags & GGML_HEXAGON_TENSOR_REPACK) {
+             return false;
+         }
++    } else if (ggml_hexagon_is_repack_type(src0->type)) {
++        // probe from a model loader: a quantized weight placed in our buffer gets repacked, and repacked rows cannot be gathered
++        return false;
+     }
+ 
+     if (src0->type != GGML_TYPE_F32 && src0->ne[0] < 32) {

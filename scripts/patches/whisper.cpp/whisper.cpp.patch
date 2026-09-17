@@ -1,22 +1,249 @@
 Honour whisper_context_params.use_coreml (see whisper.h.patch) when loading the
 Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple targets.
+
+Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
+- weight_buft_supported: only the CPU buffer type is accepted unconditionally.
+  GPU-class devices (Hexagon reports itself as GPU) are probed with
+  supports_op, so ops the backend cannot run on quantized/repacked weights
+  (GET_ROWS on token_embd, unsupported MUL_MAT types) fall back to the CPU
+  buffer instead of asserting at graph time.
+- Mark model buffers as GGML_BACKEND_BUFFER_USAGE_WEIGHTS right after
+  allocation so backends that repack weights on set_tensor (Hexagon) see the
+  usage flag while the tensors are being uploaded.
+- Write the KV caches with ggml_set_rows instead of ggml_cpy when flash
+  attention is on (encoder kv_pad, cross-attention kv_cross, decoder kv_self).
+  The cpy form reshapes and converts f32 -> f16 in one op, which Hexagon's CPY
+  kernel does not support; set_rows is what llama.cpp uses for the same job.
+  The row indices are graph inputs filled after ggml_backend_sched_alloc_graph.
+- whisper_log_callback_default keeps dropping GGML_LOG_LEVEL_DEBUG unless
+  WHISPER_LOG_DEBUG is set (GGML_HEXAGON_PROFILE=1 logs at that level).
 --- a/src/whisper.cpp
 +++ b/src/whisper.cpp
-@@ -3500,10 +3500,12 @@
+@@ -1414,10 +1414,8 @@
+ static bool weight_buft_supported(const whisper_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
+     bool op_supported = true;
+ 
+-    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
+-        ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
+-        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
+-        // GPU and default CPU backend support all operators
++    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type()) {
++        // default CPU backend supports all operators
+         op_supported = true;
+     } else {
+         switch (op) {
+@@ -1457,7 +1455,9 @@
+                 break;
+             }
+             default: {
+-                op_supported = false;
++                // ops other than MUL_MAT / GET_ROWS are assumed supported on GPU-type devices (as before); CPU extra bufts only do those two
++                op_supported = ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
++                               ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU;
+                 break;
+             }
+         };
+@@ -1860,6 +1860,7 @@
+         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
+         if (buf) {
+             model.buffers.emplace_back(buf);
++            ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+ 
+             size_t size_main = ggml_backend_buffer_get_size(buf);
+             WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
+@@ -1960,10 +1961,6 @@
+         }
+     }
+ 
+-    for (auto & buf : model.buffers) {
+-        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+-    }
+-
+     wctx.t_load_us = ggml_time_us() - t_start_us;
+ 
+     return true;
+@@ -2094,6 +2091,14 @@
+ 
+     struct ggml_context * ctx0 = ggml_init(params);
+ 
++    // flash-attn: K/V of the current layer are written into the padded KV with SET_ROWS (row i <- token i)
++    struct ggml_tensor * kv_pad_idxs = nullptr;
++    if (wctx.params.flash_attn) {
++        kv_pad_idxs = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_ctx);
++        ggml_set_name(kv_pad_idxs, "kv_pad_idxs");
++        ggml_set_input(kv_pad_idxs);
++    }
++
+     ggml_cgraph * gf = ggml_new_graph_custom(ctx0, WHISPER_MAX_NODES, false);
+ 
+     struct ggml_tensor * cur = ggml_view_tensor(ctx0, wstate.embd_conv);
+@@ -2171,8 +2176,12 @@
+                         0, 2, 1, 3);
+ 
+             if (wctx.params.flash_attn) {
+-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, ggml_view_1d(ctx0, kv_pad.k, n_ctx*n_state, 0)));
+-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, ggml_view_1d(ctx0, kv_pad.v, n_ctx*n_state, 0)));
++                ggml_build_forward_expand(gf, ggml_set_rows(ctx0,
++                            ggml_view_2d(ctx0, kv_pad.k, n_state, n_ctx_pad, ggml_element_size(kv_pad.k)*n_state, 0),
++                            Kcur, kv_pad_idxs));
++                ggml_build_forward_expand(gf, ggml_set_rows(ctx0,
++                            ggml_view_2d(ctx0, kv_pad.v, n_state, n_ctx_pad, ggml_element_size(kv_pad.v)*n_state, 0),
++                            Vcur, kv_pad_idxs));
+ 
+                 struct ggml_tensor * K =
+                     ggml_view_3d(ctx0, kv_pad.k,
+@@ -2323,6 +2332,14 @@
+ 
+     struct ggml_context * ctx0 = ggml_init(params);
+ 
++    // flash-attn: cross K/V are written with SET_ROWS (row i <- encoder position i)
++    struct ggml_tensor * cross_idxs = nullptr;
++    if (wctx.params.flash_attn) {
++        cross_idxs = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_ctx);
++        ggml_set_name(cross_idxs, "cross_idxs");
++        ggml_set_input(cross_idxs);
++    }
++
+     ggml_cgraph * gf = ggml_new_graph(ctx0);
+ 
+     struct ggml_tensor * cur = ggml_view_tensor(ctx0, wstate.embd_enc);
+@@ -2352,10 +2369,12 @@
+         struct ggml_tensor * v;
+ 
+         if (wctx.params.flash_attn) {
+-            k = ggml_view_1d(ctx0, wstate.kv_cross.k, n_state*n_ctx,
++            k = ggml_view_2d(ctx0, wstate.kv_cross.k, n_state, n_ctx_pad,
++                    ggml_element_size(wstate.kv_cross.k)*n_state,
+                     (ggml_element_size(wstate.kv_cross.k)*n_state)*(il*n_ctx_pad));
+ 
+-            v = ggml_view_1d(ctx0, wstate.kv_cross.v, n_state*n_ctx,
++            v = ggml_view_2d(ctx0, wstate.kv_cross.v, n_state, n_ctx_pad,
++                    ggml_element_size(wstate.kv_cross.v)*n_state,
+                     (ggml_element_size(wstate.kv_cross.v)*n_state)*(il*n_ctx_pad));
+         } else {
+             Vcross = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, Vcross, n_state, n_ctx));
+@@ -2368,8 +2387,13 @@
+                     (il*n_ctx)*ggml_element_size(wstate.kv_cross.v)*n_state);
+         }
+ 
+-        ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcross, k));
+-        ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcross, v));
++        if (wctx.params.flash_attn) {
++            ggml_build_forward_expand(gf, ggml_set_rows(ctx0, k, Kcross, cross_idxs));
++            ggml_build_forward_expand(gf, ggml_set_rows(ctx0, v, Vcross, cross_idxs));
++        } else {
++            ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcross, k));
++            ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcross, v));
++        }
+     }
+ 
+     //ggml_graph_print(gf);
+@@ -2477,6 +2501,13 @@
+             return false;
+         }
+ 
++        if (wctx.params.flash_attn) {
++            struct ggml_tensor * idxs = ggml_graph_get_tensor(gf, "kv_pad_idxs");
++            std::vector<int32_t> rows(ggml_nelements(idxs));
++            for (size_t i = 0; i < rows.size(); ++i) { rows[i] = (int32_t) i; }
++            ggml_backend_tensor_set(idxs, rows.data(), 0, ggml_nbytes(idxs));
++        }
++
+         if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
+             return false;
+         }
+@@ -2493,6 +2524,13 @@
+             return false;
+         }
+ 
++        if (wctx.params.flash_attn) {
++            struct ggml_tensor * idxs = ggml_graph_get_tensor(gf, "cross_idxs");
++            std::vector<int32_t> rows(ggml_nelements(idxs));
++            for (size_t i = 0; i < rows.size(); ++i) { rows[i] = (int32_t) i; }
++            ggml_backend_tensor_set(idxs, rows.data(), 0, ggml_nbytes(idxs));
++        }
++
+         if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
+             return false;
+         }
+@@ -2552,6 +2590,14 @@
+     ggml_set_name(position, "position");
+     ggml_set_input(position);
+ 
++    // flash-attn: self-attention K/V are written into the cache with SET_ROWS (row kv_head + i <- token i)
++    struct ggml_tensor * kv_idxs = nullptr;
++    if (wctx.params.flash_attn) {
++        kv_idxs = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
++        ggml_set_name(kv_idxs, "kv_idxs");
++        ggml_set_input(kv_idxs);
++    }
++
+     const float KQscale = pow(float(n_state_head), -0.25);
+ 
+     struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
+@@ -2619,11 +2665,13 @@
+                 struct ggml_tensor * v;
+ 
+                 if (wctx.params.flash_attn) {
+-                    k = ggml_view_1d(ctx0, kv_self.k, n_tokens*n_state,
+-                            (ggml_element_size(kv_self.k)*n_state)*(il*n_ctx + kv_head));
++                    k = ggml_view_2d(ctx0, kv_self.k, n_state, n_ctx,
++                            ggml_element_size(kv_self.k)*n_state,
++                            (ggml_element_size(kv_self.k)*n_state)*(il*n_ctx));
+ 
+-                    v = ggml_view_1d(ctx0, kv_self.v, n_tokens*n_state,
+-                            (ggml_element_size(kv_self.v)*n_state)*(il*n_ctx + kv_head));
++                    v = ggml_view_2d(ctx0, kv_self.v, n_state, n_ctx,
++                            ggml_element_size(kv_self.v)*n_state,
++                            (ggml_element_size(kv_self.v)*n_state)*(il*n_ctx));
+                 } else {
+                     Vcur = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, Vcur, n_state, n_tokens));
+ 
+@@ -2635,8 +2683,13 @@
+                             (il*n_ctx)*ggml_element_size(kv_self.v)*n_state + kv_head*ggml_element_size(kv_self.v));
+                 }
+ 
+-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
+-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
++                if (wctx.params.flash_attn) {
++                    ggml_build_forward_expand(gf, ggml_set_rows(ctx0, k, Kcur, kv_idxs));
++                    ggml_build_forward_expand(gf, ggml_set_rows(ctx0, v, Vcur, kv_idxs));
++                } else {
++                    ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
++                    ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
++                }
+             }
+ 
+             // ------
+@@ -2947,6 +3000,13 @@
+         }
+ 
+         {
++            if (wctx.params.flash_attn) {
++                struct ggml_tensor * kv_idxs = ggml_graph_get_tensor(gf, "kv_idxs");
++                std::vector<int32_t> rows(n_tokens);
++                for (int i = 0; i < n_tokens; ++i) { rows[i] = (int32_t) (wstate.kv_self.head + i); }
++                ggml_backend_tensor_set(kv_idxs, rows.data(), 0, ggml_nbytes(kv_idxs));
++            }
++
+             struct ggml_tensor * position = ggml_graph_get_tensor(gf, "position");
+             for (int i = 0; i < n_tokens; ++i) {
+                 const int32_t val = batch.pos[i];
+@@ -3500,10 +3560,12 @@
              return nullptr;
          }
          const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
 -        WHISPER_LOG_INFO("%s: alignment heads masks size = %ld B\n", __func__, memory_size);
 +        WHISPER_LOG_INFO("%s: alignment heads masks size = %zu B\n", __func__, memory_size);
      }
-+
  
++
  #ifdef WHISPER_USE_COREML
 +    if (ctx->params.use_coreml) {
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
  
      WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -3519,6 +3521,7 @@
+@@ -3519,6 +3581,7 @@
      } else {
          WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
      }
@@ -24,7 +251,7 @@ Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple target
  #endif
  
  #ifdef WHISPER_USE_VITISAI
-@@ -3687,6 +3690,7 @@
+@@ -3687,6 +3750,7 @@
  struct whisper_context_params whisper_context_default_params() {
      struct whisper_context_params result = {
          /*.use_gpu              =*/ true,
@@ -32,3 +259,46 @@ Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple target
          /*.flash_attn           =*/ true,
          /*.gpu_device           =*/ 0,
  
+@@ -4572,10 +4636,8 @@
+ static bool weight_buft_supported(const whisper_vad_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
+     bool op_supported = true;
+ 
+-    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
+-        ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
+-        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
+-        // GPU and default CPU backend support all operators
++    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type()) {
++        // default CPU backend supports all operators
+         op_supported = true;
+     } else {
+         switch (op) {
+@@ -4608,7 +4670,9 @@
+                 break;
+             }
+             default: {
+-                op_supported = false;
++                // ops other than MUL_MAT / GET_ROWS are assumed supported on GPU-type devices (as before); CPU extra bufts only do those two
++                op_supported = ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
++                               ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU;
+                 break;
+             }
+         };
+@@ -5095,6 +5159,7 @@
+         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
+         if (buf) {
+             model.buffers.emplace_back(buf);
++            ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+ 
+             size_t size_main = ggml_backend_buffer_get_size(buf);
+             WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
+@@ -9298,7 +9363,9 @@
+     (void) level;
+     (void) user_data;
+ #ifndef WHISPER_DEBUG
+-    if (level == GGML_LOG_LEVEL_DEBUG) {
++    // experimental: WHISPER_LOG_DEBUG=1 lets backend debug/profile lines (e.g. GGML_HEXAGON_PROFILE) through
++    static const bool pass_debug = getenv("WHISPER_LOG_DEBUG") != nullptr;
++    if (level == GGML_LOG_LEVEL_DEBUG && !pass_debug) {
+         return;
+     }
+ #endif

@@ -391,9 +391,12 @@ export type ContextOptions = {
   isBundleAsset?: boolean
   /** Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. */
   useCoreMLIos?: boolean
-  /** Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. */
+  /**
+   * Use GPU if available: Metal on iOS, Hexagon NPU on supported Android devices
+   * (see the Android installation notes). If it's enabled, Core ML option will be ignored.
+   */
   useGpu?: boolean
-  /** Use Flash Attention, only recommended if GPU available */
+  /** Use Flash Attention, only recommended if GPU available. Always on when the Hexagon NPU is used. */
   useFlashAttn?: boolean
 }
 

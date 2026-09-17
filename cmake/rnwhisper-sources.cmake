@@ -25,8 +25,9 @@ set(RNWHISPER_INCLUDE_DIRS
 )
 
 # --- version definitions ------------------------------------------------------
-# whisper.cpp passes these from its own CMake project and git history. The
-# vendor sync records them in src/version.json (scripts/sync-vendor.sh).
+# whisper.cpp passes these from its own CMake project. The vendor sync records
+# them in src/version.json (scripts/sync-vendor.sh); ggml's own version macros
+# come from the generated ggml/src/ggml-version.h.
 function(_rnwhisper_version_field key out_var)
     file(READ "${RNWHISPER_ROOT_DIR}/src/version.json" _json)
     if (NOT _json MATCHES "\"${key}\":\"([^\"]+)\"")
@@ -34,14 +35,10 @@ function(_rnwhisper_version_field key out_var)
     endif ()
     set(${out_var} "${CMAKE_MATCH_1}" PARENT_SCOPE)
 endfunction()
-_rnwhisper_version_field(version     RNWHISPER_WHISPER_VERSION)
-_rnwhisper_version_field(ggmlVersion RNWHISPER_GGML_VERSION)
-_rnwhisper_version_field(commit      RNWHISPER_BUILD_COMMIT)
+_rnwhisper_version_field(version RNWHISPER_WHISPER_VERSION)
 set(RNWHISPER_VERSION_DEFINITIONS
     WHISPER_VERSION="${RNWHISPER_WHISPER_VERSION}"
     PARAKEET_VERSION="${RNWHISPER_WHISPER_VERSION}"
-    GGML_VERSION="${RNWHISPER_GGML_VERSION}"
-    GGML_COMMIT="${RNWHISPER_BUILD_COMMIT}"
 )
 
 # --- ggml ---------------------------------------------------------------------
@@ -74,6 +71,11 @@ set(RNWHISPER_GGML_CPU_ARCH_DIR "${_ggml}/ggml-cpu/arch")
 set(RNWHISPER_GGML_METAL_DIR "${_ggml}/ggml-metal")
 file(GLOB RNWHISPER_GGML_METAL_SOURCES      CONFIGURE_DEPENDS ${_ggml}/ggml-metal/*.cpp ${_ggml}/ggml-metal/*.m)
 file(GLOB RNWHISPER_GGML_METAL_OBJC_SOURCES CONFIGURE_DEPENDS ${_ggml}/ggml-metal/*.m)  # need -fno-objc-arc
+
+# Hexagon (Android only). The host side is ggml-hexagon.cpp + htp-drv.cpp plus
+# the FastRPC stub that scripts/build-hexagon-htp.sh generates into htp/v73/;
+# the DSP side (htp/) is cross-compiled by that script into libggml-htp-*.so.
+set(RNWHISPER_GGML_HEXAGON_DIR "${_ggml}/ggml-hexagon")
 
 # --- whisper ------------------------------------------------------------------
 set(RNWHISPER_WHISPER_SOURCES

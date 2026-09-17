@@ -108,6 +108,7 @@ export default function App() {
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+              log(ctx.gpu ? 'Using GPU' : `Using CPU${ctx.reasonNoGPU ? `: ${ctx.reasonNoGPU}` : ''}`)
               whisperContextRef.current = ctx
             }}
           />
@@ -159,6 +160,7 @@ export default function App() {
               const endTime = Date.now()
               log('Loaded model, ID:', ctx.id)
               log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+              log(ctx.gpu ? 'Using GPU' : `Using CPU${ctx.reasonNoGPU ? `: ${ctx.reasonNoGPU}` : ''}`)
               whisperContextRef.current = ctx
               setDownloadProgress(0)
             } catch (error) {

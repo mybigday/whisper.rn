@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "whisper.h"
+#include "ggml-backend.h"
 #include "rn-whisper.h"
 #include "RNWhisperJSI.h"
 
@@ -612,6 +613,22 @@ void setAndroidContext(JNIEnv *env, jobject applicationContext, jobject assetMan
     g_assetManager = env->NewGlobalRef(assetManager);
 }
 
+// Hexagon is the only GPU-class backend the Android build can carry, and only
+// the rnwhisper_*_hexagon variant compiles it in (android/src/main/CMakeLists.txt).
+// whisper.cpp takes the first GPU device the registry reports, so this mirrors
+// whisper_backend_init_gpu.
+static bool hexagonDeviceAvailable(std::string &reasonNoGPU) {
+#ifdef GGML_USE_HEXAGON
+    if (ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU) != nullptr) {
+        return true;
+    }
+    reasonNoGPU = "No Hexagon NPU device found";
+#else
+    reasonNoGPU = "Hexagon backend not available in this build";
+#endif
+    return false;
+}
+
 WhisperContextInitResult hostInitWhisperContext(
     const WhisperContextInitOptions &options) {
     WhisperContextInitResult result;
@@ -623,13 +640,17 @@ WhisperContextInitResult hostInitWhisperContext(
 
     auto params = whisper_context_default_params();
     params.dtw_token_timestamps = false;
-    params.use_gpu = false;
     params.flash_attn = options.useFlashAttn;
     params.use_coreml = false;
-
-    if (options.useGpu) {
-        result.reasonNoGPU = "Currently not supported";
+    params.use_gpu = options.useGpu && hexagonDeviceAvailable(result.reasonNoGPU);
+    if (params.use_gpu && !params.flash_attn) {
+        // whisper.cpp writes the KV caches with ggml_set_rows only on the
+        // flash-attention path; the other path uses a transposed ggml_cpy that
+        // the Hexagon backend cannot run.
+        __android_log_print(ANDROID_LOG_INFO, kTag, "Hexagon NPU in use, enabling flash attention");
+        params.flash_attn = true;
     }
+    result.gpu = params.use_gpu;
 
     std::string modelPath = options.filePath;
     if (isRemoteUrl(modelPath)) {
@@ -670,12 +691,13 @@ WhisperVadContextInitResult hostInitWhisperVadContext(
     }
 
     auto params = whisper_vad_default_context_params();
+    // Not validated on Hexagon yet; keep the VAD model on the CPU.
     params.use_gpu = false;
     if (options.nThreads > 0) {
         params.n_threads = options.nThreads;
     }
     if (options.useGpu) {
-        result.reasonNoGPU = "Currently not supported";
+        result.reasonNoGPU = "VAD runs on the CPU on Android";
     }
 
     std::string modelPath = options.filePath;
@@ -717,9 +739,10 @@ ParakeetContextInitResult hostInitParakeetContext(
     }
 
     auto params = parakeet_context_default_params();
+    // Not validated on Hexagon yet; keep Parakeet on the CPU.
     params.use_gpu = false;
     if (options.useGpu) {
-        result.reasonNoGPU = "Currently not supported";
+        result.reasonNoGPU = "Parakeet runs on the CPU on Android";
     }
 
     std::string modelPath = options.filePath;
