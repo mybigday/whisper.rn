@@ -866,7 +866,7 @@ struct whisper_state {
 
     whisper_mel mel;
 
-    whisper_batch batch;
+    whisper_batch batch = {}; // freed by whisper_free_state, also on early init failures
 
     whisper_decoder decoders[WHISPER_MAX_DECODERS];
 
@@ -1858,13 +1858,15 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
         ggml_backend_buffer_type_t buft = p.first;
         ggml_context * ctx = p.second;
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
-        if (buf) {
-            model.buffers.emplace_back(buf);
-            ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
-
-            size_t size_main = ggml_backend_buffer_get_size(buf);
-            WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
+        if (!buf) {
+            WHISPER_LOG_ERROR("%s: failed to allocate %s buffer\n", __func__, ggml_backend_buft_name(buft));
+            return false;
         }
+        model.buffers.emplace_back(buf);
+        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+
+        size_t size_main = ggml_backend_buffer_get_size(buf);
+        WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
     }
 
     // load weights
@@ -3884,7 +3886,8 @@ struct whisper_context * whisper_init_with_params_no_state(struct whisper_model_
     if (!model_loaded) {
         loader->close(loader->context);
         WHISPER_LOG_ERROR("%s: failed to load model\n", __func__);
-        delete ctx;
+        // also release the buffers allocated before the failure
+        whisper_free(ctx);
         return nullptr;
     }
 
@@ -5157,13 +5160,16 @@ struct whisper_vad_context * whisper_vad_init_with_params(
         ggml_backend_buffer_type_t buft = p.first;
         ggml_context * ctx = p.second;
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
-        if (buf) {
-            model.buffers.emplace_back(buf);
-            ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
-
-            size_t size_main = ggml_backend_buffer_get_size(buf);
-            WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
+        if (!buf) {
+            WHISPER_LOG_ERROR("%s: failed to allocate %s buffer\n", __func__, ggml_backend_buft_name(buft));
+            whisper_vad_free(vctx);
+            return nullptr;
         }
+        model.buffers.emplace_back(buf);
+        ggml_backend_buffer_set_usage(buf, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+
+        size_t size_main = ggml_backend_buffer_get_size(buf);
+        WHISPER_LOG_INFO("%s: %12s total size = %8.2f MB\n", __func__, ggml_backend_buffer_name(buf), size_main / 1e6);
     }
 
     // load weights

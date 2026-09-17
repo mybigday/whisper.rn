@@ -650,32 +650,47 @@ WhisperContextInitResult hostInitWhisperContext(
         __android_log_print(ANDROID_LOG_INFO, kTag, "Hexagon NPU in use, enabling flash attention");
         params.flash_attn = true;
     }
-    result.gpu = params.use_gpu;
 
     std::string modelPath = options.filePath;
     if (isRemoteUrl(modelPath)) {
         modelPath = downloadToCache(env, modelPath, "");
     }
 
-    if (options.isBundleAsset || isAssetPath(modelPath)) {
-        result.context = whisperInitFromAsset(
-            env,
-            getAssetManager(),
-            stripAssetPrefix(modelPath),
-            params);
-    } else {
+    auto initContext = [&](whisper_context_params contextParams) -> whisper_context * {
+        if (options.isBundleAsset || isAssetPath(modelPath)) {
+            return whisperInitFromAsset(
+                env,
+                getAssetManager(),
+                stripAssetPrefix(modelPath),
+                contextParams);
+        }
         int resourceId = getResourceIdentifier(env, modelPath);
         if (resourceId != 0) {
+            whisper_context *context = nullptr;
             jobject pushbackStream = openPushbackInputStreamForResource(env, resourceId);
             if (pushbackStream) {
-                result.context = whisperInitFromInputStream(env, pushbackStream, params);
+                context = whisperInitFromInputStream(env, pushbackStream, contextParams);
                 env->DeleteLocalRef(pushbackStream);
             }
-        } else if (!modelPath.empty()) {
-            result.context =
-                whisper_init_from_file_with_params(modelPath.c_str(), params);
+            return context;
         }
+        if (!modelPath.empty()) {
+            return whisper_init_from_file_with_params(modelPath.c_str(), contextParams);
+        }
+        return nullptr;
+    };
+
+    result.context = initContext(params);
+    if (!result.context && params.use_gpu) {
+        // The NPU can refuse memory (e.g. the DSP fails to map a buffer); the
+        // model still works on the CPU, so retry there instead of failing.
+        __android_log_print(ANDROID_LOG_WARN, kTag, "Hexagon NPU init failed, retrying on CPU");
+        params.use_gpu = false;
+        params.flash_attn = options.useFlashAttn;
+        result.context = initContext(params);
+        result.reasonNoGPU = "Failed to initialize on the Hexagon NPU (see logcat)";
     }
+    result.gpu = result.context != nullptr && params.use_gpu;
 
     detachThreadIfNeeded(needsDetach);
     return result;
