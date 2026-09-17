@@ -139,7 +139,7 @@ public class RNWhisper {
 
     for (String libName : HTP_LIBS) {
       File outFile = new File(htpDir, libName);
-      try (InputStream in = context.getAssets().open("ggml-hexagon/" + libName);
+      try (InputStream in = context.getAssets().open("rnwhisper-hexagon/" + libName);
            FileOutputStream out = new FileOutputStream(outFile)) {
         byte[] buffer = new byte[64 * 1024];
         int read;
@@ -147,7 +147,7 @@ public class RNWhisper {
           out.write(buffer, 0, read);
         }
       } catch (IOException error) {
-        Log.w(TAG, "HTP library " + libName + " not bundled in assets/ggml-hexagon; using CPU");
+        Log.w(TAG, "HTP library " + libName + " not bundled in assets/rnwhisper-hexagon; using CPU");
         return false;
       }
       outFile.setReadable(true, false);

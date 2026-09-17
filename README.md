@@ -48,7 +48,7 @@ By default, `whisper.rn` will use pre-built libraries for Android: the whisper.c
 
 On Snapdragon devices with a Hexagon Tensor Processor (SM8450 / 8 Gen 1 and newer), `whisper.rn` can run the whisper model on the NPU through ggml's Hexagon backend. It is used automatically when `useGpu` is on (the default) and the device qualifies; check `WhisperContext.gpu` / `reasonNoGPU` after `initWhisper`. The NPU path always uses flash attention. VAD and Parakeet contexts stay on the CPU.
 
-The pre-built libraries include everything the backend needs: the `rnwhisper_v8fp16_va_2_hexagon` variant, and the DSP-side libraries `libggml-htp-*.so` in the package's `bin/arm64-v8a/`, which `whisper.rn`'s Gradle build copies into your app's `src/main/assets/ggml-hexagon/` (the library extracts them at runtime and points the DSP loader at them). Just add the FastRPC loader to your app manifest so the library can open it at runtime:
+The pre-built libraries include everything the backend needs: the `rnwhisper_v8fp16_va_2_hexagon` variant, and the DSP-side libraries `libggml-htp-*.so` in the package's `bin/arm64-v8a/`, which `whisper.rn`'s Gradle build copies into your app's `src/main/assets/rnwhisper-hexagon/` (the library extracts them at runtime and points the DSP loader at them). Just add the FastRPC loader to your app manifest so the library can open it at runtime:
 
 ```xml
 <uses-native-library android:name="libcdsprpc.so" android:required="false" />
