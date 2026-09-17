@@ -42,11 +42,16 @@ set(RNWHISPER_VERSION_DEFINITIONS
 )
 
 # --- ggml ---------------------------------------------------------------------
+# vendor/whisper.cpp also carries what upstream's CMake project needs for
+# whisper.node (see vendor/README.md); the filters below leave out the parts
+# no whisper.rn build uses. Keep them in sync with whisper-rn.podspec.
 file(GLOB RNWHISPER_GGML_CPU_SOURCES CONFIGURE_DEPENDS
     ${_ggml}/ggml-cpu/*.c
     ${_ggml}/ggml-cpu/*.cpp
     ${_ggml}/ggml-cpu/amx/*.cpp
 )
+# Intel HBM allocator (GGML_USE_CPU_HBM); never enabled here.
+list(FILTER RNWHISPER_GGML_CPU_SOURCES EXCLUDE REGEX "/hbm\\.cpp$")
 set(RNWHISPER_GGML_SOURCES
     ${_ggml}/ggml.c
     ${_ggml}/ggml.cpp

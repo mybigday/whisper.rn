@@ -4,7 +4,10 @@
 #
 #   1. clone (once) or fetch upstream into $WHISPER_RN_CACHE_DIR
 #   2. export the subset whisper.rn builds, keeping the upstream directory
-#      layout and file contents untouched
+#      layout and file contents untouched. vendor/whisper.cpp is also consumed
+#      by whisper.node through upstream's own CMake project, so it additionally
+#      carries the build files, the examples/ helpers whisper.node compiles and
+#      the desktop backends that project needs.
 #   3. apply scripts/patches/whisper.cpp/*.patch (-p1, paths relative to the tree)
 #   4. regenerate src/version.json (whisper/ggml versions upstream derives from
 #      its CMake project; the builds pass them as compile definitions)
@@ -31,15 +34,26 @@ source "$VENDOR_DIR/VERSIONS"
 WHISPER_CPP_PATHS=(
   LICENSE
 
+  # Upstream CMake project. whisper.rn's builds list sources themselves
+  # (cmake/rnwhisper-sources.cmake, whisper-rn.podspec); whisper.node builds
+  # this tree with add_subdirectory(), so the project files are part of the
+  # subset.
+  CMakeLists.txt
+  cmake
+
   include
 
+  src/CMakeLists.txt
   src/whisper.cpp
   src/whisper-arch.h
   src/parakeet.cpp
   src/parakeet-arch.h
   src/coreml
 
+  ggml/CMakeLists.txt
+  ggml/cmake
   ggml/include
+  ggml/src/CMakeLists.txt
   ggml/src/ggml.c
   ggml/src/ggml.cpp
   ggml/src/ggml-alloc.c
@@ -60,6 +74,10 @@ WHISPER_CPP_PATHS=(
   ggml/src/ggml-version.h.in
   ggml/src/gguf.cpp
 
+  # ggml-cpu minus the arch dirs whisper.rn/whisper.node never target
+  # (loongarch, powerpc, riscv, s390 and spacemit)
+  ggml/src/ggml-cpu/CMakeLists.txt
+  ggml/src/ggml-cpu/cmake
   ggml/src/ggml-cpu/arch-fallback.h
   ggml/src/ggml-cpu/binary-ops.cpp
   ggml/src/ggml-cpu/binary-ops.h
@@ -67,6 +85,8 @@ WHISPER_CPP_PATHS=(
   ggml/src/ggml-cpu/ggml-cpu-impl.h
   ggml/src/ggml-cpu/ggml-cpu.c
   ggml/src/ggml-cpu/ggml-cpu.cpp
+  ggml/src/ggml-cpu/hbm.cpp
+  ggml/src/ggml-cpu/hbm.h
   ggml/src/ggml-cpu/iqp.cpp
   ggml/src/ggml-cpu/iqp.h
   ggml/src/ggml-cpu/ops.cpp
@@ -84,13 +104,30 @@ WHISPER_CPP_PATHS=(
   ggml/src/ggml-cpu/vec.cpp
   ggml/src/ggml-cpu/vec.h
   ggml/src/ggml-cpu/amx
+  ggml/src/ggml-cpu/kleidiai
+  ggml/src/ggml-cpu/llamafile
   ggml/src/ggml-cpu/arch/arm
+  ggml/src/ggml-cpu/arch/wasm
   ggml/src/ggml-cpu/arch/x86
 
-  ggml/src/ggml-metal
-  # Hexagon (Android HTP): host backend plus the DSP sources that
-  # scripts/build-hexagon-htp.sh cross-compiles with the Hexagon SDK.
+  # Backends. whisper.rn builds Metal and Hexagon (Android HTP: host backend
+  # plus the DSP sources that scripts/build-hexagon-htp.sh cross-compiles with
+  # the Hexagon SDK); whisper.node additionally builds BLAS, CUDA, Vulkan and
+  # WebGPU (its WASM package).
+  ggml/src/ggml-blas
+  ggml/src/ggml-cuda
   ggml/src/ggml-hexagon
+  ggml/src/ggml-metal
+  ggml/src/ggml-vulkan
+  ggml/src/ggml-webgpu
+
+  # Audio decoding helpers from examples/ that whisper.node compiles
+  # (common-whisper.cpp pulls in common.h, miniaudio and stb_vorbis).
+  examples/common-whisper.cpp
+  examples/common-whisper.h
+  examples/common.h
+  examples/miniaudio.h
+  examples/stb_vorbis.c
 
   # Example app assets (scripts/bootstrap.sh); the CI build uses the dummy models
   models/for-tests-ggml-base.bin
@@ -98,11 +135,8 @@ WHISPER_CPP_PATHS=(
   samples/jfk.wav
 )
 
-# Exported by a directory pathspec above but not wanted: upstream build files
-# make no sense for a partial tree.
-WHISPER_CPP_PRUNE=(
-  ggml/src/ggml-metal/CMakeLists.txt
-)
+# Exported by a directory pathspec above but not wanted.
+WHISPER_CPP_PRUNE=()
 
 # Files that live inside the tree but are not upstream content. None today;
 # kept so the export loop matches llama.rn's.

@@ -95,6 +95,7 @@ whisper.rn has a 4-layer architecture:
 4. **C++ Core** (`cpp/` + `vendor/`):
    - `cpp/` holds only whisper.rn's own code: `rn-whisper.cpp/h` (job management, transcription orchestration), `rn-whisper-log.h`, and `jsi/`
    - whisper.cpp is vendored under `vendor/whisper.cpp/` in its upstream layout (`include/`, `src/` with `whisper.cpp`, `parakeet.cpp` and `coreml/`, `ggml/{include,src}` with the CPU and Metal backends), pinned by `vendor/VERSIONS`, with whisper.rn changes kept as `-p1` patches in `scripts/patches/whisper.cpp/`. No git submodule, no symbol renaming. See `vendor/README.md`.
+   - `vendor/whisper.cpp` is also consumed by whisper.node via upstream's CMake project, so it carries upstream's build files, `examples/common-whisper.*` (with `miniaudio.h`/`stb_vorbis.c`) and the BLAS/CUDA/Vulkan/WebGPU backends. whisper.rn's builds never compile those; `cmake/rnwhisper-sources.cmake` and `whisper-rn.podspec` filter them out (keep the two in sync).
    - `cmake/rnwhisper-sources.cmake` is the single source/include list every CMake build uses; `whisper-rn.podspec` mirrors it for CocoaPods
 
 ### Context Management

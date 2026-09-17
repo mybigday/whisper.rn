@@ -6,10 +6,22 @@ build (CocoaPods, the CMake projects) compiles these files in place.
 
 | Directory | Upstream | What is vendored |
 | --- | --- | --- |
-| `whisper.cpp/` | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `include/`, `src/` (whisper, parakeet, `coreml/`), `ggml/{include,src}` (CPU, Metal and Hexagon backends), `LICENSE`, plus the dummy test models and `samples/jfk.wav` the example app uses |
+| `whisper.cpp/` | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `include/`, `src/` (whisper, parakeet, `coreml/`), `ggml/{include,src}` (CPU, Metal, Hexagon, BLAS, CUDA, Vulkan and WebGPU backends), the audio-decoding helpers from `examples/`, the CMake project files, `LICENSE`, plus the dummy test models and `samples/jfk.wav` the example app uses |
 
 `VERSIONS` pins the upstream ref and resolved commit. The exact file list
 lives in `scripts/sync-vendor.sh`.
+
+`whisper.cpp/` serves two consumers. whisper.rn's builds pick their sources from
+`cmake/rnwhisper-sources.cmake` and `whisper-rn.podspec`. [whisper.node](https://github.com/mybigday/whisper.node)
+syncs whisper.rn and builds the same tree through upstream's own CMake project
+(`add_subdirectory(vendor/whisper.cpp)`), which is why the tree also carries the
+`CMakeLists.txt`/`cmake/` files, `examples/common-whisper.*` with `miniaudio.h`
+and `stb_vorbis.c`, the BLAS/CUDA/Vulkan/WebGPU backends and the wasm CPU kernels.
+whisper.rn never compiles those; its source lists filter them out, and the npm
+package leaves out the CUDA, Vulkan and WebGPU backends. Note that upstream's
+`cmake/build-info.cmake` reads the enclosing git checkout, so a build through
+that project reports whisper.rn's commit, not whisper.cpp's; the pinned upstream
+commit is in `VERSIONS` and `src/version.json`.
 
 ## Updating whisper.cpp
 

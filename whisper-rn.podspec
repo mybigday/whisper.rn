@@ -60,6 +60,11 @@ Pod::Spec.new do |s|
       "#{whisper_cpp}/ggml/src/*.{h,c,cpp}",
       "#{whisper_cpp}/ggml/src/ggml-cpu/**/*.{h,c,cpp}",
       "#{ggml_metal}/*.{h,cpp}"
+    # Exclude what no whisper.rn build compiles (same set as the filters in
+    # cmake/rnwhisper-sources.cmake): the parts of vendor/whisper.cpp that are
+    # only there for upstream's CMake project (see vendor/README.md).
+    s.exclude_files = "#{whisper_cpp}/ggml/src/ggml-cpu/hbm.cpp",
+      "#{whisper_cpp}/ggml/src/ggml-cpu/{kleidiai,llamafile,arch/wasm}/*"
     # Metal kernels are compiled at runtime from these sources.
     s.resources = [
       "#{ggml_metal}/kernels",
