@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 
+# AGP entry point. Builds the JNI/JSI wrapper (jni.cpp + cpp/jsi) from source
+# for every CPU-feature variant, because it links against the host app's React
+# Native (fbjni/jsi/reactnative prefab targets) and therefore depends on the RN
+# version. Each wrapper links one rnwhisper core library (rnwhisper/CMakeLists.txt):
+#   - prebuilt (default): jniLibs/<abi>/lib<core>.so, downloaded by the package's
+#     postinstall from the matching GitHub release (install/download-native-artifacts.js)
+#   - from source (-DRNWHISPER_BUILD_FROM_SOURCE=ON, gradle rnwhisperBuildFromSource=true):
+#     the core is built here as a subdirectory
 project(whisper.rn)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -7,60 +15,71 @@ set(CMAKE_CXX_STANDARD 17)
 # Configure STL to be compatible with ReactAndroid JSI libraries
 set(CMAKE_ANDROID_STL_TYPE c++_shared)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/rnwhisper-build-options.cmake)
+
 # Find ReactAndroid package for JSI
 find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/rnwhisper-sources.cmake)
 
-# Hexagon (Qualcomm NPU). The rnwhisper_*_hexagon variant is only built when
-# the SDK is present: its host side needs the SDK's FastRPC headers and the
-# stub that scripts/build-hexagon-htp.sh generates into htp/v73/ (the driver
-# itself dlopens the device's libcdsprpc.so, see htp-drv.cpp). The DSP-side
-# libggml-htp-*.so come from the same script and are shipped as app assets
-# (see ../../build.gradle).
-set(HEXAGON_SDK_ROOT "" CACHE PATH "Hexagon SDK root directory")
-set(RNWHISPER_HEXAGON_STUB_DIR "${RNWHISPER_GGML_HEXAGON_DIR}/htp/v73")
-if (HEXAGON_SDK_ROOT AND IS_DIRECTORY "${HEXAGON_SDK_ROOT}/incs/stddef")
-    set(RNWHISPER_HEXAGON_AVAILABLE ON)
-    message(STATUS "Hexagon SDK found at ${HEXAGON_SDK_ROOT}")
+option(RNWHISPER_BUILD_FROM_SOURCE "Build the rnwhisper core libraries from source instead of using jniLibs prebuilts" OFF)
+
+set(RNWHISPER_PREBUILT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/jniLibs/${ANDROID_ABI}")
+
+if (RNWHISPER_BUILD_FROM_SOURCE)
+    message(STATUS "whisper.rn: building rnwhisper core libraries from source")
+    add_subdirectory(rnwhisper)
 else ()
-    set(RNWHISPER_HEXAGON_AVAILABLE OFF)
-    message(STATUS "Hexagon SDK not found, skipping the rnwhisper_*_hexagon variant")
+    message(STATUS "whisper.rn: using prebuilt rnwhisper core libraries from ${RNWHISPER_PREBUILT_DIR}")
+    if (NOT EXISTS "${RNWHISPER_PREBUILT_DIR}/librnwhisper.so")
+        message(FATAL_ERROR
+            "whisper.rn: no prebuilt libraries for ${ANDROID_ABI} at ${RNWHISPER_PREBUILT_DIR}. "
+            "Run `npx whisper-rn-download-artifacts` (the package's postinstall) to fetch them, "
+            "or set `rnwhisperBuildFromSource=true` in android/gradle.properties to build from source.")
+    endif ()
 endif ()
-
-include_directories(
-    ${RNWHISPER_INCLUDE_DIRS}
-    ${RNWHISPER_CPP_DIR}/jsi
-)
-
-set(
-    SOURCE_FILES
-    ${RNWHISPER_CORE_SOURCES}
-    ${RNWHISPER_CPP_DIR}/jsi/RNWhisperJSI.cpp
-    ${CMAKE_SOURCE_DIR}/jni.cpp
-)
 
 find_library(LOG_LIB log)
 
-function(build_library target_name arch cpu_flags)
-    if (NOT ${arch} STREQUAL "generic")
-        set(SOURCE_FILES_ARCH
-            ${RNWHISPER_GGML_CPU_ARCH_DIR}/${arch}/quants.c
-            ${RNWHISPER_GGML_CPU_ARCH_DIR}/${arch}/repack.cpp
-        )
+set(JNI_SOURCE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/jni.cpp
+    ${RNWHISPER_CPP_DIR}/jsi/RNWhisperJSI.cpp
+)
+
+# The wrapper for core library ${core_name} is lib${jni_name}.so; RNWhisper.java
+# loads the wrapper and the dynamic linker pulls the core in through DT_NEEDED.
+function(build_rnwhisper_jni jni_name core_name)
+    rnwhisper_variant_enabled(${core_name} VARIANT_ENABLED)
+    if (NOT VARIANT_ENABLED)
+        message(STATUS "Skipping ${jni_name} - not in RNWHISPER_ANDROID_VARIANTS")
+        return()
     endif ()
 
-    add_library(
-        ${target_name}
-        SHARED
-        ${SOURCE_FILES}
-        ${SOURCE_FILES_ARCH}
+    if (RNWHISPER_BUILD_FROM_SOURCE)
+        if (NOT TARGET ${core_name})
+            # e.g. the Hexagon variant without the SDK on the build host
+            message(STATUS "Skipping ${jni_name} - ${core_name} is not built")
+            return()
+        endif ()
+    else ()
+        set(PREBUILT_LIB "${RNWHISPER_PREBUILT_DIR}/lib${core_name}.so")
+        if (NOT EXISTS "${PREBUILT_LIB}")
+            message(STATUS "Skipping ${jni_name} - no prebuilt lib${core_name}.so for ${ANDROID_ABI}")
+            return()
+        endif ()
+    endif ()
+
+    add_library(${jni_name} SHARED ${JNI_SOURCE_FILES})
+
+    target_include_directories(${jni_name} PRIVATE
+        ${RNWHISPER_INCLUDE_DIRS}
+        ${RNWHISPER_CPP_DIR}/jsi
     )
 
     # Link JSI libraries
-    if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 76)
-        target_link_libraries(${target_name}
+    if (${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 76)
+        target_link_libraries(${jni_name} PRIVATE
             ${LOG_LIB}
             android
             fbjni::fbjni
@@ -68,7 +87,7 @@ function(build_library target_name arch cpu_flags)
             ReactAndroid::reactnative
         )
     else ()
-        target_link_libraries(${target_name}
+        target_link_libraries(${jni_name} PRIVATE
             ${LOG_LIB}
             android
             fbjni::fbjni
@@ -78,70 +97,42 @@ function(build_library target_name arch cpu_flags)
         )
     endif ()
 
-    if (${arch} STREQUAL "generic")
-        target_compile_options(${target_name} PRIVATE -DGGML_CPU_GENERIC)
+    if (RNWHISPER_BUILD_FROM_SOURCE)
+        target_link_libraries(${jni_name} PRIVATE ${core_name})
+    else ()
+        # Linking the .so by path records its SONAME (lib${core_name}.so) as
+        # DT_NEEDED; AGP packages the file itself from src/main/jniLibs.
+        target_link_libraries(${jni_name} PRIVATE ${PREBUILT_LIB})
     endif ()
 
-    # Expose Linux CPU affinity APIs used by ggml on Android.
-    target_compile_definitions(${target_name} PRIVATE _GNU_SOURCE ${RNWHISPER_VERSION_DEFINITIONS})
-    target_compile_options(${target_name} PRIVATE -DGGML_USE_CPU -DGGML_USE_CPU_REPACK -pthread ${cpu_flags})
+    # The core exports its API with visibility("default") under these macros;
+    # the wrapper only consumes it.
+    target_compile_definitions(${jni_name} PRIVATE
+        GGML_SHARED WHISPER_SHARED PARAKEET_SHARED RNWHISPER_SHARED
+    )
 
-    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        target_compile_options(${target_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
+    # jni.cpp reports the Hexagon device only in the variant that carries it.
+    if (${core_name} MATCHES "_hexagon$")
+        target_compile_options(${jni_name} PRIVATE -DGGML_USE_HEXAGON)
     endif ()
 
-    if (${target_name} MATCHES "_hexagon$")
-        if (NOT EXISTS "${RNWHISPER_HEXAGON_STUB_DIR}/htp_iface_stub.c" OR NOT EXISTS "${RNWHISPER_HEXAGON_STUB_DIR}/htp_iface.h")
-            message(FATAL_ERROR
-                "Hexagon FastRPC stub is missing; run scripts/build-hexagon-htp.sh to generate ${RNWHISPER_HEXAGON_STUB_DIR}")
-        endif ()
-
-        target_sources(${target_name} PRIVATE
-            ${RNWHISPER_GGML_HEXAGON_DIR}/ggml-hexagon.cpp
-            ${RNWHISPER_GGML_HEXAGON_DIR}/htp-drv.cpp
-            ${RNWHISPER_HEXAGON_STUB_DIR}/htp_iface_stub.c
-        )
-        target_include_directories(${target_name} PRIVATE
-            ${HEXAGON_SDK_ROOT}/incs
-            ${HEXAGON_SDK_ROOT}/incs/stddef
-            ${HEXAGON_SDK_ROOT}/ipc/fastrpc/rpcmem/inc
-            ${HEXAGON_SDK_ROOT}/utils/examples
-            ${RNWHISPER_GGML_HEXAGON_DIR}
-            ${RNWHISPER_GGML_HEXAGON_DIR}/htp
-            ${RNWHISPER_HEXAGON_STUB_DIR}
-        )
-        target_link_libraries(${target_name} dl)
-        target_compile_options(${target_name} PRIVATE -DGGML_USE_HEXAGON)
+    if (CMAKE_BUILD_TYPE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_options(${jni_name} PRIVATE -DRNWHISPER_ANDROID_ENABLE_LOGGING)
     endif ()
 
-    # NOTE: If you want to debug the native code, you can uncomment if and endif
-    # Note that it will be extremely slow
-    # if (NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        target_compile_options(${target_name} PRIVATE -O3 -DNDEBUG)
-        target_compile_options(${target_name} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
-        target_compile_options(${target_name} PRIVATE -ffunction-sections -fdata-sections)
+    target_compile_options(${jni_name} PRIVATE -pthread)
+    target_compile_options(${jni_name} PRIVATE -O3 -DNDEBUG)
+    target_compile_options(${jni_name} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+    target_compile_options(${jni_name} PRIVATE -ffunction-sections -fdata-sections)
 
-        target_link_options(${target_name} PRIVATE -Wl,--gc-sections)
-        target_link_options(${target_name} PRIVATE -Wl,--exclude-libs,ALL)
-        # ggml/whisper symbols keep upstream names. Bind this library's own
-        # references at link time so a second ggml copy in the process (e.g.
-        # llama.rn) can never be picked up via the dynamic linker's global lookup.
-        target_link_options(${target_name} PRIVATE -Wl,-Bsymbolic)
-        target_link_options(${target_name} PRIVATE -flto)
-    # endif ()
+    target_link_options(${jni_name} PRIVATE -Wl,--gc-sections)
+    target_link_options(${jni_name} PRIVATE -Wl,--exclude-libs,ALL)
 endfunction()
 
-build_library("rnwhisper" "generic" "")
-
-if (${ANDROID_ABI} STREQUAL "arm64-v8a")
-    if (RNWHISPER_HEXAGON_AVAILABLE)
-        build_library("rnwhisper_v8fp16_va_2_hexagon" "arm" "-march=armv8.2-a+fp16")
-    endif ()
-    build_library("rnwhisper_v8fp16_va_2" "arm" "-march=armv8.2-a+fp16")
-    build_library("rnwhisper_v8" "arm" "-march=armv8-a")
-elseif (${ANDROID_ABI} STREQUAL "armeabi-v7a")
-    build_library("rnwhisper_vfpv4" "arm" "-mfpu=neon-vfpv4")
-elseif (${ANDROID_ABI} STREQUAL "x86_64")
-    # x86_64 target
-    build_library("rnwhisper_x86_64" "x86" "-march=x86-64" "-mtune=intel" "-msse4.2" "-mpopcnt")
-endif ()
+rnwhisper_android_variants(RNWHISPER_VARIANTS)
+foreach (entry IN LISTS RNWHISPER_VARIANTS)
+    rnwhisper_split_variant("${entry}" core arch flags)
+    # rnwhisper -> rnwhisper_jni, rnwhisper_v8 -> rnwhisper_jni_v8, ...
+    string(REGEX REPLACE "^rnwhisper" "rnwhisper_jni" jni "${core}")
+    build_rnwhisper_jni(${jni} ${core})
+endforeach ()

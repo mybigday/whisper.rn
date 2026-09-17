@@ -29,6 +29,9 @@
     }
   },
   "files": [
+    "bin",
+    "install/download-native-artifacts.js",
+    "install/native-artifacts.json",
     "src",
     "lib",
     "jest",
@@ -43,6 +46,7 @@
     "*.podspec",
     "!lib/typescript/example",
     "!ios/build",
+    "!ios/rnwhisper.xcframework/**",
     "!android/.cxx",
     "!android/build",
     "!android/gradle",
@@ -59,7 +63,10 @@
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
     "sync:vendor": "./scripts/sync-vendor.sh",
+    "postinstall": "node ./install/download-native-artifacts.js",
+    "download:native-artifacts": "node ./install/download-native-artifacts.js",
     "build:hexagon-htp": "./scripts/build-hexagon-htp.sh",
+    "build:android-libs": "./scripts/build-android.sh",
     "docgen": "typedoc src/index.ts src/realtime-transcription/index.ts --plugin typedoc-plugin-markdown --excludePrivate --readme none --out docs/API",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
@@ -84,6 +91,9 @@
     "speech recognition"
   ],
   "repository": "https://github.com/mybigday/whisper.rn",
+  "bin": {
+    "whisper-rn-download-artifacts": "./install/download-native-artifacts.js"
+  },
   "author": "Jhen-Jie Hong <developer@jhen.me>",
   "license": "MIT",
   "bugs": {

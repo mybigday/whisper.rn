@@ -78,6 +78,10 @@ build-arm64/
 build-armeabi-v7a/
 build-x86_64/
 jniLibs/
+android/src/main/jniLibs/.whisper-rn.sha256
+whisper-rn-android-jni-libs.tar.gz
+whisper-rn-ios-xcframework.tar.gz
+ios/rnwhisper.xcframework/.whisper-rn.sha256
 .build-ios-xcframework/
 
 ios/rnwhisper.xcframework/**/*.framework

@@ -23,6 +23,8 @@ To start the packager:
 yarn example start
 ```
 
+The example app builds `whisper.rn`'s native code from source (`example/android/gradle.properties` sets `rnwhisperBuildFromSource=true`; the Podfile uses `RNWHISPER_BUILD_FROM_SOURCE`), so it always exercises the checked-in `cpp/` and `vendor/` sources. To try the prebuilt path locally, run `yarn build:android-libs` and then `./gradlew assembleDebug -PrnwhisperBuildFromSource=false` in `example/android`.
+
 To run the example app on Android:
 
 ```sh

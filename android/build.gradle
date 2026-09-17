@@ -15,13 +15,23 @@ def isNewArchitectureEnabled() {
 
 apply plugin: "com.android.library"
 
-// Hexagon (Qualcomm NPU). The SDK only has to exist on the build host: the
-// rnwhisper_*_hexagon variant compiles against its FastRPC headers and loads
-// the device's libcdsprpc.so at runtime. The DSP-side libggml-htp-*.so are produced separately by
-// scripts/build-hexagon-htp.sh (Docker) into bin/arm64-v8a and copied into the
-// host app's assets below, because the DSP loader reads them from the
-// filesystem at runtime (see RNWhisper.java).
 def repoRootDir = project.projectDir.parentFile
+
+// The whisper.cpp core (librnwhisper*.so) is prebuilt by default: the package's
+// postinstall downloads android/src/main/jniLibs from the matching GitHub
+// release, and only the JNI/JSI wrapper is compiled against the app's React
+// Native. Set rnwhisperBuildFromSource=true (android/gradle.properties or
+// -PrnwhisperBuildFromSource=true) to compile the core here as well.
+def isRNWhisperBuildFromSource = (project.findProperty("rnwhisperBuildFromSource") ?: "false").toString() == "true"
+
+// Hexagon (Qualcomm NPU). The prebuilt jniLibs already carry the
+// rnwhisper_*_hexagon variant; when building from source it is only compiled
+// if the SDK is on the build host (its host side needs the FastRPC headers;
+// the device's libcdsprpc.so is dlopened at runtime). The DSP-side
+// libggml-htp-*.so are produced by scripts/build-hexagon-htp.sh (Docker) into
+// bin/arm64-v8a (shipped in the npm package) and copied into the host app's
+// assets below, because the DSP loader reads them from the filesystem at
+// runtime (see RNWhisper.java).
 def htpLibSourceDir = new File(repoRootDir, "bin/arm64-v8a")
 def hexagonSdkRoot = System.getenv("HEXAGON_SDK_ROOT") ?: "${System.getProperty('user.home')}/.hexagon-sdk/6.4.0.2"
 def hexagonPresent = file(hexagonSdkRoot).exists()
@@ -148,13 +158,27 @@ android {
       // Configure STL to be compatible with ReactAndroid JSI libraries
       "-DANDROID_STL=c++_shared",
       "-DREACT_NATIVE_MINOR_VERSION=${REACT_NATIVE_MINOR_VERSION}",
-      "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+      "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+      "-DRNWHISPER_BUILD_FROM_SOURCE=${isRNWhisperBuildFromSource ? 'ON' : 'OFF'}"
     ]
-    if (hexagonPresent) {
-      println("whisper.rn: Hexagon SDK found at ${hexagonSdkRoot}, building the Hexagon variant")
-      cmakeArgs += ["-DHEXAGON_SDK_ROOT=${hexagonSdkRoot}"]
+
+    // Narrows the CPU-feature variants built for each ABI. Each variant is a
+    // full copy of the source tree, so CI uses this to keep build times sane.
+    def rnwhisperVariants = project.findProperty("rnwhisperVariants")?.toString()?.trim()
+    if (rnwhisperVariants) {
+      println("whisper.rn: building variants ${rnwhisperVariants}")
+      cmakeArgs += ["-DRNWHISPER_ANDROID_VARIANTS=${rnwhisperVariants}"]
+    }
+
+    if (isRNWhisperBuildFromSource) {
+      if (hexagonPresent) {
+        println("whisper.rn: building from source, Hexagon SDK found at ${hexagonSdkRoot}, building the Hexagon variant")
+        cmakeArgs += ["-DHEXAGON_SDK_ROOT=${hexagonSdkRoot}"]
+      } else {
+        println("whisper.rn: building from source, Hexagon SDK not found, building CPU-only")
+      }
     } else {
-      println("whisper.rn: Hexagon SDK not found, building CPU-only")
+      println("whisper.rn: using prebuilt native libraries (set rnwhisperBuildFromSource=true to build from source)")
     }
     externalNativeBuild {
       cmake {
@@ -194,10 +218,12 @@ android {
       path = file('src/main/CMakeLists.txt')
     }
   }
-  // Exclude jniLibs when building from source
-  sourceSets {
-    main {
-      jniLibs.srcDirs = []
+  if (isRNWhisperBuildFromSource) {
+    // The core libraries come out of the CMake build; never package stale prebuilts.
+    sourceSets {
+      main {
+        jniLibs.srcDirs = []
+      }
     }
   }
   buildTypes {

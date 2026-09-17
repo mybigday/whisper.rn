@@ -42,6 +42,10 @@ public class RNWhisper {
   private static final Pattern SNAPDRAGON_8_SERIES_NAME_PATTERN = Pattern.compile("SNAPDRAGON\\s*8");
   private static final Pattern HEXAGON_CODENAME_PATTERN = Pattern.compile("(taro|kalama|pineapple|sun|lanai)");
 
+  // Each variant is a pair of libraries: librnwhisper_jni<suffix>.so, the JNI/JSI
+  // wrapper built against the app's React Native, and librnwhisper<suffix>.so,
+  // the whisper.cpp core it depends on (prebuilt or built from source, see
+  // android/src/main/CMakeLists.txt). Loading the wrapper pulls the core in.
   private static boolean tryLoadLibrary(String library) {
     try {
       System.loadLibrary(library);
@@ -69,33 +73,33 @@ public class RNWhisper {
     try {
       if (isArm64V8a()) {
         if (hasFp16 && isHexagonSupported() && prepareHexagon(context)
-            && tryLoadLibrary("rnwhisper_v8fp16_va_2_hexagon")) {
+            && tryLoadLibrary("rnwhisper_jni_v8fp16_va_2_hexagon")) {
           libsLoaded = true;
           return true;
         }
 
-        if (hasFp16 && tryLoadLibrary("rnwhisper_v8fp16_va_2")) {
+        if (hasFp16 && tryLoadLibrary("rnwhisper_jni_v8fp16_va_2")) {
           libsLoaded = true;
           return true;
         }
 
-        if (tryLoadLibrary("rnwhisper_v8")) {
+        if (tryLoadLibrary("rnwhisper_jni_v8")) {
           libsLoaded = true;
           return true;
         }
       } else if (isArmeabiV7a()) {
-        if (tryLoadLibrary("rnwhisper_vfpv4")) {
+        if (tryLoadLibrary("rnwhisper_jni_vfpv4")) {
           libsLoaded = true;
           return true;
         }
       } else if (isX86_64()) {
-        if (tryLoadLibrary("rnwhisper_x86_64")) {
+        if (tryLoadLibrary("rnwhisper_jni_x86_64")) {
           libsLoaded = true;
           return true;
         }
       }
 
-      if (tryLoadLibrary("rnwhisper")) {
+      if (tryLoadLibrary("rnwhisper_jni")) {
         libsLoaded = true;
       }
     } catch (UnsatisfiedLinkError error) {

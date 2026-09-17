@@ -6,6 +6,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -16,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -31,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -43,13 +44,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup
         uses: ./.github/actions/setup
 
       - name: Cache build & pods
-        uses: actions/cache@v3
+        uses: actions/cache@v4
+        continue-on-error: true
         with:
           path: |
             example/ios/Pods
@@ -75,13 +77,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup
         uses: ./.github/actions/setup
 
       - name: Cache build & pods
-        uses: actions/cache@v3
+        uses: actions/cache@v4
+        continue-on-error: true
         with:
           path: |
             example/ios/Pods
@@ -95,29 +98,135 @@ jobs:
           gem uninstall cocoapods --ignore-dependencies
           gem install cocoapods -v 1.15.2
 
+      - name: Build frameworks
+        run: |
+          yarn build:ios-frameworks
+
+      # The podspec needs the xcframework to exist when not building from source.
       - name: Install cocoapods
         run: |
           yarn example pods
         env:
           RNWHISPER_BUILD_FROM_SOURCE: 0
 
-      - name: Build frameworks
-        run: |
-          yarn build:ios-frameworks
-
       - name: Build example for iOS
         run: |
           yarn build:ios
 
-  build-android:
+  # The example's gradle.properties sets rnwhisperBuildFromSource=true, so this
+  # compiles the whisper.cpp core inside the Gradle build (CPU-only: no Hexagon
+  # SDK on the runner).
+  build-android-from-source:
     runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      # Debug objects carry DWARF, so they need more room than the libs job's.
+      CCACHE_MAXSIZE: 2G
+      # The NDK is reinstalled per run, so hash the compiler rather than stat it.
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Setup Gradle cache
+        uses: burrunan/gradle-cache-action@v3
+        with:
+          gradle-version: wrapper
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-ccache-android-src-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-android-src-
+
+      - name: Setup ccache
+        uses: ./.github/actions/setup-ccache
+
       - name: Build example for Android
+        env:
+          # Each variant recompiles the whole source tree, so build only the ones
+          # that exercise distinct code paths (generic CPU, arm64 fp16, x86_64).
+          # build-android-libs still builds all of them.
+          ORG_GRADLE_PROJECT_rnwhisperVariants: rnwhisper,rnwhisper_v8fp16_va_2,rnwhisper_x86_64
         run: |
           yarn build:android
+          ccache --show-stats
+
+  # Same path as the release workflow: prebuilt core libraries (including the
+  # Hexagon variant and its DSP-side libraries), then the example app built
+  # against them with only the JNI/JSI wrapper compiled by Gradle.
+  build-android-libs:
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
+    steps:
+      - name: Maximize build space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Setup Gradle cache
+        uses: burrunan/gradle-cache-action@v3
+        with:
+          gradle-version: wrapper
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-ccache-android-libs-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-android-libs-
+
+      - name: Setup ccache
+        uses: ./.github/actions/setup-ccache
+
+      - name: Setup Hexagon SDK
+        run: ./scripts/setup-hexagon-sdk.sh
+
+      - name: Cache Hexagon HTP artifacts
+        id: htp-cache
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: |
+            bin
+            vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/v73
+          key: ${{ runner.os }}-htp-${{ hashFiles('scripts/build-hexagon-htp.sh', 'scripts/docker-build-wrapper.sh', 'vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/**') }}
+
+      - name: Build Hexagon HTP libraries
+        if: steps.htp-cache.outputs.cache-hit != 'true'
+        run: yarn build:hexagon-htp
+
+      - name: Build libraries
+        env:
+          RNWHISPER_REQUIRE_HEXAGON: '1'
+        run: |
+          yarn build:android-libs
+          ccache --show-stats
+
+      # Proves the prebuilt path works with the libraries just built. The
+      # example's gradle.properties forces from-source, and only the command
+      # line outranks it.
+      - name: Build example for Android
+        run: |
+          cd example/android
+          ./gradlew assembleDebug --stacktrace -PrnwhisperBuildFromSource=false

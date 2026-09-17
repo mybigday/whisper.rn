@@ -2,15 +2,17 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-// whisper.rn builds its Hexagon (NPU) variant only when the Hexagon SDK is
-// present on the build host (see ../../../android/build.gradle). The DSP-side
-// libraries that variant loads at runtime come from scripts/build-hexagon-htp.sh
-// (Docker on macOS); build them here so whisper.rn can sync them into this
-// app's assets.
+// When building whisper.rn from source, its Hexagon (NPU) variant is compiled
+// only if the Hexagon SDK is present on the build host (see
+// ../../../android/build.gradle). The DSP-side libraries that variant loads at
+// runtime come from scripts/build-hexagon-htp.sh (Docker on macOS); build them
+// here so whisper.rn can sync them into this app's assets. With the prebuilt
+// libraries (rnwhisperBuildFromSource=false) nothing has to be built.
 def repoRootDir = new File(rootProject.projectDir, "../..").canonicalFile
+def rnwhisperBuildFromSource = project.findProperty("rnwhisperBuildFromSource")?.toString()?.toBoolean() ?: false
 def hexagonSdkRoot = System.getenv("HEXAGON_SDK_ROOT") ?: "${System.getProperty('user.home')}/.hexagon-sdk/6.4.0.2"
 
-if (file(hexagonSdkRoot).exists()) {
+if (rnwhisperBuildFromSource && file(hexagonSdkRoot).exists()) {
     def htpScript = new File(repoRootDir, "scripts/build-hexagon-htp.sh")
     def htpSourceDir = new File(repoRootDir, "vendor/whisper.cpp/ggml/src/ggml-hexagon/htp")
     def htpInputs = files(
@@ -27,6 +29,12 @@ if (file(hexagonSdkRoot).exists()) {
         new File(htpSourceDir, "v73/htp_iface_stub.c"),
     )
 
+    // A fresh CI runner has no Gradle task history, so prepareHTP would rebuild
+    // the DSP libraries even when a cache already restored artifacts built from
+    // these exact inputs. CI sets this after a cache hit (the cache key is the
+    // hash of htpInputs); local builds keep the normal up-to-date checks.
+    def htpArtifactsUpToDate = project.findProperty("rnwhisperHtpArtifactsUpToDate")?.toString()?.toBoolean() ?: false
+
     tasks.register("prepareHTP", Exec) {
         group = "build"
         description = "Builds the Hexagon HTP libraries and the FastRPC stub whisper.rn compiles against."
@@ -34,6 +42,9 @@ if (file(hexagonSdkRoot).exists()) {
         commandLine(htpScript.absolutePath)
         inputs.files(htpInputs)
         outputs.files(htpArtifacts)
+        onlyIf {
+            !(htpArtifactsUpToDate && htpArtifacts.files.every { it.exists() })
+        }
     }
 
     tasks.named("preBuild").configure {

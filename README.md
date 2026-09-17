@@ -21,6 +21,8 @@ React Native bindings for Whisper and NVIDIA Parakeet ASR through [whisper.cpp](
 npm install whisper.rn
 ```
 
+`whisper.rn` downloads the pre-built `ios/rnwhisper.xcframework` and `android/src/main/jniLibs` from the matching GitHub release during `postinstall`. Existing downloads are reused, and each archive is verified with SHA-256 before extraction. Set `RNWHISPER_SKIP_POSTINSTALL=1` to skip the download (e.g. when building from source), or run `npx whisper-rn-download-artifacts` to fetch it again.
+
 #### iOS
 
 Please re-run `npx pod-install` again.
@@ -40,22 +42,19 @@ Add proguard rule if it's enabled in project (android/app/proguard-rules.pro):
 
 It's recommended to use `ndkVersion = "24.0.8215888"` (or above) in your root project build configuration for Apple Silicon Macs. Otherwise please follow this trobleshooting [issue](./TROUBLESHOOTING.md#android-got-build-error-unknown-host-cpu-architecture-arm64-on-apple-silicon-macs).
 
+By default, `whisper.rn` will use pre-built libraries for Android: the whisper.cpp core (`librnwhisper*.so`, one per CPU-feature variant, including the Hexagon NPU variant) comes from `android/src/main/jniLibs`, and only the small JNI/JSI wrapper is compiled against your React Native version. If you want to build from source, please set `rnwhisperBuildFromSource` to `true` in `android/gradle.properties` (or pass `-PrnwhisperBuildFromSource=true`). Building from source compiles whisper.cpp once per variant, so it takes a while; `rnwhisperVariants=rnwhisper,rnwhisper_v8fp16_va_2` narrows it down.
+
 ##### Hexagon NPU (Experimental)
 
 On Snapdragon devices with a Hexagon Tensor Processor (SM8450 / 8 Gen 1 and newer), `whisper.rn` can run the whisper model on the NPU through ggml's Hexagon backend. It is used automatically when `useGpu` is on (the default) and the device qualifies; check `WhisperContext.gpu` / `reasonNoGPU` after `initWhisper`. The NPU path always uses flash attention. VAD and Parakeet contexts stay on the CPU.
 
-The backend needs two things the plain build does not have:
-
-1. The Hexagon SDK on the build machine, at `~/.hexagon-sdk/6.4.0.2` or `HEXAGON_SDK_ROOT`. When it is present, `whisper.rn`'s Gradle build compiles the extra `rnwhisper_v8fp16_va_2_hexagon` variant; without it the build is CPU-only.
-2. The DSP-side libraries `libggml-htp-*.so`, built with `yarn build:hexagon-htp` (Docker, using the `ghcr.io/snapdragon-toolchain/arm64-android` image). They land in `bin/arm64-v8a/` and `whisper.rn`'s Gradle build copies them into your app's `src/main/assets/ggml-hexagon/`; the library extracts them at runtime and points the DSP loader at them.
-
-Then add the FastRPC loader to your app manifest so the library can open it at runtime:
+The pre-built libraries include everything the backend needs: the `rnwhisper_v8fp16_va_2_hexagon` variant, and the DSP-side libraries `libggml-htp-*.so` in the package's `bin/arm64-v8a/`, which `whisper.rn`'s Gradle build copies into your app's `src/main/assets/ggml-hexagon/` (the library extracts them at runtime and points the DSP loader at them). Just add the FastRPC loader to your app manifest so the library can open it at runtime:
 
 ```xml
 <uses-native-library android:name="libcdsprpc.so" android:required="false" />
 ```
 
-The example app does all of this in `example/android/app/build.gradle` (`prepareHTP`) and its manifest.
+When building from source, the Hexagon variant is only compiled if the Hexagon SDK is on the build machine (`scripts/setup-hexagon-sdk.sh` installs it to `~/.hexagon-sdk/6.4.0.2`, or set `HEXAGON_SDK_ROOT`), and the DSP-side libraries have to be built with `yarn build:hexagon-htp` (Docker, using the `ghcr.io/snapdragon-toolchain/arm64-android` image). Without the SDK the from-source build is CPU-only. The example app does this in `example/android/app/build.gradle` (`prepareHTP`) and its manifest.
 
 #### Expo
 

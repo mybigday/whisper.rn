@@ -6,9 +6,18 @@
 #include "whisper.h"
 #include "rn-whisper-log.h"
 
+// The Android core library (android/src/main/rnwhisper) is built with hidden
+// visibility and exports only its public API; the JNI/JSI wrapper links against
+// it as a separate .so. Elsewhere the macro is a no-op.
+#if defined(RNWHISPER_SHARED) && !defined(_WIN32)
+#    define RNWHISPER_API __attribute__ ((visibility ("default")))
+#else
+#    define RNWHISPER_API
+#endif
+
 namespace rnwhisper {
 
-std::string bench(whisper_context * ctx, int n_threads);
+RNWHISPER_API std::string bench(whisper_context * ctx, int n_threads);
 
 struct vad_params {
     bool use_vad = false;
@@ -19,7 +28,7 @@ struct vad_params {
     bool verbose = false;
 };
 
-struct job {
+struct RNWHISPER_API job {
     int job_id;
     bool aborted = false;
     whisper_full_params params;
@@ -35,12 +44,12 @@ struct job {
 // framework (e.g. llama.rn) is in the same app, an app-level reference to a ggml
 // symbol binds to whichever framework the linker sees first. The glue therefore
 // goes through this rnwhisper-namespaced wrapper instead of calling ggml directly.
-ggml_abort_callback_t set_ggml_abort_callback(ggml_abort_callback_t callback);
+RNWHISPER_API ggml_abort_callback_t set_ggml_abort_callback(ggml_abort_callback_t callback);
 
-void job_abort_all();
-job* job_new(int job_id, struct whisper_full_params params);
-void job_remove(int job_id);
-job* job_get(int job_id);
+RNWHISPER_API void job_abort_all();
+RNWHISPER_API job* job_new(int job_id, struct whisper_full_params params);
+RNWHISPER_API void job_remove(int job_id);
+RNWHISPER_API job* job_get(int job_id);
 
 } // namespace rnwhisper
 

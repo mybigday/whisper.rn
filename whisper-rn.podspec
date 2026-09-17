@@ -88,6 +88,13 @@ Pod::Spec.new do |s|
       ss.source_files = "#{ggml_metal}/*.m"
     end
   else
+    # The prebuilt xcframework is a GitHub release asset that the package's
+    # postinstall downloads (install/download-native-artifacts.js).
+    xcframework = File.join(__dir__, "ios", "rnwhisper.xcframework")
+    unless Dir.exist?(File.join(xcframework, "ios-arm64"))
+      raise "[whisper.rn] ios/rnwhisper.xcframework is missing. Run `npx whisper-rn-download-artifacts` " \
+            "(the package's postinstall) to download it, or set RNWHISPER_BUILD_FROM_SOURCE=1 to build from source."
+    end
     # JSI bindings always compiled from source (must match RN version)
     s.source_files = "ios/*.{h,m,mm}", "cpp/jsi/*.{h,cpp}"
     s.vendored_frameworks = "ios/rnwhisper.xcframework"

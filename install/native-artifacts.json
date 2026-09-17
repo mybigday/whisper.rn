@@ -1,0 +1,18 @@
+{
+  "artifacts": [
+    {
+      "name": "android-jni-libs",
+      "assetName": "whisper-rn-android-jni-libs.tar.gz",
+      "relativePath": "android/src/main/jniLibs",
+      "markerPath": "android/src/main/jniLibs/.whisper-rn.sha256",
+      "sha256": null
+    },
+    {
+      "name": "ios-xcframework",
+      "assetName": "whisper-rn-ios-xcframework.tar.gz",
+      "relativePath": "ios/rnwhisper.xcframework",
+      "markerPath": "ios/rnwhisper.xcframework/.whisper-rn.sha256",
+      "sha256": null
+    }
+  ]
+}

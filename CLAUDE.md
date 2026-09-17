@@ -40,9 +40,12 @@ yarn test               # Run Jest unit tests
 ```bash
 yarn build              # Build TypeScript library with react-native-builder-bob
 
-# iOS framework builds (creates prebuilt xcframework)
-yarn build:ios-frameworks    # Build rnwhisper.xcframework for iOS/tvOS
-./scripts/build-ios.sh       # Manual iOS framework build script
+# Prebuilt native libraries (release assets, see "Prebuilt native libraries")
+yarn build:ios-frameworks    # Build ios/rnwhisper.xcframework for iOS/tvOS
+yarn build:android-libs      # Build android/src/main/jniLibs (librnwhisper*.so per ABI/variant)
+./scripts/setup-hexagon-sdk.sh  # Install the Hexagon SDK (needed for the *_hexagon variant)
+yarn build:hexagon-htp       # Build the Hexagon DSP-side libggml-htp-*.so into bin/ (Docker)
+yarn download:native-artifacts  # Re-run the postinstall download (--force to re-download)
 
 # Example app builds
 yarn example start      # Start Metro bundler for example app
@@ -158,7 +161,7 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 ### iOS-Specific Features
 
 **Pre-built Framework**:
-- By default, uses `ios/rnwhisper.xcframework` (pre-built)
+- By default, uses `ios/rnwhisper.xcframework` (pre-built, downloaded by postinstall from the GitHub release; see "Prebuilt native libraries")
 - Set `RNWHISPER_BUILD_FROM_SOURCE=1` in Podfile to build from source
 - Framework includes Metal shaders (`.metallib`)
 
@@ -176,12 +179,18 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 
 **JNI Bridge**: `android/src/main/jni.cpp` connects Java to C++ whisper core
 
+**Two-layer native build** (`android/src/main/CMakeLists.txt`):
+- Core `librnwhisper<variant>.so` (whisper.cpp + ggml + `cpp/rn-whisper.cpp`, no RN dependency), built by `android/src/main/rnwhisper/CMakeLists.txt`. Prebuilt by default: `scripts/build-android.sh` -> `android/src/main/jniLibs/`, shipped as a GitHub release asset and downloaded by postinstall. Compiled with hidden visibility; only the `WHISPER_API`/`GGML_API`/`PARAKEET_API`/`RNWHISPER_API` surface is exported.
+- Wrapper `librnwhisper_jni<variant>.so` (`jni.cpp` + `cpp/jsi/RNWhisperJSI.cpp`), always compiled by the consumer's Gradle build because it links the app's React Native (fbjni/jsi prefab). It links the matching core by SONAME; `RNWhisper.java` loads the wrapper and the dynamic linker pulls the core in.
+- `rnwhisperBuildFromSource=true` (gradle property) builds the core as a subdirectory instead of using jniLibs; `rnwhisperVariants=a,b` narrows the variants. The example app's `gradle.properties` sets from-source; CI passes `-PrnwhisperBuildFromSource=false` to exercise the prebuilt path.
+- Variant list lives once in `android/src/main/cmake/rnwhisper-build-options.cmake` (shared by both CMake entry points).
+
 **Build Configuration**:
 - NDK version 24.0.8215888+ recommended for Apple Silicon Macs
 - Supports 16KB page sizes (Android 15+)
 - Proguard rule required: `-keep class com.rnwhisper.** { *; }`
 
-**CMake Build**: `android/CMakeLists.txt` controls native compilation
+**Hexagon (NPU)**: the `rnwhisper_v8fp16_va_2_hexagon` variant needs the Hexagon SDK on the build host (`scripts/setup-hexagon-sdk.sh`) plus the FastRPC stub and DSP-side `bin/arm64-v8a/libggml-htp-*.so` from `scripts/build-hexagon-htp.sh` (Docker). The prebuilt jniLibs include the variant; `bin/` ships inside the npm package and `android/build.gradle` syncs it into the host app's assets.
 
 ## File Patterns and Conventions
 
@@ -191,6 +200,7 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 - **Native Android**: `android/src/main/java/com/rnwhisper/*.java`
 - **C++ Core**: `cpp/*.{cpp,h}`
 - **JSI Bindings**: `cpp/jsi/*.{cpp,h}`
+- **Native artifact download**: `install/*.js` + `install/native-artifacts.json`
 - **Tests**: `src/**/__tests__/*.test.ts`
 
 ### Naming Conventions
@@ -284,6 +294,17 @@ Its output is committed. Run it after changing `vendor/VERSIONS` or a patch; run
 1. Edit the vendored file in place, e.g. `vendor/whisper.cpp/src/whisper.cpp`
 2. Regenerate its patch: `scripts/update-patch.sh src/whisper.cpp` writes `scripts/patches/whisper.cpp/whisper.cpp.patch` (optional second argument names the patch; a file upstream lacks becomes a file-creating patch; text above the first `---` line survives regeneration, use it to say why)
 3. `yarn sync:vendor` must leave `git status` clean
+
+### Prebuilt native libraries
+
+Both platforms' heavy native code is prebuilt in the release workflow (`.github/workflows/release.yml`) and attached to the GitHub release; the npm package only carries the sources and `bin/` (Hexagon DSP libs):
+
+- `whisper-rn-android-jni-libs.tar.gz` -> `android/src/main/jniLibs/` (`scripts/build-android.sh`, ubuntu runner with the Hexagon SDK + Docker HTP build)
+- `whisper-rn-ios-xcframework.tar.gz` -> `ios/rnwhisper.xcframework/` (`scripts/build-ios.sh`, macOS runner)
+
+`install/download-native-artifacts.js` (the package's `postinstall`, also `npx whisper-rn-download-artifacts`) downloads them from `<repository>/releases/download/v<version>/`, verifies the SHA-256 recorded in `install/native-artifacts.json` and writes a `.whisper-rn.sha256` marker so reinstalls are no-ops. The checksums are `null` in git; `install/write-native-artifacts-manifest.js` fills them in CI right before `npm publish`. A git checkout therefore never downloads anything and builds from source (`RNWHISPER_BUILD_FROM_SOURCE=1` for pods, `rnwhisperBuildFromSource=true` for Gradle, both set in the example app). `RNWHISPER_SKIP_POSTINSTALL=1` skips the download.
+
+Release order matters: `yarn release` (release-it) tags and creates the GitHub release; the tag push runs the workflow, which builds Android, builds iOS, uploads both archives to that release, then publishes to npm. `workflow_dispatch` re-uploads assets to an existing release (optionally re-publishing).
 
 ### Bootstrap (`scripts/bootstrap.sh`)
 
