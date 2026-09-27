@@ -76,8 +76,8 @@ export class RingBufferVad implements RealtimeVadContextLike {
             throw new Error('preRecordingBufferMs must be greater than inferenceIntervalMs')
         }
 
-        // Initialize RingBuffer
-        const bufferSize = Math.floor((this.options.preRecordingBufferMs!) * (this.options.sampleRate!) * 2) // 16-bit samples
+        // Initialize RingBuffer. preRecordingBufferMs is milliseconds, same as inferenceIntervalMs.
+        const bufferSize = Math.floor((this.options.preRecordingBufferMs! / 1000) * this.options.sampleRate! * 2)
         this.ringBuffer = new RingBuffer(bufferSize)
 
         this.targetChunkSize = Math.floor((this.options.inferenceIntervalMs! / 1000) * (this.options.sampleRate!) * 2)
