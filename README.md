@@ -56,6 +56,25 @@ The pre-built libraries include everything the backend needs: the `rnwhisper_v8f
 
 When building from source, the Hexagon variant is only compiled if the Hexagon SDK is on the build machine (`scripts/setup-hexagon-sdk.sh` installs it to `~/.hexagon-sdk/6.4.0.2`, or set `HEXAGON_SDK_ROOT`), and the DSP-side libraries have to be built with `yarn build:hexagon-htp` (Docker, using the `ghcr.io/snapdragon-toolchain/arm64-android` image). Without the SDK the from-source build is CPU-only. The example app does this in `example/android/app/build.gradle` (`prepareHTP`) and its manifest.
 
+Benchmark on Samsung S25 Ultra (Snapdragon 8 Elite, from the example app's Benchmark screen, times in ms):
+
+| Model | Th | FA | Enc. | Dec. | Bch5 | PP |
+| --- | --- | --- | --- | --- | --- | --- |
+| tiny | 4 | 1 | 37.07 | 3.19 | 1.03 | 0.29 |
+| tiny-q8_0 | 4 | 1 | 50.84 | 2.43 | 0.81 | 0.32 |
+| base | 4 | 1 | 61.56 | 3.51 | 1.20 | 0.35 |
+| base-q8_0 | 4 | 1 | 64.46 | 3.42 | 1.27 | 0.41 |
+| small | 4 | 1 | 165.76 | 10.90 | 4.06 | 0.55 |
+| small-q8_0 | 4 | 1 | 164.13 | 7.24 | 2.98 | 0.68 |
+| medium | 4 | 1 | 379.20 | 24.55 | 10.40 | 0.89 |
+| medium-q8_0 | 4 | 1 | 372.72 | 21.90 | 9.61 | 1.19 |
+| large-v3-turbo | 4 | 1 | 1010.32 | 7.46 | 2.75 | 0.82 |
+| large-v3-turbo-q8_0 | 4 | 1 | 946.34 | 7.12 | 3.48 | 1.41 |
+
+> q5_0 / q5_1 are not supported by ggml-hexagon (they fall back to the CPU), so they are not included.
+
+For Linux arm64 Snapdragon devices (e.g. IQ-9075), [whisper.node](https://github.com/mybigday/whisper.node#snapdragon-hexagon-npu-benchmark) provides the same Hexagon NPU support through its `snapdragon` variant.
+
 #### Expo
 
 You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
@@ -386,7 +405,7 @@ jest.mock('whisper.rn', () => require('whisper.rn/jest-mock'))
 
 ## Node.js binding
 
-- [whisper.node](https://github.com/mybigday/whisper.node): An another Node.js binding of `whisper.cpp` but made API same as `whisper.rn`.
+- [whisper.node](https://github.com/mybigday/whisper.node): An another Node.js binding of `whisper.cpp` but made API same as `whisper.rn`. It shares the vendored whisper.cpp with `whisper.rn` and supports Metal, Vulkan, CUDA, the Hexagon NPU (Linux arm64 Snapdragon) and WASM/WebGPU.
 
 ## Contributing
 
