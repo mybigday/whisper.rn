@@ -31,7 +31,7 @@ describe('RingBufferVad pre-recording window', () => {
       started = data
     })
 
-    for (let i = 0; i < chunks; i++) {
+    for (let i = 0; i < chunks; i += 1) {
       const chunk = new Uint8Array(chunkBytes)
       chunk.fill(i + 1)
       vad.processAudio(chunk)
