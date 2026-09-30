@@ -1,5 +1,22 @@
 import type { AudioSlice, MemoryUsage } from './types'
 
+/**
+ * Append into the slice's preallocated buffer. The old code copied the whole slice into a new
+ * array on every chunk, so each queued transcription held its own full copy.
+ * Views handed out earlier cover only bytes already written, so appending never changes them.
+ */
+function appendToSlice(slice: AudioSlice, data: Uint8Array, bytesPerSlice: number): void {
+  if (slice.data.length < slice.sampleCount + data.length) {
+    // The buffer was trimmed by finalizeCurrentSlice(); give it room again
+    const grown = new Uint8Array(Math.max(bytesPerSlice, slice.sampleCount + data.length))
+    grown.set(slice.data.subarray(0, slice.sampleCount))
+    slice.data = grown
+  }
+  slice.data.set(data, slice.sampleCount)
+  slice.sampleCount += data.length
+  slice.endTime = Date.now()
+}
+
 export class SliceManager {
   private slices: AudioSlice[] = []
 
@@ -29,28 +46,29 @@ export class SliceManager {
   addAudioData(audioData: Uint8Array): {
     slice?: AudioSlice
   } {
-    // Get or create current slice
-    const currentSlice = this.getCurrentSlice()
-
     // Calculate bytes per slice (2 bytes per sample for 16-bit PCM)
     const bytesPerSlice = this.sliceDurationSec * this.sampleRate * 2
 
-    // Check if adding this data would exceed slice capacity
-    if (currentSlice.sampleCount + audioData.length > bytesPerSlice) {
-      // Finalize current slice and create new one
-      this.finalizeCurrentSlice()
-      this.currentSliceIndex += 1
-      return this.addAudioData(audioData) // Recursively add to new slice
+    let remaining = audioData
+    let currentSlice = this.getCurrentSlice()
+
+    // Iterative rather than recursive: data larger than a whole slice used to recurse without end,
+    // creating a new slice buffer on every call.
+    while (remaining.length > 0) {
+      if (currentSlice.sampleCount + remaining.length <= bytesPerSlice) {
+        appendToSlice(currentSlice, remaining, bytesPerSlice)
+        remaining = remaining.subarray(remaining.length)
+      } else if (currentSlice.sampleCount > 0) {
+        // Finalize current slice and continue in a new one (the chunk is not split, as before)
+        this.finalizeCurrentSlice()
+        this.currentSliceIndex += 1
+        currentSlice = this.getCurrentSlice()
+      } else {
+        // Even an empty slice cannot hold it: fill this slice and carry the rest over
+        appendToSlice(currentSlice, remaining.subarray(0, bytesPerSlice), bytesPerSlice)
+        remaining = remaining.subarray(bytesPerSlice)
+      }
     }
-
-    // Append data to current slice
-    const newData = new Uint8Array(currentSlice.sampleCount + audioData.length)
-    newData.set(currentSlice.data.subarray(0, currentSlice.sampleCount))
-    newData.set(audioData, currentSlice.sampleCount)
-
-    currentSlice.data = newData
-    currentSlice.sampleCount += audioData.length
-    currentSlice.endTime = Date.now()
 
     // Check if slice is complete
     const isSliceComplete = currentSlice.sampleCount >= bytesPerSlice * 0.8 // 80% full
@@ -62,9 +80,6 @@ export class SliceManager {
     return { slice: currentSlice }
   }
 
-  /**
-   * Get the current slice being built
-   */
   private getCurrentSlice(): AudioSlice {
     let slice = this.slices.find((s) => s.index === this.currentSliceIndex)
 

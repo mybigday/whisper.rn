@@ -392,6 +392,12 @@ export class RealtimeTranscriber {
         this.lastRealtimeTranscriptionTime = now
       }
 
+      // A newer draft of a slice supersedes any draft of it still waiting. Without this the queue
+      // grew without bound whenever transcription was slower than the trigger rate, and every
+      // stale draft was still transcribed, in order.
+      if (!isFinal) {
+        this.dropQueuedDrafts(slice.index)
+      }
       this.transcriptionQueue.push({
         sliceIndex: slice.index,
         audioData,
@@ -399,6 +405,15 @@ export class RealtimeTranscriber {
       })
       this.processTranscriptionQueue().catch(e => this.handleError(e))
     }
+  }
+
+  /**
+   * Remove queued, not-yet-started draft (non-final) transcriptions of a slice.
+   */
+  private dropQueuedDrafts(sliceIndex: number): void {
+    this.transcriptionQueue = this.transcriptionQueue.filter(
+      (queued) => queued.isFinal || queued.sliceIndex !== sliceIndex,
+    )
   }
 
   private emitVadEvent(type: RealtimeVadEvent['type'], confidence: number): void {
@@ -505,7 +520,13 @@ export class RealtimeTranscriber {
     const startTime = Date.now()
 
     try {
-      const audioBuffer = item.audioData.buffer as ArrayBuffer
+      // The view may cover only part of its buffer (slices are preallocated), so pass exactly its bytes
+      const { buffer, byteOffset, byteLength } = item.audioData
+      const audioBuffer = (
+        byteOffset === 0 && byteLength === buffer.byteLength
+          ? buffer
+          : buffer.slice(byteOffset, byteOffset + byteLength)
+      ) as ArrayBuffer
       let transcribeRequest
 
       if (this.transcriptionContext.type === 'parakeet') {
@@ -770,8 +791,9 @@ export class RealtimeTranscriber {
         `Forced slice ${result.slice.index} ready (${result.slice.data.length} bytes)`,
       )
 
-      // Queue for transcription (Final)
+      // Queue for transcription (Final); the final result makes waiting drafts of this slice moot
       if (result.slice.data.length > 0) {
+        this.dropQueuedDrafts(result.slice.index)
         this.transcriptionQueue.push({
           sliceIndex: result.slice.index,
           audioData: result.slice.data,
