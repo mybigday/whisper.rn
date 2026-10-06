@@ -77,7 +77,7 @@ For Linux arm64 Snapdragon devices (e.g. IQ-9075), [whisper.node](https://github
 
 #### Expo
 
-You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.io/guides/using-libraries/#using-a-library-in-a-expo-project) for more details.
+You will need to prebuild the project before using it. See [Expo guide](https://docs.expo.dev/workflow/using-libraries/#third-party-libraries) for more details.
 
 ## Tips & Tricks
 
