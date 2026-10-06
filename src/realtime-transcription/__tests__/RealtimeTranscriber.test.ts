@@ -373,6 +373,21 @@ describe('RealtimeTranscriber', () => {
       )
     })
 
+    it('should report VAD event duration from the audio in the slice', async () => {
+      mockWhisperVadContext.detectSpeechData.mockResolvedValue([{ t0: 0, t1: 1000 }])
+
+      // 2 x 0.5 s, less than the 2 s slice
+      mockAudioStream.simulateDataChunk(createAudioData(16000))
+      await new Promise(resolve => setTimeout(resolve, 100))
+      mockAudioStream.simulateDataChunk(createAudioData(16000))
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      const events = mockCallbacks.onVad.mock.calls.map(([event]: any[]) => event)
+      const continueEvent = events.find((event: any) => event.type === 'speech_continue')
+      expect(continueEvent?.duration).toBeGreaterThan(0)
+      events.forEach((event: any) => expect(event.duration).toBeLessThanOrEqual(1))
+    })
+
     it('should handle VAD processing errors', async () => {
       // Mock the underlying VAD context to throw an error
       mockWhisperVadContext.detectSpeechData.mockRejectedValueOnce(new Error('VAD error'))

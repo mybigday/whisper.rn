@@ -403,13 +403,16 @@ export class RealtimeTranscriber {
 
   private emitVadEvent(type: RealtimeVadEvent['type'], confidence: number): void {
     const sliceInfo = this.sliceManager.getCurrentSliceInfo()
+    const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
+    // Use the bytes written, not data.length: the slice buffer may be larger than its audio
+    const sliceBytes = this.sliceManager.getSliceByIndex(sliceInfo.currentSliceIndex)?.sampleCount ?? 0
     const event: RealtimeVadEvent = {
       type,
       timestamp: Date.now(),
       sliceIndex: sliceInfo.currentSliceIndex,
       confidence,
       lastSpeechDetectedTime: this.lastSpeechDetectedTime,
-      duration: this.sliceManager.getSliceByIndex(sliceInfo.currentSliceIndex)?.data.length ? this.sliceManager.getSliceByIndex(sliceInfo.currentSliceIndex)!.data.length / 32000 : 0
+      duration: sliceBytes / 2 / sampleRate, // seconds
     }
     this.vadEvents.set(sliceInfo.currentSliceIndex, event)
     trimMapToLimit(this.vadEvents, this.options.maxSlicesInMemory)
