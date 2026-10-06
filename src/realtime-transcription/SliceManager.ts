@@ -6,11 +6,19 @@ import type { AudioSlice, MemoryUsage } from './types'
  * Views handed out earlier cover only bytes already written, so appending never changes them.
  */
 function appendToSlice(slice: AudioSlice, data: Uint8Array, bytesPerSlice: number): void {
-  if (slice.data.length < slice.sampleCount + data.length) {
-    // The buffer was trimmed by finalizeCurrentSlice(); give it room again
-    const grown = new Uint8Array(Math.max(bytesPerSlice, slice.sampleCount + data.length))
-    grown.set(slice.data.subarray(0, slice.sampleCount))
-    slice.data = grown
+  const needed = slice.sampleCount + data.length
+  if (slice.data.length < needed) {
+    // The view was trimmed by finalizeCurrentSlice() (at 80% the slice keeps taking data).
+    // Widen it back over the same buffer when it has room; copy only if it does not.
+    const { buffer, byteOffset } = slice.data
+    const room = buffer.byteLength - byteOffset
+    if (room >= needed) {
+      slice.data = new Uint8Array(buffer, byteOffset, room)
+    } else {
+      const grown = new Uint8Array(Math.max(bytesPerSlice, needed))
+      grown.set(slice.data.subarray(0, slice.sampleCount))
+      slice.data = grown
+    }
   }
   slice.data.set(data, slice.sampleCount)
   slice.sampleCount += data.length

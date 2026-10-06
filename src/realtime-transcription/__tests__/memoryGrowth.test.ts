@@ -31,6 +31,20 @@ describe('SliceManager', () => {
     expect(Array.from(first.subarray(0, 4))).toEqual([1, 1, 1, 1])
     expect(second.length).toBe(6400)
   })
+
+  it('keeps appending into the same buffer after the slice is 80% full', () => {
+    const manager = new SliceManager(1, 3, 16000) // 32000 bytes, 80% = 25600
+    const buffers = new Set<ArrayBufferLike>()
+    for (let i = 0; i < 10; i += 1) {
+      manager.addAudioData(new Uint8Array(3200).fill(i + 1))
+      buffers.add(manager.getAudioDataForTranscription(0)!.buffer)
+    }
+    const data = manager.getAudioDataForTranscription(0)!
+    expect(buffers.size).toBe(1)
+    expect(data.length).toBe(32000)
+    expect(data[25600]).toBe(9)
+    expect(data[31999]).toBe(10)
+  })
 })
 
 describe('RealtimeTranscriber transcription queue', () => {
