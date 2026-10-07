@@ -5,5 +5,5 @@
 # line itself. See vendor/README.md.
 
 WHISPER_CPP_REPO=https://github.com/ggml-org/whisper.cpp
-WHISPER_CPP_REF=1d549b3cecc2d98d76d4ddc2edca0d1512f5d7a0
-WHISPER_CPP_COMMIT=1d549b3cecc2d98d76d4ddc2edca0d1512f5d7a0
+WHISPER_CPP_REF=4afec37b797ab531aaf363208d79d541fbc17ff4
+WHISPER_CPP_COMMIT=4afec37b797ab531aaf363208d79d541fbc17ff4

@@ -95,4 +95,4 @@ local-plan-done/
 bin/
 build-hexagon-htp/
 vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/v73/
-example/android/app/src/main/assets/ggml-hexagon/
+example/android/app/src/main/assets/rnwhisper-hexagon/

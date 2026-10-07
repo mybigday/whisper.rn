@@ -49,6 +49,7 @@ file(GLOB RNWHISPER_GGML_CPU_SOURCES CONFIGURE_DEPENDS
     ${_ggml}/ggml-cpu/*.c
     ${_ggml}/ggml-cpu/*.cpp
     ${_ggml}/ggml-cpu/amx/*.cpp
+    ${_ggml}/ggml-cpu/tiled/*.cpp
 )
 # Intel HBM allocator (GGML_USE_CPU_HBM); never enabled here.
 list(FILTER RNWHISPER_GGML_CPU_SOURCES EXCLUDE REGEX "/hbm\\.cpp$")
@@ -85,6 +86,7 @@ set(RNWHISPER_GGML_HEXAGON_DIR "${_ggml}/ggml-hexagon")
 # --- whisper ------------------------------------------------------------------
 set(RNWHISPER_WHISPER_SOURCES
     ${_whisper}/whisper.cpp
+    ${_whisper}/aneforge/whisper-aneforge.cpp  # no-op stub off Apple arm64; runtime opt-in via ANEFORGE_ENCODER
     ${_whisper}/parakeet.cpp
 )
 file(GLOB RNWHISPER_COREML_SOURCES CONFIGURE_DEPENDS ${_whisper}/coreml/*.m ${_whisper}/coreml/*.mm)  # need -fobjc-arc

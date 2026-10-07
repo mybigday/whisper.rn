@@ -49,6 +49,7 @@ WHISPER_CPP_PATHS=(
   src/parakeet.cpp
   src/parakeet-arch.h
   src/coreml
+  src/aneforge
 
   ggml/CMakeLists.txt
   ggml/cmake
@@ -87,8 +88,6 @@ WHISPER_CPP_PATHS=(
   ggml/src/ggml-cpu/ggml-cpu.cpp
   ggml/src/ggml-cpu/hbm.cpp
   ggml/src/ggml-cpu/hbm.h
-  ggml/src/ggml-cpu/iqp.cpp
-  ggml/src/ggml-cpu/iqp.h
   ggml/src/ggml-cpu/ops.cpp
   ggml/src/ggml-cpu/ops.h
   ggml/src/ggml-cpu/quants.c
@@ -106,6 +105,7 @@ WHISPER_CPP_PATHS=(
   ggml/src/ggml-cpu/amx
   ggml/src/ggml-cpu/kleidiai
   ggml/src/ggml-cpu/llamafile
+  ggml/src/ggml-cpu/tiled
   ggml/src/ggml-cpu/arch/arm
   ggml/src/ggml-cpu/arch/wasm
   ggml/src/ggml-cpu/arch/x86
