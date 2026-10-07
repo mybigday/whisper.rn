@@ -56,6 +56,7 @@ Pod::Spec.new do |s|
       "#{whisper_cpp}/include/*.h",
       "#{whisper_cpp}/src/*.{h,cpp}",
       "#{whisper_cpp}/src/coreml/*.{h,m,mm}",
+      "#{whisper_cpp}/src/aneforge/*.{h,cpp}",
       "#{whisper_cpp}/ggml/include/*.h",
       "#{whisper_cpp}/ggml/src/*.{h,c,cpp}",
       "#{whisper_cpp}/ggml/src/ggml-cpu/**/*.{h,c,cpp}",
