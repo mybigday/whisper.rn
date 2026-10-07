@@ -897,6 +897,163 @@ describe('RealtimeTranscriber', () => {
     })
   })
 
+  // https://github.com/mybigday/whisper.rn/issues/330
+  // Without VAD, `nextSlice()` (which marks a slice `isFinal` and fires
+  // `onSliceTranscriptionStabilized`) used to be invoked only by VAD's speech_end handler or at
+  // stream end - a no-VAD session got zero live/incremental stabilized updates, and at most one
+  // right at the very end of the stream. These tests drive audio through the real
+  // `handleAudioData` -> `processAudioChunk` path (no manual `nextSlice()` calls) to prove the
+  // fix delivers live stabilized callbacks as each slice crosses its `audioSliceSec` duration.
+  describe('no-VAD stabilization (issue #330)', () => {
+    const createNoVadHarness = (options: Record<string, unknown> = {}) => {
+      let sliceCounter = 0
+      const whisperContext: any = {
+        transcribeData: jest.fn(() => {
+          const text = `slice ${sliceCounter}`
+          sliceCounter += 1
+          return {
+            stop: jest.fn(),
+            promise: Promise.resolve({
+              isAborted: false,
+              result: text,
+              language: 'en',
+              segments: [{ text, t0: 0, t1: 1000 }],
+            }),
+          }
+        }),
+      }
+      const audioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      audioStream['startStreaming'] = jest.fn()
+      const onSliceTranscriptionStabilized = jest.fn()
+      const noVadTranscriber = new RealtimeTranscriber(
+        { whisperContext, audioStream },
+        { audioSliceSec: 1, maxSlicesInMemory: 3, ...options },
+        { onSliceTranscriptionStabilized },
+      )
+
+      // 3200 bytes = 0.1s of 16kHz/16-bit mono audio. 8 chunks = 0.8s = 80% of a 1s slice,
+      // which is SliceManager's completion threshold.
+      const sendChunks = async (count: number) => {
+        for (let i = 0; i < count; i += 1) {
+          audioStream.simulateDataChunk(createAudioData(3200))
+          // Let the fire-and-forget processAudioChunk promise (and any transcription it
+          // queues) settle before sending the next chunk.
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((resolve) => setTimeout(resolve, 0))
+          // eslint-disable-next-line no-await-in-loop
+          await noVadTranscriber['processingPromise']
+        }
+      }
+
+      return { transcriber: noVadTranscriber, whisperContext, onSliceTranscriptionStabilized, sendChunks }
+    }
+
+    it('never fires a live stabilized callback before the fix (documents the bug)', async () => {
+      // Sanity check against the un-fixed behavior: triggerTranscription(false) alone (what
+      // processAudioChunk's no-VAD branch used to always call) never marks a slice final.
+      const { transcriber: t, onSliceTranscriptionStabilized } = createNoVadHarness()
+      await t.start()
+
+      t['triggerTranscription'](false)
+      await t['processingPromise']
+
+      expect(onSliceTranscriptionStabilized).not.toHaveBeenCalled()
+      await t.release()
+    })
+
+    it('fires a live stabilized callback once a slice crosses audioSliceSec, without VAD', async () => {
+      const { transcriber: t, onSliceTranscriptionStabilized, sendChunks } = createNoVadHarness()
+      await t.start()
+
+      // 7 chunks (0.7s) stay under the 80%-of-1s completion threshold: no stabilization yet.
+      await sendChunks(7)
+      expect(onSliceTranscriptionStabilized).not.toHaveBeenCalled()
+
+      // The 8th chunk (0.8s total) crosses the threshold and should rotate + finalize the slice.
+      // (A draft transcription may already have fired for this slice once initRealtimeAfterMs
+      // was reached, incrementing the mock's counter - what matters here is that the *final*,
+      // slice-crossing transcription now fires the stabilized callback at all.)
+      await sendChunks(1)
+      expect(onSliceTranscriptionStabilized).toHaveBeenCalledTimes(1)
+      expect(onSliceTranscriptionStabilized).toHaveBeenCalledWith(expect.stringMatching(/^slice \d+$/))
+
+      await t.release()
+    })
+
+    it('keeps delivering live stabilized callbacks across multiple slices in one session', async () => {
+      const { transcriber: t, onSliceTranscriptionStabilized, sendChunks } = createNoVadHarness()
+      await t.start()
+
+      // 24 chunks of 0.1s = 2.4s, i.e. ~2 completed 1s slices' worth of audio.
+      await sendChunks(24)
+
+      const texts = onSliceTranscriptionStabilized.mock.calls.map((call) => call[0])
+      expect(texts.length).toBeGreaterThanOrEqual(2)
+      expect(texts).toEqual(texts.slice().sort())
+
+      await t.release()
+    })
+
+    it('applies back-pressure: does not rotate to a new final slice while one is still in flight', async () => {
+      // A slow transcription (never resolves during the test) must not stop later audio from
+      // being accepted, nor cause unbounded queue growth - the current slice should simply keep
+      // absorbing audio until the in-flight final finishes.
+      let resolveFirst: (() => void) | undefined
+      const whisperContext: any = {
+        transcribeData: jest.fn(() => ({
+          stop: jest.fn(),
+          promise: new Promise((resolve) => {
+            resolveFirst = () =>
+              resolve({ isAborted: false, result: 'slow slice', segments: [] })
+          }),
+        })),
+      }
+      const audioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      audioStream['startStreaming'] = jest.fn()
+      const onSliceTranscriptionStabilized = jest.fn()
+      const t = new RealtimeTranscriber(
+        { whisperContext, audioStream },
+        { audioSliceSec: 1, maxSlicesInMemory: 3 },
+        { onSliceTranscriptionStabilized },
+      )
+      await t.start()
+
+      // Cross the 80% threshold once: a final transcription is now queued/in-flight and will
+      // not resolve until resolveFirst() is called below.
+      for (let i = 0; i < 8; i += 1) {
+        audioStream.simulateDataChunk(createAudioData(3200))
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      expect(t['isTranscribing']).toBe(true)
+      expect(t['transcriptionQueue']).toHaveLength(0) // already shifted into processTranscription
+
+      // Send a lot more audio while the first final is still in flight. None of this should
+      // queue a second final (back-pressure), so the queue never grows unbounded.
+      for (let i = 0; i < 20; i += 1) {
+        audioStream.simulateDataChunk(createAudioData(3200))
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      expect(onSliceTranscriptionStabilized).not.toHaveBeenCalled()
+      expect(t['transcriptionQueue'].length).toBeLessThanOrEqual(1)
+
+      // Let the slow transcription finish; the next slice can now rotate again.
+      resolveFirst?.()
+      await t['processingPromise']
+
+      await t.release()
+    })
+  })
+
   describe('error handling', () => {
     it('should handle audio stream errors', async () => {
       await transcriber.start()
