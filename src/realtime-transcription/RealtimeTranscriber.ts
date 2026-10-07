@@ -324,9 +324,25 @@ export class RealtimeTranscriber {
 
       this.vadContext.processAudio(data)
     } else {
-      // Fallback: If no VAD context, treat everything as speech/audio to be processed
-      this.sliceManager.addAudioData(data)
-      this.triggerTranscription(false)
+      // Fallback: No VAD context, so there is no speech_end event to finalize a slice and emit
+      // a stabilized result. Without VAD, `nextSlice()` is otherwise only invoked at stream end
+      // (handleAudioEnd), so a long no-VAD session would never get a live/incremental
+      // stabilized update - only a single one once the whole stream finishes.
+      //
+      // Treat a slice crossing its `audioSliceSec` duration (the same 80%-full threshold
+      // SliceManager already uses to finalize the slice's buffer) as a stabilization boundary,
+      // mirroring what a VAD speech_end would have done.
+      const { isComplete } = this.sliceManager.addAudioData(data)
+
+      if (isComplete && !this.isTranscribing && this.transcriptionQueue.length === 0) {
+        // Back-pressure: only rotate to a new final slice once the previous one has fully
+        // finished transcribing. Rotating on a fixed duration regardless of inference latency
+        // would otherwise let finals pile up on a slow device; instead the current slice keeps
+        // absorbing audio (its buffer grows automatically) until the previous final is done.
+        await this.nextSlice()
+      } else {
+        this.triggerTranscription(false)
+      }
     }
   }
 
