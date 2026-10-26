@@ -16,6 +16,7 @@ import type {
   VadSegment,
 } from './NativeRNWhisper'
 import { version } from './version.json'
+import { pcmPeak, toPcm16ArrayBuffer } from './utils/pcm'
 
 type NativeConstants = {
   useCoreML?: boolean
@@ -227,6 +228,14 @@ export interface TranscribeFileOptions extends TranscribeOptions {
   onNewSegments?: (result: TranscribeNewSegmentsResult) => void
 }
 
+export interface TranscribeDataOptions extends TranscribeFileOptions {
+  silenceThreshold?: number
+}
+
+export type TranscribeDataResult = TranscribeResult & {
+  skipped?: 'silence'
+}
+
 export type BenchResult = {
   config: string
   nThreads: number
@@ -329,14 +338,14 @@ export class WhisperContext {
    * Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
    */
   transcribeData(
-    data: string | ArrayBuffer,
-    options: TranscribeFileOptions = {},
+    data: string | ArrayBuffer | Int16Array | Float32Array,
+    options: TranscribeDataOptions = {},
   ): {
     stop: () => Promise<void>
-    promise: Promise<TranscribeResult>
+    promise: Promise<TranscribeDataResult>
   } {
     const { whisperTranscribeData } = getJsi()
-    const { onProgress, ...rest } = options
+    const { onProgress, silenceThreshold, ...rest } = options
     let lastProgress = 0
     const progressCallback = onProgress
       ? (progress: number) => {
@@ -345,7 +354,32 @@ export class WhisperContext {
         }
       : undefined
     const audioData =
-      data instanceof ArrayBuffer ? data : decodeBase64ToArrayBuffer(data)
+      typeof data === 'string'
+        ? decodeBase64ToArrayBuffer(data)
+        : toPcm16ArrayBuffer(data)
+
+    if (silenceThreshold !== undefined) {
+      if (
+        !Number.isFinite(silenceThreshold) ||
+        silenceThreshold < 0 ||
+        silenceThreshold > 1
+      ) {
+        throw new Error('silenceThreshold must be between 0 and 1')
+      }
+
+      if (pcmPeak(audioData) < silenceThreshold) {
+        return {
+          stop: async () => {},
+          promise: Promise.resolve({
+            result: '',
+            language: '',
+            segments: [],
+            isAborted: false,
+            skipped: 'silence' as const,
+          }),
+        }
+      }
+    }
 
     const task = this.runTranscription(
       (jobId) =>
