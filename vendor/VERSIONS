@@ -1,9 +1,14 @@
 # Upstream pin for the vendored tree under vendor/.
 #
-# Edit WHISPER_CPP_REF (tag, branch or commit), then run `yarn sync:vendor`.
-# The script resolves WHISPER_CPP_REF to WHISPER_CPP_COMMIT and rewrites that
+# Edit WHISPER_CPP_REF or VAD_CPP_REF (tag, branch or commit), then run
+# `yarn sync:vendor`.
+# The script resolves each *_REF to its *_COMMIT and rewrites that
 # line itself. See vendor/README.md.
 
 WHISPER_CPP_REPO=https://github.com/ggml-org/whisper.cpp
 WHISPER_CPP_REF=4afec37b797ab531aaf363208d79d541fbc17ff4
 WHISPER_CPP_COMMIT=4afec37b797ab531aaf363208d79d541fbc17ff4
+
+VAD_CPP_REPO=https://github.com/mybigday/vad.cpp
+VAD_CPP_REF=6de48c67ebbce05d0eafa529c4ff4cfaf96a4286
+VAD_CPP_COMMIT=6de48c67ebbce05d0eafa529c4ff4cfaf96a4286

@@ -1,0 +1,17 @@
+whisper.rn: vad.cpp reports errors on stderr, which is invisible on Android.
+Send them through ggml_log_internal so whisper_log_set (logcat, JS log
+forwarding) receives them.
+--- a/src/vad.cpp
++++ b/src/vad.cpp
+@@ -48,7 +48,10 @@
+     return list;
+ }
+ 
+-void log_err(const std::string & msg) { fprintf(stderr, "vad: %s\n", msg.c_str()); }
++// whisper.rn: route errors through ggml's logger (whisper_log_set installs it),
++// stderr is not visible on Android.
++extern "C" void ggml_log_internal(enum ggml_log_level level, const char * format, ...);
++void log_err(const std::string & msg) { ggml_log_internal(GGML_LOG_LEVEL_ERROR, "vad: %s\n", msg.c_str()); }
+ 
+ } // namespace
+ 

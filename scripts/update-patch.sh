@@ -1,11 +1,12 @@
 #!/bin/bash
 #
-# Regenerate one patch under scripts/patches/whisper.cpp/ from an in-place
-# edit of the vendored tree.
+# Regenerate one patch under scripts/patches/<dep>/ from an in-place edit of
+# the vendored tree.
 #
 #   scripts/update-patch.sh <path> [name]
 #
-#   path  file path inside vendor/whisper.cpp, e.g. src/whisper.cpp
+#   path  file path inside vendor/whisper.cpp, e.g. src/whisper.cpp; prefix it
+#         with vad.cpp/ for vendor/vad.cpp, e.g. vad.cpp/src/vad.cpp
 #   name  patch file name without .patch (default: the file's basename)
 #
 # The pristine file comes from the pinned upstream commit in the sync cache
@@ -22,13 +23,21 @@ CACHE_DIR="${WHISPER_RN_CACHE_DIR:-$HOME/.cache/whisper.rn}"
 
 dep="whisper.cpp"
 path="${1:?usage: update-patch.sh <path> [name]}"
+if [[ "$path" == vad.cpp/* ]]; then
+  dep="vad.cpp"
+  path="${path#vad.cpp/}"
+fi
 name="${2:-$(basename "$path")}"
 
 # shellcheck source=../vendor/VERSIONS
 source "$ROOT_DIR/vendor/VERSIONS"
-commit="${WHISPER_CPP_COMMIT:-}"
+if [ "$dep" = "vad.cpp" ]; then
+  commit="${VAD_CPP_COMMIT:-}"
+else
+  commit="${WHISPER_CPP_COMMIT:-}"
+fi
 if [ -z "$commit" ]; then
-  echo "WHISPER_CPP_COMMIT missing from vendor/VERSIONS" >&2
+  echo "commit for $dep missing from vendor/VERSIONS" >&2
   exit 1
 fi
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Re-vendors vendor/whisper.cpp from the pin in vendor/VERSIONS.
+# Re-vendors vendor/whisper.cpp and vendor/vad.cpp from the pins in
+# vendor/VERSIONS.
 #
 #   1. clone (once) or fetch upstream into $WHISPER_RN_CACHE_DIR
 #   2. export the subset whisper.rn builds, keeping the upstream directory
@@ -8,7 +9,7 @@
 #      by whisper.node through upstream's own CMake project, so it additionally
 #      carries the build files, the examples/ helpers whisper.node compiles and
 #      the desktop backends that project needs.
-#   3. apply scripts/patches/whisper.cpp/*.patch (-p1, paths relative to the tree)
+#   3. apply scripts/patches/<name>/*.patch (-p1, paths relative to the tree)
 #   4. regenerate src/version.json (whisper/ggml versions upstream derives from
 #      its CMake project; the builds pass them as compile definitions)
 #
@@ -137,6 +138,20 @@ WHISPER_CPP_PATHS=(
 
 # Exported by a directory pathspec above but not wanted.
 WHISPER_CPP_PRUNE=()
+
+# vad.cpp: the library and its CPU kernels. It builds against the ggml in
+# vendor/whisper.cpp (its own third_party/ggml submodule pins the same
+# commit), so neither the submodule nor tests/examples/tools are vendored.
+# CMakeLists.txt reuses a parent project's ggml target, which is how
+# whisper.node can add_subdirectory() it.
+VAD_CPP_PATHS=(
+  LICENSE
+  CMakeLists.txt
+  include
+  src
+)
+VAD_CPP_PRUNE=()
+VAD_CPP_KEEP=()
 
 # Files that live inside the tree but are not upstream content. None today;
 # kept so the export loop matches llama.rn's.
@@ -286,6 +301,7 @@ generate_version_file() {
 }
 
 sync_dep whisper.cpp WHISPER_CPP
+sync_dep vad.cpp VAD_CPP
 generate_version_file
 
 log "Done. Review with: git status vendor src/version.json"
