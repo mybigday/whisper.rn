@@ -865,6 +865,7 @@ export class RealtimeTranscriber {
     // reset/clear VAD context
     if (this.vadContext) {
       await this.vadContext.reset()
+      await this.vadContext.release?.()
     }
     this.vadContext = undefined
   }

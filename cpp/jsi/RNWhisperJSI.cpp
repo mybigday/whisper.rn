@@ -378,15 +378,47 @@ struct WhisperContextHolder : public ContextLifecycle {
     int activeJobId = -1;
 };
 
+// One vad_stream: stateful detection over live audio (the recurrent state stays
+// in vad.cpp between pushes). vad_stream is not thread-safe; the JS wrapper
+// serializes the calls of a stream in order, the mutex only guards misuse.
+struct VadStreamHolder {
+    std::mutex mutex;
+    vad_stream *stream = nullptr;
+};
+
 struct WhisperVadContextHolder : public ContextLifecycle {
     explicit WhisperVadContextHolder(int contextId)
         : id(contextId) {}
 
+    std::shared_ptr<VadStreamHolder> getStream(int streamId) {
+        std::lock_guard<std::mutex> lock(streamsMutex);
+        auto it = streams.find(streamId);
+        return it == streams.end() ? nullptr : it->second;
+    }
+
+    std::shared_ptr<VadStreamHolder> removeStream(int streamId) {
+        std::lock_guard<std::mutex> lock(streamsMutex);
+        auto it = streams.find(streamId);
+        if (it == streams.end()) {
+            return nullptr;
+        }
+        auto stream = it->second;
+        streams.erase(it);
+        return stream;
+    }
+
     int id = 0;
-    whisper_vad_context *context = nullptr;
+    vad_model *context = nullptr;
     long ptr = 0;
     bool gpu = false;
     std::string reasonNoGPU;
+    int sampleRate = 0;
+    int hopSamples = 0;
+    std::string arch;
+
+    std::mutex streamsMutex;
+    std::unordered_map<int, std::shared_ptr<VadStreamHolder>> streams;
+    int nextStreamId = 1;
 };
 
 std::atomic<int> g_parakeetDetachedContexts{0};
@@ -966,38 +998,93 @@ ParakeetTranscribeConfig createParakeetTranscribeConfig(
     return config;
 }
 
-whisper_vad_params createVadParams(
+vad_segment_params createVadParams(
     jsi::Runtime &runtime,
     const jsi::Object &options) {
-    whisper_vad_params params = whisper_vad_default_params();
+    vad_segment_params params = vad_segment_default_params();
     params.threshold =
         getFloatProperty(runtime, options, "threshold", params.threshold);
-    params.min_speech_duration_ms = getIntProperty(
+    params.neg_threshold =
+        getFloatProperty(runtime, options, "negThreshold", params.neg_threshold);
+    params.min_speech_ms = getIntProperty(
         runtime,
         options,
         "minSpeechDurationMs",
-        params.min_speech_duration_ms);
-    params.min_silence_duration_ms = getIntProperty(
+        params.min_speech_ms);
+    params.min_silence_ms = getIntProperty(
         runtime,
         options,
         "minSilenceDurationMs",
-        params.min_silence_duration_ms);
-    params.max_speech_duration_s = getFloatProperty(
+        params.min_silence_ms);
+    params.max_speech_s = getFloatProperty(
         runtime,
         options,
         "maxSpeechDurationS",
-        params.max_speech_duration_s);
+        params.max_speech_s);
     params.speech_pad_ms = getIntProperty(
         runtime,
         options,
         "speechPadMs",
         params.speech_pad_ms);
-    params.samples_overlap = getFloatProperty(
-        runtime,
-        options,
-        "samplesOverlap",
-        params.samples_overlap);
+    // samplesOverlap (whisper.cpp's VAD) has no counterpart: vad.cpp streams
+    // the whole buffer with exact Silero state, so there are no windows to overlap.
     return params;
+}
+
+// Offline detection: probabilities for the whole buffer, then silero-vad's
+// segmentation. Segment times are in 10 ms units, as before.
+VadResultData runVadDetect(
+    const std::shared_ptr<WhisperVadContextHolder> &holder,
+    const std::vector<float> &audio,
+    const vad_segment_params &params) {
+    VadResultData result;
+    if (audio.empty()) {
+        return result;
+    }
+    const int hop = holder->hopSamples;
+    const int n_samples = static_cast<int>(audio.size());
+    std::vector<float> probs(static_cast<size_t>(n_samples / hop + 1));
+    int n_probs = vad_detect(
+        holder->context,
+        audio.data(),
+        n_samples,
+        probs.data(),
+        static_cast<int>(probs.size()));
+    if (n_probs < 0) {
+        throw JsiError("VAD detection failed");
+    }
+    n_probs = std::min(n_probs, static_cast<int>(probs.size()));
+
+    std::vector<vad_segment> segments(16);
+    for (;;) {
+        int n = vad_segments_from_probs(
+            probs.data(), n_probs, 1, hop, holder->sampleRate, n_samples,
+            params, segments.data(), static_cast<int>(segments.size()));
+        if (n <= static_cast<int>(segments.size())) {
+            segments.resize(static_cast<size_t>(n));
+            break;
+        }
+        segments.resize(static_cast<size_t>(n));
+    }
+
+    const double toCentiseconds = 100.0 / holder->sampleRate;
+    result.segments.reserve(segments.size());
+    for (const auto &segment : segments) {
+        result.segments.push_back({
+            static_cast<float>(segment.start * toCentiseconds),
+            static_cast<float>(segment.end * toCentiseconds),
+        });
+    }
+    result.hasSpeech = !result.segments.empty();
+    return result;
+}
+
+jsi::Array createProbsArray(jsi::Runtime &runtime, const std::vector<float> &probs) {
+    jsi::Array array(runtime, probs.size());
+    for (size_t index = 0; index < probs.size(); ++index) {
+        array.setValueAtIndex(runtime, index, jsi::Value(static_cast<double>(probs[index])));
+    }
+    return array;
 }
 
 std::vector<rnwhisper_jsi::CoreMLAssetInfo> parseCoreMLAssets(
@@ -1494,6 +1581,9 @@ jsi::Value createVadContextValue(
         runtime,
         "reasonNoGPU",
         jsi::String::createFromUtf8(runtime, holder->reasonNoGPU));
+    result.setProperty(runtime, "sampleRate", jsi::Value(holder->sampleRate));
+    result.setProperty(runtime, "hopSamples", jsi::Value(holder->hopSamples));
+    result.setProperty(runtime, "arch", jsi::String::createFromUtf8(runtime, holder->arch));
     return result;
 }
 
@@ -1610,8 +1700,18 @@ bool releaseVadHolder(
             holder->id);
         return false;
     }
+    {
+        // Streams belong to the model: free them first.
+        std::lock_guard<std::mutex> lock(holder->streamsMutex);
+        for (auto &entry : holder->streams) {
+            std::lock_guard<std::mutex> streamLock(entry.second->mutex);
+            vad_stream_free(entry.second->stream);
+            entry.second->stream = nullptr;
+        }
+        holder->streams.clear();
+    }
     if (holder->context != nullptr) {
-        whisper_vad_free(holder->context);
+        vad_model_free(holder->context);
         holder->context = nullptr;
     }
     return true;
@@ -1660,6 +1760,46 @@ int requireContextId(
         throw jsi::JSError(runtime, "First argument must be a context id");
     }
     return static_cast<int>(arguments[index].asNumber());
+}
+
+// Runs `op` on a VAD stream in the thread pool. The context's task count keeps
+// the model alive meanwhile (releaseVadHolder waits for it).
+template <typename Op>
+jsi::Value runVadStreamOp(
+    jsi::Runtime &runtime,
+    const std::shared_ptr<react::CallInvoker> &callInvoker,
+    int contextId,
+    int streamId,
+    Op op) {
+    auto holder = g_vadContexts.get(contextId);
+    if (!holder) {
+        throw jsi::JSError(runtime, "VAD context not found");
+    }
+    holder->retainTask();
+    try {
+        return createPromiseTask(runtime, callInvoker, [holder, streamId, op]() -> PromiseResultGenerator {
+            PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+            auto stream = holder->getStream(streamId);
+            if (!stream) {
+                throw JsiError("VAD stream not found");
+            }
+            std::lock_guard<std::mutex> lock(stream->mutex);
+            if (stream->stream == nullptr) {
+                throw JsiError("VAD stream not found");
+            }
+            return op(stream->stream);
+        }, contextId);
+    } catch (...) {
+        holder->releaseTask();
+        throw;
+    }
+}
+
+int requireStreamId(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+    if (count <= 1 || !arguments[1].isNumber()) {
+        throw jsi::JSError(runtime, "Second argument must be a VAD stream id");
+    }
+    return static_cast<int>(arguments[1].asNumber());
 }
 
 std::string requireStringArgument(
@@ -2476,10 +2616,22 @@ void installJSIBindings(
                     throw JsiError("Failed to load the VAD model");
                 }
                 if (g_isShuttingDown.load(std::memory_order_relaxed)) {
-                    whisper_vad_free(result.context);
+                    vad_model_free(result.context);
                     return [](jsi::Runtime &) {
                         return jsi::Value::undefined();
                     };
+                }
+                // vad.cpp also loads turn-end and diarization models; only
+                // speech probabilities at 16 kHz are wired up for now.
+                if (vad_model_output(result.context) != VAD_OUTPUT_SPEECH ||
+                    vad_model_n_outputs(result.context) != 1) {
+                    std::string arch = vad_model_arch(result.context);
+                    vad_model_free(result.context);
+                    throw JsiError("Unsupported VAD model (" + arch + "): only speech detection models are supported");
+                }
+                if (vad_model_sample_rate(result.context) != 16000) {
+                    vad_model_free(result.context);
+                    throw JsiError("Unsupported VAD model: expected a 16 kHz model");
                 }
 
                 auto holder = std::make_shared<WhisperVadContextHolder>(contextId);
@@ -2487,6 +2639,9 @@ void installJSIBindings(
                 holder->ptr = reinterpret_cast<long>(result.context);
                 holder->gpu = result.gpu;
                 holder->reasonNoGPU = result.reasonNoGPU;
+                holder->sampleRate = vad_model_sample_rate(result.context);
+                holder->hopSamples = vad_model_hop_samples(result.context);
+                holder->arch = vad_model_arch(result.context);
                 g_vadContexts.add(contextId, holder);
 
                 return [holder](jsi::Runtime &rt) {
@@ -2578,30 +2733,7 @@ void installJSIBindings(
                 return createPromiseTask(runtime, callInvoker, [holder, audio, vadOptions]() -> PromiseResultGenerator {
                     PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
 
-                    bool detected = whisper_vad_detect_speech(
-                        holder->context,
-                        audio.data(),
-                        static_cast<int>(audio.size()));
-
-                    VadResultData result;
-                    result.hasSpeech = detected;
-                    if (detected) {
-                        auto *segments = whisper_vad_segments_from_probs(holder->context, vadOptions);
-                        if (segments != nullptr) {
-                            int count = whisper_vad_segments_n_segments(segments);
-                            result.segments.reserve(static_cast<size_t>(count));
-                            for (int index = 0; index < count; ++index) {
-                                result.segments.push_back({
-                                    whisper_vad_segments_get_segment_t0(segments, index),
-                                    whisper_vad_segments_get_segment_t1(segments, index),
-                                });
-                            }
-                            whisper_vad_free_segments(segments);
-                            result.hasSpeech = !result.segments.empty();
-                        } else {
-                            result.hasSpeech = false;
-                        }
-                    }
+                    auto result = runVadDetect(holder, audio, vadOptions);
 
                     return [result](jsi::Runtime &rt) {
                         return createVadResultValue(rt, result);
@@ -2648,33 +2780,159 @@ void installJSIBindings(
                     PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
 
                     auto audio = readWaveAudio(input);
-                    bool detected = whisper_vad_detect_speech(
-                        holder->context,
-                        audio.data(),
-                        static_cast<int>(audio.size()));
-
-                    VadResultData result;
-                    result.hasSpeech = detected;
-                    if (detected) {
-                        auto *segments = whisper_vad_segments_from_probs(holder->context, vadOptions);
-                        if (segments != nullptr) {
-                            int count = whisper_vad_segments_n_segments(segments);
-                            result.segments.reserve(static_cast<size_t>(count));
-                            for (int index = 0; index < count; ++index) {
-                                result.segments.push_back({
-                                    whisper_vad_segments_get_segment_t0(segments, index),
-                                    whisper_vad_segments_get_segment_t1(segments, index),
-                                });
-                            }
-                            whisper_vad_free_segments(segments);
-                            result.hasSpeech = !result.segments.empty();
-                        } else {
-                            result.hasSpeech = false;
-                        }
-                    }
+                    auto result = runVadDetect(holder, audio, vadOptions);
 
                     return [result](jsi::Runtime &rt) {
                         return createVadResultValue(rt, result);
+                    };
+                }, contextId);
+            } catch (...) {
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    auto vadStreamCreate = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadStreamCreate"),
+        1,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            auto holder = g_vadContexts.get(contextId);
+            if (!holder) {
+                throw jsi::JSError(runtime, "VAD context not found");
+            }
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder]() -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+                    auto stream = std::make_shared<VadStreamHolder>();
+                    stream->stream = vad_stream_new(holder->context);
+                    if (stream->stream == nullptr) {
+                        throw JsiError("Failed to create a VAD stream");
+                    }
+                    int streamId = 0;
+                    {
+                        std::lock_guard<std::mutex> lock(holder->streamsMutex);
+                        streamId = holder->nextStreamId++;
+                        holder->streams[streamId] = stream;
+                    }
+                    return [streamId](jsi::Runtime &) {
+                        return jsi::Value(streamId);
+                    };
+                }, contextId);
+            } catch (...) {
+                holder->releaseTask();
+                throw;
+            }
+        });
+
+    // Feeds PCM16 audio to a stream; resolves with the speech probabilities
+    // that became available (one per hop, in order).
+    auto vadStreamPush = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadStreamPush"),
+        3,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int streamId = requireStreamId(runtime, arguments, count);
+            auto audio = requireAudioBufferArgument(runtime, arguments, count, 2);
+            return runVadStreamOp(runtime, callInvoker, contextId, streamId, [audio](vad_stream *stream) -> PromiseResultGenerator {
+                const int n_samples = static_cast<int>(audio.size());
+                const int max_probs = vad_stream_n_pending(stream, n_samples);
+                std::vector<float> probs(static_cast<size_t>(std::max(max_probs, 0)));
+                int n = vad_stream_push(stream, audio.data(), n_samples, probs.data(), max_probs);
+                if (n < 0) {
+                    throw JsiError("VAD stream push failed");
+                }
+                probs.resize(static_cast<size_t>(n));
+                return [probs](jsi::Runtime &rt) {
+                    return jsi::Value(createProbsArray(rt, probs));
+                };
+            });
+        });
+
+    // End of audio: resolves with the probabilities still pending (a partial
+    // hop is zero padded). The stream keeps its state; reset it to reuse.
+    auto vadStreamFlush = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadStreamFlush"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int streamId = requireStreamId(runtime, arguments, count);
+            return runVadStreamOp(runtime, callInvoker, contextId, streamId, [](vad_stream *stream) -> PromiseResultGenerator {
+                const int max_probs = vad_stream_n_flush(stream);
+                std::vector<float> probs(static_cast<size_t>(std::max(max_probs, 0)));
+                int n = vad_stream_flush(stream, probs.data(), max_probs);
+                if (n < 0) {
+                    throw JsiError("VAD stream flush failed");
+                }
+                probs.resize(static_cast<size_t>(n));
+                return [probs](jsi::Runtime &rt) {
+                    return jsi::Value(createProbsArray(rt, probs));
+                };
+            });
+        });
+
+    auto vadStreamReset = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadStreamReset"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int streamId = requireStreamId(runtime, arguments, count);
+            return runVadStreamOp(runtime, callInvoker, contextId, streamId, [](vad_stream *stream) -> PromiseResultGenerator {
+                vad_stream_reset(stream);
+                return [](jsi::Runtime &) {
+                    return jsi::Value::undefined();
+                };
+            });
+        });
+
+    auto vadStreamRelease = jsi::Function::createFromHostFunction(
+        runtime,
+        jsi::PropNameID::forAscii(runtime, "whisperVadStreamRelease"),
+        2,
+        [callInvoker](
+            jsi::Runtime &runtime,
+            const jsi::Value &,
+            const jsi::Value *arguments,
+            size_t count) -> jsi::Value {
+            int contextId = requireContextId(runtime, arguments, count);
+            int streamId = requireStreamId(runtime, arguments, count);
+            auto holder = g_vadContexts.get(contextId);
+            if (!holder) {
+                // The context was released, and its streams with it.
+                return createResolvedPromise(runtime);
+            }
+            holder->retainTask();
+            try {
+                return createPromiseTask(runtime, callInvoker, [holder, streamId]() -> PromiseResultGenerator {
+                    PromiseScopeGuard taskGuard([holder]() { holder->releaseTask(); });
+                    if (auto stream = holder->removeStream(streamId)) {
+                        std::lock_guard<std::mutex> lock(stream->mutex);
+                        vad_stream_free(stream->stream);
+                        stream->stream = nullptr;
+                    }
+                    return [](jsi::Runtime &) {
+                        return jsi::Value::undefined();
                     };
                 }, contextId);
             } catch (...) {
@@ -2735,6 +2993,11 @@ void installJSIBindings(
     runtime.global().setProperty(runtime, "whisperReleaseAllVadContexts", std::move(releaseAllVadContexts));
     runtime.global().setProperty(runtime, "whisperVadDetectSpeech", std::move(vadDetectSpeech));
     runtime.global().setProperty(runtime, "whisperVadDetectSpeechFile", std::move(vadDetectSpeechFile));
+    runtime.global().setProperty(runtime, "whisperVadStreamCreate", std::move(vadStreamCreate));
+    runtime.global().setProperty(runtime, "whisperVadStreamPush", std::move(vadStreamPush));
+    runtime.global().setProperty(runtime, "whisperVadStreamFlush", std::move(vadStreamFlush));
+    runtime.global().setProperty(runtime, "whisperVadStreamReset", std::move(vadStreamReset));
+    runtime.global().setProperty(runtime, "whisperVadStreamRelease", std::move(vadStreamRelease));
     runtime.global().setProperty(runtime, "whisperToggleNativeLog", std::move(toggleNativeLog));
 }
 

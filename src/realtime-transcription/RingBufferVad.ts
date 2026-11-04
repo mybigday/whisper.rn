@@ -15,6 +15,12 @@ export type RingBufferVadOptions = {
     logger?: (message: string) => void
 }
 
+/**
+ * @deprecated Use `StreamVad`. RingBufferVad re-runs stateless detection over
+ * the last `preRecordingBufferMs` of audio every `inferenceIntervalMs` and
+ * times speech with the wall clock; StreamVad keeps the model state across
+ * chunks and segments exactly, per hop.
+ */
 export class RingBufferVad implements RealtimeVadContextLike {
     private vadContext: WhisperVadContextLike
 

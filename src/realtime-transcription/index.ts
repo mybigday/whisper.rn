@@ -8,6 +8,12 @@ export { SliceManager } from './SliceManager'
 export { RingBuffer } from './RingBuffer'
 export { RingBufferVad } from './RingBufferVad'
 
+// Stateful VAD (vad.cpp streams)
+export { StreamVad } from './StreamVad'
+export type { StreamVadOptions, StreamVadContextLike, VadStreamLike } from './StreamVad'
+export { StreamingVadSegmenter } from './StreamingVadSegmenter'
+export type { VadSegmenterEvent } from './StreamingVadSegmenter'
+
 export type { WavFileWriterFs } from '../utils/WavFileWriter'
 
 // Types and interfaces

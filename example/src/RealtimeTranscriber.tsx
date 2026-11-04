@@ -19,7 +19,7 @@ import contextOpts from './context-opts'
 import { createDir, fileDir, toTimestamp, downloadModel, whisperModels, WhisperModel } from './util'
 import {
   RealtimeTranscriber,
-  RingBufferVad,
+  StreamVad,
   VAD_PRESETS,
   type RealtimeTranscribeEvent,
   type RealtimeVadEvent,
@@ -387,9 +387,8 @@ export default function RealtimeTranscriberDemo() {
         realtimeTranscriberRef.current.release()
       }
 
-      // Create RingBufferVad wrapper
-      const vadContext = new RingBufferVad(vadContextRef.current, {
-        vadOptions: VAD_PRESETS[currentVadPreset],
+      // Stateful VAD: one native stream, one speech probability per 32 ms hop
+      const vadContext = new StreamVad(vadContextRef.current, {
         vadPreset: currentVadPreset,
         logger: (message) => log(message),
       })

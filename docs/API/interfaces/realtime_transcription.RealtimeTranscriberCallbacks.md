@@ -21,7 +21,7 @@
 
 ### onBeginTranscribe
 
-• `Optional` **onBeginTranscribe**: (`sliceInfo`: { `audioData`: `Uint8Array`<`ArrayBufferLike`\> ; `duration`: `number` ; `sliceIndex`: `number` ; `vadEvent?`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)  }) => `Promise`<`boolean`\>
+• `Optional` **onBeginTranscribe**: (`sliceInfo`: { `audioData`: `Uint8Array` ; `duration`: `number` ; `sliceIndex`: `number` ; `vadEvent?`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)  }) => `Promise`<`boolean`\>
 
 #### Type declaration
 
@@ -32,7 +32,7 @@
 | Name | Type |
 | :------ | :------ |
 | `sliceInfo` | `Object` |
-| `sliceInfo.audioData` | `Uint8Array`<`ArrayBufferLike`\> |
+| `sliceInfo.audioData` | `Uint8Array` |
 | `sliceInfo.duration` | `number` |
 | `sliceInfo.sliceIndex` | `number` |
 | `sliceInfo.vadEvent?` | [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md) |
@@ -43,13 +43,13 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:249](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L249)
+[realtime-transcription/types.ts:254](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L254)
 
 ___
 
 ### onBeginVad
 
-• `Optional` **onBeginVad**: (`sliceInfo`: { `audioData`: `Uint8Array`<`ArrayBufferLike`\> ; `duration`: `number` ; `sliceIndex`: `number`  }) => `Promise`<`boolean`\>
+• `Optional` **onBeginVad**: (`sliceInfo`: { `audioData`: `Uint8Array` ; `duration`: `number` ; `sliceIndex`: `number`  }) => `Promise`<`boolean`\>
 
 #### Type declaration
 
@@ -60,7 +60,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `sliceInfo` | `Object` |
-| `sliceInfo.audioData` | `Uint8Array`<`ArrayBufferLike`\> |
+| `sliceInfo.audioData` | `Uint8Array` |
 | `sliceInfo.duration` | `number` |
 | `sliceInfo.sliceIndex` | `number` |
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:256](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L256)
+[realtime-transcription/types.ts:261](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L261)
 
 ___
 
@@ -94,7 +94,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:262](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L262)
+[realtime-transcription/types.ts:267](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L267)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:265](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L265)
+[realtime-transcription/types.ts:270](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L270)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:264](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L264)
+[realtime-transcription/types.ts:269](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L269)
 
 ___
 
@@ -166,7 +166,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:263](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L263)
+[realtime-transcription/types.ts:268](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L268)
 
 ___
 
@@ -190,7 +190,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:255](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L255)
+[realtime-transcription/types.ts:260](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L260)
 
 ___
 
@@ -214,4 +214,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:261](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L261)
+[realtime-transcription/types.ts:266](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L266)

@@ -7,7 +7,7 @@ whisper.rn is a React Native binding for [whisper.cpp](https://github.com/ggerga
 **Key Features:**
 - Native speech-to-text transcription via whisper.cpp
 - NVIDIA Parakeet TDT transcription with multilingual model support
-- Voice Activity Detection (VAD) using Silero VAD model
+- Voice Activity Detection (VAD) on [vad.cpp](https://github.com/mybigday/vad.cpp) (Silero / FireRedVAD), offline and stateful streaming
 - Realtime transcription with auto-slicing and memory management
 - Core ML support for iOS (encoder acceleration)
 - Metal/GPU acceleration support
@@ -79,6 +79,7 @@ whisper.rn has a 4-layer architecture:
    - `NativeRNWhisper.ts`: TurboModule spec (New Architecture compatible)
    - `realtime-transcription/`: Enhanced realtime transcription framework
      - `RealtimeTranscriber.ts`: Main transcriber with VAD integration
+     - `StreamVad.ts` + `StreamingVadSegmenter.ts`: stateful VAD on a native vad.cpp stream (`RingBufferVad` is the deprecated windowed one)
      - `SliceManager.ts`: Audio slice memory management
      - `adapters/`: Audio stream adapters (e.g., AudioPcmStreamAdapter)
 
@@ -86,7 +87,7 @@ whisper.rn has a 4-layer architecture:
    - `RNWhisperJSI.cpp/h`: High-performance JSI functions for ArrayBuffer operations
    - Direct memory transfer for audio data (bypasses JSON serialization)
    - Thread pool for async processing
-   - Functions: `whisperTranscribeData`, `parakeetTranscribeData`, `whisperVadDetectSpeech`
+   - Functions: `whisperTranscribeData`, `parakeetTranscribeData`, `whisperVadDetectSpeech`, `whisperVadStream{Create,Push,Flush,Reset,Release}`
 
 3. **Native Modules** (`ios/`, `android/src/main/java/`):
    - **iOS**: `RNWhisper.mm`, `RNWhisperContext.mm`, `RNWhisperVadContext.mm`
@@ -97,6 +98,7 @@ whisper.rn has a 4-layer architecture:
 
 4. **C++ Core** (`cpp/` + `vendor/`):
    - `cpp/` holds only whisper.rn's own code: `rn-whisper.cpp/h` (job management, transcription orchestration), `rn-whisper-log.h`, and `jsi/`
+   - vad.cpp (VAD models, segmentation and its `vad-cpu` ggml backend) is vendored under `vendor/vad.cpp/`, built against the same ggml; its pin in `vendor/VERSIONS` must track the ggml whisper.cpp carries (vad-cpu uses ggml's internal backend headers). Patches in `scripts/patches/vad.cpp/`.
    - whisper.cpp is vendored under `vendor/whisper.cpp/` in its upstream layout (`include/`, `src/` with `whisper.cpp`, `parakeet.cpp` and `coreml/`, `ggml/{include,src}` with the CPU and Metal backends), pinned by `vendor/VERSIONS`, with whisper.rn changes kept as `-p1` patches in `scripts/patches/whisper.cpp/`. No git submodule, no symbol renaming. See `vendor/README.md`.
    - `vendor/whisper.cpp` is also consumed by whisper.node via upstream's CMake project, so it carries upstream's build files, `examples/common-whisper.*` (with `miniaudio.h`/`stb_vorbis.c`) and the BLAS/CUDA/Vulkan/WebGPU backends. whisper.rn's builds never compile those; `cmake/rnwhisper-sources.cmake` and `whisper-rn.podspec` filter them out (keep the two in sync).
    - `cmake/rnwhisper-sources.cmake` is the single source/include list every CMake build uses; `whisper-rn.podspec` mirrors it for CocoaPods
@@ -113,9 +115,9 @@ The library uses a context-based model:
   - Methods: `transcribe()`, `transcribeData()`, `release()`
   - Supports WAV file paths, base64 WAV, raw PCM16 ArrayBuffer data, and asset URIs
 
-- **WhisperVadContext**: VAD context, initialized with Silero VAD model
-  - Methods: `detectSpeech()`, `detectSpeechData()`, `release()`
-  - Used for voice activity detection in audio segments
+- **WhisperVadContext**: VAD context (vad.cpp), initialized with a speech model (whisper.cpp `ggml-silero-*.bin` or vad.cpp GGUF)
+  - Methods: `detectSpeech()`, `detectSpeechData()` (offline), `createStream()` (stateful `WhisperVadStream`: `push`/`flush`/`reset`/`release`), `release()`
+  - Always on the CPU (vad.cpp kernels); Android copies asset/resource models to a temp file because vad.cpp only loads from paths
 
 All contexts maintain:
 - `id`: Unique context identifier
@@ -138,8 +140,9 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
    - Keeps limited slices in memory (default: 3)
    - Provides memory usage stats
 
-2. **VAD Integration**:
-   - Detects speech vs silence in audio slices
+2. **VAD Integration** (`StreamVad`):
+   - One native stream per session: each chunk is pushed once, the model state carries over, one probability per hop (32 ms for Silero)
+   - `StreamingVadSegmenter` is the incremental form of silero-vad's offline segmentation (parity-tested against vad.cpp's `vad_segments_from_probs`); events carry the segment's audio and sample positions, not wall-clock time
    - Triggers auto-slice on speech_end events
    - Configurable thresholds and presets
 

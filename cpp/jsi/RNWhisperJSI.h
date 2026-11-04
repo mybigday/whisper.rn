@@ -9,6 +9,7 @@
 #include <jni.h>
 #include "parakeet.h"
 #include "whisper.h"
+#include "vad.h"
 #include "rn-whisper.h"
 #endif
 
@@ -16,10 +17,12 @@
 #if RNWHISPER_BUILD_FROM_SOURCE
 #include "parakeet.h"
 #include "whisper.h"
+#include "vad.h"
 #include "rn-whisper.h"
 #else
 #include <rnwhisper/parakeet.h>
 #include <rnwhisper/whisper.h>
+#include <rnwhisper/vad.h>
 #include <rnwhisper/rn-whisper.h>
 #endif
 #endif
@@ -54,8 +57,10 @@ struct WhisperVadContextInitOptions {
     int nThreads = 0;
 };
 
+// VAD models are loaded by vad.cpp (vendor/vad.cpp), which only reads files:
+// hosts resolve assets/resources to a readable path first.
 struct WhisperVadContextInitResult {
-    whisper_vad_context *context = nullptr;
+    vad_model *context = nullptr;
     bool gpu = false;
     std::string reasonNoGPU;
 };

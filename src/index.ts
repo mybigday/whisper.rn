@@ -52,6 +52,11 @@ const jsiBindingKeys = [
   'whisperReleaseAllVadContexts',
   'whisperVadDetectSpeech',
   'whisperVadDetectSpeechFile',
+  'whisperVadStreamCreate',
+  'whisperVadStreamPush',
+  'whisperVadStreamFlush',
+  'whisperVadStreamReset',
+  'whisperVadStreamRelease',
   'whisperToggleNativeLog',
 ] as const
 
@@ -588,13 +593,92 @@ export async function releaseAllParakeet(): Promise<void> {
 //
 
 export type VadContextOptions = {
+  /**
+   * Speech model file: a vad.cpp GGUF (Silero, FireRedVAD) or whisper.cpp's
+   * `ggml-silero-*.bin`
+   */
   filePath: string | number
   /** Is the file path a bundle asset for pure string filePath */
   isBundleAsset?: boolean
-  /** Use GPU if available. Currently iOS only */
+  /** @deprecated Ignored. VAD always runs on the CPU (vad.cpp's kernels), which is fastest for a single stream. */
   useGpu?: boolean
-  /** Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) */
+  /** Number of threads to use during computation (Default: 1, best for the small per-hop graphs) */
   nThreads?: number
+}
+
+// Always a copy: stream calls run after earlier ones settle, by which time the
+// caller may have reused its buffer for the next chunk.
+const copyAudioToArrayBuffer = (audio: ArrayBuffer | Uint8Array): ArrayBuffer =>
+  audio instanceof ArrayBuffer ? audio.slice(0) : toArrayBuffer(audio)
+
+/**
+ * Stateful voice activity detection over live audio, created with
+ * `WhisperVadContext.createStream()`.
+ *
+ * The model state carries over between pushes, so every sample is analyzed
+ * once and each probability takes all earlier audio into account (Silero's
+ * exact streaming semantics). Calls on one stream run in call order.
+ */
+export class WhisperVadStream {
+  readonly contextId: number
+
+  readonly id: number
+
+  /** Sample rate the stream expects (16000) */
+  readonly sampleRate: number
+
+  /** Samples covered by each probability (512 = 32 ms for Silero) */
+  readonly hopSamples: number
+
+  private queue: Promise<unknown> = Promise.resolve()
+
+  constructor(
+    contextId: number,
+    streamId: number,
+    sampleRate: number,
+    hopSamples: number,
+  ) {
+    this.contextId = contextId
+    this.id = streamId
+    this.sampleRate = sampleRate
+    this.hopSamples = hopSamples
+  }
+
+  private enqueue<T>(op: () => Promise<T>): Promise<T> {
+    // Run after the previous call settles, whether it failed or not
+    const run = this.queue.then(op, op)
+    this.queue = run.catch(() => undefined)
+    return run
+  }
+
+  /**
+   * Feed 16 kHz mono PCM16 audio of any length. Resolves with the speech
+   * probabilities that became available, in order: probability `i` of the
+   * stream covers samples `[i * hopSamples, (i + 1) * hopSamples)`.
+   */
+  push(audio: ArrayBuffer | Uint8Array): Promise<number[]> {
+    const { whisperVadStreamPush } = getJsi()
+    const data = copyAudioToArrayBuffer(audio)
+    return this.enqueue(() => whisperVadStreamPush(this.contextId, this.id, data))
+  }
+
+  /** End of audio: resolves with the probabilities still pending (a partial hop is zero padded). */
+  flush(): Promise<number[]> {
+    const { whisperVadStreamFlush } = getJsi()
+    return this.enqueue(() => whisperVadStreamFlush(this.contextId, this.id))
+  }
+
+  /** Clear the model state and buffered audio to start a new audio stream. */
+  reset(): Promise<void> {
+    const { whisperVadStreamReset } = getJsi()
+    return this.enqueue(() => whisperVadStreamReset(this.contextId, this.id))
+  }
+
+  /** Free the stream. Releasing the context frees its streams as well. */
+  release(): Promise<void> {
+    const { whisperVadStreamRelease } = getJsi()
+    return this.enqueue(() => whisperVadStreamRelease(this.contextId, this.id))
+  }
 }
 
 export class WhisperVadContext {
@@ -604,10 +688,39 @@ export class WhisperVadContext {
 
   reasonNoGPU = ''
 
-  constructor({ contextId, gpu, reasonNoGPU }: NativeWhisperVadContext) {
+  /** Sample rate the model expects (16000) */
+  sampleRate = 16000
+
+  /** Samples between consecutive speech probabilities (512 for Silero) */
+  hopSamples = 512
+
+  /** Model architecture, e.g. `silero` */
+  arch = ''
+
+  constructor({
+    contextId,
+    gpu,
+    reasonNoGPU,
+    sampleRate,
+    hopSamples,
+    arch,
+  }: NativeWhisperVadContext) {
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
+    if (sampleRate) this.sampleRate = sampleRate
+    if (hopSamples) this.hopSamples = hopSamples
+    if (arch) this.arch = arch
+  }
+
+  /**
+   * Create a stateful stream for live audio (see `WhisperVadStream`).
+   * `StreamVad` builds speech segments on top of it for `RealtimeTranscriber`.
+   */
+  async createStream(): Promise<WhisperVadStream> {
+    const { whisperVadStreamCreate } = getJsi()
+    const streamId = await whisperVadStreamCreate(this.id)
+    return new WhisperVadStream(this.id, streamId, this.sampleRate, this.hopSamples)
   }
 
   /**

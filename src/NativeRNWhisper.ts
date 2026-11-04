@@ -85,15 +85,23 @@ export type NativeParakeetContext = {
 export type VadOptions = {
   /** Probability threshold to consider as speech (Default: 0.5) */
   threshold?: number
+  /**
+   * Probability below which audio counts as silence while in speech, the lower
+   * edge of the hysteresis (Default: max(threshold - 0.15, 0.01))
+   */
+  negThreshold?: number
   /** Min duration for a valid speech segment in ms (Default: 250) */
   minSpeechDurationMs?: number
   /** Min silence duration to consider speech as ended in ms (Default: 100) */
   minSilenceDurationMs?: number
-  /** Max duration of a speech segment before forcing a new segment in seconds (Default: 30) */
+  /** Max duration of a speech segment before forcing a new segment in seconds (Default: no limit) */
   maxSpeechDurationS?: number
   /** Padding added before and after speech segments in ms (Default: 30) */
   speechPadMs?: number
-  /** Overlap in seconds when copying audio samples from speech segment (Default: 0.1) */
+  /**
+   * @deprecated Ignored. It applied to whisper.cpp's windowed VAD; detection
+   * now keeps the model state across the whole input, so nothing overlaps.
+   */
   samplesOverlap?: number
 }
 
@@ -108,6 +116,12 @@ export type NativeWhisperVadContext = {
   contextId: number
   gpu: boolean
   reasonNoGPU: string
+  /** Sample rate the model expects (16000) */
+  sampleRate: number
+  /** Samples between consecutive speech probabilities (512 for Silero) */
+  hopSamples: number
+  /** Model architecture, e.g. `silero` */
+  arch: string
 }
 
 export type VadSegment = {

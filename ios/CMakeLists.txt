@@ -37,10 +37,13 @@ if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
     )
 endif ()
 
+rnwhisper_vad_configure_sources("" RNWHISPER_VAD_ISA_SOURCES RNWHISPER_VAD_ISA_DEFINITIONS)
+
 # Define public headers
 set(PUBLIC_HEADERS
     ${RNWHISPER_CPP_DIR}/rn-whisper.h
     ${RNWHISPER_WHISPER_CPP_DIR}/include/whisper.h
+    ${RNWHISPER_VAD_CPP_DIR}/include/vad.h
     ${RNWHISPER_WHISPER_CPP_DIR}/ggml/include/ggml.h
 )
 
@@ -52,7 +55,7 @@ add_library(rnwhisper SHARED
     ${SOURCE_FILES_ARCH}
 )
 
-target_compile_definitions(rnwhisper PRIVATE ${RNWHISPER_VERSION_DEFINITIONS})
+target_compile_definitions(rnwhisper PRIVATE ${RNWHISPER_VERSION_DEFINITIONS} ${RNWHISPER_VAD_DEFINITIONS})
 
 # Setup include directories
 target_include_directories(rnwhisper

@@ -9,6 +9,7 @@
 - [ParakeetContext](../classes/index.ParakeetContext.md)
 - [WhisperContext](../classes/index.WhisperContext.md)
 - [WhisperVadContext](../classes/index.WhisperVadContext.md)
+- [WhisperVadStream](../classes/index.WhisperVadStream.md)
 
 ### Interfaces
 
@@ -64,7 +65,7 @@
 
 #### Defined in
 
-[index.ts:230](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L230)
+[index.ts:235](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L235)
 
 ___
 
@@ -80,12 +81,12 @@ ___
 | `filePath` | `string` \| `number` | - |
 | `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
 | `useCoreMLIos?` | `boolean` | Prefer to use Core ML model if exists. If set to false, even if the Core ML model exists, it will not be used. |
-| `useFlashAttn?` | `boolean` | Use Flash Attention, only recommended if GPU available |
-| `useGpu?` | `boolean` | Use GPU if available. Currently iOS only, if it's enabled, Core ML option will be ignored. |
+| `useFlashAttn?` | `boolean` | Use Flash Attention, only recommended if GPU available. Always on when the Hexagon NPU is used. |
+| `useGpu?` | `boolean` | Use GPU if available: Metal on iOS, Hexagon NPU on supported Android devices (see the Android installation notes). If it's enabled, Core ML option will be ignored. |
 
 #### Defined in
 
-[index.ts:382](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L382)
+[index.ts:387](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L387)
 
 ___
 
@@ -103,7 +104,7 @@ ___
 
 #### Defined in
 
-[index.ts:459](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L459)
+[index.ts:467](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L467)
 
 ___
 
@@ -120,7 +121,7 @@ ___
 
 #### Defined in
 
-[index.ts:467](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L467)
+[index.ts:475](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L475)
 
 ___
 
@@ -139,7 +140,7 @@ ___
 
 #### Defined in
 
-[index.ts:216](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L216)
+[index.ts:221](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L221)
 
 ___
 
@@ -170,7 +171,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -189,7 +190,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L40)
+[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L40)
 
 ___
 
@@ -201,14 +202,14 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `filePath` | `string` \| `number` | - |
+| `filePath` | `string` \| `number` | Speech model file: a vad.cpp GGUF (Silero, FireRedVAD) or whisper.cpp's `ggml-silero-*.bin` |
 | `isBundleAsset?` | `boolean` | Is the file path a bundle asset for pure string filePath |
-| `nThreads?` | `number` | Number of threads to use during computation (Default: 2 for 4-core devices, 4 for more cores) |
-| `useGpu?` | `boolean` | Use GPU if available. Currently iOS only |
+| `nThreads?` | `number` | Number of threads to use during computation (Default: 1, best for the small per-hop graphs) |
+| `useGpu?` | `boolean` | **`Deprecated`** Ignored. VAD always runs on the CPU (vad.cpp's kernels), which is fastest for a single stream. |
 
 #### Defined in
 
-[index.ts:587](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L587)
+[index.ts:595](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L595)
 
 ___
 
@@ -220,16 +221,17 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `maxSpeechDurationS?` | `number` | Max duration of a speech segment before forcing a new segment in seconds (Default: 30) |
+| `maxSpeechDurationS?` | `number` | Max duration of a speech segment before forcing a new segment in seconds (Default: no limit) |
 | `minSilenceDurationMs?` | `number` | Min silence duration to consider speech as ended in ms (Default: 100) |
 | `minSpeechDurationMs?` | `number` | Min duration for a valid speech segment in ms (Default: 250) |
-| `samplesOverlap?` | `number` | Overlap in seconds when copying audio samples from speech segment (Default: 0.1) |
+| `negThreshold?` | `number` | Probability below which audio counts as silence while in speech, the lower edge of the hysteresis (Default: max(threshold - 0.15, 0.01)) |
+| `samplesOverlap?` | `number` | **`Deprecated`** Ignored. It applied to whisper.cpp's windowed VAD; detection now keeps the model state across the whole input, so nothing overlaps. |
 | `speechPadMs?` | `number` | Padding added before and after speech segments in ms (Default: 30) |
 | `threshold?` | `number` | Probability threshold to consider as speech (Default: 0.5) |
 
 #### Defined in
 
-[NativeRNWhisper.ts:85](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L85)
+[NativeRNWhisper.ts:85](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L85)
 
 ___
 
@@ -246,7 +248,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:113](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/NativeRNWhisper.ts#L113)
+[NativeRNWhisper.ts:127](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L127)
 
 ## Variables
 
@@ -258,7 +260,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:452](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L452)
+[index.ts:460](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L460)
 
 ___
 
@@ -270,7 +272,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:449](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L449)
+[index.ts:457](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L457)
 
 ___
 
@@ -282,7 +284,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:446](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L446)
+[index.ts:454](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L454)
 
 ## Functions
 
@@ -308,7 +310,7 @@ Add a listener for native whisper.cpp log output
 
 #### Defined in
 
-[index.ts:715](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L715)
+[index.ts:831](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L831)
 
 ___
 
@@ -330,7 +332,7 @@ Initialize a Parakeet context with a GGML model file.
 
 #### Defined in
 
-[index.ts:550](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L550)
+[index.ts:558](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L558)
 
 ___
 
@@ -354,7 +356,7 @@ Promise resolving to WhisperContext instance
 
 #### Defined in
 
-[index.ts:405](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L405)
+[index.ts:413](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L413)
 
 ___
 
@@ -378,7 +380,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:663](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L663)
+[index.ts:779](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L779)
 
 ___
 
@@ -392,7 +394,7 @@ ___
 
 #### Defined in
 
-[index.ts:93](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L93)
+[index.ts:98](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L98)
 
 ___
 
@@ -408,7 +410,7 @@ Release every Parakeet context and free its memory.
 
 #### Defined in
 
-[index.ts:577](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L577)
+[index.ts:585](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L585)
 
 ___
 
@@ -422,7 +424,7 @@ ___
 
 #### Defined in
 
-[index.ts:439](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L439)
+[index.ts:447](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L447)
 
 ___
 
@@ -440,7 +442,7 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:695](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L695)
+[index.ts:811](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L811)
 
 ___
 
@@ -462,4 +464,4 @@ Enable or disable native whisper.cpp logging
 
 #### Defined in
 
-[index.ts:704](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L704)
+[index.ts:820](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L820)

@@ -91,6 +91,24 @@ declare global {
     pathOrBase64: string,
     options: VadOptions,
   ) => Promise<{ hasSpeech: boolean; segments: VadSegment[] }>
+  var whisperVadStreamCreate: (contextId: number) => Promise<number>
+  var whisperVadStreamPush: (
+    contextId: number,
+    streamId: number,
+    audioData: ArrayBuffer,
+  ) => Promise<number[]>
+  var whisperVadStreamFlush: (
+    contextId: number,
+    streamId: number,
+  ) => Promise<number[]>
+  var whisperVadStreamReset: (
+    contextId: number,
+    streamId: number,
+  ) => Promise<void>
+  var whisperVadStreamRelease: (
+    contextId: number,
+    streamId: number,
+  ) => Promise<void>
   var whisperToggleNativeLog: (
     enabled: boolean,
     onLog?: (level: string, text: string) => void,
