@@ -116,10 +116,12 @@ set(RNWHISPER_VAD_DEFINITIONS VAD_WITH_CPU_KERNELS)
 
 # Source-level settings upstream's CMake applies (vendor/vad.cpp/CMakeLists.txt).
 # Call once per directory that compiles RNWHISPER_VAD_SOURCES; source properties
-# are directory-scoped. `abi` is ANDROID_ABI on Android, empty elsewhere: the
-# ARMv8.2 (fp16 + dotprod) kernels are picked at runtime from HWCAP, which only
-# Linux/Android expose, so Apple builds keep the NEON baseline.
-function(rnwhisper_vad_configure_sources abi out_sources out_definitions)
+# are directory-scoped. `arm_variants`: the build targets arm64 only (Android
+# arm64-v8a, an Apple arm64 slice), so the ARMv8.2 (fp16 + dotprod) kernels are
+# compiled too and picked at runtime (HWCAP on Android, hw.optional.arm.*
+# sysctls on Apple, whose compilers default to ARMv8.0). Multi-arch slices keep
+# the NEON baseline only.
+function(rnwhisper_vad_configure_sources arm_variants out_sources out_definitions)
     set(vad "${RNWHISPER_VAD_CPP_DIR}/src")
     # errno/FP-exception semantics of libm calls block vectorization; the kernels never rely on them
     set_source_files_properties(
@@ -130,7 +132,7 @@ function(rnwhisper_vad_configure_sources abi out_sources out_definitions)
 
     set(sources "")
     set(definitions "")
-    if (abi STREQUAL "arm64-v8a")
+    if (arm_variants)
         set(sources ${vad}/ggml-vad-cpu/kernels_armv82.cpp)
         set(definitions VADK_ARM_VARIANTS)
         set_source_files_properties(${vad}/ggml-vad-cpu/kernels_armv82.cpp PROPERTIES

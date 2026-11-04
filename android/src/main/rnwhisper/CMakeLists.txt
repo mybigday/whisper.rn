@@ -40,7 +40,12 @@ endif ()
 
 find_library(LOG_LIB log)
 
-rnwhisper_vad_configure_sources("${ANDROID_ABI}" RNWHISPER_VAD_ISA_SOURCES RNWHISPER_VAD_ISA_DEFINITIONS)
+if (ANDROID_ABI STREQUAL "arm64-v8a")
+    set(RNWHISPER_VAD_ARM_VARIANTS ON)
+else ()
+    set(RNWHISPER_VAD_ARM_VARIANTS OFF)
+endif ()
+rnwhisper_vad_configure_sources(${RNWHISPER_VAD_ARM_VARIANTS} RNWHISPER_VAD_ISA_SOURCES RNWHISPER_VAD_ISA_DEFINITIONS)
 
 function(build_rnwhisper_library target_name arch cpu_flags)
     rnwhisper_variant_enabled(${target_name} VARIANT_ENABLED)

@@ -19,8 +19,9 @@ pins its own `third_party/ggml` submodule to the ggml commit whisper.cpp
 syncs, and a whisper.cpp update that moves ggml needs a matching vad.cpp.
 `cmake/rnwhisper-sources.cmake` (`RNWHISPER_VAD_SOURCES`,
 `rnwhisper_vad_configure_sources`) applies the same per-file flags as
-vad.cpp's own CMake project. On Android arm64 that includes the ARMv8.2
-kernels, which are selected at runtime.
+vad.cpp's own CMake project. Android arm64 and the Apple arm64 device slices
+also build the ARMv8.2 (fp16 + dotprod) kernels, selected at runtime (HWCAP /
+`hw.optional.arm.*`); the podspec does this with its `vad-armv82` subspec.
 
 `whisper.cpp/` serves two consumers. whisper.rn's builds pick their sources from
 `cmake/rnwhisper-sources.cmake` and `whisper-rn.podspec`. [whisper.node](https://github.com/mybigday/whisper.node)

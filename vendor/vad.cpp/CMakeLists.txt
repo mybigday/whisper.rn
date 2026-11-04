@@ -46,11 +46,18 @@ if(VAD_CPU_KERNELS)
         target_compile_options(ggml-vad-cpu PRIVATE -fno-math-errno -fno-trapping-math)
     endif()
 
+    # Target arch: Apple toolchains (iOS in particular) set CMAKE_OSX_ARCHITECTURES and may leave
+    # CMAKE_SYSTEM_PROCESSOR empty or set to the host; multi-arch (universal) builds get the generic kernels only.
+    set(VAD_TARGET_ARCH ${CMAKE_SYSTEM_PROCESSOR})
+    if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+        set(VAD_TARGET_ARCH ${CMAKE_OSX_ARCHITECTURES})
+    endif()
+
     if(VAD_CPU_NATIVE)
         if(NOT MSVC)
             set_source_files_properties(${VADCPU_DIR}/kernels_generic.cpp PROPERTIES COMPILE_OPTIONS "-march=native")
         endif()
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    elseif(VAD_TARGET_ARCH MATCHES "^(x86_64|AMD64|amd64)$")
         # x86: one build per ISA level, chosen at runtime
         target_sources(ggml-vad-cpu PRIVATE ${VADCPU_DIR}/kernels_avx2.cpp ${VADCPU_DIR}/kernels_avx512.cpp ${VADCPU_DIR}/kernels_avx512vnni.cpp)
         target_compile_definitions(ggml-vad-cpu PRIVATE VADK_X86_VARIANTS)
@@ -64,8 +71,9 @@ if(VAD_CPU_KERNELS)
             set_source_files_properties(${VADCPU_DIR}/kernels_avx512vnni.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw;-mavx512vl;-mavx512dq;-mavx512vnni;-mavx2;-mfma;-mf16c")
         endif()
     endif()
-    if(NOT VAD_CPU_NATIVE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$" AND CMAKE_SYSTEM_NAME MATCHES "^(Linux|Android)$" AND NOT MSVC)
-        # aarch64 Linux/Android: NEON baseline + an ARMv8.2 fp16/dotprod build, chosen at runtime (HWCAP)
+    if(NOT VAD_CPU_NATIVE AND VAD_TARGET_ARCH MATCHES "^(aarch64|arm64|ARM64)$" AND CMAKE_SYSTEM_NAME MATCHES "^(Linux|Android|Darwin|iOS|tvOS|visionOS)$" AND NOT MSVC)
+        # aarch64 Linux/Android/Apple: NEON baseline + an ARMv8.2 fp16/dotprod build, chosen at runtime
+        # (HWCAP on Linux, sysctl hw.optional.arm.* on Apple; iOS builds default to ARMv8.0)
         target_sources(ggml-vad-cpu PRIVATE ${VADCPU_DIR}/kernels_armv82.cpp)
         target_compile_definitions(ggml-vad-cpu PRIVATE VADK_ARM_VARIANTS)
         set_source_files_properties(${VADCPU_DIR}/kernels_armv82.cpp PROPERTIES COMPILE_OPTIONS "-march=armv8.2-a+fp16+dotprod")

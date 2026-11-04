@@ -11,13 +11,25 @@ static bool has_avx512() {
 }
 #endif
 #ifdef VADK_ARM_VARIANTS
+namespace vadk_armv82 { extern const vadk::table table; }
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+static bool sysctl_flag(const char * name) {
+    int v = 0;
+    size_t n = sizeof(v);
+    return sysctlbyname(name, &v, &n, nullptr, 0) == 0 && v != 0;
+}
+static bool has_armv82() {
+    return sysctl_flag("hw.optional.arm.FEAT_FP16") && sysctl_flag("hw.optional.arm.FEAT_DotProd");
+}
+#else
 #include <sys/auxv.h>
 #include <asm/hwcap.h>
-namespace vadk_armv82 { extern const vadk::table table; }
 static bool has_armv82() {
     const unsigned long hw = getauxval(AT_HWCAP);
     return (hw & HWCAP_ASIMDHP) && (hw & HWCAP_ASIMDDP);
 }
+#endif
 #endif
 
 namespace vadk {
