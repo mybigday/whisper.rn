@@ -28,19 +28,19 @@ test('rejects an odd-length ArrayBuffer', async () => {
   )
 })
 
-test('rejects an invalid silence threshold', async () => {
+test('rejects an invalid peak threshold', async () => {
   const context = await initWhisper({ filePath: 'test.bin' })
 
   expect(() =>
-    context.transcribeData(new Int16Array([1]), { silenceThreshold: 2 }),
-  ).toThrow('silenceThreshold must be between 0 and 1')
+    context.transcribeData(new Int16Array([1]), { peakThreshold: 2 }),
+  ).toThrow('peakThreshold must be between 0 and 1')
 })
 
 test('drops a silent buffer without calling native code', async () => {
   const context = await initWhisper({ filePath: 'test.bin' })
 
   const task = context.transcribeData(new Int16Array([0, 0, 0]), {
-    silenceThreshold: 0.01,
+    peakThreshold: 0.01,
   })
   const result = await task.promise
 
@@ -55,15 +55,15 @@ test('drops a silent buffer without calling native code', async () => {
   await task.stop()
 })
 
-test('runs inference when the buffer is above the silence threshold', async () => {
+test('runs inference when the buffer is above the peak threshold', async () => {
   const context = await initWhisper({ filePath: 'test.bin' })
 
   await context.transcribeData(new Int16Array([16384]), {
-    silenceThreshold: 0.01,
+    peakThreshold: 0.01,
   }).promise
 
   expect(transcribeData).toHaveBeenCalledTimes(1)
   expect(transcribeData.mock.calls[0]![1]).not.toHaveProperty(
-    'silenceThreshold',
+    'peakThreshold',
   )
 })
