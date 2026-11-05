@@ -229,7 +229,7 @@ export interface TranscribeFileOptions extends TranscribeOptions {
 }
 
 export interface TranscribeDataOptions extends TranscribeFileOptions {
-  silenceThreshold?: number
+  peakThreshold?: number
 }
 
 export type TranscribeDataResult = TranscribeResult & {
@@ -345,7 +345,7 @@ export class WhisperContext {
     promise: Promise<TranscribeDataResult>
   } {
     const { whisperTranscribeData } = getJsi()
-    const { onProgress, silenceThreshold, ...rest } = options
+    const { onProgress, peakThreshold, ...rest } = options
     let lastProgress = 0
     const progressCallback = onProgress
       ? (progress: number) => {
@@ -358,16 +358,16 @@ export class WhisperContext {
         ? decodeBase64ToArrayBuffer(data)
         : toPcm16ArrayBuffer(data)
 
-    if (silenceThreshold !== undefined) {
+    if (peakThreshold !== undefined) {
       if (
-        !Number.isFinite(silenceThreshold) ||
-        silenceThreshold < 0 ||
-        silenceThreshold > 1
+        !Number.isFinite(peakThreshold) ||
+        peakThreshold < 0 ||
+        peakThreshold > 1
       ) {
-        throw new Error('silenceThreshold must be between 0 and 1')
+        throw new Error('peakThreshold must be between 0 and 1')
       }
 
-      if (pcmPeak(audioData) < silenceThreshold) {
+      if (pcmPeak(audioData) < peakThreshold) {
         return {
           stop: async () => {},
           promise: Promise.resolve({

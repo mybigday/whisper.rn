@@ -104,11 +104,11 @@ const { result } = await promise
 
 `transcribeData` accepts base64 encoded PCM, `ArrayBuffer`, `Int16Array`, and `Float32Array`. Audio must be mono at 16 kHz. `Int16Array` and `ArrayBuffer` input is signed 16-bit PCM. `Float32Array` samples in -1..1 are converted to signed 16-bit PCM.
 
-A `silenceThreshold` option in 0..1 drops buffers whose peak amplitude is below the threshold before inference. The returned result has an empty `result` and `skipped: 'silence'`.
+A `peakThreshold` option in 0..1 drops buffers whose peak amplitude is below the threshold before inference. The returned result has an empty `result` and `skipped: 'silence'`. This is a cheap peak gate, not voice activity detection: quiet speech can be dropped and loud noise can pass. Use `WhisperVadContext` when you need model-based VAD.
 
 ```js
 const { promise } = context.transcribeData(pcm, {
-  silenceThreshold: 0.01,
+  peakThreshold: 0.01,
 })
 const { result, skipped } = await promise
 ```
