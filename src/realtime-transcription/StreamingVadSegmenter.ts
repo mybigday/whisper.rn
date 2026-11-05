@@ -27,16 +27,16 @@ export type VadSegmenterEvent =
  *   `prob < negThreshold` lasting `minSilenceDurationMs` ends it;
  * - `minSpeechDurationMs`: a segment is reported once it is certain to be long
  *   enough, i.e. exactly the segments the offline pass keeps;
- * - `speechPadMs`: starts and ends are padded, a start never reaches back
- *   before the previous segment's end;
+ * - `speechPadMs`: starts and ends are padded; where the paddings of two
+ *   segments would meet, the pause between them is split in half. An end is
+ *   therefore reported once that is decided: when the next segment is
+ *   confirmed, or `2 * speechPadMs` into the pause;
  * - `maxSpeechDurationS`: a longer segment is split, at the start of the
  *   current pause if there is one, else right away (the next segment then
  *   starts at the split). Unlike the offline pass it cannot go back to the
  *   longest earlier pause, since that audio is out.
  *
- * Apart from the split rule, and where two segments' paddings meet (the
- * offline pass splits the gap between them in half, this gives it to the
- * earlier one), the segments equal the offline result.
+ * Apart from the split rule, the segments equal the offline result.
  */
 export class StreamingVadSegmenter {
   private readonly hopSamples: number
@@ -73,8 +73,14 @@ export class StreamingVadSegmenter {
   /** Padded end of the previous segment */
   private prevEnd = 0
 
-  /** End decided but not reported yet: its padding reaches past the audio seen so far */
-  private pendingEnd: { sample: number; prob: number } | null = null
+  /**
+   * The previous segment ended at `pauseStart`, but its padded end is open:
+   * a segment starting within 2 * pad of the pause takes half of the pause.
+   */
+  private pendingEnd: { pauseStart: number; prob: number } | null = null
+
+  /** Total audio length once known (flush), bounds the last partial hop */
+  private audioEnd = Infinity
 
   constructor(options: VadOptions, hopSamples: number, sampleRate = 16000) {
     this.hopSamples = hopSamples
@@ -115,7 +121,12 @@ export class StreamingVadSegmenter {
    * Only meaningful while `inSpeech`.
    */
   get speechCertainUntil(): number {
-    if (this.pendingEnd) return this.pendingEnd.sample
+    if (this.pendingEnd) {
+      // The earliest the end can be: half the pause up to a segment starting next
+      const { pauseStart } = this.pendingEnd
+      const nextStart = this.triggered ? this.start : this.processedSamples
+      return pauseStart + Math.min(this.padSamples, Math.floor((nextStart - pauseStart) / 2))
+    }
     const knownEnd = this.tempEnd >= 0 ? this.tempEnd : this.processedSamples
     return knownEnd + this.padSamples
   }
@@ -135,6 +146,7 @@ export class StreamingVadSegmenter {
     this.tempEnd = -1
     this.prevEnd = 0
     this.pendingEnd = null
+    this.audioEnd = Infinity
   }
 
   /** Consume the next probabilities, one per hop. */
@@ -143,26 +155,30 @@ export class StreamingVadSegmenter {
     for (let k = 0; k < probs.length; k += 1) {
       this.step(probs[k]!, events)
     }
-    if (this.pendingEnd && this.pendingEnd.sample <= this.processedSamples) {
-      this.emitPendingEnd(events)
-    }
+    this.settlePendingEnd(this.processedSamples, events)
     return events
   }
 
-  /** End of audio after `totalSamples` samples: closes an open segment. */
-  flush(totalSamples: number): VadSegmenterEvent[] {
-    const events: VadSegmenterEvent[] = []
-    if (this.pendingEnd) {
-      // Like offline, the padding stops at the end of the audio
-      this.pendingEnd.sample = Math.min(this.pendingEnd.sample, totalSamples)
-      this.emitPendingEnd(events)
-    }
+  /**
+   * End of audio after `totalSamples` samples: consumes the last
+   * probabilities (the final hop may be partial) and closes open speech.
+   */
+  flush(totalSamples: number, probs: ArrayLike<number> = []): VadSegmenterEvent[] {
+    this.audioEnd = totalSamples
+    const events = this.push(probs)
     if (this.triggered) {
-      if (totalSamples - this.start > this.minSpeechSamples) {
+      if (this.confirmed || totalSamples - this.start > this.minSpeechSamples) {
         this.confirm(events)
         events.push({ type: 'end', sample: totalSamples, prob: 0 })
+        this.close(totalSamples)
+      } else {
+        this.triggered = false
+        this.tempEnd = -1
       }
-      this.close(totalSamples)
+    }
+    if (this.pendingEnd) {
+      // No next segment: full padding, stopping at the end of the audio
+      this.emitPendingEnd(this.pendingEnd.pauseStart + this.padSamples, events)
     }
     return events
   }
@@ -170,13 +186,12 @@ export class StreamingVadSegmenter {
   private step(prob: number, events: VadSegmenterEvent[]): void {
     const s = this.frame * this.hopSamples
     this.frame += 1
+    this.settlePendingEnd(s, events)
 
     if (prob >= this.threshold && this.tempEnd >= 0) {
       this.tempEnd = -1
     }
     if (prob >= this.threshold && !this.triggered) {
-      // The previous segment's end is final once the next one begins
-      this.emitPendingEnd(events)
       this.triggered = true
       this.confirmed = false
       this.start = s
@@ -210,10 +225,11 @@ export class StreamingVadSegmenter {
       }
       if (this.tempEnd - this.start > this.minSpeechSamples) {
         this.confirm(events)
-        const end = this.tempEnd + this.padSamples
-        this.pendingEnd = { sample: end, prob }
-        if (end <= this.processedSamples) this.emitPendingEnd(events)
-        this.close(end)
+        this.pendingEnd = { pauseStart: this.tempEnd, prob }
+        this.triggered = false
+        this.confirmed = false
+        this.tempEnd = -1
+        this.settlePendingEnd(this.processedSamples, events)
       } else {
         // Too short: never reported. Nothing was emitted, so prevEnd stays.
         this.triggered = false
@@ -229,7 +245,8 @@ export class StreamingVadSegmenter {
   // The segment will be kept once its end can no longer fall within
   // minSpeech of its start; `knownEnd` is a lower bound of that end.
   private maybeConfirm(knownEnd: number, events: VadSegmenterEvent[]): void {
-    if (!this.confirmed && knownEnd - this.start > this.minSpeechSamples) {
+    const end = Math.min(knownEnd, this.audioEnd)
+    if (!this.confirmed && end - this.start > this.minSpeechSamples) {
       this.confirm(events)
     }
   }
@@ -237,17 +254,36 @@ export class StreamingVadSegmenter {
   private confirm(events: VadSegmenterEvent[]): void {
     if (this.confirmed) return
     this.confirmed = true
+    let pad = this.padSamples
+    if (this.pendingEnd) {
+      // Within 2 * pad of the previous segment (else it would be settled):
+      // the two share the pause
+      pad = Math.floor((this.start - this.pendingEnd.pauseStart) / 2)
+      this.emitPendingEnd(this.pendingEnd.pauseStart + pad, events)
+    }
     events.push({
       type: 'start',
-      sample: Math.max(this.start - this.padSamples, this.prevEnd, 0),
+      sample: Math.max(this.start - pad, this.prevEnd, 0),
       prob: this.startProb,
     })
   }
 
-  private emitPendingEnd(events: VadSegmenterEvent[]): void {
+  /** The pending end gets the full padding once no segment can start within 2 * pad of the pause */
+  private settlePendingEnd(nextStart: number, events: VadSegmenterEvent[]): void {
+    if (
+      this.pendingEnd &&
+      !this.triggered &&
+      nextStart - this.pendingEnd.pauseStart >= 2 * this.padSamples
+    ) {
+      this.emitPendingEnd(this.pendingEnd.pauseStart + this.padSamples, events)
+    }
+  }
+
+  private emitPendingEnd(sample: number, events: VadSegmenterEvent[]): void {
     if (!this.pendingEnd) return
-    events.push({ type: 'end', ...this.pendingEnd })
-    this.prevEnd = this.pendingEnd.sample
+    const end = Math.min(sample, this.audioEnd)
+    events.push({ type: 'end', sample: end, prob: this.pendingEnd.prob })
+    this.prevEnd = end
     this.pendingEnd = null
   }
 

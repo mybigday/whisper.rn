@@ -161,6 +161,33 @@ describe('StreamVad', () => {
     expect(stream.release).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the audio of speech resuming within the padding', async () => {
+    const { context } = createFakeContext()
+    const vad = new StreamVad(context, {
+      vadOptions: { ...options.vadOptions, speechPadMs: 300 },
+    })
+    const events = record(vad)
+    // 160 ms pause: the two segments share it
+    const audio = makeAudio([[512, false], [1024, true], [160, false], [1024, true], [1000, false]])
+    feed(vad, audio, 100)
+    await vad.flush()
+    expect(events.filter((e) => e.type === 'start')).toHaveLength(2)
+    // Back to back, nothing dropped between them: speech in hops 16-47 and
+    // 53-84, padded by 4800 samples at the outer edges
+    const emitted = concat(events.map((e) => e.samples))
+    expect(emitted).toEqual(audio.slice(16 * HOP - 4800, 85 * HOP + 4800))
+  })
+
+  it('reports no speech for a final partial hop below the minimum', async () => {
+    const { context } = createFakeContext()
+    const vad = new StreamVad(context, options)
+    const events = record(vad)
+    // 7 hops + 16 ms of speech = 240 ms < 250 ms
+    feed(vad, makeAudio([[224 + 16, true]]), 100)
+    await vad.flush()
+    expect(events).toHaveLength(0)
+  })
+
   it('reports push failures through onError and keeps going', async () => {
     const { context, stream } = createFakeContext()
     const vad = new StreamVad(context, options)

@@ -67,28 +67,7 @@ describe('StreamingVadSegmenter', () => {
     it.each(cases.map((c, index) => [index, c] as const))(
       'matches the offline segmentation (case %i)',
       (_index, { params, probs, segments: expected }) => {
-        const pad = Math.floor((params.speechPadMs * 16000) / 1000)
-        const actual = runStreaming(probs, params, makeChunker())
-
-        expect(actual.length).toBe(expected.length)
-        actual.forEach(([start, end], i) => {
-          const [refStart, refEnd] = expected[i]!
-          // Where two padded segments meet, offline splits the gap between
-          // them in half; the stream gives it to the earlier segment.
-          const touchesPrev = i > 0 && expected[i - 1]![1] === refStart
-          const touchesNext = i + 1 < expected.length && expected[i + 1]![0] === refEnd
-          if (touchesPrev) {
-            expect(start).toBe(actual[i - 1]![1])
-            expect(Math.abs(start - refStart)).toBeLessThanOrEqual(pad)
-          } else {
-            expect(start).toBe(refStart)
-          }
-          if (touchesNext) {
-            expect(Math.abs(end - refEnd)).toBeLessThanOrEqual(pad)
-          } else {
-            expect(end).toBe(refEnd)
-          }
-        })
+        expect(runStreaming(probs, params, makeChunker())).toEqual(expected)
       },
     )
   })
@@ -119,6 +98,42 @@ describe('StreamingVadSegmenter', () => {
       expect(starts[i + 1]).toBe(end)
       expect(end - starts[i]!).toBeLessThanOrEqual(16000)
     })
+  })
+
+  it('splits a short pause between segments instead of reporting an end ahead of the audio', () => {
+    // 300 ms pad, 160 ms pause (5 hops): the paddings meet
+    const options = { speechPadMs: 300, minSilenceDurationMs: 100, minSpeechDurationMs: 250 }
+    const probs = [
+      ...new Array(20).fill(0.9),
+      ...new Array(5).fill(0.05),
+      ...new Array(20).fill(0.9),
+      ...new Array(40).fill(0.05),
+    ]
+    const segmenter = new StreamingVadSegmenter(options, HOP)
+    const events: Array<{ type: string; sample: number; seen: number }> = []
+    probs.forEach((p) => {
+      segmenter.push([p]).forEach((e) =>
+        events.push({ type: e.type, sample: e.sample, seen: segmenter.processedSamples }))
+    })
+    segmenter.flush(probs.length * HOP).forEach((e) =>
+      events.push({ type: e.type, sample: e.sample, seen: probs.length * HOP }))
+
+    // Never ahead of the probabilities consumed so far
+    events.forEach((e) => expect(e.sample).toBeLessThanOrEqual(e.seen))
+    const half = (5 * HOP) / 2
+    expect(events.map(({ type, sample }) => [type, sample])).toEqual([
+      ['start', 0],
+      ['end', 20 * HOP + half],
+      ['start', 20 * HOP + half],
+      ['end', 45 * HOP + 4800],
+    ])
+  })
+
+  it('bounds the final partial hop by the real audio length', () => {
+    // 7 hops + 16 ms = 240 ms of speech, below the 250 ms minimum
+    const segmenter = new StreamingVadSegmenter({ minSpeechDurationMs: 250 }, HOP)
+    expect(segmenter.push(new Array(7).fill(0.9))).toEqual([])
+    expect(segmenter.flush(7 * HOP + 256, [0.9])).toEqual([])
   })
 
   it('starts over after reset', () => {

@@ -14,16 +14,16 @@ certain:
   `prob < negThreshold` lasting `minSilenceDurationMs` ends it;
 - `minSpeechDurationMs`: a segment is reported once it is certain to be long
   enough, i.e. exactly the segments the offline pass keeps;
-- `speechPadMs`: starts and ends are padded, a start never reaches back
-  before the previous segment's end;
+- `speechPadMs`: starts and ends are padded; where the paddings of two
+  segments would meet, the pause between them is split in half. An end is
+  therefore reported once that is decided: when the next segment is
+  confirmed, or `2 * speechPadMs` into the pause;
 - `maxSpeechDurationS`: a longer segment is split, at the start of the
   current pause if there is one, else right away (the next segment then
   starts at the split). Unlike the offline pass it cannot go back to the
   longest earlier pause, since that audio is out.
 
-Apart from the split rule, and where two segments' paddings meet (the
-offline pass splits the gap between them in half, this gives it to the
-earlier one), the segments equal the offline result.
+Apart from the split rule, the segments equal the offline result.
 
 ## Table of contents
 
@@ -61,7 +61,7 @@ earlier one), the segments equal the offline result.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:79](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L79)
+[realtime-transcription/StreamingVadSegmenter.ts:85](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L85)
 
 ## Accessors
 
@@ -77,7 +77,7 @@ Whether a confirmed speech segment is open (its end not reported yet)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:104](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L104)
+[realtime-transcription/StreamingVadSegmenter.ts:110](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L110)
 
 ___
 
@@ -93,7 +93,7 @@ Samples covered by the probabilities consumed so far
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:109](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L109)
+[realtime-transcription/StreamingVadSegmenter.ts:115](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L115)
 
 ___
 
@@ -109,7 +109,7 @@ Earliest sample a future or pending segment may still need
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:124](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L124)
+[realtime-transcription/StreamingVadSegmenter.ts:135](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L135)
 
 ___
 
@@ -126,21 +126,23 @@ Only meaningful while `inSpeech`.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:117](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L117)
+[realtime-transcription/StreamingVadSegmenter.ts:123](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L123)
 
 ## Methods
 
 ### flush
 
-▸ **flush**(`totalSamples`): [`VadSegmenterEvent`](../modules/realtime_transcription.md#vadsegmenterevent)[]
+▸ **flush**(`totalSamples`, `probs?`): [`VadSegmenterEvent`](../modules/realtime_transcription.md#vadsegmenterevent)[]
 
-End of audio after `totalSamples` samples: closes an open segment.
+End of audio after `totalSamples` samples: consumes the last
+probabilities (the final hop may be partial) and closes open speech.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `totalSamples` | `number` |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `totalSamples` | `number` | `undefined` |
+| `probs` | `ArrayLike`<`number`\> | `[]` |
 
 #### Returns
 
@@ -148,7 +150,7 @@ End of audio after `totalSamples` samples: closes an open segment.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:153](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L153)
+[realtime-transcription/StreamingVadSegmenter.ts:166](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L166)
 
 ___
 
@@ -170,7 +172,7 @@ Consume the next probabilities, one per hop.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:141](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L141)
+[realtime-transcription/StreamingVadSegmenter.ts:153](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L153)
 
 ___
 
@@ -184,7 +186,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:129](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L129)
+[realtime-transcription/StreamingVadSegmenter.ts:140](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L140)
 
 ___
 
@@ -204,4 +206,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:85](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L85)
+[realtime-transcription/StreamingVadSegmenter.ts:91](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L91)

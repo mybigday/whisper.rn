@@ -242,8 +242,9 @@ export class StreamVad implements RealtimeVadContextLike {
     if (!this.stream || this.streamEnded) return
     const probs = await this.stream.flush()
     this.streamEnded = true
-    this.consume(probs)
-    this.apply(this.segmenter.flush(this.audio.end))
+    if (probs.length > 0) this.lastProb = probs[probs.length - 1]!
+    // The last hop may be partial: the segmenter needs the real length first
+    this.apply(this.segmenter.flush(this.audio.end, probs))
     this.audio.dropBefore(this.audio.end)
   }
 
