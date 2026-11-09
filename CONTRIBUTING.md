@@ -6,59 +6,57 @@ We want this community to be friendly and respectful to each other. Please follo
 
 ## Development workflow
 
-To get started with the project, run `yarn` in the root directory to install the required dependencies for each package:
+To get started with the project, run `npm install` in the root directory to install the required dependencies for each package:
 
 ```sh
-yarn
-yarn bootstrap
+npm install
+npm run bootstrap
 ```
-
-> While it's possible to use [`npm`](https://github.com/npm/cli), the tooling is built around [`yarn`](https://classic.yarnpkg.com/), so you'll have an easier time if you use `yarn` for development.
 
 While developing, you can run the [example app](/example/) to test your changes. Any changes you make in your library's JavaScript code will be reflected in the example app without a rebuild. If you change any native code, then you'll need to rebuild the example app.
 
 To start the packager:
 
 ```sh
-yarn example start
+npm run example run start
 ```
 
-The example app builds `whisper.rn`'s native code from source (`example/android/gradle.properties` sets `rnwhisperBuildFromSource=true`; the Podfile uses `RNWHISPER_BUILD_FROM_SOURCE`), so it always exercises the checked-in `cpp/` and `vendor/` sources. To try the prebuilt path locally, run `yarn build:android-libs` and then `./gradlew assembleDebug -PrnwhisperBuildFromSource=false` in `example/android`.
+The example app builds `whisper.rn`'s native code from source (`example/android/gradle.properties` sets `rnwhisperBuildFromSource=true`; the Podfile uses `RNWHISPER_BUILD_FROM_SOURCE`), so it always exercises the checked-in `cpp/` and `vendor/` sources. To try the prebuilt path locally, run `npm run build:android-libs` and then `./gradlew assembleDebug -PrnwhisperBuildFromSource=false` in `example/android`.
 
 To run the example app on Android:
 
 ```sh
-yarn example android
+npm run example run android
 ```
 
 To run the example app on iOS:
 
 ```sh
-yarn example pods
-yarn example ios
+npm run example run pods
+npm run example run ios
 ```
 
 For test better performance on transcribe, you can run the app in Release mode:
-- iOS: `yarn example ios --mode Release`
-- Android: `yarn example android --mode release`
+- iOS: `npm run example run ios -- --mode Release`
+- Android: `npm run example run android -- --mode release`
 
 Make sure your code passes TypeScript and ESLint. Run the following to verify:
 
 ```sh
-yarn typecheck
-yarn lint
+npm run typecheck
+npm run lint
 ```
 
 To fix formatting errors, run the following:
 
 ```sh
-yarn lint --fix
+npm run lint -- --fix
 ```
 
 Remember to add tests for your change if possible. Run the unit tests by:
 
 ```sh
-yarn test
+npm test
 ```
 
 To edit the Objective-C or Swift files, open `example/ios/RNWhisperExample.xcworkspace` in XCode and find the source files at `Pods > Development Pods > whisper-rn`.
@@ -94,21 +92,21 @@ We use [release-it](https://github.com/release-it/release-it) to bump the versio
 To publish new versions, run the following:
 
 ```sh
-yarn release
+npm run release
 ```
 
 ### Scripts
 
 The `package.json` file contains various scripts for common tasks:
 
-- `yarn bootstrap`: setup project by installing all dependencies.
-- `yarn sync:vendor`: re-vendor `vendor/whisper.cpp` from `vendor/VERSIONS` and `scripts/patches/` (see `vendor/README.md`).
-- `yarn typecheck`: type-check files with TypeScript.
-- `yarn lint`: lint files with ESLint.
-- `yarn test`: run unit tests with Jest.
-- `yarn example start`: start the Metro server for the example app.
-- `yarn example android`: run the example app on Android.
-- `yarn example ios`: run the example app on iOS.
+- `npm run bootstrap`: setup project by installing all dependencies.
+- `npm run sync:vendor`: re-vendor `vendor/whisper.cpp` from `vendor/VERSIONS` and `scripts/patches/` (see `vendor/README.md`).
+- `npm run typecheck`: type-check files with TypeScript.
+- `npm run lint`: lint files with ESLint.
+- `npm test`: run unit tests with Jest.
+- `npm run example run start`: start the Metro server for the example app.
+- `npm run example run android`: run the example app on Android.
+- `npm run example run ios`: run the example app on iOS.
 
 ### Sending a pull request
 

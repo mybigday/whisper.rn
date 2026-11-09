@@ -23,49 +23,49 @@ whisper.rn is a React Native binding for [whisper.cpp](https://github.com/ggerga
 
 ### Setup and Bootstrap
 ```bash
-yarn                    # Install dependencies
-yarn bootstrap          # Setup example app deps + download example model assets
-yarn sync:vendor        # Re-vendor vendor/whisper.cpp from vendor/VERSIONS + scripts/patches
+npm install                        # Install dependencies
+npm run bootstrap                  # Setup example app deps + download example model assets
+npm run sync:vendor                # Re-vendor vendor/whisper.cpp from vendor/VERSIONS + scripts/patches
 ```
 
 ### Code Quality
 ```bash
-yarn typecheck          # Type-check TypeScript files
-yarn lint               # Lint files with ESLint
-yarn lint --fix         # Fix lint errors
-yarn test               # Run Jest unit tests
+npm run typecheck                  # Type-check TypeScript files
+npm run lint                       # Lint files with ESLint
+npm run lint -- --fix              # Fix lint errors
+npm test                           # Run Jest unit tests
 ```
 
 ### Build Commands
 ```bash
-yarn build              # Build TypeScript library with react-native-builder-bob
+npm run build                      # Build TypeScript library with react-native-builder-bob
 
 # Prebuilt native libraries (release assets, see "Prebuilt native libraries")
-yarn build:ios-frameworks    # Build ios/rnwhisper.xcframework for iOS/tvOS
-yarn build:android-libs      # Build android/src/main/jniLibs (librnwhisper*.so per ABI/variant)
-./scripts/setup-hexagon-sdk.sh  # Install the Hexagon SDK (needed for the *_hexagon variant)
-yarn build:hexagon-htp       # Build the Hexagon DSP-side libggml-htp-*.so into bin/ (Docker)
-yarn download:native-artifacts  # Re-run the postinstall download (--force to re-download)
+npm run build:ios-frameworks       # Build ios/rnwhisper.xcframework for iOS/tvOS
+npm run build:android-libs         # Build android/src/main/jniLibs (librnwhisper*.so per ABI/variant)
+./scripts/setup-hexagon-sdk.sh     # Install the Hexagon SDK (needed for the *_hexagon variant)
+npm run build:hexagon-htp          # Build the Hexagon DSP-side libggml-htp-*.so into bin/ (Docker)
+npm run download:native-artifacts  # Re-run the postinstall download (--force to re-download)
 
 # Example app builds
-yarn example start      # Start Metro bundler for example app
-yarn example android    # Run example on Android
-yarn example ios        # Run example on iOS
-yarn example pods       # Install iOS pods for example
+npm run example run start          # Start Metro bundler for example app
+npm run example run android        # Run example on Android
+npm run example run ios            # Run example on iOS
+npm run example run pods           # Install iOS pods for example
 
 # Release builds for testing performance
-yarn example ios --mode Release
-yarn example android --mode release
+npm run example run ios -- --mode Release
+npm run example run android -- --mode release
 ```
 
 ### Documentation
 ```bash
-yarn docgen             # Generate API documentation with typedoc
+npm run docgen                     # Generate API documentation with typedoc
 ```
 
 ### Release
 ```bash
-yarn release            # Publish new version with release-it
+npm run release                    # Publish new version with release-it
 ```
 
 ## Architecture
@@ -270,7 +270,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Unit Tests
 - Jest with React Native preset
 - Mock available: `jest.mock('whisper.rn', () => require('whisper.rn/jest-mock'))`
-- Run: `yarn test`
+- Run: `npm test`
 
 ### Example App
 - Located in `example/`
@@ -293,7 +293,7 @@ Its output is committed. Run it after changing `vendor/VERSIONS` or a patch; run
 
 1. Edit the vendored file in place, e.g. `vendor/whisper.cpp/src/whisper.cpp`
 2. Regenerate its patch: `scripts/update-patch.sh src/whisper.cpp` writes `scripts/patches/whisper.cpp/whisper.cpp.patch` (optional second argument names the patch; a file upstream lacks becomes a file-creating patch; text above the first `---` line survives regeneration, use it to say why)
-3. `yarn sync:vendor` must leave `git status` clean
+3. `npm run sync:vendor` must leave `git status` clean
 
 ### Prebuilt native libraries
 
@@ -304,7 +304,7 @@ Both platforms' heavy native code is prebuilt in the release workflow (`.github/
 
 `install/download-native-artifacts.js` (the package's `postinstall`, also `npx whisper-rn-download-artifacts`) downloads them from `<repository>/releases/download/v<version>/`, verifies the SHA-256 recorded in `install/native-artifacts.json` and writes a `.whisper-rn.sha256` marker so reinstalls are no-ops. The checksums are `null` in git; `install/write-native-artifacts-manifest.js` fills them in CI right before `npm publish`. A git checkout therefore never downloads anything and builds from source (`RNWHISPER_BUILD_FROM_SOURCE=1` for pods, `rnwhisperBuildFromSource=true` for Gradle, both set in the example app). `RNWHISPER_SKIP_POSTINSTALL=1` skips the download.
 
-Release order matters: `yarn release` (release-it) tags and creates the GitHub release; the tag push runs the workflow, which builds Android, builds iOS, uploads both archives to that release, then publishes to npm. `workflow_dispatch` re-uploads assets to an existing release (optionally re-publishing).
+Release order matters: `npm run release` (release-it) tags and creates the GitHub release; the tag push runs the workflow, which builds Android, builds iOS, uploads both archives to that release, then publishes to npm. `workflow_dispatch` re-uploads assets to an existing release (optionally re-publishing).
 
 ### Bootstrap (`scripts/bootstrap.sh`)
 
@@ -351,7 +351,7 @@ Developer environment only; it never touches `vendor/`:
 
 ### iOS Build Issues
 - Clean derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData`
-- Clean build: `yarn clean && cd example/ios && pod install`
+- Clean build: `npm run clean && cd example/ios && pod install`
 - Large models: Enable Extended Virtual Addressing entitlement
 
 ### Android Build Issues
