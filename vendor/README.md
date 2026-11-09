@@ -38,7 +38,7 @@ commit is in `VERSIONS` and `src/version.json`.
 ## Updating whisper.cpp or vad.cpp
 
 1. Edit the `WHISPER_CPP_REF` or `VAD_CPP_REF` line in `VERSIONS` (a tag such as `v1.9.3`, a branch, or a commit).
-2. Run `yarn sync:vendor`. It fetches the upstream repo into
+2. Run `npm run sync:vendor`. It fetches the upstream repo into
    `~/.cache/whisper.rn/` (override with `WHISPER_RN_CACHE_DIR`), exports the
    subset, applies `scripts/patches/<name>/*.patch`, regenerates
    `src/version.json`, and writes the resolved `*_COMMIT` back.
@@ -62,7 +62,7 @@ To change or add one:
    The optional second argument names the patch file (default: the file's
    basename). A file upstream does not have becomes a file-creating patch.
    For vad.cpp, prefix the path: `scripts/update-patch.sh vad.cpp/src/vad.cpp`.
-3. `yarn sync:vendor` must leave the tree unchanged (`git status` clean);
+3. `npm run sync:vendor` must leave the tree unchanged (`git status` clean);
    that is the check that the patch set is complete.
 
 Do not edit vendored files without regenerating the patch: the next sync

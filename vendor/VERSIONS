@@ -1,7 +1,7 @@
 # Upstream pin for the vendored tree under vendor/.
 #
 # Edit WHISPER_CPP_REF or VAD_CPP_REF (tag, branch or commit), then run
-# `yarn sync:vendor`.
+# `npm run sync:vendor`.
 # The script resolves each *_REF to its *_COMMIT and rewrites that
 # line itself. See vendor/README.md.
 
