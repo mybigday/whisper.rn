@@ -14,7 +14,7 @@ ASSETS_DIR="$ROOT_DIR/example/assets"
 
 cd "$ROOT_DIR"
 
-yarn example
+cd example && npm install && cd ..
 
 download() {
   local url="$1" dest="$2"

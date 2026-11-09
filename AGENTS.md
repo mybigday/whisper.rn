@@ -23,46 +23,46 @@ whisper.rn is a React Native binding for [whisper.cpp](https://github.com/ggerga
 
 ### Setup and Bootstrap
 ```bash
-yarn                    # Install dependencies
-yarn bootstrap          # Setup example app deps + download example model assets
-yarn sync:vendor        # Re-vendor vendor/whisper.cpp from vendor/VERSIONS + scripts/patches
+npm install                        # Install dependencies
+npm run bootstrap                  # Setup example app deps + download example model assets
+npm run sync:vendor                # Re-vendor vendor/whisper.cpp from vendor/VERSIONS + scripts/patches
 ```
 
 ### Code Quality
 ```bash
-yarn typecheck          # Type-check TypeScript files
-yarn lint               # Lint files with ESLint
-yarn lint --fix         # Fix lint errors
-yarn test               # Run Jest unit tests
+npm run typecheck                  # Type-check TypeScript files
+npm run lint                       # Lint files with ESLint
+npm run lint -- --fix              # Fix lint errors
+npm test                           # Run Jest unit tests
 ```
 
 ### Build Commands
 ```bash
-yarn build              # Build TypeScript library with react-native-builder-bob
+npm run build                      # Build TypeScript library with react-native-builder-bob
 
 # iOS framework builds (creates prebuilt xcframework)
-yarn build:ios-frameworks    # Build rnwhisper.xcframework for iOS/tvOS
-./scripts/build-ios.sh       # Manual iOS framework build script
+npm run build:ios-frameworks       # Build rnwhisper.xcframework for iOS/tvOS
+./scripts/build-ios.sh             # Manual iOS framework build script
 
 # Example app builds
-yarn example start      # Start Metro bundler for example app
-yarn example android    # Run example on Android
-yarn example ios        # Run example on iOS
-yarn example pods       # Install iOS pods for example
+npm run example run start          # Start Metro bundler for example app
+npm run example run android        # Run example on Android
+npm run example run ios            # Run example on iOS
+npm run example run pods           # Install iOS pods for example
 
 # Release builds for testing performance
-yarn example ios --mode Release
-yarn example android --mode release
+npm run example run ios -- --mode Release
+npm run example run android -- --mode release
 ```
 
 ### Documentation
 ```bash
-yarn docgen             # Generate API documentation with typedoc
+npm run docgen                     # Generate API documentation with typedoc
 ```
 
 ### Release
 ```bash
-yarn release            # Publish new version with release-it
+npm run release                    # Publish new version with release-it
 ```
 
 ## Architecture
@@ -260,7 +260,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Unit Tests
 - Jest with React Native preset
 - Mock available: `jest.mock('whisper.rn', () => require('whisper.rn/jest-mock'))`
-- Run: `yarn test`
+- Run: `npm test`
 
 ### Example App
 - Located in `example/`
@@ -283,7 +283,7 @@ Its output is committed. Run it after changing `vendor/VERSIONS` or a patch; run
 
 1. Edit the vendored file in place, e.g. `vendor/whisper.cpp/src/whisper.cpp`
 2. Regenerate its patch: `scripts/update-patch.sh src/whisper.cpp` writes `scripts/patches/whisper.cpp/whisper.cpp.patch` (optional second argument names the patch; a file upstream lacks becomes a file-creating patch; text above the first `---` line survives regeneration, use it to say why)
-3. `yarn sync:vendor` must leave `git status` clean
+3. `npm run sync:vendor` must leave `git status` clean
 
 ### Bootstrap (`scripts/bootstrap.sh`)
 
@@ -330,7 +330,7 @@ Developer environment only; it never touches `vendor/`:
 
 ### iOS Build Issues
 - Clean derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData`
-- Clean build: `yarn clean && cd example/ios && pod install`
+- Clean build: `npm run clean && cd example/ios && pod install`
 - Large models: Enable Extended Virtual Addressing entitlement
 
 ### Android Build Issues
