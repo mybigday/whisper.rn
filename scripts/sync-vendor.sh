@@ -13,7 +13,7 @@
 #   4. regenerate src/version.json (whisper/ggml versions upstream derives from
 #      its CMake project; the builds pass them as compile definitions)
 #
-# Everything this script writes is committed. Builds and `yarn bootstrap`
+# Everything this script writes is committed. Builds and `npm run bootstrap`
 # never run it, so CI always compiles the tree as checked in. Run it after
 # editing vendor/VERSIONS or scripts/patches/.
 set -eo pipefail

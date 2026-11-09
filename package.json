@@ -71,10 +71,10 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "build": "bob build",
-    "prepack": "yarn docgen && yarn build",
+    "prepack": "npm run docgen && npm run build",
     "test": "jest",
     "release": "release-it",
-    "example": "yarn --cwd example",
+    "example": "npm --prefix example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build",
     "build:ios-frameworks": "./scripts/build-ios.sh",
     "build:ios": "cd example && npm run build:ios",
@@ -129,8 +129,8 @@
     "react": "*",
     "react-native": "*"
   },
-  "resolutions": {
-    "@types/react": "19.2.14"
+  "overrides": {
+    "@types/react": "$@types/react"
   },
   "engines": {
     "node": ">=20.19.4"
@@ -188,7 +188,6 @@
     "type": "modules",
     "jsSrcsDir": "src"
   },
-  "packageManager": "yarn@1.22.22",
   "dependencies": {
     "safe-buffer": "^5.2.1"
   }

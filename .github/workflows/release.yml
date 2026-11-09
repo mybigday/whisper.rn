@@ -49,12 +49,12 @@ jobs:
         run: ./scripts/setup-hexagon-sdk.sh
 
       - name: Build Hexagon HTP libraries
-        run: yarn build:hexagon-htp
+        run: npm run build:hexagon-htp
 
       - name: Build Android libraries
         env:
           RNWHISPER_REQUIRE_HEXAGON: '1'
-        run: yarn build:android-libs
+        run: npm run build:android-libs
 
       - name: Verify Android libraries
         run: |
@@ -160,7 +160,7 @@ jobs:
           name: android-build-artifacts
 
       - name: Build iOS frameworks
-        run: yarn build:ios-frameworks
+        run: npm run build:ios-frameworks
 
       - name: Verify iOS frameworks
         run: |
@@ -230,7 +230,7 @@ jobs:
       - name: Write native artifact manifest
         run: node ./install/write-native-artifacts-manifest.js
 
-      # `yarn release` (release-it) creates the GitHub release locally; attach
+      # `npm run release` (release-it) creates the GitHub release locally; attach
       # the archives to it, or create the release if it does not exist yet.
       - name: Upload native release assets
         env:

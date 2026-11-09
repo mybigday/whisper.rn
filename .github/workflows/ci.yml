@@ -23,10 +23,10 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Lint files
-        run: yarn lint
+        run: npm run lint
 
       - name: Typecheck files
-        run: yarn typecheck
+        run: npm run typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -38,7 +38,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Run unit tests
-        run: yarn test --maxWorkers=2 --coverage
+        run: npm test -- --maxWorkers=2 --coverage
 
   build-ios-from-source:
     runs-on: macos-latest
@@ -67,11 +67,11 @@ jobs:
 
       - name: Install cocoapods
         run: |
-          yarn example pods
+          npm run example run pods
 
       - name: Build example for iOS
         run: |
-          yarn build:ios
+          npm run build:ios
 
   build-ios-frameworks:
     runs-on: macos-latest
@@ -100,18 +100,18 @@ jobs:
 
       - name: Build frameworks
         run: |
-          yarn build:ios-frameworks
+          npm run build:ios-frameworks
 
       # The podspec needs the xcframework to exist when not building from source.
       - name: Install cocoapods
         run: |
-          yarn example pods
+          npm run example run pods
         env:
           RNWHISPER_BUILD_FROM_SOURCE: 0
 
       - name: Build example for iOS
         run: |
-          yarn build:ios
+          npm run build:ios
 
   # The example's gradle.properties sets rnwhisperBuildFromSource=true, so this
   # compiles the whisper.cpp core inside the Gradle build (CPU-only: no Hexagon
@@ -156,7 +156,7 @@ jobs:
           # build-android-libs still builds all of them.
           ORG_GRADLE_PROJECT_rnwhisperVariants: rnwhisper,rnwhisper_v8fp16_va_2,rnwhisper_x86_64
         run: |
-          yarn build:android
+          npm run build:android
           ccache --show-stats
 
   # Same path as the release workflow: prebuilt core libraries (including the
@@ -214,13 +214,13 @@ jobs:
 
       - name: Build Hexagon HTP libraries
         if: steps.htp-cache.outputs.cache-hit != 'true'
-        run: yarn build:hexagon-htp
+        run: npm run build:hexagon-htp
 
       - name: Build libraries
         env:
           RNWHISPER_REQUIRE_HEXAGON: '1'
         run: |
-          yarn build:android-libs
+          npm run build:android-libs
           ccache --show-stats
 
       # Proves the prebuilt path works with the libraries just built. The

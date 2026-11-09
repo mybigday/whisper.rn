@@ -54,7 +54,7 @@ The pre-built libraries include everything the backend needs: the `rnwhisper_v8f
 <uses-native-library android:name="libcdsprpc.so" android:required="false" />
 ```
 
-When building from source, the Hexagon variant is only compiled if the Hexagon SDK is on the build machine (`scripts/setup-hexagon-sdk.sh` installs it to `~/.hexagon-sdk/6.4.0.2`, or set `HEXAGON_SDK_ROOT`), and the DSP-side libraries have to be built with `yarn build:hexagon-htp` (Docker, using the `ghcr.io/snapdragon-toolchain/arm64-android` image). Without the SDK the from-source build is CPU-only. The example app does this in `example/android/app/build.gradle` (`prepareHTP`) and its manifest.
+When building from source, the Hexagon variant is only compiled if the Hexagon SDK is on the build machine (`scripts/setup-hexagon-sdk.sh` installs it to `~/.hexagon-sdk/6.4.0.2`, or set `HEXAGON_SDK_ROOT`), and the DSP-side libraries have to be built with `npm run build:hexagon-htp` (Docker, using the `ghcr.io/snapdragon-toolchain/arm64-android` image). Without the SDK the from-source build is CPU-only. The example app does this in `example/android/app/build.gradle` (`prepareHTP`) and its manifest.
 
 Benchmark on Samsung S25 Ultra (Snapdragon 8 Elite, from the example app's Benchmark screen, times in ms):
 
