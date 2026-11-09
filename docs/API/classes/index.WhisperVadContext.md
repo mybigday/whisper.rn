@@ -12,12 +12,16 @@
 
 ### Properties
 
+- [arch](index.WhisperVadContext.md#arch)
 - [gpu](index.WhisperVadContext.md#gpu)
+- [hopSamples](index.WhisperVadContext.md#hopsamples)
 - [id](index.WhisperVadContext.md#id)
 - [reasonNoGPU](index.WhisperVadContext.md#reasonnogpu)
+- [sampleRate](index.WhisperVadContext.md#samplerate)
 
 ### Methods
 
+- [createStream](index.WhisperVadContext.md#createstream)
 - [detectSpeech](index.WhisperVadContext.md#detectspeech)
 - [detectSpeechData](index.WhisperVadContext.md#detectspeechdata)
 - [release](index.WhisperVadContext.md#release)
@@ -36,9 +40,21 @@
 
 #### Defined in
 
-[index.ts:604](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L604)
+[index.ts:700](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L700)
 
 ## Properties
+
+### arch
+
+• **arch**: `string` = `''`
+
+Model architecture, e.g. `silero`
+
+#### Defined in
+
+[index.ts:698](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L698)
+
+___
 
 ### gpu
 
@@ -46,7 +62,19 @@
 
 #### Defined in
 
-[index.ts:600](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L600)
+[index.ts:687](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L687)
+
+___
+
+### hopSamples
+
+• **hopSamples**: `number` = `512`
+
+Samples between consecutive speech probabilities (512 for Silero)
+
+#### Defined in
+
+[index.ts:695](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L695)
 
 ___
 
@@ -56,7 +84,7 @@ ___
 
 #### Defined in
 
-[index.ts:598](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L598)
+[index.ts:685](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L685)
 
 ___
 
@@ -66,9 +94,38 @@ ___
 
 #### Defined in
 
-[index.ts:602](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L602)
+[index.ts:689](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L689)
+
+___
+
+### sampleRate
+
+• **sampleRate**: `number` = `16000`
+
+Sample rate the model expects (16000)
+
+#### Defined in
+
+[index.ts:692](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L692)
 
 ## Methods
+
+### createStream
+
+▸ **createStream**(): `Promise`<[`WhisperVadStream`](index.WhisperVadStream.md)\>
+
+Create a stateful stream for live audio (see `WhisperVadStream`).
+`StreamVad` builds speech segments on top of it for `RealtimeTranscriber`.
+
+#### Returns
+
+`Promise`<[`WhisperVadStream`](index.WhisperVadStream.md)\>
+
+#### Defined in
+
+[index.ts:720](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L720)
+
+___
 
 ### detectSpeech
 
@@ -90,7 +147,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:614](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L614)
+[index.ts:730](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L730)
 
 ___
 
@@ -113,7 +170,7 @@ Detect speech segments in raw audio data (base64 encoded float32 PCM data or Arr
 
 #### Defined in
 
-[index.ts:639](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L639)
+[index.ts:755](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L755)
 
 ___
 
@@ -127,4 +184,4 @@ ___
 
 #### Defined in
 
-[index.ts:652](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/index.ts#L652)
+[index.ts:768](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L768)

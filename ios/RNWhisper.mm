@@ -221,17 +221,16 @@ WhisperVadContextInitResult hostInitWhisperVadContext(
         return result;
     }
 
-    auto params = whisper_vad_default_context_params();
-    if (options.nThreads > 0) {
-        params.n_threads = options.nThreads;
-    }
-    params.use_gpu = false;
+    // vad.cpp's own CPU kernels; an accelerator only pays off with many
+    // concurrent streams. One thread suits the tiny per-hop graphs best.
+    auto params = vad_model_default_params();
+    params.device = "cpu";
+    params.n_threads = options.nThreads > 0 ? options.nThreads : 1;
 
-    result.context =
-        whisper_vad_init_from_file_with_params(modelPath.c_str(), params);
+    result.context = vad_model_load(modelPath.c_str(), params);
     result.gpu = false;
     if (options.useGpu) {
-        result.reasonNoGPU = "GPU VAD is not supported";
+        result.reasonNoGPU = "VAD runs on the CPU";
     }
     return result;
 }

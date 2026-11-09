@@ -241,7 +241,6 @@ export default function VadExample() {
                   minSilenceDurationMs: 100,
                   maxSpeechDurationS: 30,
                   speechPadMs: 30,
-                  samplesOverlap: 0.1,
                 },
               )
 
@@ -296,7 +295,6 @@ ${segments
                   minSilenceDurationMs: 100,
                   maxSpeechDurationS: 30,
                   speechPadMs: 30,
-                  samplesOverlap: 0.1,
                 },
               )
 
@@ -342,7 +340,6 @@ ${segments
                   minSilenceDurationMs: 50, // Shorter silence requirement
                   maxSpeechDurationS: 15, // Shorter max segments
                   speechPadMs: 50, // More padding
-                  samplesOverlap: 0.2, // More overlap
                 },
               )
 

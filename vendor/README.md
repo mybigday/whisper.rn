@@ -1,15 +1,27 @@
 # vendor
 
-Vendored copy of whisper.cpp, in its upstream directory layout. There is no
+Vendored copies of whisper.cpp and vad.cpp, in their upstream directory layouts. There is no
 git submodule: `git clone` gives you everything the builds need, and every
 build (CocoaPods, the CMake projects) compiles these files in place.
 
 | Directory | Upstream | What is vendored |
 | --- | --- | --- |
 | `whisper.cpp/` | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | `include/`, `src/` (whisper, parakeet, `coreml/`), `ggml/{include,src}` (CPU, Metal, Hexagon, BLAS, CUDA, Vulkan and WebGPU backends), the audio-decoding helpers from `examples/`, the CMake project files, `LICENSE`, plus the dummy test models and `samples/jfk.wav` the example app uses |
+| `vad.cpp/` | [mybigday/vad.cpp](https://github.com/mybigday/vad.cpp) | `include/vad.h`, `src/` (models, loaders, segmentation and the `vad-cpu` backend with its CPU kernels), `CMakeLists.txt`, `LICENSE` |
 
-`VERSIONS` pins the upstream ref and resolved commit. The exact file list
-lives in `scripts/sync-vendor.sh`.
+`VERSIONS` pins each upstream ref and resolved commit. The exact file lists
+live in `scripts/sync-vendor.sh`.
+
+vad.cpp builds against the ggml in `whisper.cpp/`; there is only one ggml.
+Its `vad-cpu` backend includes ggml's internal backend headers
+(`ggml-backend-impl.h`, `ggml-impl.h`), so the two pins move together: vad.cpp
+pins its own `third_party/ggml` submodule to the ggml commit whisper.cpp
+syncs, and a whisper.cpp update that moves ggml needs a matching vad.cpp.
+`cmake/rnwhisper-sources.cmake` (`RNWHISPER_VAD_SOURCES`,
+`rnwhisper_vad_configure_sources`) applies the same per-file flags as
+vad.cpp's own CMake project. Android arm64 and the Apple arm64 device slices
+also build the ARMv8.2 (fp16 + dotprod) kernels, selected at runtime (HWCAP /
+`hw.optional.arm.*`); the podspec does this with its `vad-armv82` subspec.
 
 `whisper.cpp/` serves two consumers. whisper.rn's builds pick their sources from
 `cmake/rnwhisper-sources.cmake` and `whisper-rn.podspec`. [whisper.node](https://github.com/mybigday/whisper.node)
@@ -23,19 +35,19 @@ package leaves out the CUDA, Vulkan and WebGPU backends. Note that upstream's
 that project reports whisper.rn's commit, not whisper.cpp's; the pinned upstream
 commit is in `VERSIONS` and `src/version.json`.
 
-## Updating whisper.cpp
+## Updating whisper.cpp or vad.cpp
 
-1. Edit the `WHISPER_CPP_REF` line in `VERSIONS` (a tag such as `v1.9.3`, a branch, or a commit).
-2. Run `yarn sync:vendor`. It fetches the upstream repo into
+1. Edit the `WHISPER_CPP_REF` or `VAD_CPP_REF` line in `VERSIONS` (a tag such as `v1.9.3`, a branch, or a commit).
+2. Run `npm run sync:vendor`. It fetches the upstream repo into
    `~/.cache/whisper.rn/` (override with `WHISPER_RN_CACHE_DIR`), exports the
-   subset, applies `scripts/patches/whisper.cpp/*.patch`, regenerates
-   `src/version.json`, and writes the resolved `WHISPER_CPP_COMMIT` back.
+   subset, applies `scripts/patches/<name>/*.patch`, regenerates
+   `src/version.json`, and writes the resolved `*_COMMIT` back.
 3. Fix any patch that no longer applies (see below), then commit the result.
 
 ## Patching upstream code
 
 Patches are plain `-p1` unified diffs against the upstream tree, one file per
-patch, under `scripts/patches/whisper.cpp/`. Text above the first `---` line
+patch, under `scripts/patches/whisper.cpp/` and `scripts/patches/vad.cpp/`. Text above the first `---` line
 is kept when a patch is regenerated, so use it to explain why the patch exists.
 
 To change or add one:
@@ -49,7 +61,8 @@ To change or add one:
 
    The optional second argument names the patch file (default: the file's
    basename). A file upstream does not have becomes a file-creating patch.
-3. `yarn sync:vendor` must leave the tree unchanged (`git status` clean);
+   For vad.cpp, prefix the path: `scripts/update-patch.sh vad.cpp/src/vad.cpp`.
+3. `npm run sync:vendor` must leave the tree unchanged (`git status` clean);
    that is the check that the patch set is complete.
 
 Do not edit vendored files without regenerating the patch: the next sync

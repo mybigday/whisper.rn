@@ -4,6 +4,13 @@
 
 [realtime-transcription](../modules/realtime_transcription.md).RingBufferVad
 
+**`Deprecated`**
+
+Use `StreamVad`. RingBufferVad re-runs stateless detection over
+the last `preRecordingBufferMs` of audio every `inferenceIntervalMs` and
+times speech with the wall clock; StreamVad keeps the model state across
+chunks and segments exactly, per hop.
+
 ## Implements
 
 - `RealtimeVadContextLike`
@@ -40,7 +47,7 @@
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:51](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L51)
+[realtime-transcription/RingBufferVad.ts:57](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L57)
 
 ## Methods
 
@@ -58,7 +65,7 @@ RealtimeVadContextLike.flush
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:132](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L132)
+[realtime-transcription/RingBufferVad.ts:138](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L138)
 
 ___
 
@@ -82,7 +89,7 @@ RealtimeVadContextLike.onError
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:98](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L98)
+[realtime-transcription/RingBufferVad.ts:104](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L104)
 
 ___
 
@@ -94,7 +101,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `callback` | (`confidence`: `number`, `data`: `Uint8Array`<`ArrayBufferLike`\>) => `void` |
+| `callback` | (`confidence`: `number`, `data`: `Uint8Array`) => `void` |
 
 #### Returns
 
@@ -106,7 +113,7 @@ RealtimeVadContextLike.onSpeechContinue
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:90](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L90)
+[realtime-transcription/RingBufferVad.ts:96](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L96)
 
 ___
 
@@ -130,7 +137,7 @@ RealtimeVadContextLike.onSpeechEnd
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:94](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L94)
+[realtime-transcription/RingBufferVad.ts:100](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L100)
 
 ___
 
@@ -142,7 +149,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `callback` | (`confidence`: `number`, `data`: `Uint8Array`<`ArrayBufferLike`\>) => `void` |
+| `callback` | (`confidence`: `number`, `data`: `Uint8Array`) => `void` |
 
 #### Returns
 
@@ -154,7 +161,7 @@ RealtimeVadContextLike.onSpeechStart
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:86](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L86)
+[realtime-transcription/RingBufferVad.ts:92](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L92)
 
 ___
 
@@ -166,7 +173,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `data` | `Uint8Array`<`ArrayBufferLike`\> |
+| `data` | `Uint8Array` |
 
 #### Returns
 
@@ -178,7 +185,7 @@ RealtimeVadContextLike.processAudio
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:102](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L102)
+[realtime-transcription/RingBufferVad.ts:108](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L108)
 
 ___
 
@@ -196,7 +203,7 @@ RealtimeVadContextLike.reset
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:155](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L155)
+[realtime-transcription/RingBufferVad.ts:161](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L161)
 
 ___
 
@@ -220,4 +227,4 @@ RealtimeVadContextLike.updateOptions
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:280](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/RingBufferVad.ts#L280)
+[realtime-transcription/RingBufferVad.ts:286](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L286)

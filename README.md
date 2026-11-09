@@ -137,7 +137,7 @@ Parakeet file and base64 inputs must be WAV containing 16-bit PCM audio. `transc
 
 ## Voice Activity Detection (VAD)
 
-Voice Activity Detection allows you to detect speech segments in audio data using the Silero VAD model.
+Voice Activity Detection finds the speech in audio. It runs on [vad.cpp](https://github.com/mybigday/vad.cpp) with its CPU kernels tuned for small models. It supports Silero VAD (whisper.cpp's `ggml-silero-*.bin` files or vad.cpp GGUF files) and FireRedVAD (vad.cpp GGUF).
 
 #### Initialize VAD Context
 
@@ -146,10 +146,11 @@ import { initWhisperVad } from 'whisper.rn'
 
 const vadContext = await initWhisperVad({
   filePath: require('./assets/ggml-silero-v6.2.0.bin'), // VAD model file
-  useGpu: true, // Use GPU acceleration (iOS only, VAD stays on the CPU on Android)
-  nThreads: 4, // Number of threads for processing
+  nThreads: 1, // Default; the per-hop graphs are too small to gain from more threads
 })
 ```
+
+VAD always runs on the CPU, so `useGpu` is ignored.
 
 #### Detect Speech Segments
 
@@ -163,7 +164,6 @@ const segments = await vadContext.detectSpeech(require('./assets/audio.wav'), {
   minSilenceDurationMs: 100, // Minimum silence duration in ms
   maxSpeechDurationS: 30, // Maximum speech duration in seconds
   speechPadMs: 30, // Padding around speech segments in ms
-  samplesOverlap: 0.1, // Overlap between analysis windows
 })
 
 // Also supports:
@@ -176,29 +176,44 @@ const segments = await vadContext.detectSpeech(require('./assets/audio.wav'), {
 ##### From Raw Audio Data
 
 ```typescript
-// Detect speech in base64 encoded float32 PCM data
-const segments = await vadContext.detectSpeechData(base64AudioData, {
+// 16 kHz mono 16-bit PCM, as an ArrayBuffer or base64 string
+const segments = await vadContext.detectSpeechData(pcmArrayBuffer, {
   threshold: 0.5,
   minSpeechDurationMs: 250,
   minSilenceDurationMs: 100,
   maxSpeechDurationS: 30,
   speechPadMs: 30,
-  samplesOverlap: 0.1,
 })
 ```
 
 #### Process Results
 
 ```typescript
+// t0 / t1 are in 10 ms units
 segments.forEach((segment, index) => {
-  console.log(
-    `Segment ${index + 1}: ${segment.t0.toFixed(2)}s - ${segment.t1.toFixed(
-      2,
-    )}s`,
-  )
-  console.log(`Duration: ${(segment.t1 - segment.t0).toFixed(2)}s`)
+  const start = segment.t0 / 100
+  const end = segment.t1 / 100
+  console.log(`Segment ${index + 1}: ${start.toFixed(2)}s - ${end.toFixed(2)}s`)
 })
 ```
+
+#### Streaming (stateful) detection
+
+To process live audio, create a stream. It keeps the model state between pushes, so each sample is analyzed once and every probability takes all earlier audio into account. Silero produces one probability per 32 ms hop.
+
+```typescript
+const stream = await vadContext.createStream()
+
+// For each incoming chunk of 16 kHz mono PCM16 audio (any length):
+const probs = await stream.push(chunk) // speech probabilities that became available
+// probs[i] of the whole stream covers samples [i * stream.hopSamples, (i + 1) * stream.hopSamples)
+
+const lastProbs = await stream.flush() // end of audio
+await stream.reset() // start over with a new audio stream
+await stream.release() // also freed when the context is released
+```
+
+`StreamingVadSegmenter` (from `whisper.rn/realtime-transcription`) turns these probabilities into speech segments as they arrive. It uses the same options and segmentation as `detectSpeech*`. `StreamVad` combines the stream and the segmenter for `RealtimeTranscriber` (see below).
 
 #### Release VAD Context
 
@@ -214,7 +229,7 @@ The new `RealtimeTranscriber` provides enhanced realtime transcription with feat
 
 ```js
 // If your RN packager is not enable package exports support, use whisper.rn/src/realtime-transcription
-import { RealtimeTranscriber } from 'whisper.rn/realtime-transcription'
+import { RealtimeTranscriber, StreamVad } from 'whisper.rn/realtime-transcription'
 import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters'
 import RNFS from 'react-native-fs' // or any compatible filesystem
 
@@ -222,9 +237,13 @@ import RNFS from 'react-native-fs' // or any compatible filesystem
 const whisperContext = await initWhisper({
   /* ... */
 })
-const vadContext = await initWhisperVad({
-  /* ... */
-})
+// Stateful VAD on a vad.cpp stream (RingBufferVad, the previous windowed VAD, is deprecated)
+const vadContext = new StreamVad(
+  await initWhisperVad({
+    /* ... */
+  }),
+  { vadPreset: 'default' },
+)
 const audioStream = new AudioPcmStreamAdapter() // requires @fugood/react-native-audio-pcm-stream
 
 // Create transcriber

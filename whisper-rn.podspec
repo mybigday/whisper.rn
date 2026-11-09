@@ -47,6 +47,7 @@ Pod::Spec.new do |s|
   header_search_paths = ['$(inherited)']
 
   whisper_cpp = "vendor/whisper.cpp"
+  vad_cpp = "vendor/vad.cpp"
   ggml_metal = "#{whisper_cpp}/ggml/src/ggml-metal"
 
   if ENV["RNWHISPER_BUILD_FROM_SOURCE"] == "1"
@@ -60,19 +61,33 @@ Pod::Spec.new do |s|
       "#{whisper_cpp}/ggml/include/*.h",
       "#{whisper_cpp}/ggml/src/*.{h,c,cpp}",
       "#{whisper_cpp}/ggml/src/ggml-cpu/**/*.{h,c,cpp}",
-      "#{ggml_metal}/*.{h,cpp}"
+      "#{ggml_metal}/*.{h,cpp}",
+      "#{vad_cpp}/include/*.h",
+      # vad.cpp: CocoaPods has no per-file flags, so unlike
+      # rnwhisper_vad_configure_sources this skips -ffp-contract=off on
+      # models/frame_dft.cpp (FireRed/smart-turn stream vs offline rounding
+      # only; Silero does not use it) and -fno-math-errno on the kernels
+      # (Apple clang's default already).
+      "#{vad_cpp}/src/**/*.{h,cpp}"
+    # kernels_impl.inc is #included by the kernel variants, not compiled itself.
+    s.preserve_paths = "#{vad_cpp}/src/ggml-vad-cpu/*.inc"
     # Exclude what no whisper.rn build compiles (same set as the filters in
     # cmake/rnwhisper-sources.cmake): the parts of vendor/whisper.cpp that are
     # only there for upstream's CMake project (see vendor/README.md).
     s.exclude_files = "#{whisper_cpp}/ggml/src/ggml-cpu/hbm.cpp",
-      "#{whisper_cpp}/ggml/src/ggml-cpu/{kleidiai,llamafile,arch/wasm}/*"
+      "#{whisper_cpp}/ggml/src/ggml-cpu/{kleidiai,llamafile,arch/wasm}/*",
+      # vad.cpp's x86 kernel variants (never an Apple device target); the
+      # ARMv8.2 one is built by the vad-armv82 subspec below.
+      "#{vad_cpp}/src/ggml-vad-cpu/kernels_{avx2,avx512,avx512vnni,armv82}.cpp"
     # Metal kernels are compiled at runtime from these sources.
     s.resources = [
       "#{ggml_metal}/kernels",
       "#{ggml_metal}/ggml-metal-impl.h",
       "#{whisper_cpp}/ggml/src/ggml-common.h"
     ]
-    base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE"
+    # VADK_ARM_VARIANTS: dispatch to the ARMv8.2 kernels when the sysctls report
+    # fp16 + dotprod (false on x86_64 simulators, so that slice stays baseline)
+    base_compiler_flags += " -DRNWHISPER_BUILD_FROM_SOURCE -DVAD_WITH_CPU_KERNELS -DVADK_ARM_VARIANTS"
     # Same list as cmake/rnwhisper-sources.cmake.
     [
       "cpp",
@@ -81,7 +96,18 @@ Pod::Spec.new do |s|
       "#{whisper_cpp}/ggml/src",
       "#{whisper_cpp}/ggml/src/ggml-cpu",
       "#{whisper_cpp}/src",
+      "#{vad_cpp}/include",
+      "#{vad_cpp}/src",
+      "#{vad_cpp}/src/ggml-vad-cpu",
     ].each { |dir| header_search_paths << "\"$(PODS_TARGET_SRCROOT)/#{dir}\"" }
+
+    # vad.cpp's ARMv8.2 (fp16 + dotprod) kernels, picked at runtime. A subspec
+    # is the only way to give one file its own flags; -Xarch_arm64 keeps
+    # -march off x86_64 simulator compiles.
+    s.subspec "vad-armv82" do |ss|
+      ss.source_files = "#{vad_cpp}/src/ggml-vad-cpu/kernels_armv82.cpp"
+      ss.compiler_flags = "-Xarch_arm64 -march=armv8.2-a+fp16+dotprod"
+    end
 
     # ggml-metal's Objective-C sources do not support ARC.
     s.subspec "no-require-arc" do |ss|

@@ -33,6 +33,7 @@ copy_headers() {
   mkdir -p "$headers"
   cp "$ROOT_DIR"/cpp/*.h "$headers/"
   cp "$WHISPER_CPP_DIR"/include/*.h "$headers/"
+  cp "$ROOT_DIR"/vendor/vad.cpp/include/vad.h "$headers/"
   # ggml public API only; the other ggml/include headers are backends this
   # framework does not build.
   local h

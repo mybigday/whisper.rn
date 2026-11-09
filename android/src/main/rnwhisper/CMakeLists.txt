@@ -40,6 +40,13 @@ endif ()
 
 find_library(LOG_LIB log)
 
+if (ANDROID_ABI STREQUAL "arm64-v8a")
+    set(RNWHISPER_VAD_ARM_VARIANTS ON)
+else ()
+    set(RNWHISPER_VAD_ARM_VARIANTS OFF)
+endif ()
+rnwhisper_vad_configure_sources(${RNWHISPER_VAD_ARM_VARIANTS} RNWHISPER_VAD_ISA_SOURCES RNWHISPER_VAD_ISA_DEFINITIONS)
+
 function(build_rnwhisper_library target_name arch cpu_flags)
     rnwhisper_variant_enabled(${target_name} VARIANT_ENABLED)
     if (NOT VARIANT_ENABLED)
@@ -67,6 +74,7 @@ function(build_rnwhisper_library target_name arch cpu_flags)
         ${target_name}
         SHARED
         ${RNWHISPER_CORE_SOURCES}
+        ${RNWHISPER_VAD_ISA_SOURCES}
         ${SOURCE_FILES_ARCH}
     )
 
@@ -77,7 +85,7 @@ function(build_rnwhisper_library target_name arch cpu_flags)
         target_compile_options(${target_name} PRIVATE -DGGML_CPU_GENERIC)
     endif ()
 
-    # Only the public whisper/ggml/parakeet/rnwhisper APIs are exported; the
+    # Only the public whisper/ggml/parakeet/vad/rnwhisper APIs are exported; the
     # *_SHARED/*_BUILD macros switch their API annotations to
     # visibility("default") while everything else stays hidden.
     target_compile_definitions(${target_name} PRIVATE
@@ -85,7 +93,10 @@ function(build_rnwhisper_library target_name arch cpu_flags)
         GGML_SHARED GGML_BUILD
         WHISPER_SHARED WHISPER_BUILD
         PARAKEET_SHARED PARAKEET_BUILD
+        VAD_SHARED VAD_BUILD
         RNWHISPER_SHARED RNWHISPER_BUILD
+        ${RNWHISPER_VAD_DEFINITIONS}
+        ${RNWHISPER_VAD_ISA_DEFINITIONS}
         ${RNWHISPER_VERSION_DEFINITIONS}
     )
     target_compile_options(${target_name} PRIVATE -DGGML_USE_CPU -DGGML_USE_CPU_REPACK -pthread ${cpu_flags})

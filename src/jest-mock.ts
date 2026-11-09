@@ -73,11 +73,57 @@ global.whisperInitVadContext = jest.fn(async (contextId: number) => ({
   contextId,
   gpu: false,
   reasonNoGPU: 'Mock VAD context',
+  sampleRate: 16000,
+  hopSamples: 512,
+  arch: 'silero',
 }))
 global.whisperReleaseVadContext = jest.fn(async () => undefined)
 global.whisperReleaseAllVadContexts = jest.fn(async () => undefined)
 global.whisperVadDetectSpeech = jest.fn(async () => vadResult)
 global.whisperVadDetectSpeechFile = jest.fn(async () => vadResult)
+
+// Mock VAD streams: one probability per 512-sample hop of PCM16 audio, 0.9 when
+// the hop's mean absolute amplitude exceeds 1000, else 0.05.
+const mockVadHop = 512
+const mockVadStreams = new Map<number, number[]>()
+let mockVadNextStreamId = 1
+const mockVadProbs = (pending: number[], final: boolean) => {
+  const probs: number[] = []
+  while (pending.length >= mockVadHop || (final && pending.length > 0)) {
+    const hop = pending.splice(0, mockVadHop)
+    const mean = hop.reduce((sum, v) => sum + Math.abs(v), 0) / mockVadHop
+    probs.push(mean > 1000 ? 0.9 : 0.05)
+  }
+  return probs
+}
+global.whisperVadStreamCreate = jest.fn(async () => {
+  const id = mockVadNextStreamId
+  mockVadNextStreamId += 1
+  mockVadStreams.set(id, [])
+  return id
+})
+global.whisperVadStreamPush = jest.fn(
+  async (_contextId: number, streamId: number, audio: ArrayBuffer) => {
+    const pending = mockVadStreams.get(streamId)
+    if (!pending) throw new Error('VAD stream not found')
+    pending.push(...Array.from(new Int16Array(audio, 0, Math.floor(audio.byteLength / 2))))
+    return mockVadProbs(pending, false)
+  },
+)
+global.whisperVadStreamFlush = jest.fn(
+  async (_contextId: number, streamId: number) =>
+    mockVadProbs(mockVadStreams.get(streamId) ?? [], true),
+)
+global.whisperVadStreamReset = jest.fn(
+  async (_contextId: number, streamId: number) => {
+    mockVadStreams.set(streamId, [])
+  },
+)
+global.whisperVadStreamRelease = jest.fn(
+  async (_contextId: number, streamId: number) => {
+    mockVadStreams.delete(streamId)
+  },
+)
 global.whisperToggleNativeLog = jest.fn(async () => undefined)
 
 module.exports = jest.requireActual('./index')

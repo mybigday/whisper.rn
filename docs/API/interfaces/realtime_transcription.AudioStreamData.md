@@ -21,17 +21,17 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:14](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L14)
+[realtime-transcription/types.ts:14](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L14)
 
 ___
 
 ### data
 
-• **data**: `Uint8Array`<`ArrayBufferLike`\>
+• **data**: `Uint8Array`
 
 #### Defined in
 
-[realtime-transcription/types.ts:12](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L12)
+[realtime-transcription/types.ts:12](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L12)
 
 ___
 
@@ -41,7 +41,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:13](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L13)
+[realtime-transcription/types.ts:13](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L13)
 
 ___
 
@@ -51,4 +51,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:15](https://github.com/mybigday/whisper.rn/blob/db23f7b/src/realtime-transcription/types.ts#L15)
+[realtime-transcription/types.ts:15](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L15)

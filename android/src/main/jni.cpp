@@ -5,12 +5,16 @@
 #include <fbjni/fbjni.h>
 #include <ReactCommon/CallInvokerHolder.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include <unistd.h>
 
 #include "whisper.h"
 #include "ggml-backend.h"
@@ -221,23 +225,6 @@ whisper_context *whisperInitFromInputStream(
     return whisper_init_with_params(&loader, params);
 }
 
-whisper_vad_context *whisperVadInitFromInputStream(
-    JNIEnv *env,
-    jobject inputStream,
-    whisper_vad_context_params params) {
-    auto *context = new input_stream_context;
-    context->env = env;
-    context->input_stream = env->NewGlobalRef(inputStream);
-
-    whisper_model_loader loader = {
-        .context = context,
-        .read = &inputStreamRead,
-        .eof = &inputStreamIsEof,
-        .close = &inputStreamClose,
-    };
-    return whisper_vad_init_with_params(&loader, params);
-}
-
 parakeet_context *parakeetInitFromInputStream(
     JNIEnv *env,
     jobject inputStream,
@@ -286,27 +273,6 @@ whisper_context *whisperInitFromAsset(
         .close = &assetClose,
     };
     return whisper_init_with_params(&loader, params);
-}
-
-whisper_vad_context *whisperVadInitFromAsset(
-    JNIEnv *env,
-    jobject assetManager,
-    const std::string &assetPath,
-    whisper_vad_context_params params) {
-    auto *manager = AAssetManager_fromJava(env, assetManager);
-    AAsset *asset = AAssetManager_open(manager, assetPath.c_str(), AASSET_MODE_STREAMING);
-    if (!asset) {
-        __android_log_print(ANDROID_LOG_WARN, kTag, "Failed to open VAD asset %s", assetPath.c_str());
-        return nullptr;
-    }
-
-    whisper_model_loader loader = {
-        .context = asset,
-        .read = &assetRead,
-        .eof = &assetIsEof,
-        .close = &assetClose,
-    };
-    return whisper_vad_init_with_params(&loader, params);
 }
 
 parakeet_context *parakeetInitFromAsset(
@@ -696,6 +662,47 @@ WhisperContextInitResult hostInitWhisperContext(
     return result;
 }
 
+// vad.cpp only loads models from files. Assets and raw resources are copied to
+// a private temp file for the load and removed right after: the weights are
+// read into memory, and VAD models are small (Silero is under 1 MB).
+template <typename Read>
+vad_model *vadLoadThroughTempFile(JNIEnv *env, Read &&read, const vad_model_params &params) {
+    std::string cacheDir = getCacheDirectory(env);
+    if (cacheDir.empty()) {
+        return nullptr;
+    }
+    std::string path = cacheDir + "/rnwhisper-vad-XXXXXX";
+    int fd = mkstemp(path.data());
+    if (fd < 0) {
+        __android_log_print(ANDROID_LOG_WARN, kTag, "Failed to create a temp file for the VAD model");
+        return nullptr;
+    }
+    FILE *file = fdopen(fd, "wb");
+    if (!file) {
+        close(fd);
+        unlink(path.c_str());
+        return nullptr;
+    }
+
+    std::vector<char> buffer(1 << 16);
+    bool ok = true;
+    for (;;) {
+        size_t n = read(buffer.data(), buffer.size());
+        if (n == 0) {
+            break;
+        }
+        if (fwrite(buffer.data(), 1, n, file) != n) {
+            ok = false;
+            break;
+        }
+    }
+    ok = fclose(file) == 0 && ok;
+
+    vad_model *model = ok ? vad_model_load(path.c_str(), params) : nullptr;
+    unlink(path.c_str());
+    return model;
+}
+
 WhisperVadContextInitResult hostInitWhisperVadContext(
     const WhisperVadContextInitOptions &options) {
     WhisperVadContextInitResult result;
@@ -705,14 +712,13 @@ WhisperVadContextInitResult hostInitWhisperVadContext(
         return result;
     }
 
-    auto params = whisper_vad_default_context_params();
-    // Not validated on Hexagon yet; keep the VAD model on the CPU.
-    params.use_gpu = false;
-    if (options.nThreads > 0) {
-        params.n_threads = options.nThreads;
-    }
+    // vad.cpp's own CPU kernels; an accelerator only pays off with many
+    // concurrent streams. One thread suits the tiny per-hop graphs best.
+    auto params = vad_model_default_params();
+    params.device = "cpu";
+    params.n_threads = options.nThreads > 0 ? options.nThreads : 1;
     if (options.useGpu) {
-        result.reasonNoGPU = "VAD runs on the CPU on Android";
+        result.reasonNoGPU = "VAD runs on the CPU";
     }
 
     std::string modelPath = options.filePath;
@@ -721,22 +727,33 @@ WhisperVadContextInitResult hostInitWhisperVadContext(
     }
 
     if (options.isBundleAsset || isAssetPath(modelPath)) {
-        result.context = whisperVadInitFromAsset(
-            env,
-            getAssetManager(),
-            stripAssetPrefix(modelPath),
-            params);
+        std::string assetPath = stripAssetPrefix(modelPath);
+        auto *manager = AAssetManager_fromJava(env, getAssetManager());
+        AAsset *asset = AAssetManager_open(manager, assetPath.c_str(), AASSET_MODE_STREAMING);
+        if (asset) {
+            result.context = vadLoadThroughTempFile(
+                env,
+                [asset](void *out, size_t size) { return assetRead(asset, out, size); },
+                params);
+            AAsset_close(asset);
+        } else {
+            __android_log_print(ANDROID_LOG_WARN, kTag, "Failed to open VAD asset %s", assetPath.c_str());
+        }
     } else {
         int resourceId = getResourceIdentifier(env, modelPath);
         if (resourceId != 0) {
             jobject pushbackStream = openPushbackInputStreamForResource(env, resourceId);
             if (pushbackStream) {
-                result.context = whisperVadInitFromInputStream(env, pushbackStream, params);
+                auto *stream = new input_stream_context{env, env->NewGlobalRef(pushbackStream)};
                 env->DeleteLocalRef(pushbackStream);
+                result.context = vadLoadThroughTempFile(
+                    env,
+                    [stream](void *out, size_t size) { return inputStreamRead(stream, out, size); },
+                    params);
+                inputStreamClose(stream);  // releases the global ref and the context
             }
         } else if (!modelPath.empty()) {
-            result.context =
-                whisper_vad_init_from_file_with_params(modelPath.c_str(), params);
+            result.context = vad_model_load(modelPath.c_str(), params);
         }
     }
 

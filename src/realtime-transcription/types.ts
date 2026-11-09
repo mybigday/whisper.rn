@@ -62,7 +62,6 @@ export interface AudioStreamInterface {
  * - minSilenceDurationMs: Min silence before ending speech
  * - maxSpeechDurationS: Max continuous speech duration
  * - speechPadMs: Padding around detected speech
- * - samplesOverlap: Analysis window overlap (0.0-1.0)
  */
 export const VAD_PRESETS = {
   // Default - balanced performance
@@ -72,7 +71,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 100,
     maxSpeechDurationS: 30,
     speechPadMs: 30,
-    samplesOverlap: 0.1,
   },
 
   // Sensitive - good for quiet environments
@@ -82,7 +80,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 50,
     maxSpeechDurationS: 15,
     speechPadMs: 50,
-    samplesOverlap: 0.2,
   },
 
   // Very sensitive - catches even quiet speech
@@ -92,7 +89,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 50,
     maxSpeechDurationS: 15,
     speechPadMs: 100,
-    samplesOverlap: 0.3,
   },
 
   // Conservative - avoids false positives
@@ -102,7 +98,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 200,
     maxSpeechDurationS: 25,
     speechPadMs: 20,
-    samplesOverlap: 0.05,
   },
 
   // Very conservative - only clear speech
@@ -112,7 +107,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 300,
     maxSpeechDurationS: 20,
     speechPadMs: 10,
-    samplesOverlap: 0.05,
   },
 
   // Continuous speech - for presentations/lectures
@@ -122,7 +116,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 300,
     maxSpeechDurationS: 60, // Longer segments
     speechPadMs: 50,
-    samplesOverlap: 0.15,
   },
 
   // Meeting mode - handles multiple speakers
@@ -132,7 +125,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 150,
     maxSpeechDurationS: 45,
     speechPadMs: 75,
-    samplesOverlap: 0.2,
   },
 
   // Noisy environment - more strict thresholds
@@ -142,7 +134,6 @@ export const VAD_PRESETS = {
     minSilenceDurationMs: 100,
     maxSpeechDurationS: 25,
     speechPadMs: 40,
-    samplesOverlap: 0.1,
   },
 }
 
@@ -326,6 +317,8 @@ export interface RealtimeVadContextLike {
   flush(): Promise<void>
   // Reset the VAD context
   reset(): Promise<void>
+  // Free native resources (called by RealtimeTranscriber.release)
+  release?(): Promise<void>
 }
 
 /**

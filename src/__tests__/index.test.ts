@@ -133,3 +133,45 @@ test('rejects remote Parakeet models and audio files', async () => {
     'Parakeet remote audio files are not supported',
   )
 })
+
+describe('WhisperVadStream', () => {
+  it('copies pushed audio, so the caller can reuse its buffer', async () => {
+    const { initWhisperVad } = require('../jest-mock')
+    const context = await initWhisperVad({ filePath: 'vad.bin' })
+    const stream = await context.createStream()
+    const buffer = new Int16Array(512).fill(3000)
+    const first = stream.push(new Uint8Array(buffer.buffer))
+    buffer.fill(0) // reused for the next chunk before the first push ran
+    const second = stream.push(new Uint8Array(buffer.buffer))
+    expect(await first).toEqual([0.9])
+    expect(await second).toEqual([0.05])
+    await stream.release()
+  })
+})
+
+describe('multiple WhisperVadStreams on one context', () => {
+  it('keeps each stream independent while pushes interleave', async () => {
+    const { initWhisperVad } = require('../jest-mock')
+    const context = await initWhisperVad({ filePath: 'vad.bin' })
+    const speech = await context.createStream()
+    const silence = await context.createStream()
+    expect(speech.id).not.toBe(silence.id)
+
+    // Half hops: each stream only completes a hop on its second push, so a
+    // shared buffer would mix the two signals into one probability.
+    const loud = new Int16Array(256).fill(3000)
+    const quiet = new Int16Array(256)
+    const pushes = [
+      speech.push(new Uint8Array(loud.buffer)),
+      silence.push(new Uint8Array(quiet.buffer)),
+      speech.push(new Uint8Array(loud.buffer)),
+      silence.push(new Uint8Array(quiet.buffer)),
+    ]
+    expect(await Promise.all(pushes)).toEqual([[], [], [0.9], [0.05]])
+
+    // Releasing one stream leaves the other usable
+    await silence.release()
+    expect(await speech.push(new Uint8Array(new Int16Array(512).fill(3000).buffer))).toEqual([0.9])
+    await speech.release()
+  })
+})

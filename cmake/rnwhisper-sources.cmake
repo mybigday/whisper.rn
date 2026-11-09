@@ -2,8 +2,8 @@
 #   ios/CMakeLists.txt               (xcframework)
 #   android/src/main/CMakeLists.txt  (per-CPU-variant .so)
 #
-# vendor/whisper.cpp keeps its upstream layout, so the paths below match
-# upstream's own CMake targets (see vendor/README.md). Backends that only some
+# vendor/whisper.cpp and vendor/vad.cpp keep their upstream layout, so the
+# paths below match upstream's own CMake targets (see vendor/README.md). Backends that only some
 # builds enable (Metal, Core ML) are exposed as separate variables for the
 # caller to add. The CocoaPods equivalent lives in whisper-rn.podspec.
 include_guard(GLOBAL)
@@ -11,9 +11,11 @@ include_guard(GLOBAL)
 get_filename_component(RNWHISPER_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(RNWHISPER_CPP_DIR         "${RNWHISPER_ROOT_DIR}/cpp")
 set(RNWHISPER_WHISPER_CPP_DIR "${RNWHISPER_ROOT_DIR}/vendor/whisper.cpp")
+set(RNWHISPER_VAD_CPP_DIR     "${RNWHISPER_ROOT_DIR}/vendor/vad.cpp")
 
 set(_ggml    "${RNWHISPER_WHISPER_CPP_DIR}/ggml/src")
 set(_whisper "${RNWHISPER_WHISPER_CPP_DIR}/src")
+set(_vad     "${RNWHISPER_VAD_CPP_DIR}/src")
 
 set(RNWHISPER_INCLUDE_DIRS
     ${RNWHISPER_CPP_DIR}
@@ -22,6 +24,9 @@ set(RNWHISPER_INCLUDE_DIRS
     ${_ggml}                                    # ggml-impl.h, "ggml-cpu/ggml-cpu-impl.h"
     ${_ggml}/ggml-cpu                           # ggml-cpu/amx includes its siblings bare
     ${_whisper}                                 # whisper-arch.h, "coreml/whisper-encoder.h"
+    ${RNWHISPER_VAD_CPP_DIR}/include            # vad.h
+    ${_vad}                                     # vad-impl.h
+    ${_vad}/ggml-vad-cpu                        # vad-cpu.h
 )
 
 # --- version definitions ------------------------------------------------------
@@ -91,6 +96,52 @@ set(RNWHISPER_WHISPER_SOURCES
 )
 file(GLOB RNWHISPER_COREML_SOURCES CONFIGURE_DEPENDS ${_whisper}/coreml/*.m ${_whisper}/coreml/*.mm)  # need -fobjc-arc
 
+# --- vad.cpp ------------------------------------------------------------------
+# Voice activity detection on the same ggml. Its vad-cpu backend runs the graphs
+# on its own kernels; kernels_generic.cpp is the baseline every build compiles,
+# and RNWHISPER_VAD_ISA_SOURCES are the runtime-dispatched ISA variants for the
+# build to opt into (see rnwhisper_vad_configure_sources). Keep in sync with
+# whisper-rn.podspec.
+file(GLOB RNWHISPER_VAD_SOURCES CONFIGURE_DEPENDS
+    ${_vad}/*.cpp
+    ${_vad}/loader/*.cpp
+    ${_vad}/models/*.cpp
+)
+list(APPEND RNWHISPER_VAD_SOURCES
+    ${_vad}/ggml-vad-cpu/vad-cpu.cpp
+    ${_vad}/ggml-vad-cpu/kernels_dispatch.cpp
+    ${_vad}/ggml-vad-cpu/kernels_generic.cpp
+)
+set(RNWHISPER_VAD_DEFINITIONS VAD_WITH_CPU_KERNELS)
+
+# Source-level settings upstream's CMake applies (vendor/vad.cpp/CMakeLists.txt).
+# Call once per directory that compiles RNWHISPER_VAD_SOURCES; source properties
+# are directory-scoped. `arm_variants`: the build targets arm64 only (Android
+# arm64-v8a, an Apple arm64 slice), so the ARMv8.2 (fp16 + dotprod) kernels are
+# compiled too and picked at runtime (HWCAP on Android, hw.optional.arm.*
+# sysctls on Apple, whose compilers default to ARMv8.0). Multi-arch slices keep
+# the NEON baseline only.
+function(rnwhisper_vad_configure_sources arm_variants out_sources out_definitions)
+    set(vad "${RNWHISPER_VAD_CPP_DIR}/src")
+    # errno/FP-exception semantics of libm calls block vectorization; the kernels never rely on them
+    set_source_files_properties(
+        ${vad}/ggml-vad-cpu/vad-cpu.cpp ${vad}/ggml-vad-cpu/kernels_generic.cpp
+        PROPERTIES COMPILE_OPTIONS "-fno-math-errno;-fno-trapping-math")
+    # one frame (streaming) and 8 frames at once (offline) must give identical spectra
+    set_source_files_properties(${vad}/models/frame_dft.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+
+    set(sources "")
+    set(definitions "")
+    if (arm_variants)
+        set(sources ${vad}/ggml-vad-cpu/kernels_armv82.cpp)
+        set(definitions VADK_ARM_VARIANTS)
+        set_source_files_properties(${vad}/ggml-vad-cpu/kernels_armv82.cpp PROPERTIES
+            COMPILE_OPTIONS "-fno-math-errno;-fno-trapping-math;-march=armv8.2-a+fp16+dotprod")
+    endif ()
+    set(${out_sources} "${sources}" PARENT_SCOPE)
+    set(${out_definitions} "${definitions}" PARENT_SCOPE)
+endfunction()
+
 # --- whisper.rn ---------------------------------------------------------------
 set(RNWHISPER_RN_SOURCES
     ${RNWHISPER_CPP_DIR}/rn-whisper.cpp
@@ -100,8 +151,10 @@ set(RNWHISPER_RN_SOURCES
 set(RNWHISPER_CORE_SOURCES
     ${RNWHISPER_GGML_SOURCES}
     ${RNWHISPER_WHISPER_SOURCES}
+    ${RNWHISPER_VAD_SOURCES}
     ${RNWHISPER_RN_SOURCES}
 )
 
 unset(_ggml)
 unset(_whisper)
+unset(_vad)
