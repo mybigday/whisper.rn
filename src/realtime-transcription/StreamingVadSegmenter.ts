@@ -122,13 +122,29 @@ export class StreamingVadSegmenter {
    */
   get speechCertainUntil(): number {
     if (this.pendingEnd) {
-      // The earliest the end can be: half the pause up to a segment starting next
       const { pauseStart } = this.pendingEnd
       const nextStart = this.triggered ? this.start : this.processedSamples
-      return pauseStart + Math.min(this.padSamples, Math.floor((nextStart - pauseStart) / 2))
+      return this.earliestPaddedEnd(pauseStart, nextStart)
     }
-    const knownEnd = this.tempEnd >= 0 ? this.tempEnd : this.processedSamples
-    return knownEnd + this.padSamples
+    // The pause that ends the segment starts here or later, and the next
+    // segment starts at least minSilence after it: a pause shorter than
+    // 2 * pad gives the segment only half of it, not the full padding.
+    const pauseStart = this.tempEnd >= 0 ? this.tempEnd : this.processedSamples
+    const nextStart = Math.max(this.processedSamples, pauseStart + this.minSilenceSamples)
+    // A max-duration split may also end the segment before its padding
+    return Math.min(this.earliestPaddedEnd(pauseStart, nextStart), this.nextSplitSample)
+  }
+
+  /** Padded end of a segment whose pause starts at `pauseStart`, with the next segment starting no earlier than `nextStart` */
+  private earliestPaddedEnd(pauseStart: number, nextStart: number): number {
+    return pauseStart + Math.min(this.padSamples, Math.floor((nextStart - pauseStart) / 2))
+  }
+
+  /** First frame at which the open segment is split for exceeding maxSpeechDurationS */
+  private get nextSplitSample(): number {
+    if (!Number.isFinite(this.maxSpeechSamples)) return Infinity
+    const hop = this.hopSamples
+    return (Math.floor((this.start + this.maxSpeechSamples) / hop) + 1) * hop
   }
 
   /** Earliest sample a future or pending segment may still need */

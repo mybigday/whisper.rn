@@ -1,5 +1,6 @@
 import { StreamVad } from '../StreamVad'
 import type { StreamVadContextLike, VadStreamLike } from '../StreamVad'
+import { StreamingVadSegmenter } from '../StreamingVadSegmenter'
 
 const SR = 16000
 const HOP = 512
@@ -177,6 +178,57 @@ describe('StreamVad', () => {
     const emitted = concat(events.map((e) => e.samples))
     expect(emitted).toEqual(audio.slice(16 * HOP - 4800, 85 * HOP + 4800))
   })
+
+  // Each segment's audio must be exactly [start, end) as the segmenter reports
+  // it on the same probabilities, so no audio crosses into a neighbour.
+  it.each([
+    ['pause shorter than 2 * pad', { speechPadMs: 100, minSilenceDurationMs: 50 }, [[1000, false], [1000, true], [150, false], [1000, true], [1000, false]]],
+    ['pause between minSilence and 2 * pad', { speechPadMs: 300 }, [[512, false], [1024, true], [160, false], [1024, true], [1000, false]]],
+    ['max-duration split', { maxSpeechDurationS: 1 }, [[500, false], [3000, true], [500, false]]],
+  ] as Array<[string, Partial<typeof options.vadOptions>, Array<[number, boolean]>]>)(
+    'hands each segment exactly its own audio (%s)',
+    async (_name, vadOptions, regions) => {
+      const merged = { ...options.vadOptions, ...vadOptions }
+      const audio = makeAudio(regions)
+
+      const segmenter = new StreamingVadSegmenter(merged, HOP, SR)
+      const probs: number[] = []
+      for (let i = 0; i < audio.length; i += HOP) {
+        const hop = audio.subarray(i, i + HOP)
+        probs.push(hop.reduce((sum, v) => sum + Math.abs(v), 0) / HOP > 1000 ? 0.9 : 0.05)
+      }
+      const lastFull = Math.floor(audio.length / HOP)
+      const bounds = [
+        ...segmenter.push(probs.slice(0, lastFull)),
+        ...segmenter.flush(audio.length, probs.slice(lastFull)),
+      ]
+      const expected: Int16Array[] = []
+      for (let i = 0; i < bounds.length; i += 2) {
+        expect(bounds[i]!.type).toBe('start')
+        expect(bounds[i + 1]!.type).toBe('end')
+        expected.push(audio.slice(bounds[i]!.sample, bounds[i + 1]!.sample))
+      }
+      expect(expected.length).toBeGreaterThan(1)
+
+      const { context } = createFakeContext()
+      const vad = new StreamVad(context, { vadOptions: merged })
+      const events = record(vad)
+      feed(vad, audio, 10)
+      await vad.flush()
+
+      const segments: Int16Array[] = []
+      let current: Int16Array[] = []
+      events.forEach((e) => {
+        if (e.type === 'end') {
+          segments.push(concat(current))
+          current = []
+        } else {
+          current.push(e.samples)
+        }
+      })
+      expect(segments).toEqual(expected)
+    },
+  )
 
   it('reports no speech for a final partial hop below the minimum', async () => {
     const { context } = createFakeContext()
