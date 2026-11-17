@@ -107,11 +107,14 @@ file(GLOB RNWHISPER_VAD_SOURCES CONFIGURE_DEPENDS
     ${_vad}/loader/*.cpp
     ${_vad}/models/*.cpp
 )
-list(APPEND RNWHISPER_VAD_SOURCES
+# The vad-cpu backend, named separately because its kernels follow the CPU flags
+# they are compiled with (the Android build compiles them per CPU variant).
+set(RNWHISPER_VAD_CPU_SOURCES
     ${_vad}/ggml-vad-cpu/vad-cpu.cpp
     ${_vad}/ggml-vad-cpu/kernels_dispatch.cpp
     ${_vad}/ggml-vad-cpu/kernels_generic.cpp
 )
+list(APPEND RNWHISPER_VAD_SOURCES ${RNWHISPER_VAD_CPU_SOURCES})
 set(RNWHISPER_VAD_DEFINITIONS VAD_WITH_CPU_KERNELS)
 
 # Source-level settings upstream's CMake applies (vendor/vad.cpp/CMakeLists.txt).

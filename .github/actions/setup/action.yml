@@ -11,14 +11,17 @@ runs:
 
     - name: Cache dependencies
       id: npm-cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
+      continue-on-error: true
       with:
         path: |
-          **/node_modules
-        key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/package.json') }}
-        restore-keys: |
-          ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          ${{ runner.os }}-npm-
+          node_modules
+          example/node_modules
+        # The manifests are named one by one: the key is evaluated again when the
+        # job ends, and a `**` glob then walks node_modules and the build output
+        # (15-30 s per job). No restore-keys: `npm ci` deletes node_modules, so
+        # an older cache would be downloaded only to be thrown away.
+        key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json', 'example/package-lock.json', 'package.json', 'example/package.json') }}
 
     - name: Install dependencies
       if: steps.npm-cache.outputs.cache-hit != 'true'

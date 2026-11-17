@@ -187,13 +187,14 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 - Wrapper `librnwhisper_jni<variant>.so` (`jni.cpp` + `cpp/jsi/RNWhisperJSI.cpp`), always compiled by the consumer's Gradle build because it links the app's React Native (fbjni/jsi prefab). It links the matching core by SONAME; `RNWhisper.java` loads the wrapper and the dynamic linker pulls the core in.
 - `rnwhisperBuildFromSource=true` (gradle property) builds the core as a subdirectory instead of using jniLibs; `rnwhisperVariants=a,b` narrows the variants. The example app's `gradle.properties` sets from-source; CI passes `-PrnwhisperBuildFromSource=false` to exercise the prebuilt path.
 - Variant list lives once in `android/src/main/cmake/rnwhisper-build-options.cmake` (shared by both CMake entry points).
+- Only the two CPU backends (ggml-cpu, vad.cpp's vad-cpu) and the sources that read a per-variant macro (`RNWHISPER_VARIANT_MACROS`, e.g. `GGML_USE_HEXAGON`) are compiled per variant; everything else is compiled once per ABI and linked into all of them (`android/src/main/rnwhisper/CMakeLists.txt`). armeabi-v7a is the exception: its variant flag selects the FPU, so everything stays per variant there. The variants link one after another and share a ThinLTO cache (`RNWHISPER_THINLTO_CACHE_DIR` moves it out of the build tree). A shared source that would see a per-variant macro through a header fails to compile ("poisoned identifier"); move it to `RNWHISPER_VARIANT_SOURCES`.
 
 **Build Configuration**:
 - NDK version 24.0.8215888+ recommended for Apple Silicon Macs
 - Supports 16KB page sizes (Android 15+)
 - Proguard rule required: `-keep class com.rnwhisper.** { *; }`
 
-**Hexagon (NPU)**: the `rnwhisper_v8fp16_va_2_hexagon` variant needs the Hexagon SDK on the build host (`scripts/setup-hexagon-sdk.sh`) plus the FastRPC stub and DSP-side `bin/arm64-v8a/libggml-htp-*.so` from `scripts/build-hexagon-htp.sh` (Docker). The prebuilt jniLibs include the variant; `bin/` ships inside the npm package and `android/build.gradle` syncs it into the host app's assets.
+**Hexagon (NPU)**: the `rnwhisper_v8fp16_va_2_hexagon` variant needs the Hexagon SDK on the build host (`scripts/setup-hexagon-sdk.sh`; `--headers-only` keeps just the headers that build includes, which is what CI caches) plus the FastRPC stub and DSP-side `bin/arm64-v8a/libggml-htp-*.so` from `scripts/build-hexagon-htp.sh` (Docker). The prebuilt jniLibs include the variant; `bin/` ships inside the npm package and `android/build.gradle` syncs it into the host app's assets.
 
 ## File Patterns and Conventions
 
@@ -321,7 +322,7 @@ Developer environment only; it never touches `vendor/`:
 2. Builds for multiple targets: iOS device, iOS simulator, tvOS device, tvOS simulator
 3. Creates universal `rnwhisper.xcframework` with all architectures
 4. Includes Metal kernel sources (compiled at runtime) and the public C headers
-5. Script: `scripts/build-ios.sh`
+5. Script: `scripts/build-ios.sh [slice...]` builds the named slices (`ios-simulator`, `ios-device`, `tvos-simulator`, `tvos-device`; all by default). CI builds them in two parallel jobs; the release workflow packages all four.
 
 ### TypeScript Build
 - Uses `react-native-builder-bob`

@@ -49,6 +49,15 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      # The other pods are most of this build and only change with the
+      # example's dependencies, so this cache is not tied to the whisper.cpp
+      # version.
+      - name: Setup ccache
+        uses: ./.github/actions/setup-ccache
+        continue-on-error: true
+        with:
+          key: ios-from-source
+
       - name: Cache build & pods
         uses: actions/cache@v4
         continue-on-error: true
@@ -73,6 +82,14 @@ jobs:
         run: |
           npm run build:ios
 
+      - name: Save ccache
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-ccache
+
+  # Every xcframework slice compiles the whole library, so the slices are split
+  # over two parallel jobs: this one and build-ios-framework-slices. This job
+  # builds the slice the example app runs on and proves the prebuilt path with
+  # it. (The release workflow packages all four slices together.)
   build-ios-frameworks:
     runs-on: macos-latest
     steps:
@@ -81,6 +98,12 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+
+      - name: Setup ccache
+        uses: ./.github/actions/setup-ccache
+        continue-on-error: true
+        with:
+          key: ios-frameworks-simulator
 
       - name: Cache build & pods
         uses: actions/cache@v4
@@ -100,7 +123,7 @@ jobs:
 
       - name: Build frameworks
         run: |
-          npm run build:ios-frameworks
+          ./scripts/build-ios.sh ios-simulator
 
       # The podspec needs the xcframework to exist when not building from source.
       - name: Install cocoapods
@@ -113,18 +136,37 @@ jobs:
         run: |
           npm run build:ios
 
+      - name: Save ccache
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-ccache
+
+  # The slices the example build above does not need. Only CMake and Xcode are
+  # involved, so this job skips the Node.js setup.
+  build-ios-framework-slices:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup ccache
+        uses: ./.github/actions/setup-ccache
+        continue-on-error: true
+        with:
+          key: ios-frameworks-other-${{ hashFiles('vendor/VERSIONS') }}
+
+      - name: Build frameworks
+        run: |
+          ./scripts/build-ios.sh ios-device tvos-simulator tvos-device
+
+      - name: Save ccache
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-ccache
+
   # The example's gradle.properties sets rnwhisperBuildFromSource=true, so this
   # compiles the whisper.cpp core inside the Gradle build (CPU-only: no Hexagon
   # SDK on the runner).
   build-android-from-source:
     runs-on: ubuntu-latest
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      # Debug objects carry DWARF, so they need more room than the libs job's.
-      CCACHE_MAXSIZE: 2G
-      # The NDK is reinstalled per run, so hash the compiler rather than stat it.
-      CCACHE_COMPILERCHECK: content
-      CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -132,49 +174,53 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Setup Gradle cache
-        uses: burrunan/gradle-cache-action@v3
+      # Pin the JDK: with the runner's newer default (ubuntu-26.04), a JVM
+      # restricted-method warning fails the Android Gradle Plugin's CMake
+      # configure.
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
         with:
-          gradle-version: wrapper
-
-      - name: Cache ccache
-        uses: actions/cache@v4
-        continue-on-error: true
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-android-src-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-android-src-
+          distribution: temurin
+          java-version: 17
 
       - name: Setup ccache
         uses: ./.github/actions/setup-ccache
+        continue-on-error: true
+        with:
+          key: android-src-${{ hashFiles('vendor/VERSIONS') }}
+          # Debug objects carry DWARF, so they need more room than the libs job's.
+          max-size: 1G
 
       - name: Build example for Android
         env:
-          # Each variant recompiles the whole source tree, so build only the ones
-          # that exercise distinct code paths (generic CPU, arm64 fp16, x86_64).
-          # build-android-libs still builds all of them.
+          # Build only the variants that exercise distinct code paths (generic
+          # CPU, arm64 fp16, x86_64). The remaining ones differ only in the
+          # CPU flags of the ggml-cpu and vad-cpu backends; build-android-libs
+          # still builds all of them.
           ORG_GRADLE_PROJECT_rnwhisperVariants: rnwhisper,rnwhisper_v8fp16_va_2,rnwhisper_x86_64
         run: |
           npm run build:android
-          ccache --show-stats
+
+      - name: Save ccache
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-ccache
 
   # Same path as the release workflow: prebuilt core libraries (including the
   # Hexagon variant and its DSP-side libraries), then the example app built
   # against them with only the JNI/JSI wrapper compiled by Gradle.
   build-android-libs:
     runs-on: ubuntu-latest
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 1G
-      CCACHE_COMPILERCHECK: content
-      CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
     steps:
-      - name: Maximize build space
+      # Runners currently have ~85 GB free, several times what this job needs.
+      # Only spend time on cleaning up if that stops being true.
+      - name: Free disk space if short
         run: |
-          df -h
-          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache
-          df -h
+          df -h /
+          available_gb=$(df --output=avail -BG / | tail -n 1 | tr -dc '0-9')
+          if [ "$available_gb" -lt 40 ]; then
+            sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache
+            df -h /
+          fi
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -182,25 +228,20 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Setup Gradle cache
-        uses: burrunan/gradle-cache-action@v3
+      # Pin the JDK: with the runner's newer default (ubuntu-26.04), a JVM
+      # restricted-method warning fails the Android Gradle Plugin's CMake
+      # configure.
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
         with:
-          gradle-version: wrapper
-
-      - name: Cache ccache
-        uses: actions/cache@v4
-        continue-on-error: true
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-android-libs-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-android-libs-
+          distribution: temurin
+          java-version: 17
 
       - name: Setup ccache
         uses: ./.github/actions/setup-ccache
-
-      - name: Setup Hexagon SDK
-        run: ./scripts/setup-hexagon-sdk.sh
+        continue-on-error: true
+        with:
+          key: android-libs-${{ hashFiles('vendor/VERSIONS') }}
 
       - name: Cache Hexagon HTP artifacts
         id: htp-cache
@@ -212,16 +253,44 @@ jobs:
             vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/v73
           key: ${{ runner.os }}-htp-${{ hashFiles('scripts/build-hexagon-htp.sh', 'scripts/docker-build-wrapper.sh', 'vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/**') }}
 
+      # Building the DSP-side libraries runs the Hexagon SDK's tools, so that
+      # needs the whole SDK (700 MB download, 3 GB unpacked).
       - name: Build Hexagon HTP libraries
         if: steps.htp-cache.outputs.cache-hit != 'true'
-        run: npm run build:hexagon-htp
+        run: |
+          ./scripts/setup-hexagon-sdk.sh
+          npm run build:hexagon-htp
+
+      # With those libraries cached, the Hexagon variant only compiles against
+      # the SDK's headers, which are small enough to keep between runs. They
+      # are saved right after the download so that the cache can never pick up
+      # the whole SDK.
+      - name: Restore Hexagon SDK headers
+        id: hexagon-sdk-cache
+        if: steps.htp-cache.outputs.cache-hit == 'true'
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: ~/.hexagon-sdk
+          key: ${{ runner.os }}-hexagon-sdk-headers-${{ hashFiles('scripts/setup-hexagon-sdk.sh') }}
+
+      - name: Setup Hexagon SDK headers
+        if: steps.htp-cache.outputs.cache-hit == 'true' && steps.hexagon-sdk-cache.outputs.cache-hit != 'true'
+        run: ./scripts/setup-hexagon-sdk.sh --headers-only
+
+      - name: Save Hexagon SDK headers
+        if: steps.htp-cache.outputs.cache-hit == 'true' && steps.hexagon-sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ~/.hexagon-sdk
+          key: ${{ runner.os }}-hexagon-sdk-headers-${{ hashFiles('scripts/setup-hexagon-sdk.sh') }}
 
       - name: Build libraries
         env:
           RNWHISPER_REQUIRE_HEXAGON: '1'
         run: |
           npm run build:android-libs
-          ccache --show-stats
 
       # Proves the prebuilt path works with the libraries just built. The
       # example's gradle.properties forces from-source, and only the command
@@ -230,3 +299,7 @@ jobs:
         run: |
           cd example/android
           ./gradlew assembleDebug --stacktrace -PrnwhisperBuildFromSource=false
+
+      - name: Save ccache
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-ccache

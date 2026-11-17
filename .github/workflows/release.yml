@@ -28,11 +28,16 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     steps:
-      - name: Maximize build space
+      # Runners currently have ~85 GB free, several times what this job needs.
+      # Only spend time on cleaning up if that stops being true.
+      - name: Free disk space if short
         run: |
-          df -h
-          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache
-          df -h
+          df -h /
+          available_gb=$(df --output=avail -BG / | tail -n 1 | tr -dc '0-9')
+          if [ "$available_gb" -lt 40 ]; then
+            sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache
+            df -h /
+          fi
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,9 +46,6 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Setup ccache
-        uses: ./.github/actions/setup-ccache
 
       - name: Setup Hexagon SDK
         run: ./scripts/setup-hexagon-sdk.sh
