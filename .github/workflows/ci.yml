@@ -243,21 +243,6 @@ jobs:
         with:
           key: android-libs-${{ hashFiles('vendor/VERSIONS') }}
 
-      # The Hexagon variant only compiles against the SDK's headers, so those
-      # are kept between runs instead of downloading and unpacking the whole
-      # SDK every time (700 MB, ~40 s).
-      - name: Cache Hexagon SDK headers
-        id: hexagon-sdk-cache
-        uses: actions/cache@v4
-        continue-on-error: true
-        with:
-          path: ~/.hexagon-sdk
-          key: ${{ runner.os }}-hexagon-sdk-headers-${{ hashFiles('scripts/setup-hexagon-sdk.sh') }}
-
-      - name: Setup Hexagon SDK
-        if: steps.hexagon-sdk-cache.outputs.cache-hit != 'true'
-        run: ./scripts/setup-hexagon-sdk.sh --headers-only
-
       - name: Cache Hexagon HTP artifacts
         id: htp-cache
         uses: actions/cache@v4
@@ -268,9 +253,38 @@ jobs:
             vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/v73
           key: ${{ runner.os }}-htp-${{ hashFiles('scripts/build-hexagon-htp.sh', 'scripts/docker-build-wrapper.sh', 'vendor/whisper.cpp/ggml/src/ggml-hexagon/htp/**') }}
 
+      # Building the DSP-side libraries runs the Hexagon SDK's tools, so that
+      # needs the whole SDK (700 MB download, 3 GB unpacked).
       - name: Build Hexagon HTP libraries
         if: steps.htp-cache.outputs.cache-hit != 'true'
-        run: npm run build:hexagon-htp
+        run: |
+          ./scripts/setup-hexagon-sdk.sh
+          npm run build:hexagon-htp
+
+      # With those libraries cached, the Hexagon variant only compiles against
+      # the SDK's headers, which are small enough to keep between runs. They
+      # are saved right after the download so that the cache can never pick up
+      # the whole SDK.
+      - name: Restore Hexagon SDK headers
+        id: hexagon-sdk-cache
+        if: steps.htp-cache.outputs.cache-hit == 'true'
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: ~/.hexagon-sdk
+          key: ${{ runner.os }}-hexagon-sdk-headers-${{ hashFiles('scripts/setup-hexagon-sdk.sh') }}
+
+      - name: Setup Hexagon SDK headers
+        if: steps.htp-cache.outputs.cache-hit == 'true' && steps.hexagon-sdk-cache.outputs.cache-hit != 'true'
+        run: ./scripts/setup-hexagon-sdk.sh --headers-only
+
+      - name: Save Hexagon SDK headers
+        if: steps.htp-cache.outputs.cache-hit == 'true' && steps.hexagon-sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ~/.hexagon-sdk
+          key: ${{ runner.os }}-hexagon-sdk-headers-${{ hashFiles('scripts/setup-hexagon-sdk.sh') }}
 
       - name: Build libraries
         env:

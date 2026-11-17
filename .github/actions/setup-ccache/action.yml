@@ -53,11 +53,11 @@ runs:
             # The NDK may be reinstalled per run, so hash the compiler rather than stat it.
             echo "CCACHE_COMPILERCHECK=content"
             echo "CCACHE_SLOPPINESS=time_macros,include_file_mtime,include_file_ctime"
-            # whisper.rn's CMake files look for ccache themselves. This covers the
-            # other CMake projects of an example app build (React Native's
-            # generated code, other native modules).
-            echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
-            echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+            # whisper.rn's CMake files look for ccache themselves, so only its
+            # own sources are cached. Do not export CMAKE_<LANG>_COMPILER_LAUNCHER
+            # to cover the rest of an example app build: with it, each CMake
+            # configure of the app module stalls for 30 s under the Android
+            # Gradle Plugin and its native build went from 7 s to 214 s.
           fi
         } >> "$GITHUB_ENV"
 
