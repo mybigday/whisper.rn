@@ -297,7 +297,7 @@ Developer environment only; it never touches `vendor/`:
 2. Builds for multiple targets: iOS device, iOS simulator, tvOS device, tvOS simulator
 3. Creates universal `rnwhisper.xcframework` with all architectures
 4. Includes Metal kernel sources (compiled at runtime) and the public C headers
-5. Script: `scripts/build-ios.sh`
+5. Script: `scripts/build-ios.sh [slice...]` builds the named slices (`ios-simulator`, `ios-device`, `tvos-simulator`, `tvos-device`; all by default). CI builds them in two parallel jobs; the release workflow packages all four.
 
 ### TypeScript Build
 - Uses `react-native-builder-bob`

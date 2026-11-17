@@ -194,7 +194,7 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 - Supports 16KB page sizes (Android 15+)
 - Proguard rule required: `-keep class com.rnwhisper.** { *; }`
 
-**Hexagon (NPU)**: the `rnwhisper_v8fp16_va_2_hexagon` variant needs the Hexagon SDK on the build host (`scripts/setup-hexagon-sdk.sh`) plus the FastRPC stub and DSP-side `bin/arm64-v8a/libggml-htp-*.so` from `scripts/build-hexagon-htp.sh` (Docker). The prebuilt jniLibs include the variant; `bin/` ships inside the npm package and `android/build.gradle` syncs it into the host app's assets.
+**Hexagon (NPU)**: the `rnwhisper_v8fp16_va_2_hexagon` variant needs the Hexagon SDK on the build host (`scripts/setup-hexagon-sdk.sh`; `--headers-only` keeps just the headers that build includes, which is what CI caches) plus the FastRPC stub and DSP-side `bin/arm64-v8a/libggml-htp-*.so` from `scripts/build-hexagon-htp.sh` (Docker). The prebuilt jniLibs include the variant; `bin/` ships inside the npm package and `android/build.gradle` syncs it into the host app's assets.
 
 ## File Patterns and Conventions
 
@@ -322,7 +322,7 @@ Developer environment only; it never touches `vendor/`:
 2. Builds for multiple targets: iOS device, iOS simulator, tvOS device, tvOS simulator
 3. Creates universal `rnwhisper.xcframework` with all architectures
 4. Includes Metal kernel sources (compiled at runtime) and the public C headers
-5. Script: `scripts/build-ios.sh`
+5. Script: `scripts/build-ios.sh [slice...]` builds the named slices (`ios-simulator`, `ios-device`, `tvos-simulator`, `tvos-device`; all by default). CI builds them in two parallel jobs; the release workflow packages all four.
 
 ### TypeScript Build
 - Uses `react-native-builder-bob`

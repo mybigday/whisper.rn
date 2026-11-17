@@ -118,7 +118,8 @@ Pod::Spec.new do |s|
     # The prebuilt xcframework is a GitHub release asset that the package's
     # postinstall downloads (install/download-native-artifacts.js).
     xcframework = File.join(__dir__, "ios", "rnwhisper.xcframework")
-    unless Dir.exist?(File.join(xcframework, "ios-arm64"))
+    # (Any slice will do: scripts/build-ios.sh can build a subset.)
+    unless Dir.glob(File.join(xcframework, "*", "rnwhisper.framework")).any?
       raise "[whisper.rn] ios/rnwhisper.xcframework is missing. Run `npx whisper-rn-download-artifacts` " \
             "(the package's postinstall) to download it, or set RNWHISPER_BUILD_FROM_SOURCE=1 to build from source."
     end
