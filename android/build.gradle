@@ -163,8 +163,9 @@ android {
       "-DRNWHISPER_BUILD_FROM_SOURCE=${isRNWhisperBuildFromSource ? 'ON' : 'OFF'}"
     ]
 
-    // Narrows the CPU-feature variants built for each ABI. Each variant is a
-    // full copy of the source tree, so CI uses this to keep build times sane.
+    // Narrows the CPU-feature variants built for each ABI. Each variant
+    // compiles the CPU backends and links the whole library again, so CI uses
+    // this to keep build times down.
     def rnwhisperVariants = project.findProperty("rnwhisperVariants")?.toString()?.trim()
     if (rnwhisperVariants) {
       println("whisper.rn: building variants ${rnwhisperVariants}")

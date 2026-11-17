@@ -31,6 +31,8 @@ project.xcworkspace
 
 # Android/IJ
 #
+.ccache
+.thinlto-cache
 .classpath
 .cxx
 .gradle

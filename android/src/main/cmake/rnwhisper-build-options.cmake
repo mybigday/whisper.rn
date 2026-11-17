@@ -4,8 +4,8 @@
 include_guard(GLOBAL)
 
 # --- ccache ------------------------------------------------------------------
-# Every CPU-feature variant compiles the whole whisper.cpp tree again, so a warm
-# compiler cache is worth a lot on CI and on rebuilds.
+# Most of the library rarely changes, so a warm compiler cache is worth a lot on
+# CI and on rebuilds.
 option(RNWHISPER_CCACHE "Use ccache to speed up recompilation" ON)
 
 if (RNWHISPER_CCACHE AND NOT CMAKE_C_COMPILER_LAUNCHER)
