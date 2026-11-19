@@ -53,6 +53,8 @@ export class SliceManager {
    */
   addAudioData(audioData: Uint8Array): {
     slice?: AudioSlice
+    /** True once the current slice has reached its 80% duration threshold and been finalized. */
+    isComplete?: boolean
   } {
     // Calculate bytes per slice (2 bytes per sample for 16-bit PCM)
     const bytesPerSlice = this.sliceDurationSec * this.sampleRate * 2
@@ -85,7 +87,7 @@ export class SliceManager {
       this.finalizeCurrentSlice()
     }
 
-    return { slice: currentSlice }
+    return { slice: currentSlice, isComplete: isSliceComplete }
   }
 
   private getCurrentSlice(): AudioSlice {
