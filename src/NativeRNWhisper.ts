@@ -25,6 +25,17 @@ export type TranscribeOptions = {
   offset?: number
   /** Duration of audio to process in milliseconds */
   duration?: number
+  /**
+   * Encoder audio context size (whisper.cpp `audio_ctx`). A smaller context
+   * encodes less than the model's full 30 s window, which is faster for short
+   * audio at some cost in accuracy.
+   * - number: fixed size, a non-negative integer (0 = model default, the
+   *   default). Must not exceed the model's audio context (1500 for stock models).
+   * - 'auto': fit to the input length (after `offset`/`duration`), with ~2 s
+   *   of headroom, aligned to 64, at least 256 and capped at the model's
+   *   audio context.
+   */
+  audioCtx?: number | 'auto'
   /** Initial decoding temperature */
   temperature?: number
   /** Temperature fallback increment applied between decoding retries */

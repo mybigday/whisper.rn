@@ -1,9 +1,11 @@
 #include "RNWhisperJSI.h"
+#include "AudioCtx.h"
 #include "ThreadPool.h"
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdarg>
 #include <cstdint>
@@ -885,6 +887,8 @@ struct TranscribeConfig {
     int nProcessors = 1;
     int jobId = 0;
     bool tdrzEnable = false;
+    // audioCtx: 'auto' — resolved against the input length once it is known.
+    bool audioCtxAuto = false;
     JsiFunctionPtr onProgress;
     JsiFunctionPtr onNewSegments;
 
@@ -895,7 +899,46 @@ struct TranscribeConfig {
             params.language = language.c_str();
         }
     }
+
+    void resolveAudioCtx(whisper_context *context, int64_t nSamples) {
+        if (!audioCtxAuto) {
+            return;
+        }
+        params.audio_ctx = rnwhisper_jsi::fitAudioCtx(
+            rnwhisper_jsi::effectiveAudioSamples(
+                nSamples, params.offset_ms, params.duration_ms),
+            whisper_model_n_audio_ctx(context));
+    }
 };
+
+// audioCtx: a non-negative integer (0 = model default) or 'auto'.
+void parseWhisperAudioCtx(
+    jsi::Runtime &runtime,
+    const jsi::Object &options,
+    TranscribeConfig &config) {
+    if (!options.hasProperty(runtime, "audioCtx")) {
+        return;
+    }
+    auto value = options.getProperty(runtime, "audioCtx");
+    if (value.isUndefined() || value.isNull()) {
+        return;
+    }
+    if (value.isString() && value.asString(runtime).utf8(runtime) == "auto") {
+        config.audioCtxAuto = true;
+        return;
+    }
+    if (value.isNumber()) {
+        double number = value.asNumber();
+        if (std::isfinite(number) && number >= 0 && number <= INT32_MAX &&
+            std::floor(number) == number) {
+            config.params.audio_ctx = static_cast<int>(number);
+            return;
+        }
+    }
+    throw jsi::JSError(
+        runtime,
+        "audioCtx must be a non-negative integer or 'auto'");
+}
 
 TranscribeConfig createTranscribeConfig(
     jsi::Runtime &runtime,
@@ -924,6 +967,7 @@ TranscribeConfig createTranscribeConfig(
         getIntProperty(runtime, options, "offset", config.params.offset_ms);
     config.params.duration_ms =
         getIntProperty(runtime, options, "duration", config.params.duration_ms);
+    parseWhisperAudioCtx(runtime, options, config);
     config.params.thold_pt =
         getFloatProperty(runtime, options, "wordThold", config.params.thold_pt);
     config.params.temperature =
@@ -2108,6 +2152,7 @@ void installJSIBindings(
                         config.params.new_segment_callback_user_data = &segmentsState;
                     }
 
+                    config.resolveAudioCtx(holder->context, static_cast<int64_t>(audio.size()));
                     rnwhisper::job *job = rnwhisper::job_new(config.jobId, config.params);
                     if (job == nullptr) {
                         throw JsiError("Failed to create transcription job");
@@ -2225,6 +2270,7 @@ void installJSIBindings(
                         config.params.new_segment_callback_user_data = &segmentsState;
                     }
 
+                    config.resolveAudioCtx(holder->context, static_cast<int64_t>(audio.size()));
                     rnwhisper::job *job = rnwhisper::job_new(config.jobId, config.params);
                     if (job == nullptr) {
                         throw JsiError("Failed to create transcription job");

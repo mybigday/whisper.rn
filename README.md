@@ -100,6 +100,12 @@ const { result } = await promise
 // result: (The inference text result from audio file)
 ```
 
+Whisper always encodes a 30 s window. For short clips, `audioCtx` shrinks the encoder context to speed things up, at some cost in accuracy: pass a fixed size (0 = model default, up to 1500 for stock models), or `'auto'` to fit it to the input length (~2 s of headroom, aligned to 64, at least 256, capped at the model's context). It works for `transcribe()`, `transcribeData()` and `RealtimeTranscriber`'s `transcribeOptions`.
+
+```js
+const { promise } = whisperContext.transcribeData(pcmBuffer, { audioCtx: 'auto' })
+```
+
 ## NVIDIA Parakeet TDT
 
 `ParakeetContext` runs NVIDIA's Parakeet TDT 0.6B v3 model through the Parakeet API included in whisper.cpp. The v3 model supports English plus 24 other European languages.
