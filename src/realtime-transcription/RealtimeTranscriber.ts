@@ -523,6 +523,27 @@ export class RealtimeTranscriber {
     const startTime = Date.now()
 
     try {
+      // Let the user filter this slice before paying for inference
+      if (this.callbacks.onBeginTranscribe) {
+        const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
+        const duration = (item.audioData.length / 2) / (sampleRate / 1000) // ms
+
+        const shouldContinue = await this.callbacks.onBeginTranscribe({
+          audioData: item.audioData,
+          sliceIndex: item.sliceIndex,
+          duration,
+          vadEvent: this.vadEvents.get(item.sliceIndex),
+        })
+
+        // Stopped while the callback was pending
+        if (!this.isActive) return
+
+        if (!shouldContinue) {
+          this.log(`Transcription filtered by onBeginTranscribe for slice ${item.sliceIndex}`)
+          return
+        }
+      }
+
       // The view may cover only part of its buffer (slices are preallocated), so pass exactly its bytes
       const { buffer, byteOffset, byteLength } = item.audioData
       const audioBuffer = (
@@ -586,24 +607,6 @@ export class RealtimeTranscriber {
       if (!slice) {
         this.log(`Slice not found for index ${item.sliceIndex}, skipping transcription processing.`)
         return
-      }
-
-      // Check if user wants to filter this transcription
-      if (this.callbacks.onBeginTranscribe) {
-        const { sampleRate = 16000 } = this.options.audioStreamConfig || {}
-        const duration = (item.audioData.length / 2) / (sampleRate / 1000) // ms
-
-        const shouldContinue = await this.callbacks.onBeginTranscribe({
-          audioData: item.audioData,
-          sliceIndex: slice.index,
-          duration,
-          vadEvent: this.vadEvents.get(item.sliceIndex)
-        })
-
-        if (!shouldContinue) {
-          this.log(`Transcription filtered by onBeginTranscribe for slice ${slice.index}`)
-          return
-        }
       }
 
       // Create new transcription event

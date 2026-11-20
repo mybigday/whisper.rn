@@ -585,6 +585,85 @@ describe('RealtimeTranscriber', () => {
         await parakeetTranscriber.release()
       }
     })
+
+    it('should not run inference for a slice rejected by onBeginTranscribe', async () => {
+      const onBeginTranscribe = jest.fn().mockResolvedValue(false)
+      transcriber.updateCallbacks({ onBeginTranscribe })
+
+      mockAudioStream.simulateDataChunk(createAudioData(16000))
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(onBeginTranscribe).toHaveBeenCalledWith(
+        expect.objectContaining({
+          audioData: expect.any(Uint8Array),
+          sliceIndex: 0,
+          duration: 500, // 16000 bytes of 16-bit PCM at 16 kHz
+        }),
+      )
+      expect(mockWhisperContext.transcribeData).not.toHaveBeenCalled()
+      expect(mockCallbacks.onTranscribe).not.toHaveBeenCalled()
+      expect(transcriber.getStatistics().isTranscribing).toBe(false)
+    })
+
+    it('should run inference for a slice accepted by onBeginTranscribe', async () => {
+      const onBeginTranscribe = jest.fn().mockResolvedValue(true)
+      transcriber.updateCallbacks({ onBeginTranscribe })
+
+      mockAudioStream.simulateDataChunk(createAudioData(16000))
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      expect(onBeginTranscribe).toHaveBeenCalled()
+      expect(mockWhisperContext.transcribeData).toHaveBeenCalled()
+      // The gate is evaluated before inference starts
+      expect(onBeginTranscribe.mock.invocationCallOrder[0]).toBeLessThan(
+        mockWhisperContext.transcribeData.mock.invocationCallOrder[0],
+      )
+      expect(mockCallbacks.onTranscribe).toHaveBeenCalled()
+    })
+
+    it('should not run Parakeet inference for a rejected slice', async () => {
+      const testAudioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      testAudioStream['startStreaming'] = jest.fn()
+
+      const mockParakeetContext = {
+        transcribeData: jest.fn(() => ({
+          stop: jest.fn().mockResolvedValue(undefined),
+          promise: Promise.resolve({
+            isAborted: false,
+            language: '',
+            result: 'Parakeet transcription',
+            segments: [],
+          }),
+        })),
+      }
+      const onBeginTranscribe = jest.fn().mockResolvedValue(false)
+      const onTranscribe = jest.fn()
+      const parakeetTranscriber = new RealtimeTranscriber(
+        {
+          parakeetContext: mockParakeetContext,
+          audioStream: testAudioStream,
+        },
+        {},
+        { onBeginTranscribe, onTranscribe },
+      )
+
+      await parakeetTranscriber.start()
+
+      try {
+        testAudioStream.simulateDataChunk(createAudioData(16000))
+        await new Promise(resolve => setTimeout(resolve, 50))
+
+        expect(onBeginTranscribe).toHaveBeenCalled()
+        expect(mockParakeetContext.transcribeData).not.toHaveBeenCalled()
+        expect(onTranscribe).not.toHaveBeenCalled()
+      } finally {
+        await parakeetTranscriber.release()
+      }
+    })
   })
 
   describe('auto-slicing', () => {
