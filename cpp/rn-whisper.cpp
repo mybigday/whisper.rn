@@ -1,10 +1,20 @@
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include "rn-whisper.h"
 #include "ggml.h"
+#include "ggml-cpu.h"
+
+#if defined(__linux__)
+#include <sched.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 #define DEFAULT_MAX_AUDIO_SEC 30;
 
@@ -104,6 +114,117 @@ void job::abort() {
 
 job::~job() {
     RNWHISPER_LOG_INFO("rnwhisper::job::%s: job_id: %d\n", __func__, job_id);
+    if (threadpool != nullptr) {
+        ggml_threadpool_free(threadpool);
+    }
+    if (restore_affinity) {
+        restore_affinity();
+    }
+}
+
+// parse_cpu_range and parse_hex_cpu_mask are llama.cpp common's
+// parse_cpu_range / parse_cpu_mask (common/common.cpp), with std::stoull's
+// exceptions turned into a false return.
+static bool parse_cpu_range(const std::string & range, bool (&boolmask)[GGML_MAX_N_THREADS]) {
+    size_t dash_loc = range.find('-');
+    if (dash_loc == std::string::npos) {
+        return false;
+    }
+
+    size_t start_i;
+    size_t end_i;
+
+    try {
+        if (dash_loc == 0) {
+            start_i = 0;
+        } else {
+            start_i = std::stoull(range.substr(0, dash_loc));
+            if (start_i >= GGML_MAX_N_THREADS) {
+                return false;
+            }
+        }
+
+        if (dash_loc == range.length() - 1) {
+            end_i = GGML_MAX_N_THREADS - 1;
+        } else {
+            end_i = std::stoull(range.substr(dash_loc + 1));
+            if (end_i >= GGML_MAX_N_THREADS) {
+                return false;
+            }
+        }
+    } catch (const std::exception &) {
+        return false;
+    }
+
+    for (size_t i = start_i; i <= end_i; i++) {
+        boolmask[i] = true;
+    }
+
+    return true;
+}
+
+static bool parse_hex_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]) {
+    // Discard potential 0x prefix
+    size_t start_i = 0;
+    if (mask.length() >= 2 && mask.substr(0, 2) == "0x") {
+        start_i = 2;
+    }
+
+    size_t num_digits = mask.length() - start_i;
+    num_digits = std::min<size_t>(num_digits, 128);
+
+    size_t end_i = num_digits + start_i;
+
+    for (size_t i = start_i, n = (num_digits*4 - 1); i < end_i; i++, n-=4) {
+        char c = mask.at(i);
+        int8_t id = c;
+
+        if ((c >= '0' && c <= '9')) {
+            id -= '0';
+        } else if (c >= 'a' && c <= 'f') {
+            id -= 'a' - 10;
+        } else if (c >= 'A' && c <= 'F') {
+            id -= 'A' - 10;
+        } else {
+            return false;
+        }
+
+        boolmask[  n  ] = boolmask[  n  ] || ((id & 8) != 0);
+        boolmask[n - 1] = boolmask[n - 1] || ((id & 4) != 0);
+        boolmask[n - 2] = boolmask[n - 2] || ((id & 2) != 0);
+        boolmask[n - 3] = boolmask[n - 3] || ((id & 1) != 0);
+    }
+
+    return true;
+}
+
+bool parse_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]) {
+    // A hex mask never contains '-', so the two forms cannot be confused.
+    if (mask.find('-') != std::string::npos) {
+        return parse_cpu_range(mask, boolmask);
+    }
+    return parse_hex_cpu_mask(mask, boolmask);
+}
+
+// ggml_threadpool_new pins the calling thread (it is worker 0) to the mask and
+// nothing undoes that; ggml's clear_numa_thread_affinity is a no-op outside
+// NUMA mode. Job threads are reused, and threads they spawn inherit the
+// affinity, so a later job without a mask would stay pinned. Affinity is a
+// no-op in ggml on Apple platforms, so only Linux/Android need restoring.
+[[maybe_unused]] static std::function<void()> save_thread_affinity() {
+#if defined(__linux__)
+    cpu_set_t saved;
+    CPU_ZERO(&saved);
+    const pid_t tid = static_cast<pid_t>(syscall(SYS_gettid));
+    if (sched_getaffinity(tid, sizeof(saved), &saved) != 0) {
+        return nullptr;
+    }
+    return [tid, saved]() {
+        sched_setaffinity(tid, sizeof(saved), &saved);
+    };
+#else
+    return nullptr;
+#endif
 }
 
 std::unordered_map<int, job*> job_map;
@@ -120,10 +241,29 @@ void job_abort_all() {
     }
 }
 
-job* job_new(int job_id, struct whisper_full_params params) {
+job* job_new(int job_id, struct whisper_full_params params, const cpu_params * cpu) {
     job* ctx = new job();
     ctx->job_id = job_id;
     ctx->params = params;
+    // Without a mask, ggml keeps creating its own pool per graph, as before.
+    // ggml cannot set thread affinity on Apple platforms, so a pool would
+    // change nothing there but the thread lifetime; keep the default path.
+#if !defined(__APPLE__)
+    if (cpu != nullptr && cpu->has_mask() && params.n_threads > 0) {
+        ggml_threadpool_params tpp = ggml_threadpool_params_default(params.n_threads);
+        std::memcpy(tpp.cpumask, cpu->mask, sizeof(tpp.cpumask));
+        tpp.strict_cpu = cpu->strict;
+
+        ctx->restore_affinity = save_thread_affinity();
+        ctx->threadpool = ggml_threadpool_new(&tpp);
+        if (ctx->threadpool == nullptr) {
+            RNWHISPER_LOG_WARN("rnwhisper::%s: failed to create threadpool, using the default threads\n", __func__);
+        }
+    }
+#else
+    (void) cpu;
+#endif
+    ctx->params.threadpool = ctx->threadpool;
     ctx->params.encoder_begin_callback = [](struct whisper_context * /*ctx*/, struct whisper_state * /*state*/, void * user_data) {
         job *j = (job*)user_data;
         return !j->is_aborted();

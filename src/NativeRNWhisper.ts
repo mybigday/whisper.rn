@@ -11,6 +11,16 @@ export type TranscribeOptions = {
   maxThreads?: number
   /** Number of processors to use for parallel processing with whisper_full_parallel (Default: 1 to use whisper_full) */
   nProcessors?: number
+  /**
+   * CPU affinity mask for the compute threads: hex as in llama.rn's cpu_mask, e.g. '0xC0'
+   * for CPUs 6 and 7, or (whisper.rn only) an inclusive range like llama.cpp's
+   * --cpu-range, e.g. '6-7'. The job then runs on a ggml threadpool of maxThreads threads
+   * placed on these CPUs. Android only: ignored on iOS, which has no thread affinity.
+   * Not supported with nProcessors > 1. An invalid mask rejects the call.
+   */
+  cpu_mask?: string
+  /** Strict CPU placement: one compute thread per CPU of cpu_mask, in order (Default: false). Requires cpu_mask. */
+  cpu_strict?: boolean
   /** Maximum number of text context tokens to store */
   maxContext?: number
   /** Maximum segment length in characters */

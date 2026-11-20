@@ -1,6 +1,7 @@
 #ifndef RNWHISPER_H
 #define RNWHISPER_H
 
+#include <functional>
 #include <string>
 #include <vector>
 #include "whisper.h"
@@ -28,11 +29,40 @@ struct vad_params {
     bool verbose = false;
 };
 
+// Placement of a job's ggml CPU compute threads (cpu_mask / cpu_strict).
+struct cpu_params {
+    bool mask[GGML_MAX_N_THREADS] = {};
+    bool strict = false;           // one thread per CPU of the mask, in order
+
+    // At least one CPU set. Inline: the JSI glue links against the core
+    // library, which exports only RNWHISPER_API symbols on Android.
+    bool has_mask() const {
+        for (bool set : mask) {
+            if (set) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+// cpu_mask syntax shared with llama.rn / llama.node, i.e. llama.cpp common's:
+// a hex mask with an optional 0x prefix ("0xC0", "C0": CPUs 6 and 7), or, as
+// with llama.cpp's --cpu-range, an inclusive "lo-hi" range where either end
+// may be omitted ("6-7", "4-"). Bits are OR-ed into boolmask. Returns false
+// for invalid input.
+RNWHISPER_API bool parse_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]);
+
 struct RNWHISPER_API job {
     int job_id;
     bool aborted = false;
     whisper_full_params params;
     int n_processors = 1;
+
+    // Owned pool behind params.threadpool, only when the job has a cpu mask.
+    ggml_threadpool_t threadpool = nullptr;
+    // Undoes the pinning ggml applies to the thread that created the pool.
+    std::function<void()> restore_affinity;
 
     ~job();
     bool is_aborted();
@@ -47,7 +77,11 @@ struct RNWHISPER_API job {
 RNWHISPER_API ggml_abort_callback_t set_ggml_abort_callback(ggml_abort_callback_t callback);
 
 RNWHISPER_API void job_abort_all();
-RNWHISPER_API job* job_new(int job_id, struct whisper_full_params params);
+// With a cpu mask, the job gets a ggml threadpool of params.n_threads threads
+// placed on that mask (not on Apple platforms, where ggml has no affinity). Call job_new and job_remove on the thread that runs
+// whisper_full*: ggml pins the creating thread too, and the job restores its
+// affinity when removed.
+RNWHISPER_API job* job_new(int job_id, struct whisper_full_params params, const cpu_params * cpu = nullptr);
 RNWHISPER_API void job_remove(int job_id);
 RNWHISPER_API job* job_get(int job_id);
 
