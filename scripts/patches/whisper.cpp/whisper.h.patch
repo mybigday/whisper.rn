@@ -1,5 +1,9 @@
 Add whisper_context_params.use_coreml so the Core ML encoder can be turned
 off per context (useCoreMLIos option) even when the build has WHISPER_USE_COREML.
+
+Add whisper_full_params.threadpool, an optional caller-owned ggml CPU
+threadpool for the call's graph computes (cpu_mask/cpu_strict transcribe
+options). See whisper.cpp.patch.
 --- a/include/whisper.h
 +++ b/include/whisper.h
 @@ -115,6 +115,7 @@
@@ -10,3 +14,18 @@ off per context (useCoreMLIos option) even when the build has WHISPER_USE_COREML
          bool  flash_attn;
          int   gpu_device;  // CUDA device
  
+@@ -588,6 +589,14 @@
+         const char * vad_model_path;              // Path to VAD model
+ 
+         whisper_vad_params vad_params;
++
++        // Optional ggml CPU threadpool for this call's graph computes, e.g. to pin
++        // the compute threads with ggml_threadpool_params.cpumask. NULL (default)
++        // keeps ggml's disposable per-graph pool. The caller owns the pool and
++        // keeps it alive for the call; it needs at least n_threads threads and
++        // must not run another graph meanwhile, so whisper_full_parallel uses it
++        // only for the calling thread's chunk.
++        struct ggml_threadpool * threadpool;
+     };
+ 
+     // NOTE: this function allocates memory, and it is the responsibility of the caller to free the pointer - see whisper_free_context_params & whisper_free_params()

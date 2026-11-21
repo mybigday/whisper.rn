@@ -37,6 +37,15 @@ const parakeetMocks = {
   >,
 }
 
+const whisperMocks = {
+  transcribeFile: global.whisperTranscribeFile as jest.MockedFunction<
+    typeof global.whisperTranscribeFile
+  >,
+  transcribeData: global.whisperTranscribeData as jest.MockedFunction<
+    typeof global.whisperTranscribeData
+  >,
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
 })
@@ -55,6 +64,41 @@ test('provides the Whisper mock API', async () => {
   })
   await context.release()
   await releaseAllWhisper()
+})
+
+test('passes cpu_mask and cpu_strict through to the native transcribe calls', async () => {
+  const { transcribeFile, transcribeData } = whisperMocks
+  const context = await initWhisper({ filePath: 'test.bin' })
+
+  await context.transcribe('file:///audio/jfk.wav', {
+    maxThreads: 2,
+    cpu_mask: '0xC0',
+    cpu_strict: true,
+  }).promise
+  expect(transcribeFile).toHaveBeenLastCalledWith(
+    context.id,
+    '/audio/jfk.wav',
+    expect.objectContaining({
+      maxThreads: 2,
+      cpu_mask: '0xC0',
+      cpu_strict: true,
+      jobId: expect.any(Number),
+    }),
+  )
+
+  const audioData = new Float32Array(16).buffer
+  await context.transcribeData(audioData, { cpu_mask: '0xfc' }).promise
+  const [, options] = transcribeData.mock.calls.at(-1)!
+  expect(options).toMatchObject({ cpu_mask: '0xfc' })
+  expect(options).not.toHaveProperty('cpu_strict')
+
+  // Without the options nothing is added, so the native default path is kept
+  await context.transcribe('file:///audio/jfk.wav').promise
+  const [, , defaultOptions] = transcribeFile.mock.calls.at(-1)!
+  expect(defaultOptions).not.toHaveProperty('cpu_mask')
+  expect(defaultOptions).not.toHaveProperty('cpu_strict')
+
+  await context.release()
 })
 
 test('initializes and releases a Parakeet context', async () => {

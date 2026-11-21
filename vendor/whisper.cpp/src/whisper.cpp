@@ -6243,6 +6243,8 @@ struct whisper_full_params whisper_full_default_params(enum whisper_sampling_str
         /*.vad_model_path              =*/ nullptr,
 
         /* vad_params =*/ whisper_vad_default_params(),
+
+        /*.threadpool =*/ nullptr,
     };
 
     switch (strategy) {
@@ -7041,12 +7043,48 @@ static bool whisper_vad(
     return true;
 }
 
+// Attaches whisper_full_params.threadpool to the state's CPU backend for one
+// whisper_full_with_state call. The backends outlive the call, so the pool is
+// always detached on return: the caller frees it afterwards, and a later call
+// without a pool must not reach the freed one.
+struct whisper_threadpool_scope {
+    using set_threadpool_t = decltype(ggml_backend_cpu_set_threadpool) *;
+
+    std::vector<std::pair<ggml_backend_t, set_threadpool_t>> attached;
+
+    whisper_threadpool_scope(whisper_state & state, ggml_threadpool_t threadpool) {
+        if (threadpool == nullptr) {
+            return;
+        }
+        for (auto * backend : state.backends) {
+            ggml_backend_dev_t dev = ggml_backend_get_device(backend);
+            if (dev == nullptr || ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_CPU) {
+                continue;
+            }
+            auto set_threadpool_fn = (set_threadpool_t)
+                ggml_backend_reg_get_proc_address(ggml_backend_dev_backend_reg(dev), "ggml_backend_cpu_set_threadpool");
+            if (set_threadpool_fn) {
+                set_threadpool_fn(backend, threadpool);
+                attached.emplace_back(backend, set_threadpool_fn);
+            }
+        }
+    }
+
+    ~whisper_threadpool_scope() {
+        for (auto & entry : attached) {
+            entry.second(entry.first, nullptr);
+        }
+    }
+};
+
 int whisper_full_with_state(
         struct whisper_context * ctx,
           struct whisper_state * state,
     struct whisper_full_params   params,
                    const float * samples,
                            int   n_samples) {
+    whisper_threadpool_scope threadpool_scope(*state, params.threadpool);
+
     // clear old results
     auto & result_all = state->result_all;
 
@@ -8091,6 +8129,9 @@ int whisper_full_parallel(
 
         params_cur.progress_callback = nullptr;
         params_cur.progress_callback_user_data = nullptr;
+
+        // a ggml threadpool runs one graph at a time; it stays with the calling thread
+        params_cur.threadpool = nullptr;
 
         workers[i] = std::thread(whisper_full_with_state, ctx, states[i], std::move(params_cur), samples + start_samples, n_samples_cur);
     }

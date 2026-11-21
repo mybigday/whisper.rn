@@ -589,6 +589,14 @@ extern "C" {
         const char * vad_model_path;              // Path to VAD model
 
         whisper_vad_params vad_params;
+
+        // Optional ggml CPU threadpool for this call's graph computes, e.g. to pin
+        // the compute threads with ggml_threadpool_params.cpumask. NULL (default)
+        // keeps ggml's disposable per-graph pool. The caller owns the pool and
+        // keeps it alive for the call; it needs at least n_threads threads and
+        // must not run another graph meanwhile, so whisper_full_parallel uses it
+        // only for the calling thread's chunk.
+        struct ggml_threadpool * threadpool;
     };
 
     // NOTE: this function allocates memory, and it is the responsibility of the caller to free the pointer - see whisper_free_context_params & whisper_free_params()
