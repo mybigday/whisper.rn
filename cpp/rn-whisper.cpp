@@ -122,48 +122,9 @@ job::~job() {
     }
 }
 
-// parse_cpu_range and parse_hex_cpu_mask are llama.cpp common's
-// parse_cpu_range / parse_cpu_mask (common/common.cpp), with std::stoull's
-// exceptions turned into a false return.
-static bool parse_cpu_range(const std::string & range, bool (&boolmask)[GGML_MAX_N_THREADS]) {
-    size_t dash_loc = range.find('-');
-    if (dash_loc == std::string::npos) {
-        return false;
-    }
-
-    size_t start_i;
-    size_t end_i;
-
-    try {
-        if (dash_loc == 0) {
-            start_i = 0;
-        } else {
-            start_i = std::stoull(range.substr(0, dash_loc));
-            if (start_i >= GGML_MAX_N_THREADS) {
-                return false;
-            }
-        }
-
-        if (dash_loc == range.length() - 1) {
-            end_i = GGML_MAX_N_THREADS - 1;
-        } else {
-            end_i = std::stoull(range.substr(dash_loc + 1));
-            if (end_i >= GGML_MAX_N_THREADS) {
-                return false;
-            }
-        }
-    } catch (const std::exception &) {
-        return false;
-    }
-
-    for (size_t i = start_i; i <= end_i; i++) {
-        boolmask[i] = true;
-    }
-
-    return true;
-}
-
-static bool parse_hex_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]) {
+// llama.cpp common's parse_cpu_mask (common/common.cpp), which llama.rn and
+// llama.node use for their cpu_mask, so the same strings mean the same CPUs.
+bool parse_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]) {
     // Discard potential 0x prefix
     size_t start_i = 0;
     if (mask.length() >= 2 && mask.substr(0, 2) == "0x") {
@@ -198,14 +159,6 @@ static bool parse_hex_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_M
     return true;
 }
 
-bool parse_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]) {
-    // A hex mask never contains '-', so the two forms cannot be confused.
-    if (mask.find('-') != std::string::npos) {
-        return parse_cpu_range(mask, boolmask);
-    }
-    return parse_hex_cpu_mask(mask, boolmask);
-}
-
 // ggml_threadpool_new pins the calling thread (it is worker 0) to the mask and
 // nothing undoes that; ggml's clear_numa_thread_affinity is a no-op outside
 // NUMA mode. Job threads are reused, and threads they spawn inherit the
@@ -224,6 +177,30 @@ bool parse_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREAD
     };
 #else
     return nullptr;
+#endif
+}
+
+// With cpu_strict, ggml_threadpool_new also narrows the calling thread to
+// worker 0's single CPU. whisper.cpp spawns plain std::threads from that thread
+// (log-mel workers, parallel beam sampling), which would inherit it and all run
+// on one CPU. Give the calling thread the whole mask again: those threads then
+// spread over it, and worker 0 stays inside the mask. ggml re-pins worker 0
+// only when a paused pool resumes, and this pool is never paused.
+[[maybe_unused]] static void set_thread_affinity_to_mask(const bool * mask) {
+#if defined(__linux__)
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    for (int i = 0; i < GGML_MAX_N_THREADS && i < CPU_SETSIZE; i++) {
+        if (mask[i]) {
+            CPU_SET(i, &set);
+        }
+    }
+    const pid_t tid = static_cast<pid_t>(syscall(SYS_gettid));
+    if (sched_setaffinity(tid, sizeof(set), &set) != 0) {
+        RNWHISPER_LOG_WARN("rnwhisper::%s: failed to set the job thread affinity\n", __func__);
+    }
+#else
+    (void) mask;
 #endif
 }
 
@@ -258,6 +235,8 @@ job* job_new(int job_id, struct whisper_full_params params, const cpu_params * c
         ctx->threadpool = ggml_threadpool_new(&tpp);
         if (ctx->threadpool == nullptr) {
             RNWHISPER_LOG_WARN("rnwhisper::%s: failed to create threadpool, using the default threads\n", __func__);
+        } else {
+            set_thread_affinity_to_mask(cpu->mask);
         }
     }
 #else

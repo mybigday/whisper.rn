@@ -46,11 +46,9 @@ struct cpu_params {
     }
 };
 
-// cpu_mask syntax shared with llama.rn / llama.node, i.e. llama.cpp common's:
-// a hex mask with an optional 0x prefix ("0xC0", "C0": CPUs 6 and 7), or, as
-// with llama.cpp's --cpu-range, an inclusive "lo-hi" range where either end
-// may be omitted ("6-7", "4-"). Bits are OR-ed into boolmask. Returns false
-// for invalid input.
+// cpu_mask as in llama.rn / llama.node (llama.cpp common's parse_cpu_mask): a
+// hex mask with an optional 0x prefix, bit N = CPU N ("0xfc": CPUs 2-7, "C0":
+// CPUs 6 and 7). Bits are OR-ed into boolmask. Returns false for invalid input.
 RNWHISPER_API bool parse_cpu_mask(const std::string & mask, bool (&boolmask)[GGML_MAX_N_THREADS]);
 
 struct RNWHISPER_API job {

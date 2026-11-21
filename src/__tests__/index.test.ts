@@ -87,9 +87,9 @@ test('passes cpu_mask and cpu_strict through to the native transcribe calls', as
   )
 
   const audioData = new Float32Array(16).buffer
-  await context.transcribeData(audioData, { cpu_mask: '6-7' }).promise
+  await context.transcribeData(audioData, { cpu_mask: '0xfc' }).promise
   const [, options] = transcribeData.mock.calls.at(-1)!
-  expect(options).toMatchObject({ cpu_mask: '6-7' })
+  expect(options).toMatchObject({ cpu_mask: '0xfc' })
   expect(options).not.toHaveProperty('cpu_strict')
 
   // Without the options nothing is added, so the native default path is kept
