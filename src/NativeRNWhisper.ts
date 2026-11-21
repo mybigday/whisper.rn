@@ -34,6 +34,9 @@ export type TranscribeOptions = {
    * - 'auto': fit to the input length (after `offset`/`duration`), with ~2 s
    *   of headroom, aligned to 64, at least 256 and capped at the model's
    *   audio context.
+   *
+   * Ignored (full context, with a warning) while the Core ML encoder is
+   * active on iOS, whose model has a fixed 30 s input.
    */
   audioCtx?: number | 'auto'
   /** Initial decoding temperature */

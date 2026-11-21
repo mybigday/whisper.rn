@@ -100,7 +100,7 @@ const { result } = await promise
 // result: (The inference text result from audio file)
 ```
 
-Whisper always encodes a 30 s window. For short clips, `audioCtx` shrinks the encoder context to speed things up, at some cost in accuracy: pass a fixed size (0 = model default, up to 1500 for stock models), or `'auto'` to fit it to the input length (~2 s of headroom, aligned to 64, at least 256, capped at the model's context). It works for `transcribe()`, `transcribeData()` and `RealtimeTranscriber`'s `transcribeOptions`.
+Whisper always encodes a 30 s window. For short clips, `audioCtx` shrinks the encoder context to speed things up, at some cost in accuracy: pass a fixed size (0 = model default, up to 1500 for stock models), or `'auto'` to fit it to the input length (~2 s of headroom, aligned to 64, at least 256, capped at the model's context). It works for `transcribe()`, `transcribeData()` and `RealtimeTranscriber`'s `transcribeOptions`. It is ignored (full context) while the Core ML encoder is active on iOS, since that model has a fixed 30 s input.
 
 ```js
 const { promise } = whisperContext.transcribeData(pcmBuffer, { audioCtx: 'auto' })
