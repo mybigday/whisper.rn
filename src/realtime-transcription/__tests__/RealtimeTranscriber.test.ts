@@ -1,4 +1,4 @@
-import { RealtimeTranscriber, isRepetitive, untilLastSentenceEnd } from '../RealtimeTranscriber'
+import { RealtimeTranscriber, isRepetitive } from '../RealtimeTranscriber'
 import { StreamVad } from '../StreamVad'
 import type { StreamVadContextLike, VadStreamLike } from '../StreamVad'
 import { StreamingVadSegmenter } from '../StreamingVadSegmenter'
@@ -671,15 +671,7 @@ describe('RealtimeTranscriber', () => {
       await t.release()
     })
 
-    it('cuts text at its last sentence end', () => {
-      expect(untilLastSentenceEnd('It works. And then the')).toBe('It works.')
-      expect(untilLastSentenceEnd('Is it "done?" Maybe')).toBe('Is it "done?"')
-      expect(untilLastSentenceEnd('version 1.5 is out')).toBe('')
-      expect(untilLastSentenceEnd('我們走吧。然後')).toBe('我們走吧。')
-      expect(untilLastSentenceEnd('他說「好。」接著')).toBe('他說「好。」')
-    })
-
-    it('prompts across an in-speech split only up to the last sentence end, even with a backlog', async () => {
+    it('chains no previous text across an in-speech split, even with a backlog', async () => {
       let release: () => void = () => {}
       const gate = new Promise<void>((resolve) => { release = resolve })
       const prompts: Array<string | undefined> = []
@@ -703,10 +695,7 @@ describe('RealtimeTranscriber', () => {
       release()
       await t.stop()
       expect(prompts.length).toBeGreaterThanOrEqual(4)
-      expect(prompts[0]).toBeUndefined()
-      expect(prompts[1]).toBe('S0.')
-      // Older slices keep their whole text: only the end right before the audio is cut
-      expect(prompts[2]).toBe('S0. tail0 S1.')
+      expect(prompts.every((p) => p === undefined)).toBe(true)
       await t.release()
     })
 

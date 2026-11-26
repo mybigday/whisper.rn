@@ -94,15 +94,6 @@ export const isRepetitive = (text: string): boolean => {
   return grams.size / (units.length - 2) < 0.5
 }
 
-/** The text up to its last sentence end (`.`, `!`, `?` and their CJK forms), '' if there is none */
-export const untilLastSentenceEnd = (text: string): string => {
-  // A CJK mark ends a sentence anywhere; a Latin one only before a space or the end
-  const match = /^[\s\S]*(?:[\u3002\uff01\uff1f][\u300d\u300f\u201d)]*|[.!?]["'\u201d)\]]*(?=\s|$))/u.exec(
-    text.trim(),
-  )
-  return match ? match[0] : ''
-}
-
 const isStreamVadContext = (value: unknown): value is StreamVadContextLike =>
   !!value &&
   typeof (value as StreamVadContextLike).createStream === 'function' &&
@@ -210,7 +201,7 @@ export class RealtimeTranscriber {
   private inSpeechCuts = new Set<number>()
 
   /** Prompt chaining across an in-speech split (evaluation toggle) */
-  private readonly promptAcrossSplit: 'full' | 'sentence' | 'drop'
+  private readonly promptAcrossSplit: 'full' | 'reset'
 
   // Simplified VAD state management
   private lastSpeechDetectedTime = 0
@@ -325,7 +316,7 @@ export class RealtimeTranscriber {
       ? Math.max(0, Math.round(((options.splitOverlapMs ?? 0) * this.sampleRate) / 1000))
       : 0
     this.promptAcrossSplit =
-      (options as { promptAcrossSplit?: 'full' | 'sentence' | 'drop' }).promptAcrossSplit ?? 'sentence'
+      (options as { promptAcrossSplit?: 'full' | 'reset' }).promptAcrossSplit ?? 'reset'
     const { language } = this.options.transcribeOptions as TranscribeOptions
     if (isWhisper && options.languageLock && (!language || language === 'auto')) {
       this.languageLock = new LanguageLock(
@@ -730,16 +721,14 @@ export class RealtimeTranscriber {
    * limited to maxPromptSlices so the prompt stays bounded regardless of session length.
    */
   private getPreviousResultTexts(currentSliceIndex: number): string[] {
+    // After a cut inside speech, Whisper skips or repeats words at the cut when
+    // the prompt ends where this audio goes on (measured with base to
+    // large-v3-turbo; shortening the prompt to a sentence end does not help, as
+    // Whisper ends every slice with punctuation): start over without history
+    if (this.promptAcrossSplit === 'reset' && this.inSpeechCuts.has(currentSliceIndex - 1)) return []
     const previous: Array<[number, string]> = []
     this.transcriptionResults.forEach((result, sliceIndex) => {
-      let text = result.transcribeEvent.data?.result
-      if (text && sliceIndex === currentSliceIndex - 1 && this.inSpeechCuts.has(sliceIndex)) {
-        // The slice right before was cut inside speech: its text ends mid-sentence
-        // where this audio goes on, and Whisper tends to skip what it believes
-        // the prompt already covers
-        if (this.promptAcrossSplit === 'drop') text = ''
-        else if (this.promptAcrossSplit === 'sentence') text = untilLastSentenceEnd(text)
-      }
+      const text = result.transcribeEvent.data?.result
       // A repetition loop in the prompt makes Whisper repeat it in every later slice
       if (sliceIndex < currentSliceIndex && text && !isRepetitive(text)) {
         previous.push([sliceIndex, text])
