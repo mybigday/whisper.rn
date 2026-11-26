@@ -168,7 +168,7 @@ async function main() {
   }
   if (arg('log')) options.logger = (m) => console.error(m)
   // Offline split rule (cut right at the limit) for comparison
-  if (arg('hardcut')) options.segmenter = new StreamingVadSegmenter({}, 512, 16000, { splitAtDip: false })
+  if (arg('hardcut')) options.probabilitySegmenter = new StreamingVadSegmenter({}, 512, 16000, { splitAtDip: false })
   const finals: RealtimeTranscribeEvent[] = []
   const { stream, play } = replayStream(samples)
   const transcriber = new RealtimeTranscriber(
@@ -197,7 +197,7 @@ async function main() {
     dtw: server.dtw,
     requests,
     computePerAudio: computeMs / 1000 / (samples.length / 16000),
-    options: { ...options, segmenter: options.segmenter ? 'hardcut' : undefined },
+    options: { ...options, segmenter: options.probabilitySegmenter ? "hardcut" : undefined },
   }
   if (ref) Object.assign(report, { errorRate: errorRate(ref, hyp).rate, refUnits: errorRate(ref, hyp).refUnits })
   if (arg('print') === 'finals') finals.forEach((e) => console.log(`[${(e.startSample! / 16000).toFixed(2)}-${(e.endSample! / 16000).toFixed(2)} ${e.endReason}] ${e.data?.result}`))

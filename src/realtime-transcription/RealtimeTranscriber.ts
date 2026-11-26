@@ -33,6 +33,7 @@ import type {
   WhisperContextLike,
   ParakeetContextLike,
   RealtimeSliceEndReason,
+  RealtimeSegmenterLike,
   VadSpeechChunkInfo,
   VadSpeechEndInfo,
 } from './types'
@@ -101,10 +102,12 @@ const isStreamVadContext = (value: unknown): value is StreamVadContextLike =>
 /**
  * RealtimeTranscriber transcribes a live audio stream in slices.
  *
- * - The audio goes through a speech probability source (a `WhisperVadContext`
- *   stream, or "always speech" without one) and a segmenter: each speech
- *   segment becomes a slice. Segments longer than `maxSpeechDurationS` are
- *   split, at an earlier pause when there is one.
+ * - The audio goes through a segmenter: each speech segment becomes a slice.
+ *   Given a speech probability source (a `WhisperVadContext`, or "always
+ *   speech" without a VAD) the transcriber segments the probabilities itself
+ *   (`StreamVad`): segments longer than `maxSpeechDurationS` are split, at an
+ *   earlier pause when there is one. A segmenter VAD (`RealtimeSegmenterLike`)
+ *   is used as it is.
  * - While a slice grows it gets draft transcriptions (`isFinal: false`); when
  *   it ends, one final transcription (`isFinal: true`, with `endReason`).
  * - Finals run before drafts, and a running draft is aborted for a final.
@@ -116,8 +119,14 @@ export class RealtimeTranscriber {
     | { type: 'whisper'; context: WhisperContextLike }
     | { type: 'parakeet'; context: ParakeetContextLike }
 
-  /** Probabilities -> speech segments with their audio */
-  private segmentation: StreamVad
+  /** Audio -> speech segments with their audio */
+  private segmentation: RealtimeSegmenterLike
+
+  /** Bound on the length of a slice, in samples */
+  private readonly maxSliceSamples: number
+
+  /** Samples pushed to the segmenter (estimates positions a segmenter does not report) */
+  private pushedSamples = 0
 
   private audioStream: AudioStreamInterface
 
@@ -230,14 +239,6 @@ export class RealtimeTranscriber {
       )
     }
     const { vadContext } = dependencies
-    if (vadContext !== undefined && !isStreamVadContext(vadContext)) {
-      throw new Error(
-        'RealtimeTranscriber vadContext must be a WhisperVadContext (initWhisperVad) or provide ' +
-          'hopSamples, sampleRate and createStream(). Event-based VADs (StreamVad, RingBufferVad) ' +
-          'are no longer accepted: the transcriber segments the probabilities itself ' +
-          '(RealtimeOptions.vadOptions / vadPreset / segmenter).',
-      )
-    }
     this.audioStream = dependencies.audioStream
     this.fs = dependencies.fs
     this.callbacks = callbacks
@@ -281,14 +282,24 @@ export class RealtimeTranscriber {
           options.vadOptions?.maxSpeechDurationS ?? presetOptions.maxSpeechDurationS,
       }
     vadOptions.maxSpeechDurationS = this.boundedMaxSpeech(vadOptions.maxSpeechDurationS)
-    this.segmentation = new StreamVad(
-      vadContext ?? new ContinuousSpeechSource(this.sampleRate),
-      {
-        vadOptions,
-        segmenter: options.segmenter,
-        logger: (message) => this.log(message),
-      },
-    )
+    this.maxSliceSamples = vadOptions.maxSpeechDurationS * this.sampleRate
+    if (vadContext && !isStreamVadContext(vadContext)) {
+      this.segmentation = vadContext
+      this.log(
+        'Using the VAD as a segmenter. Pass the probability source instead (e.g. the ' +
+          'WhisperVadContext itself) to let the transcriber segment: stateful streaming and long ' +
+          'speech split back at earlier pauses.',
+      )
+    } else {
+      this.segmentation = new StreamVad(
+        vadContext ?? new ContinuousSpeechSource(this.sampleRate),
+        {
+          vadOptions,
+          segmenter: options.probabilitySegmenter,
+          logger: (message) => this.log(message),
+        },
+      )
+    }
     this.segmentation.onSpeechStart(this.handleSpeechDetected.bind(this))
     this.segmentation.onSpeechContinue(this.handleSpeechContinue.bind(this))
     this.segmentation.onSpeechEnd(this.handleSpeechEnded.bind(this))
@@ -457,6 +468,7 @@ export class RealtimeTranscriber {
       if (!shouldContinue) return
     }
 
+    this.pushedSamples += data.length / 2
     this.segmentation.processAudio(data)
   }
 
@@ -465,7 +477,7 @@ export class RealtimeTranscriber {
   private handleSpeechDetected(
     confidence: number,
     data: Uint8Array,
-    info: VadSpeechChunkInfo,
+    info?: VadSpeechChunkInfo,
   ): void {
     if (!this.isActive || this.isSpeechActive) return
     this.isSpeechActive = true
@@ -473,8 +485,10 @@ export class RealtimeTranscriber {
     this.lastSpeechDetectedTime = Date.now()
     this.emitVadEvent('speech_start', confidence)
 
-    // The previous segment's slice was finalized, so this audio starts a slice
-    const start = Math.max(info.startSample, this.committedUntil)
+    // The previous segment's slice was finalized, so this audio starts a slice.
+    // A segmenter without positions: assume its audio ends at what was pushed.
+    const reported = info ? info.startSample : this.pushedSamples - data.length / 2
+    const start = Math.max(reported, this.committedUntil)
     const carry = this.overlapCarry
     this.overlapCarry = null
     if (carry && carry.cut === start) {
@@ -486,24 +500,40 @@ export class RealtimeTranscriber {
       this.sliceStartSample = start
       this.sliceKeepFrom = undefined
     }
-    this.appendAudio(data, info.startSample)
+    this.appendAudio(data, info ? info.startSample : start)
     this.triggerDraft()
   }
 
   private handleSpeechContinue(
     confidence: number,
     data: Uint8Array,
-    info: VadSpeechChunkInfo,
+    info?: VadSpeechChunkInfo,
   ): void {
     if (!this.isActive || !this.isSpeechActive) return
     this.emitVadEvent('speech_continue', confidence)
-    this.appendAudio(data, info.startSample)
+    if (info) {
+      this.appendAudio(data, info.startSample)
+    } else {
+      this.sliceManager.addAudioData(data)
+      // A segmenter that does not bound its segments: cut here, at the limit
+      if (this.currentSliceAudio().length / 2 >= this.maxSliceSamples) {
+        this.log('Slice reached maxSpeechDurationS, finalizing it')
+        // The speech goes on in the next slice
+        this.finishSlice('max_duration')
+      }
+    }
     this.triggerDraft()
   }
 
-  private handleSpeechEnded(confidence: number, info: VadSpeechEndInfo): void {
+  private handleSpeechEnded(confidence: number, info?: VadSpeechEndInfo): void {
     if (!this.isActive || !this.isSpeechActive) return
     this.isSpeechActive = false
+    if (!info) {
+      // No position: the slice ends with the audio received
+      this.emitVadEvent('speech_end', confidence)
+      this.finishSlice(undefined)
+      return
+    }
 
     // A split may end the segment before audio already received (that audio
     // comes again with the next segment). For an in-speech split with overlap,
@@ -1109,7 +1139,7 @@ export class RealtimeTranscriber {
 
     await this.audioStream.release()
     await this.wavFileWriter?.finalize()
-    await this.segmentation.release()
+    await this.segmentation.release?.()
   }
 
   /**

@@ -139,17 +139,15 @@ describe('RealtimeTranscriber', () => {
       )
     })
 
-    it('rejects an event-based VAD and explains why', () => {
-      const { context } = createWhisper()
-      const eventVad = new StreamVad(createFakeVad())
-      expect(
-        () =>
-          new RealtimeTranscriber({
-            whisperContext: context,
-            vadContext: eventVad as any,
-            audioStream: createStream(),
-          }),
-      ).toThrow(/no longer accepted/)
+    it('takes a segmenter VAD as it is and recommends the probability source', () => {
+      const logger = jest.fn()
+      const segmenter = new StreamVad(createFakeVad())
+      const t = new RealtimeTranscriber(
+        { whisperContext: createWhisper().context, vadContext: segmenter, audioStream: createStream() },
+        { logger },
+      )
+      expect(t.getStatistics().vadEnabled).toBe(true)
+      expect(logger).toHaveBeenCalledWith(expect.stringContaining('Pass the probability source instead'))
     })
 
     it('reports whether a VAD is used', () => {
@@ -273,6 +271,67 @@ describe('RealtimeTranscriber', () => {
       })
       expect(finalAudio).toEqual(expected)
       expect(finals.map((e) => e.endReason)).toContain('max_duration')
+      await t.release()
+    })
+  })
+
+  describe('with a segmenter VAD', () => {
+    // A segmenter the test drives; `positions` adds the optional sample positions
+    const createManualSegmenter = () => {
+      const handlers: any = {}
+      const segmenter = {
+        processAudio: jest.fn(),
+        onSpeechStart: (cb: any) => { handlers.start = cb },
+        onSpeechContinue: (cb: any) => { handlers.continue = cb },
+        onSpeechEnd: (cb: any) => { handlers.end = cb },
+        onError: jest.fn(),
+        updateOptions: jest.fn(),
+        flush: jest.fn(async () => undefined),
+        reset: jest.fn(async () => undefined),
+        release: jest.fn(async () => undefined),
+      }
+      return { segmenter, handlers }
+    }
+
+    it('cuts at the reported end when the segmenter gives positions', async () => {
+      const { segmenter, handlers } = createManualSegmenter()
+      const onTranscribe = jest.fn()
+      const t = new RealtimeTranscriber(
+        { whisperContext: createWhisper().context, vadContext: segmenter, audioStream: createStream() },
+        { realtimeProcessingPauseMs: 1e9 },
+        { onTranscribe },
+      )
+      await t.start()
+      handlers.start(0.9, bytesOf(makeAudio([[1000, true]])), { startSample: 0 })
+      handlers.end(0.9, { endSample: 8000, reason: 'max_duration' })
+      // The next segment re-sends from 7000: only what was not final yet is kept
+      handlers.start(0.9, bytesOf(makeAudio([[500, true]])), { startSample: 7000 })
+      handlers.end(0.9, { endSample: 15000, reason: 'pause' })
+      await settle()
+      expect(finalsOf(onTranscribe).map((e) => [e.endReason, e.startSample, e.endSample])).toEqual([
+        ['max_duration', 0, 8000],
+        ['pause', 8000, 15000],
+      ])
+      await t.release()
+      expect(segmenter.release).toHaveBeenCalled()
+    })
+
+    it('follows a segmenter without positions, bounding slices by maxSpeechDurationS', async () => {
+      const { segmenter, handlers } = createManualSegmenter()
+      const onTranscribe = jest.fn()
+      const t = new RealtimeTranscriber(
+        { whisperContext: createWhisper().context, vadContext: segmenter, audioStream: createStream() },
+        { vadOptions: { maxSpeechDurationS: 1 }, realtimeProcessingPauseMs: 1e9 },
+        { onTranscribe },
+      )
+      await t.start()
+      handlers.start(0.9, bytesOf(makeAudio([[500, true]])))
+      for (let i = 0; i < 5; i += 1) handlers.continue(0.9, bytesOf(makeAudio([[250, true]])))
+      handlers.end(0.9)
+      await settle()
+      const finals = finalsOf(onTranscribe)
+      expect(finals.map((e) => e.endReason)).toEqual(['max_duration', undefined])
+      expect(finals.map((e) => e.endSample! - e.startSample!)).toEqual([SR, 0.75 * SR])
       await t.release()
     })
   })

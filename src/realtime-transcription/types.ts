@@ -5,7 +5,7 @@ import type {
   VadOptions,
 } from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
-import type { VadSegmentEndReason, SpeechSegmenter } from './StreamingVadSegmenter'
+import type { VadSegmentEndReason, ProbabilitySegmenter } from './StreamingVadSegmenter'
 import type { StreamVadContextLike } from './StreamVad'
 import type { LanguageLockOptions } from './LanguageLock'
 
@@ -220,8 +220,11 @@ export interface RealtimeOptions {
   vadOptions?: VadOptions
   /** Preset for `vadOptions` (Default: 'default') */
   vadPreset?: keyof typeof VAD_PRESETS
-  /** Custom segmentation of the VAD probabilities (Default: `StreamingVadSegmenter`) */
-  segmenter?: SpeechSegmenter
+  /**
+   * Custom segmentation of the probabilities of a probability-source
+   * `vadContext` (Default: `StreamingVadSegmenter`)
+   */
+  probabilitySegmenter?: ProbabilitySegmenter
   /** Maximum number of raw audio slices kept in memory. Default: 3. */
   maxSlicesInMemory?: number
   /**
@@ -376,7 +379,14 @@ export type WhisperVadContextLike = {
   ) => Promise<Array<{ t0: number; t1: number }>>
 }
 
-export interface RealtimeVadContextLike {
+/**
+ * A segmenter: turns pushed audio into speech segments, reported as start /
+ * continue / end events with the segment's audio. `StreamVad` and
+ * `RingBufferVad` implement it; other VADs can too. The optional `info`
+ * arguments (sample positions, end reason) let `RealtimeTranscriber` cut slices
+ * exactly and report why they ended.
+ */
+export interface RealtimeSegmenterLike {
   // Push audio data to the VAD context
   processAudio(data: Uint8Array): void
   // Callback for when speech is detected. `info` (optional for implementers) locates the audio.
@@ -401,19 +411,29 @@ export interface RealtimeVadContextLike {
   release?(): Promise<void>
 }
 
+/** @deprecated Renamed to `RealtimeSegmenterLike` */
+export type RealtimeVadContextLike = RealtimeSegmenterLike
+
 /**
  * Dependencies for realtime transcription. Provide exactly one transcription
  * context: `whisperContext` or `parakeetContext`.
  */
 export type RealtimeTranscriberDependencies = {
   /**
-   * Speech probability source: a `WhisperVadContext` (`initWhisperVad`) or any
-   * object with `hopSamples`, `sampleRate` and `createStream()` returning
-   * per-hop probabilities. The transcriber segments them itself (see
-   * `RealtimeOptions.vadOptions` / `segmenter`). Without it, audio is sliced
-   * by duration only.
+   * The VAD, either of:
+   * - a speech probability source (recommended): a `WhisperVadContext`
+   *   (`initWhisperVad`) or any object with `hopSamples`, `sampleRate` and
+   *   `createStream()` returning per-hop probabilities. The transcriber
+   *   segments them (`RealtimeOptions.vadOptions` / `probabilitySegmenter`),
+   *   splitting long speech back at earlier pauses;
+   * - a segmenter (`RealtimeSegmenterLike`, e.g. `StreamVad` or the deprecated
+   *   `RingBufferVad`) that reports speech segments itself. With sample
+   *   positions in its callbacks the transcriber cuts slices exactly where its
+   *   segments end; without them slices follow its events as they come.
+   *
+   * Without it, audio is sliced by duration only.
    */
-  vadContext?: StreamVadContextLike
+  vadContext?: StreamVadContextLike | RealtimeSegmenterLike
   audioStream: AudioStreamInterface
   fs?: WavFileWriterFs
 } &

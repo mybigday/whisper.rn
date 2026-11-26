@@ -1,8 +1,8 @@
 import type { VadOptions } from '../index'
-import type { RealtimeVadContextLike, VadSpeechChunkInfo, VadSpeechEndInfo } from './types'
+import type { RealtimeSegmenterLike, VadSpeechChunkInfo, VadSpeechEndInfo } from './types'
 import { VAD_PRESETS } from './types'
 import { StreamingVadSegmenter } from './StreamingVadSegmenter'
-import type { SpeechSegmenter } from './StreamingVadSegmenter'
+import type { ProbabilitySegmenter } from './StreamingVadSegmenter'
 
 /** The part of `WhisperVadStream` StreamVad uses */
 export type VadStreamLike = {
@@ -26,7 +26,7 @@ export type StreamVadOptions = {
    * Segmentation of the probabilities (Default: a `StreamingVadSegmenter` with
    * `vadOptions`). A custom one gets `vadOptions` through `setOptions`.
    */
-  segmenter?: SpeechSegmenter
+  segmenter?: ProbabilitySegmenter
   logger?: (message: string) => void
 }
 
@@ -135,10 +135,10 @@ class PcmQueue {
  * padded start, repeating that audio.
  * Input: 16 kHz mono PCM16.
  */
-export class StreamVad implements RealtimeVadContextLike {
+export class StreamVad implements RealtimeSegmenterLike {
   private readonly vadContext: StreamVadContextLike
 
-  private readonly segmenter: SpeechSegmenter
+  private readonly segmenter: ProbabilitySegmenter
 
   private readonly audio = new PcmQueue()
 

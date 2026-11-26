@@ -16,7 +16,7 @@ export type {
   VadSegmenterEvent,
   VadSegmentEndReason,
   StreamingVadSegmenterOptions,
-  SpeechSegmenter,
+  ProbabilitySegmenter,
 } from './StreamingVadSegmenter'
 
 // Probability source without a VAD, and the language lock (used by RealtimeTranscriber)
@@ -38,6 +38,7 @@ export type {
   RealtimeTranscribeEvent,
   RealtimeStatsEvent,
   RealtimeSliceEndReason,
+  RealtimeSegmenterLike,
   RealtimeVadContextLike,
   VadSpeechChunkInfo,
   VadSpeechEndInfo,

@@ -78,8 +78,8 @@ whisper.rn has a 4-layer architecture:
    - `index.ts`: Main API exports, `WhisperContext`, `ParakeetContext`, and `WhisperVadContext` classes
    - `NativeRNWhisper.ts`: TurboModule spec (New Architecture compatible)
    - `realtime-transcription/`: Enhanced realtime transcription framework
-     - `RealtimeTranscriber.ts`: Main transcriber; takes a speech probability source (`WhisperVadContext` or any `createStream()` source) and segments it itself
-     - `StreamingVadSegmenter.ts` (probabilities -> segments, injectable as `SpeechSegmenter`) + `StreamVad.ts` (stream + segmenter -> speech events with audio and sample positions; used inside the transcriber). `RingBufferVad` is the deprecated windowed VAD
+     - `RealtimeTranscriber.ts`: Main transcriber; `vadContext` is a speech probability source (`WhisperVadContext` or any `createStream()` source, recommended: segmented by the transcriber via `StreamVad`) or a segmenter (`RealtimeSegmenterLike`, e.g. `StreamVad` / `RingBufferVad`, used as is; positions in its callbacks are optional)
+     - `StreamingVadSegmenter.ts` (probabilities -> segments, injectable as `ProbabilitySegmenter`) + `StreamVad.ts` (stream + segmenter -> speech events with audio and sample positions; used inside the transcriber). `RingBufferVad` is the deprecated windowed VAD
      - `ContinuousSpeechSource.ts` ("always speech" source without a VAD), `LanguageLock.ts`, `overlapAlignment.ts` (word assignment around in-speech splits)
      - `SliceManager.ts`: Audio slice memory management (growing slices, one per segment)
      - `adapters/`: Audio stream adapters (e.g., AudioPcmStreamAdapter)

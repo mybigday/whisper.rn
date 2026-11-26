@@ -282,7 +282,9 @@ await transcriber.start()
 await transcriber.stop()
 ```
 
-- **The VAD:** `vadContext` is a speech probability source, either a `WhisperVadContext` or your own object with `hopSamples`, `sampleRate` and `createStream()`, whose streams `push` audio and return one probability per hop. The transcriber segments the probabilities with `StreamingVadSegmenter`, configured by `vadPreset` / `vadOptions`; pass `segmenter` to replace it. Event-based VADs (`StreamVad`, `RingBufferVad`) are no longer accepted.
+- **The VAD:** `vadContext` takes either of two kinds of VAD.
+  - **A speech probability source (recommended):** a `WhisperVadContext`, or your own object with `hopSamples`, `sampleRate` and `createStream()`, whose streams `push` audio and return one probability per hop. The transcriber segments the probabilities with `StreamingVadSegmenter`, configured by `vadPreset` / `vadOptions`; pass `probabilitySegmenter` to replace it. This is what enables stateful streaming and splitting long speech back at an earlier pause.
+  - **A segmenter (`RealtimeSegmenterLike`):** for example `StreamVad`, the deprecated `RingBufferVad`, or your own VAD that reports speech start / continue / end with the audio. It is used as it is. When its callbacks include sample positions (`VadSpeechChunkInfo` / `VadSpeechEndInfo`), slices are cut exactly at its segment ends; otherwise they follow its events, bounded by `maxSpeechDurationS`.
 - **Without a VAD:** audio is cut into slices of at most `vadOptions.maxSpeechDurationS` (default 30 s), at the quietest point near the limit.
 - **Drafts:** they run every `realtimeProcessingPauseMs` of audio (default 200), after `initRealtimeAfterMs` (default 200), and can be made cheaper with `draftTranscribeOptions`. For example, `{ audioCtx: 'auto', maxTokens: 64, singleSegment: true, temperatureInc: 0 }`. A final always runs before a waiting draft and aborts a running one. `onBeginTranscribe` gets `isFinal`, so it can skip drafts under load.
 - **Slice length:** `audioSliceSec` and `audioMinSec` are gone. `maxSpeechDurationS` bounds every slice, and so every draft's cost. It must be finite: an unbounded value falls back to 30 s.

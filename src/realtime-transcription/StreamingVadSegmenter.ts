@@ -42,7 +42,7 @@ export type VadSegmenterEvent =
  * Turns per-hop speech probabilities into segment events. `StreamVad` (and so
  * `RealtimeTranscriber`) runs one; `StreamingVadSegmenter` is the default.
  */
-export interface SpeechSegmenter {
+export interface ProbabilitySegmenter {
   push(probs: ArrayLike<number>): VadSegmenterEvent[]
   /** End of audio after `totalSamples` samples, with the last probabilities */
   flush(totalSamples: number, probs?: ArrayLike<number>): VadSegmenterEvent[]
@@ -108,7 +108,7 @@ const DIP_PROB_TIE = 0.05
  *
  * With `splitAtDip: false` the segments equal the offline result.
  */
-export class StreamingVadSegmenter implements SpeechSegmenter {
+export class StreamingVadSegmenter implements ProbabilitySegmenter {
   private readonly hopSamples: number
 
   private readonly sampleRate: number
