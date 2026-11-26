@@ -2,6 +2,7 @@ import type { VadOptions } from '../index'
 import type { RealtimeVadContextLike, VadSpeechChunkInfo, VadSpeechEndInfo } from './types'
 import { VAD_PRESETS } from './types'
 import { StreamingVadSegmenter } from './StreamingVadSegmenter'
+import type { SpeechSegmenter } from './StreamingVadSegmenter'
 
 /** The part of `WhisperVadStream` StreamVad uses */
 export type VadStreamLike = {
@@ -21,6 +22,11 @@ export type StreamVadContextLike = {
 export type StreamVadOptions = {
   vadOptions?: VadOptions
   vadPreset?: keyof typeof VAD_PRESETS
+  /**
+   * Segmentation of the probabilities (Default: a `StreamingVadSegmenter` with
+   * `vadOptions`). A custom one gets `vadOptions` through `setOptions`.
+   */
+  segmenter?: SpeechSegmenter
   logger?: (message: string) => void
 }
 
@@ -132,7 +138,7 @@ class PcmQueue {
 export class StreamVad implements RealtimeVadContextLike {
   private readonly vadContext: StreamVadContextLike
 
-  private readonly segmenter: StreamingVadSegmenter
+  private readonly segmenter: SpeechSegmenter
 
   private readonly audio = new PcmQueue()
 
@@ -174,12 +180,24 @@ export class StreamVad implements RealtimeVadContextLike {
     this.logger = options.logger || (() => {})
     const preset = options.vadPreset ? VAD_PRESETS[options.vadPreset] : VAD_PRESETS.default
     this.vadOptions = { ...preset, ...options.vadOptions }
-    this.segmenter = new StreamingVadSegmenter(
-      this.vadOptions,
-      vadContext.hopSamples,
-      vadContext.sampleRate,
-      { frameEnergy: (from, to) => this.audio.energy(from, to) },
-    )
+    const frameEnergy = (from: number, to: number) => this.audio.energy(from, to)
+    if (options.segmenter) {
+      this.segmenter = options.segmenter
+      this.segmenter.setOptions(this.vadOptions)
+      this.segmenter.setFrameEnergy?.(frameEnergy)
+    } else {
+      this.segmenter = new StreamingVadSegmenter(
+        this.vadOptions,
+        vadContext.hopSamples,
+        vadContext.sampleRate,
+        { frameEnergy },
+      )
+    }
+  }
+
+  /** Current VAD options (preset merged with overrides) */
+  get options(): VadOptions {
+    return this.vadOptions
   }
 
   onSpeechStart(
@@ -315,7 +333,11 @@ export class StreamVad implements RealtimeVadContextLike {
         this.startPending = false
         const endSample = Math.min(event.sample, this.audio.end)
         this.log(`speech end at ${endSample} (${event.reason})`)
-        this.speechEndCallback?.(1 - event.prob, { endSample, reason: event.reason })
+        this.speechEndCallback?.(1 - event.prob, {
+          endSample,
+          reason: event.reason,
+          ...(event.inSpeech ? { inSpeech: true } : {}),
+        })
       }
     })
   }

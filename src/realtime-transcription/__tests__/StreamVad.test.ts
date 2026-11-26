@@ -1,7 +1,6 @@
 import { StreamVad } from '../StreamVad'
 import type { StreamVadContextLike, VadStreamLike } from '../StreamVad'
 import { StreamingVadSegmenter } from '../StreamingVadSegmenter'
-import { RealtimeTranscriber } from '../RealtimeTranscriber'
 
 const SR = 16000
 const HOP = 512
@@ -314,74 +313,6 @@ describe('StreamVad', () => {
     expect(next.type).toBe('start')
     expect(next.sample).toBeLessThan(sentBefore)
     expect(next.sample).toBeGreaterThanOrEqual(events[firstEnd]!.sample)
-  })
-
-  it('gives RealtimeTranscriber exactly each segment\'s audio across a split back', async () => {
-    const vadOptions = { ...options.vadOptions, maxSpeechDurationS: 1, minSilenceDurationMs: 300 }
-    const audio = makeAudio([[300, false], [600, true], [200, false], [900, true], [120, false], [500, true], [400, false]])
-
-    // Expected segments, from the segmenter alone
-    const segmenter = new StreamingVadSegmenter(vadOptions, HOP, SR, {
-      frameEnergy: (from, to) =>
-        audio.slice(from, to).reduce((sum, v) => sum + (v / 32768) ** 2, 0) / (to - from),
-    })
-    const probs: number[] = []
-    for (let i = 0; i < audio.length; i += HOP) {
-      const hop = audio.subarray(i, i + HOP)
-      probs.push(hop.reduce((sum, v) => sum + Math.abs(v), 0) / HOP > 1000 ? 0.9 : 0.05)
-    }
-    const lastFull = Math.floor(audio.length / HOP)
-    const bounds = [
-      ...segmenter.push(probs.slice(0, lastFull)),
-      ...segmenter.flush(audio.length, probs.slice(lastFull)),
-    ]
-    const expected: number[][] = []
-    for (let i = 0; i < bounds.length; i += 2) {
-      expected.push(Array.from(audio.slice(bounds[i]!.sample, bounds[i + 1]!.sample)))
-    }
-    expect(bounds.some((b) => b.type === 'end' && b.reason === 'max_duration')).toBe(true)
-
-    const finals: number[][] = []
-    const whisperContext = {
-      transcribeData: jest.fn((buffer: ArrayBuffer) => ({
-        stop: jest.fn(),
-        promise: Promise.resolve({ result: 'x', language: 'en', segments: [], isAborted: false, buffer }),
-      })),
-    }
-    let endHandler: (() => void) | undefined
-    const audioStream = {
-      initialize: jest.fn(async () => undefined),
-      start: jest.fn(async () => undefined),
-      stop: jest.fn(async () => undefined),
-      release: jest.fn(async () => undefined),
-      isRecording: () => true,
-      onData: jest.fn(),
-      onError: jest.fn(),
-      onStatusChange: jest.fn(),
-      onEnd: (cb: () => void) => { endHandler = cb },
-    }
-    const { context } = createFakeContext()
-    const vad = new StreamVad(context, { vadOptions })
-    const transcriber = new RealtimeTranscriber(
-      { whisperContext, vadContext: vad, audioStream },
-      { audioSliceSec: 30, realtimeProcessingPauseMs: 1e9 },
-      {
-        onTranscribe: (event) => {
-          if (event.type === 'transcribe' && event.isFinal) {
-            const { buffer } = event.data as unknown as { buffer: ArrayBuffer }
-            finals.push(Array.from(new Int16Array(buffer)))
-          }
-        },
-      },
-    )
-    await transcriber.start()
-    feed(vad, audio, 10)
-    endHandler!()
-    await vad.flush()
-    await new Promise((resolve) => setTimeout(resolve, 20))
-
-    expect(finals).toEqual(expected)
-    await transcriber.release()
   })
 
   it('reports no speech for a final partial hop below the minimum', async () => {

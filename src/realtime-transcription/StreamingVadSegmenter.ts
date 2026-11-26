@@ -31,14 +31,39 @@ export type VadSegmenterEvent =
       /** Probability of the frame that decided the end */
       prob: number
       reason: VadSegmentEndReason
+      /**
+       * The split fell inside speech (no pause to cut at): the next segment
+       * starts right here, and a word may straddle the cut.
+       */
+      inSpeech?: boolean
     }
+
+/**
+ * Turns per-hop speech probabilities into segment events. `StreamVad` (and so
+ * `RealtimeTranscriber`) runs one; `StreamingVadSegmenter` is the default.
+ */
+export interface SpeechSegmenter {
+  push(probs: ArrayLike<number>): VadSegmenterEvent[]
+  /** End of audio after `totalSamples` samples, with the last probabilities */
+  flush(totalSamples: number, probs?: ArrayLike<number>): VadSegmenterEvent[]
+  reset(): void
+  setOptions(options: VadOptions): void
+  /** Audio up to here surely belongs to the open segment (emitted as it comes) */
+  readonly speechCertainUntil: number
+  /** Earliest sample a future or pending segment may still need */
+  readonly retainFrom: number
+  /** Whether an end or next start may still move back into consumed audio */
+  readonly maySplitBack: boolean
+  /** Optional: energy of audio samples, for picking split points */
+  setFrameEnergy?(frameEnergy: ((start: number, end: number) => number) | undefined): void
+}
 
 export type StreamingVadSegmenterOptions = {
   /**
    * Where a segment without any usable pause is split at `maxSpeechDurationS`.
    * - true (default): at the least speech-like frame of the last 3 s (0.5 s
-   *   before the limit at the latest), the quietest one per `frameEnergy` when
-   *   several are about as low. An ongoing pause longer than every earlier one
+   *   before the limit at the latest, and in the second half of the segment),
+   *   the quietest one per `frameEnergy` when several are about as low. An ongoing pause longer than every earlier one
    *   ends the segment where it began.
    * - false: right at the limit, exactly as the offline pass does.
    */
@@ -83,7 +108,7 @@ const DIP_PROB_TIE = 0.05
  *
  * With `splitAtDip: false` the segments equal the offline result.
  */
-export class StreamingVadSegmenter {
+export class StreamingVadSegmenter implements SpeechSegmenter {
   private readonly hopSamples: number
 
   private readonly sampleRate: number
@@ -136,8 +161,12 @@ export class StreamingVadSegmenter {
    * The previous segment ended at `pauseStart`, but its padded end is open:
    * a segment starting within 2 * pad of the pause takes half of the pause.
    */
-  private pendingEnd: { pauseStart: number; prob: number; reason: VadSegmentEndReason } | null =
-    null
+  private pendingEnd: {
+    pauseStart: number
+    prob: number
+    reason: VadSegmentEndReason
+    inSpeech?: boolean
+  } | null = null
 
   /** Total audio length once known (flush), bounds the last partial hop */
   private audioEnd = Infinity
@@ -372,17 +401,26 @@ export class StreamingVadSegmenter {
       return false
     }
 
-    const cut = this.splitAtDip ? this.findDip(s) : -1
+    // No dip window (a short limit) but speech goes on: cut here, seamlessly. The
+    // offline rule below would start the next segment a frame later, dropping
+    // that frame when there is no padding to share.
+    const dip = this.splitAtDip ? this.findDip(s) : -1
+    const cut = dip < 0 && this.splitAtDip && prob >= this.threshold ? s : dip
     if (cut >= 0) {
       // Mid-speech: no pause to pad into, the two segments meet at the cut
-      events.push({ type: 'end', sample: cut, prob, reason: 'max_duration' })
+      events.push({ type: 'end', sample: cut, prob, reason: 'max_duration', inSpeech: true })
       this.prevEnd = cut
       this.restartAt(cut)
       return false
     }
 
     // As offline: end right here; the next segment starts at the next speech frame
-    this.pendingEnd = { pauseStart: s, prob, reason: 'max_duration' }
+    this.pendingEnd = {
+      pauseStart: s,
+      prob,
+      reason: 'max_duration',
+      inSpeech: prob >= this.negThreshold,
+    }
     this.untrigger()
     return true
   }
@@ -408,9 +446,11 @@ export class StreamingVadSegmenter {
   private findDip(s: number): number {
     const hop = this.hopSamples
     const ms = (value: number) => (value * this.sampleRate) / 1000
+    // In the second half of the segment only: a cut near its start would leave
+    // a remainder that is over the limit again right away (and a tiny segment)
     const from = Math.max(
       this.historyBase,
-      Math.ceil(Math.max(this.start, s - ms(DIP_WINDOW_MS)) / hop),
+      Math.ceil(Math.max(this.start + this.maxSpeechSamples / 2, s - ms(DIP_WINDOW_MS)) / hop),
     )
     // Frames that end by the guard, excluding the current one (s)
     const to = Math.min(
@@ -481,7 +521,8 @@ export class StreamingVadSegmenter {
   private emitPendingEnd(sample: number, events: VadSegmenterEvent[]): void {
     if (!this.pendingEnd) return
     const end = Math.min(sample, this.audioEnd)
-    events.push({ type: 'end', sample: end, prob: this.pendingEnd.prob, reason: this.pendingEnd.reason })
+    const { prob, reason, inSpeech } = this.pendingEnd
+    events.push({ type: 'end', sample: end, prob, reason, ...(inSpeech ? { inSpeech } : {}) })
     this.prevEnd = end
     this.pendingEnd = null
   }

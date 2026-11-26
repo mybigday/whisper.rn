@@ -1,0 +1,17 @@
+# Host build of the realtime evaluation server (see README.md): the vendored
+# whisper.cpp and ggml (CPU), plus the JSI layer's audioCtx rule.
+cmake_minimum_required(VERSION 3.14)
+project(realtime_eval C CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(W ${ROOT}/vendor/whisper.cpp)
+set(GGML_NATIVE ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(${W}/ggml ggml)
+add_library(whisper STATIC ${W}/src/whisper.cpp ${W}/src/aneforge/whisper-aneforge.cpp)
+target_include_directories(whisper PUBLIC ${W}/include ${W}/src)
+target_compile_definitions(whisper PRIVATE WHISPER_VERSION="realtime-eval")
+target_link_libraries(whisper PUBLIC ggml)
+add_executable(whisper-server whisper-server.cpp)
+target_include_directories(whisper-server PRIVATE ${ROOT}/cpp/jsi)
+target_link_libraries(whisper-server whisper)

@@ -16,7 +16,13 @@ export type {
   VadSegmenterEvent,
   VadSegmentEndReason,
   StreamingVadSegmenterOptions,
+  SpeechSegmenter,
 } from './StreamingVadSegmenter'
+
+// Probability source without a VAD, and the language lock (used by RealtimeTranscriber)
+export { ContinuousSpeechSource } from './ContinuousSpeechSource'
+export { LanguageLock } from './LanguageLock'
+export type { LanguageLockOptions } from './LanguageLock'
 
 export type { WavFileWriterFs } from '../utils/WavFileWriter'
 

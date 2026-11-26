@@ -5,7 +5,9 @@ import type {
   VadOptions,
 } from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
-import type { VadSegmentEndReason } from './StreamingVadSegmenter'
+import type { VadSegmentEndReason, SpeechSegmenter } from './StreamingVadSegmenter'
+import type { StreamVadContextLike } from './StreamVad'
+import type { LanguageLockOptions } from './LanguageLock'
 
 // === Audio Stream Interfaces ===
 
@@ -174,6 +176,8 @@ export interface VadSpeechEndInfo {
    */
   endSample: number
   reason: VadSegmentEndReason
+  /** A max-duration split inside speech: the next segment starts at `endSample` */
+  inSpeech?: boolean
 }
 
 /** Why a slice was finalized: its VAD segment's end reason, or `manual` (`nextSlice()`) */
@@ -200,12 +204,24 @@ export interface RealtimeTranscribeEvent {
    * a period). Undefined when a custom VAD context does not report it.
    */
   endReason?: RealtimeSliceEndReason
+  /** Position of the slice's audio in the stream, in samples (`endSample` exclusive) */
+  startSample?: number
+  endSample?: number
 }
 
 export interface RealtimeOptions {
-  // Audio settings
-  audioSliceSec?: number // default: 25
-  audioMinSec?: number // default: 1
+  /**
+   * Segmentation options, merged over `vadPreset`. With a `vadContext` they
+   * drive the speech segmentation; without one only `maxSpeechDurationS`
+   * applies (continuous audio is cut into slices of at most that length).
+   * `maxSpeechDurationS` bounds every slice and so the cost of each draft; it
+   * must be finite (Default: the preset's, 30 s for `default`).
+   */
+  vadOptions?: VadOptions
+  /** Preset for `vadOptions` (Default: 'default') */
+  vadPreset?: keyof typeof VAD_PRESETS
+  /** Custom segmentation of the VAD probabilities (Default: `StreamingVadSegmenter`) */
+  segmenter?: SpeechSegmenter
   /** Maximum number of raw audio slices kept in memory. Default: 3. */
   maxSlicesInMemory?: number
   /**
@@ -217,6 +233,34 @@ export interface RealtimeOptions {
 
   /** Options for the selected Whisper or Parakeet context. */
   transcribeOptions?: TranscribeOptions | ParakeetTranscribeOptions
+  /**
+   * Overrides of `transcribeOptions` for drafts (the repeated passes while a
+   * slice grows), e.g. `{ audioCtx: 'auto', maxTokens: 64, singleSegment: true,
+   * temperatureInc: 0 }` to keep them cheap. Default: none.
+   */
+  draftTranscribeOptions?: Partial<TranscribeOptions> | Partial<ParakeetTranscribeOptions>
+
+  /**
+   * Whisper: drop result segments whose average token log probability
+   * (`avgLogprob`) is below this, typically text hallucinated on noise or
+   * silence. Pick it for your model and audio. Default: off.
+   */
+  minAvgLogprob?: number
+  /**
+   * Whisper with language auto-detection: keep the detected language once it
+   * was detected confidently a few times, and pass it explicitly from then on
+   * (see `LanguageLockOptions`). Default: off.
+   */
+  languageLock?: boolean | LanguageLockOptions
+  /**
+   * Whisper: audio, in ms, both slices keep beyond a split that falls inside
+   * speech (a max-duration split without a pause). A word cut by the split is
+   * then whole on one side; each word is kept on the side it starts in, by its
+   * token times (DTW times when the context has `dtwAheadsPreset`, else token
+   * timestamps). Final results of such slices are assembled from their tokens.
+   * Default: 0 (off).
+   */
+  splitOverlapMs?: number
 
   /** Initial Whisper prompt. Ignored when using ParakeetContext. */
   initialPrompt?: string
@@ -239,9 +283,10 @@ export interface RealtimeOptions {
   // Logger settings
   logger?: (message: string) => void // default: noop - custom logger function
 
-  // Realtime transcription settings
-  realtimeProcessingPauseMs?: number // default: 200 - interval between realtime updates
-  initRealtimeAfterMs?: number // default: 200 - wait before first realtime transcription
+  /** Audio time between drafts of a slice, in ms (Default: 200) */
+  realtimeProcessingPauseMs?: number
+  /** Audio a slice needs before its first draft, in ms (Default: 200) */
+  initRealtimeAfterMs?: number
 }
 
 export interface AudioSlice {
@@ -285,6 +330,8 @@ export interface RealtimeTranscriberCallbacks {
     sliceIndex: number
     duration: number
     vadEvent?: RealtimeVadEvent
+    /** A final transcription (else a draft, which can be skipped to save work) */
+    isFinal: boolean
   }) => Promise<boolean>
   onTranscribe?: (event: RealtimeTranscribeEvent) => void
   onBeginVad?: (sliceInfo: {
@@ -359,7 +406,14 @@ export interface RealtimeVadContextLike {
  * context: `whisperContext` or `parakeetContext`.
  */
 export type RealtimeTranscriberDependencies = {
-  vadContext?: RealtimeVadContextLike
+  /**
+   * Speech probability source: a `WhisperVadContext` (`initWhisperVad`) or any
+   * object with `hopSamples`, `sampleRate` and `createStream()` returning
+   * per-hop probabilities. The transcriber segments them itself (see
+   * `RealtimeOptions.vadOptions` / `segmenter`). Without it, audio is sliced
+   * by duration only.
+   */
+  vadContext?: StreamVadContextLike
   audioStream: AudioStreamInterface
   fs?: WavFileWriterFs
 } &

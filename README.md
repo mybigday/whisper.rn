@@ -228,7 +228,7 @@ await stream.reset() // start over with a new audio stream
 await stream.release() // also freed when the context is released
 ```
 
-`StreamingVadSegmenter` (from `whisper.rn/realtime-transcription`) turns these probabilities into speech segments as they arrive. It uses the same options and segmentation as `detectSpeech*`, except that speech longer than `maxSpeechDurationS` with no pause over 98 ms is split at its least speech-like frame rather than right at the limit (`splitAtDip: false` restores the offline rule). `StreamVad` combines the stream and the segmenter for `RealtimeTranscriber` (see below).
+`StreamingVadSegmenter` (from `whisper.rn/realtime-transcription`) turns these probabilities into speech segments as they arrive. It uses the same options and segmentation as `detectSpeech*`, except that speech longer than `maxSpeechDurationS` with no pause over 98 ms is split at its least speech-like frame rather than right at the limit (`splitAtDip: false` restores the offline rule). `StreamVad` combines a stream and a segmenter into speech start / continue / end events with the segment's audio; `RealtimeTranscriber` uses it internally (see below).
 
 #### Release VAD Context
 
@@ -240,38 +240,36 @@ await releaseAllWhisperVad()
 
 ## Realtime Transcription
 
-The new `RealtimeTranscriber` provides enhanced realtime transcription with features like Voice Activity Detection (VAD), auto-slicing, and memory management.
+`RealtimeTranscriber` transcribes a live audio stream. A VAD's speech probabilities are segmented into slices, one per stretch of speech. Each slice gets draft transcriptions while it grows, then one final transcription when it ends.
 
 ```js
 // If your RN packager is not enable package exports support, use whisper.rn/src/realtime-transcription
-import { RealtimeTranscriber, StreamVad } from 'whisper.rn/realtime-transcription'
+import { RealtimeTranscriber } from 'whisper.rn/realtime-transcription'
 import { AudioPcmStreamAdapter } from 'whisper.rn/realtime-transcription/adapters'
 import RNFS from 'react-native-fs' // or any compatible filesystem
 
-// Dependencies
 const whisperContext = await initWhisper({
   /* ... */
 })
-// Stateful VAD on a vad.cpp stream (RingBufferVad, the previous windowed VAD, is deprecated)
-const vadContext = new StreamVad(
-  await initWhisperVad({
-    /* ... */
-  }),
-  { vadPreset: 'default' },
-)
+// The VAD context itself: the transcriber opens a stateful vad.cpp stream on it
+// (one speech probability per 32 ms hop) and segments the probabilities
+const vadContext = await initWhisperVad({
+  /* ... */
+})
 const audioStream = new AudioPcmStreamAdapter() // requires @fugood/react-native-audio-pcm-stream
 
-// Create transcriber
 const transcriber = new RealtimeTranscriber(
   { whisperContext, vadContext, audioStream, fs: RNFS },
   {
-    audioSliceSec: 30,
-    vadPreset: 'default',
-    autoSliceOnSpeechEnd: true,
+    vadPreset: 'default', // segmentation: preset + vadOptions overrides
     transcribeOptions: { language: 'en' },
   },
   {
-    onTranscribe: (event) => console.log('Transcription:', event.data?.result),
+    onTranscribe: (event) => {
+      // event.isFinal: final (else a draft a later event replaces)
+      // event.startSample / endSample: the slice's audio in the stream
+      console.log(event.isFinal ? 'Final:' : 'Draft:', event.data?.result)
+    },
     onVad: (event) => console.log('VAD:', event.type, event.confidence),
     onStatusChange: (isActive) =>
       console.log('Status:', isActive ? 'ACTIVE' : 'INACTIVE'),
@@ -279,10 +277,15 @@ const transcriber = new RealtimeTranscriber(
   },
 )
 
-// Start/stop transcription
 await transcriber.start()
+// stop() transcribes speech still open (endReason 'end_of_stream') before it resolves
 await transcriber.stop()
 ```
+
+- **The VAD:** `vadContext` is a speech probability source, either a `WhisperVadContext` or your own object with `hopSamples`, `sampleRate` and `createStream()`, whose streams `push` audio and return one probability per hop. The transcriber segments the probabilities with `StreamingVadSegmenter`, configured by `vadPreset` / `vadOptions`; pass `segmenter` to replace it. Event-based VADs (`StreamVad`, `RingBufferVad`) are no longer accepted.
+- **Without a VAD:** audio is cut into slices of at most `vadOptions.maxSpeechDurationS` (default 30 s), at the quietest point near the limit.
+- **Drafts:** they run every `realtimeProcessingPauseMs` of audio (default 200), after `initRealtimeAfterMs` (default 200), and can be made cheaper with `draftTranscribeOptions`. For example, `{ audioCtx: 'auto', maxTokens: 64, singleSegment: true, temperatureInc: 0 }`. A final always runs before a waiting draft and aborts a running one. `onBeginTranscribe` gets `isFinal`, so it can skip drafts under load.
+- **Slice length:** `audioSliceSec` and `audioMinSec` are gone. `maxSpeechDurationS` bounds every slice, and so every draft's cost. It must be finite: an unbounded value falls back to 30 s.
 
 To use Parakeet, provide `parakeetContext` instead of `whisperContext`:
 
@@ -315,13 +318,17 @@ const transcriber = new RealtimeTranscriber(
 )
 ```
 
-**Long speech:** with `StreamVad`, speech longer than the VAD's `maxSpeechDurationS` is split the way `detectSpeech*` splits it: at the longest earlier pause over 98 ms, even when that audio was already transcribed as a draft. The slice is cut there, and the rest starts the next slice. If a pause is in progress at the limit and it is longer than every earlier one, the segment ends where that pause began. Otherwise, with no pause at all, the split falls on the least speech-like 32 ms frame of the last 3 s (at least 0.5 s before the limit), the quietest one when several are about as low, aiming for a gap between words. Final `onTranscribe` events have `isFinal: true` and an `endReason`:
+**Long speech:** speech longer than the VAD's `maxSpeechDurationS` is split the way `detectSpeech*` splits it: at the longest earlier pause over 98 ms, even when that audio was already transcribed as a draft. The slice is cut there, and the rest starts the next slice. If a pause is in progress at the limit and it is longer than every earlier one, the segment ends where that pause began. Otherwise, with no pause at all, the split falls on the least speech-like 32 ms frame of the last 3 s (in the second half of the segment, at least 0.5 s before the limit), the quietest one when several are about as low, aiming for a gap between words. Final `onTranscribe` events have `isFinal: true` and an `endReason`:
 - `'pause'`: the speaker paused.
 - `'max_duration'`: the speech went on, so the text probably ends mid-sentence, even if Whisper ended it with a period.
 - `'end_of_stream'`: the audio ended.
 - `'manual'`: `nextSlice()` was called.
 
-Keep `audioSliceSec` at least as long as `maxSpeechDurationS` (plus padding). A slice that fills up first is cut at a chunk boundary, with `endReason: 'max_duration'`.
+**Quality options (Whisper):**
+
+- **`minAvgLogprob`:** drops result segments whose average token log probability is below it, typically text hallucinated on noise. Pick it for your model and audio.
+- **`languageLock`:** with language auto-detection, the language is passed explicitly once it was detected confidently a few times, which also saves the detection pass. Occasional re-checks on long finals let a real language change unlock it (see `LanguageLockOptions`). `transcriber.lockedLanguage` reports it.
+- **`splitOverlapMs`:** for example 400. Around a split inside speech, both slices keep that much extra audio, so a word cut by the split is whole on one side. Each word is kept on the side where it starts, by its token times: DTW times when the context was created with `dtwAheadsPreset`, else token timestamps. Words repeated at the boundary are dropped. Final results of those slices are assembled from their tokens.
 
 **Dependencies:**
 

@@ -197,12 +197,16 @@ describe('StreamingVadSegmenter', () => {
       ])
     })
 
+    // A 3 s limit splits at frame 93; the dip window is frames 47-76 (second
+    // half of the segment, up to 0.5 s before the split)
+    const dipOptions = { ...options, maxSpeechDurationS: 3 }
+
     it('ignores pauses of 98 ms or less', () => {
-      // A 3-hop pause (96 ms): no candidate, so a dip split at the lowest frame instead
-      const probs = [...speech(10), ...quiet(3), ...speech(40), ...quiet(20)]
-      const events = run(probs, options)
+      // A 3-hop pause (96 ms): no candidate, so a dip split at its lowest (latest) frame instead
+      const probs = [...speech(60), ...quiet(3), ...speech(60), ...quiet(20)]
+      const events = run(probs, dipOptions)
       const end = events.find((e) => e.type === 'end')!
-      expect(end).toMatchObject({ sample: 12 * HOP + HOP / 2, reason: 'max_duration' })
+      expect(end).toMatchObject({ sample: 62 * HOP + HOP / 2, reason: 'max_duration' })
     })
 
     it('ends at an ongoing pause longer than every earlier one', () => {
@@ -216,34 +220,43 @@ describe('StreamingVadSegmenter', () => {
       ])
     })
 
-    // With a 1 s limit the window is frames 0-14 (up to 0.5 s before the split at frame 31)
     it('splits continuous speech at the least speech-like frame', () => {
-      const probs = speech(60)
-      probs[8] = 0.6
-      probs[10] = 0.55 // the lowest
-      const events = run(probs, options)
+      const probs = speech(150)
+      probs[58] = 0.6
+      probs[60] = 0.55 // the lowest
+      const events = run(probs, dipOptions)
       expect(events.slice(0, 3)).toEqual([
         { type: 'start', sample: 0, prob: 0.9 },
-        { type: 'end', sample: 10 * HOP + HOP / 2, prob: 0.9, reason: 'max_duration' },
-        { type: 'start', sample: 10 * HOP + HOP / 2, prob: 0.55 },
+        { type: 'end', sample: 60 * HOP + HOP / 2, prob: 0.9, reason: 'max_duration', inSpeech: true },
+        { type: 'start', sample: 60 * HOP + HOP / 2, prob: 0.55 },
       ])
     })
 
     it('picks the quietest of the near-lowest frames', () => {
-      const probs = speech(60)
-      probs[8] = 0.6 // near the lowest, but the quietest
-      probs[10] = 0.58
-      const frameEnergy = (start: number) => (start === 8 * HOP ? 0.001 : 0.1)
-      const events = run(probs, options, { frameEnergy })
-      expect(events[1]).toMatchObject({ type: 'end', sample: 8 * HOP + HOP / 2 })
+      const probs = speech(150)
+      probs[58] = 0.6 // near the lowest, but the quietest
+      probs[60] = 0.58
+      const frameEnergy = (start: number) => (start === 58 * HOP ? 0.001 : 0.1)
+      const events = run(probs, dipOptions, { frameEnergy })
+      expect(events[1]).toMatchObject({ type: 'end', sample: 58 * HOP + HOP / 2 })
     })
 
-    it('never picks a frame within 0.5 s of the limit', () => {
-      const probs = speech(60)
-      probs[29] = 0.1 // lowest, but in the last 0.5 s before the split
-      probs[10] = 0.6
-      const events = run(probs, options)
-      expect(events[1]).toMatchObject({ type: 'end', sample: 10 * HOP + HOP / 2 })
+    it('never picks a frame within 0.5 s of the limit or in the first half', () => {
+      const probs = speech(150)
+      probs[85] = 0.1 // lowest, but in the last 0.5 s before the split
+      probs[20] = 0.1 // lowest, but in the first half
+      probs[60] = 0.6
+      const events = run(probs, dipOptions)
+      expect(events[1]).toMatchObject({ type: 'end', sample: 60 * HOP + HOP / 2 })
+    })
+
+    it('does not split again right after a split', () => {
+      // Energy rising with time makes the earliest window frame the quietest
+      const events = run(speech(400), dipOptions, { frameEnergy: (start) => start })
+      const ends = events.filter((e) => e.type === 'end').map((e) => e.sample)
+      ends.forEach((end, i) => {
+        if (i > 0) expect(end - ends[i - 1]!).toBeGreaterThanOrEqual(1.5 * 16000 - HOP)
+      })
     })
 
     it('cuts at the limit like offline without dip splits', () => {
@@ -253,7 +266,7 @@ describe('StreamingVadSegmenter', () => {
       // Splits at frame 31 (the first one past 31.25 - 1 hops); the next segment starts at frame 32
       expect(events.slice(0, 3)).toEqual([
         { type: 'start', sample: 0, prob: 0.9 },
-        { type: 'end', sample: 31 * HOP, prob: 0.9, reason: 'max_duration' },
+        { type: 'end', sample: 31 * HOP, prob: 0.9, reason: 'max_duration', inSpeech: true },
         { type: 'start', sample: 32 * HOP, prob: 0.9 },
       ])
     })

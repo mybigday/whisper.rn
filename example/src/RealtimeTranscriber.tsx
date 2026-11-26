@@ -19,7 +19,6 @@ import contextOpts from './context-opts'
 import { createDir, fileDir, toTimestamp, downloadModel, whisperModels, WhisperModel } from './util'
 import {
   RealtimeTranscriber,
-  StreamVad,
   VAD_PRESETS,
   type RealtimeTranscribeEvent,
   type RealtimeVadEvent,
@@ -387,26 +386,20 @@ export default function RealtimeTranscriberDemo() {
         realtimeTranscriberRef.current.release()
       }
 
-      // Stateful VAD: one native stream, one speech probability per 32 ms hop
-      const vadContext = new StreamVad(vadContextRef.current, {
-        vadPreset: currentVadPreset,
-        logger: (message) => log(message),
-      })
-
       // Create RealtimeTranscriber if not exists
       const transcriber = new RealtimeTranscriber(
         // Dependencies
         {
           whisperContext: whisperContextRef.current,
-          vadContext,
+          // Stateful VAD: one native stream, one speech probability per 32 ms hop
+          vadContext: vadContextRef.current,
           audioStream,
           fs: RNFS,
         },
         // Options
         {
           logger: (message) => log(message),
-          audioSliceSec: 30,
-          audioMinSec: 0.5,
+          vadPreset: currentVadPreset,
           maxSlicesInMemory: 1,
           transcribeOptions: {
             language: 'en',
