@@ -520,6 +520,74 @@ describe('RealtimeTranscriber', () => {
       await promptTranscriber.release()
     })
 
+    it('should pass audioCtx through to Whisper', async () => {
+      const testAudioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      testAudioStream['startStreaming'] = jest.fn()
+
+      const whisperTranscriber = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, audioStream: testAudioStream },
+        { transcribeOptions: { maxThreads: 2, audioCtx: 'auto' } },
+      )
+
+      await whisperTranscriber.start()
+
+      try {
+        testAudioStream.simulateDataChunk(createAudioData(16000))
+        await new Promise(resolve => setTimeout(resolve, 50))
+
+        expect(mockWhisperContext.transcribeData).toHaveBeenCalledWith(
+          expect.any(ArrayBuffer),
+          expect.objectContaining({ maxThreads: 2, audioCtx: 'auto' }),
+        )
+      } finally {
+        await whisperTranscriber.release()
+      }
+    })
+
+    it('should not pass Whisper-only audioCtx auto to Parakeet', async () => {
+      const testAudioStream = new JestAudioStreamAdapter({
+        chunkSize: 3200,
+        chunkInterval: 100,
+        generateSilence: false,
+      })
+      testAudioStream['startStreaming'] = jest.fn()
+
+      const mockParakeetContext = {
+        transcribeData: jest.fn(
+          (_data: ArrayBuffer, _options: ParakeetTranscribeOptions) => ({
+            stop: jest.fn().mockResolvedValue(undefined),
+            promise: Promise.resolve({
+              isAborted: false,
+              language: '',
+              result: 'Parakeet transcription',
+              segments: [],
+            }),
+          }),
+        ),
+      }
+      const parakeetTranscriber = new RealtimeTranscriber(
+        { parakeetContext: mockParakeetContext, audioStream: testAudioStream },
+        { transcribeOptions: { maxThreads: 2, audioCtx: 'auto' } },
+      )
+
+      await parakeetTranscriber.start()
+
+      try {
+        testAudioStream.simulateDataChunk(createAudioData(16000))
+        await new Promise(resolve => setTimeout(resolve, 50))
+
+        expect(mockParakeetContext.transcribeData).toHaveBeenCalledTimes(1)
+        const options = mockParakeetContext.transcribeData.mock.calls[0]![1]
+        expect(options).toEqual({ maxThreads: 2 })
+      } finally {
+        await parakeetTranscriber.release()
+      }
+    })
+
     it('should use Parakeet options without Whisper-only options', async () => {
       const testAudioStream = new JestAudioStreamAdapter({
         chunkSize: 3200,

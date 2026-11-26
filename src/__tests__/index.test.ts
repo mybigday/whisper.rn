@@ -37,6 +37,15 @@ const parakeetMocks = {
   >,
 }
 
+const whisperMocks = {
+  transcribeFile: global.whisperTranscribeFile as jest.MockedFunction<
+    typeof global.whisperTranscribeFile
+  >,
+  transcribeData: global.whisperTranscribeData as jest.MockedFunction<
+    typeof global.whisperTranscribeData
+  >,
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
 })
@@ -55,6 +64,26 @@ test('provides the Whisper mock API', async () => {
   })
   await context.release()
   await releaseAllWhisper()
+})
+
+test('passes Whisper audioCtx (number or auto) to file and data transcription', async () => {
+  const { transcribeFile, transcribeData } = whisperMocks
+  const context = await initWhisper({ filePath: 'test.bin' })
+
+  await context.transcribe('test.wav', { audioCtx: 768 }).promise
+  expect(transcribeFile.mock.calls[0]![2]).toMatchObject({ audioCtx: 768 })
+
+  await context.transcribe('test.wav', { audioCtx: 'auto' }).promise
+  expect(transcribeFile.mock.calls[1]![2]).toMatchObject({ audioCtx: 'auto' })
+
+  const audioData = new ArrayBuffer(3200)
+  await context.transcribeData(audioData, { audioCtx: 'auto' }).promise
+  expect(transcribeData.mock.calls[0]![1]).toMatchObject({ audioCtx: 'auto' })
+
+  await context.transcribeData(audioData, { audioCtx: 0 }).promise
+  expect(transcribeData.mock.calls[1]![1]).toMatchObject({ audioCtx: 0 })
+
+  await context.release()
 })
 
 test('initializes and releases a Parakeet context', async () => {
