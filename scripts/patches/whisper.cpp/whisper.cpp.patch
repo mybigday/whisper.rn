@@ -1,3 +1,7 @@
+Apply audio_ctx (and the Core ML full-context fallback) before language
+detection: detection encodes too, and used the previous call's audio context
+(the full 30 s on the first call).
+
 Keep the probability of the auto-detected language (whisper_full_lang_prob, see
 whisper.h.patch); whisper_full() only logged it.
 
@@ -405,18 +409,13 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  
      if (n_samples > 0) {
          // compute log mel spectrogram
-@@ -7006,6 +7097,7 @@
-             return -3;
+@@ -6989,6 +7080,18 @@
          }
-         state->lang_id = lang_id;
-+        state->lang_prob = probs[lang_id];
-         params.language = whisper_lang_str(lang_id);
- 
-         WHISPER_LOG_INFO("%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
-@@ -7145,6 +7237,15 @@
      }
-     state->exp_n_audio_ctx = params.audio_ctx;
  
++    // before language detection, which encodes too
++    state->exp_n_audio_ctx = params.audio_ctx;
++
 +#ifdef WHISPER_USE_COREML
 +    // the Core ML encoder takes a fixed 1x80x3000 mel input, a shorter audio context cannot be fed to it
 +    if (state->ctx_coreml != nullptr && state->exp_n_audio_ctx > 0 && state->exp_n_audio_ctx < whisper_n_audio_ctx(ctx)) {
@@ -426,10 +425,27 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
 +    }
 +#endif
 +
+     // auto-detect language if not specified
+     if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
+         std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
+@@ -7006,6 +7109,7 @@
+             return -3;
+         }
+         state->lang_id = lang_id;
++        state->lang_prob = probs[lang_id];
+         params.language = whisper_lang_str(lang_id);
+ 
+         WHISPER_LOG_INFO("%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
+@@ -7143,8 +7247,6 @@
+         WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
+         return -5;
+     }
+-    state->exp_n_audio_ctx = params.audio_ctx;
+-
      // these tokens determine the task that will be performed
      std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
  
-@@ -7338,6 +7439,12 @@
+@@ -7338,6 +7440,12 @@
  
                  whisper_batch_prep_legacy(state->batch, prompt.data(), prompt.size(), 0, 0);
  
@@ -442,7 +458,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  if (!whisper_decode_internal(*ctx, *state, state->batch, params.n_threads, false, params.abort_callback, params.abort_callback_user_data)) {
                      WHISPER_LOG_ERROR("%s: failed to decode\n", __func__);
                      return -8;
-@@ -7346,12 +7453,16 @@
+@@ -7346,12 +7454,16 @@
                  // Calculate no_speech probability after first decode.
                  // This has to be done before any logit filtering. Hence we cannot use the probs from the whisper_process_logits.
                  {
@@ -461,7 +477,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                      state->no_speech_prob = probs[whisper_token_nosp(ctx)];
                  }
  
-@@ -8117,6 +8228,14 @@
+@@ -8117,6 +8229,14 @@
      return ctx->state->lang_id;
  }
  
@@ -476,7 +492,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  static int64_t map_processed_to_original_time(int64_t processed_time, const std::vector<vad_time_mapping> & mapping_table) {
      if (mapping_table.empty()) {
          return processed_time;
-@@ -9358,7 +9477,9 @@
+@@ -9358,7 +9478,9 @@
      (void) level;
      (void) user_data;
  #ifndef WHISPER_DEBUG
