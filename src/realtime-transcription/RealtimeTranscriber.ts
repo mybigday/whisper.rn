@@ -12,7 +12,6 @@ import type { StreamVadContextLike } from './StreamVad'
 import { ContinuousSpeechSource } from './ContinuousSpeechSource'
 import { LanguageLock } from './LanguageLock'
 import {
-  anchorAfterPrevious,
   dropRepeatedPrefix,
   joinUnits,
   keepUnitsInRange,
@@ -63,9 +62,6 @@ const DEFAULT_MAX_SEGMENT_SEC = 30
 
 /** Overlap word assignment: a word starting this much before the cut may still be kept */
 const OVERLAP_SLACK_SEC = 0.1
-
-/** Overlap text anchor: look for the previous slice's last words this far past the cut */
-const OVERLAP_ANCHOR_SEARCH_SEC = 1
 
 /** Treat undefined / non-positive limits as "unbounded". */
 const normalizeLimit = (value: number | undefined): number =>
@@ -190,9 +186,6 @@ export class RealtimeTranscriber {
   /** Units kept by the previous final, for the repeated-prefix check */
   private previousKeptUnits: TimedUnit[] = []
 
-  /** Overlap: anchor a slice's start on the previous slice's last words (evaluation toggle) */
-  private readonly overlapTextAnchor: boolean
-
   private languageLock?: LanguageLock
 
   // Simplified VAD state management
@@ -305,7 +298,6 @@ export class RealtimeTranscriber {
     this.overlapSamples = isWhisper
       ? Math.max(0, Math.round(((options.splitOverlapMs ?? 0) * this.sampleRate) / 1000))
       : 0
-    this.overlapTextAnchor = (options as { overlapTextAnchor?: boolean }).overlapTextAnchor !== false
     const { language } = this.options.transcribeOptions as TranscribeOptions
     if (isWhisper && options.languageLock && (!language || language === 'auto')) {
       this.languageLock = new LanguageLock(
@@ -756,20 +748,13 @@ export class RealtimeTranscriber {
       this.previousKeptUnits = []
       return
     }
-    let kept: TimedUnit[] | null = null
-    if (item.keepFrom !== undefined && this.overlapTextAnchor) {
-      // Text first: continue right after the previous slice's last kept words
-      const anchor = anchorAfterPrevious(
-        this.previousKeptUnits,
-        units,
-        item.keepFrom + OVERLAP_ANCHOR_SEARCH_SEC * this.sampleRate,
-      )
-      if (anchor >= 0) kept = keepUnitsInRange(units.slice(anchor), undefined, item.keepUntil, 0)
-    }
-    if (!kept) {
-      kept = keepUnitsInRange(units, item.keepFrom, item.keepUntil, OVERLAP_SLACK_SEC * this.sampleRate)
-      if (item.keepFrom !== undefined) kept = dropRepeatedPrefix(this.previousKeptUnits, kept)
-    }
+    let kept = keepUnitsInRange(
+      units,
+      item.keepFrom,
+      item.keepUntil,
+      OVERLAP_SLACK_SEC * this.sampleRate,
+    )
+    if (item.keepFrom !== undefined) kept = dropRepeatedPrefix(this.previousKeptUnits, kept)
     result.result = joinUnits(kept)
     this.previousKeptUnits = kept
   }

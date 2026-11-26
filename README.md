@@ -301,7 +301,7 @@ const transcriber = new RealtimeTranscriber(
 )
 ```
 
-`initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
+`initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. A result that is a repetition loop (mostly repeated 3-grams) is not chained into later prompts, since Whisper would repeat it in every following slice. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
 
 **Long-running sessions:** `maxSlicesInMemory` only bounds raw audio. Per-slice results (transcript + segments) returned by `getTranscriptionResults()` are kept until `stop()`/`reset()` by default, so a transcriber that runs for hours or days grows without bound. Set `maxResultsInMemory` to keep only the newest N results (older ones are dropped oldest-first) and, when `promptPreviousSlices` is enabled, `maxPromptSlices` to cap how many previous results are appended to each Whisper prompt. Consumers that need every result should collect them from `onTranscribe` as they arrive.
 
@@ -328,7 +328,7 @@ const transcriber = new RealtimeTranscriber(
 
 - **`minAvgLogprob`:** drops result segments whose average token log probability is below it, typically text hallucinated on noise. Pick it for your model and audio.
 - **`languageLock`:** with language auto-detection, the language is passed explicitly once it was detected confidently a few times, which also saves the detection pass. Occasional re-checks on long finals let a real language change unlock it (see `LanguageLockOptions`). `transcriber.lockedLanguage` reports it.
-- **`splitOverlapMs`:** for example 400. Around a split inside speech, both slices keep that much extra audio, so a word cut by the split is whole on one side. Each word is kept on the side where it starts, by its token times: DTW times when the context was created with `dtwAheadsPreset`, else token timestamps. Words repeated at the boundary are dropped. Final results of those slices are assembled from their tokens.
+- **`splitOverlapMs`:** for example 400. Around a split inside speech, both slices keep that much extra audio, so a word cut by the split is whole on one side. Each word is kept on the side where it starts, by its token times: DTW times when the context was created with `dtwAheadsPreset`, else token timestamps. Words repeated at the boundary are dropped. Final results of those slices are assembled from their tokens. In host measurements (whisper base, 6 s slices without a VAD) it lowered English WER from 0.206 to 0.168 but raised Japanese and Chinese CER, so it suits languages written with spaces.
 
 **Dependencies:**
 
