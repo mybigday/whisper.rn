@@ -1,4 +1,4 @@
-import { RealtimeTranscriber, isRepetitive } from '../RealtimeTranscriber'
+import { RealtimeTranscriber, isRepetitive, untilLastSentenceEnd } from '../RealtimeTranscriber'
 import { StreamVad } from '../StreamVad'
 import type { StreamVadContextLike, VadStreamLike } from '../StreamVad'
 import { StreamingVadSegmenter } from '../StreamingVadSegmenter'
@@ -668,6 +668,45 @@ describe('RealtimeTranscriber', () => {
         await settle()
       }
       expect(calls.map((c) => c.options.prompt)).toEqual([undefined, undefined, 'r1'])
+      await t.release()
+    })
+
+    it('cuts text at its last sentence end', () => {
+      expect(untilLastSentenceEnd('It works. And then the')).toBe('It works.')
+      expect(untilLastSentenceEnd('Is it "done?" Maybe')).toBe('Is it "done?"')
+      expect(untilLastSentenceEnd('version 1.5 is out')).toBe('')
+      expect(untilLastSentenceEnd('我們走吧。然後')).toBe('我們走吧。')
+      expect(untilLastSentenceEnd('他說「好。」接著')).toBe('他說「好。」')
+    })
+
+    it('prompts across an in-speech split only up to the last sentence end, even with a backlog', async () => {
+      let release: () => void = () => {}
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      const prompts: Array<string | undefined> = []
+      const whisper = {
+        transcribeData: jest.fn((_data: ArrayBuffer, options: any) => {
+          const i = prompts.push(options.prompt) - 1
+          return {
+            stop: jest.fn(),
+            promise: gate.then(() => ({ isAborted: false, language: 'en', result: `S${i}. tail${i}`, segments: [] })),
+          }
+        }),
+      }
+      const stream = createStream()
+      const t = new RealtimeTranscriber(
+        { whisperContext: whisper, audioStream: stream },
+        { vadOptions: { maxSpeechDurationS: 1 }, realtimeProcessingPauseMs: 1e9, initRealtimeAfterMs: 1e9 },
+      )
+      await t.start()
+      // Every slice is cut inside speech, and all are cut before any is transcribed
+      await feed(stream, makeAudio([[3500, true]]))
+      release()
+      await t.stop()
+      expect(prompts.length).toBeGreaterThanOrEqual(4)
+      expect(prompts[0]).toBeUndefined()
+      expect(prompts[1]).toBe('S0.')
+      // Older slices keep their whole text: only the end right before the audio is cut
+      expect(prompts[2]).toBe('S0. tail0 S1.')
       await t.release()
     })
 

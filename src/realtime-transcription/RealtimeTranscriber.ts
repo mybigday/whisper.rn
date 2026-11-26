@@ -579,12 +579,9 @@ export class RealtimeTranscriber {
 
   /** The current slice ends at a split inside speech */
   private markInSpeechCut(): void {
-    const index = this.sliceManager.getCurrentSliceInfo().currentSliceIndex
-    this.inSpeechCuts.add(index)
-    // Only the slice right before a prompt matters
-    this.inSpeechCuts.forEach((old) => {
-      if (old < index - 1) this.inSpeechCuts.delete(old)
-    })
+    // Kept like the results: the final of this slice's successor may be
+    // transcribed long after later slices were cut
+    this.inSpeechCuts.add(this.sliceManager.getCurrentSliceInfo().currentSliceIndex)
   }
 
   private currentSliceAudio(): Uint8Array {
@@ -651,9 +648,11 @@ export class RealtimeTranscriber {
 
   private abortRunningDraft(): void {
     if (this.running && !this.running.item.isFinal) {
-      this.running.request.stop().catch((error) => {
-        this.log(`Failed to abort a draft: ${error}`)
-      })
+      // Runs inside segmentation: a failing stop() must not interrupt it
+      const { request } = this.running
+      Promise.resolve()
+        .then(() => request.stop())
+        .catch((error) => this.log(`Failed to abort a draft: ${error}`))
     }
   }
 
