@@ -10,12 +10,14 @@
 
 - [data](realtime_transcription.RealtimeTranscribeEvent.md#data)
 - [endReason](realtime_transcription.RealtimeTranscribeEvent.md#endreason)
+- [endSample](realtime_transcription.RealtimeTranscribeEvent.md#endsample)
 - [isCapturing](realtime_transcription.RealtimeTranscribeEvent.md#iscapturing)
 - [isFinal](realtime_transcription.RealtimeTranscribeEvent.md#isfinal)
 - [memoryUsage](realtime_transcription.RealtimeTranscribeEvent.md#memoryusage)
 - [processTime](realtime_transcription.RealtimeTranscribeEvent.md#processtime)
 - [recordingTime](realtime_transcription.RealtimeTranscribeEvent.md#recordingtime)
 - [sliceIndex](realtime_transcription.RealtimeTranscribeEvent.md#sliceindex)
+- [startSample](realtime_transcription.RealtimeTranscribeEvent.md#startsample)
 - [type](realtime_transcription.RealtimeTranscribeEvent.md#type)
 - [vadEvent](realtime_transcription.RealtimeTranscribeEvent.md#vadevent)
 
@@ -27,7 +29,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:185](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L185)
+[realtime-transcription/types.ts:189](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L189)
 
 ___
 
@@ -41,7 +43,17 @@ a period). Undefined when a custom VAD context does not report it.
 
 #### Defined in
 
-[realtime-transcription/types.ts:202](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L202)
+[realtime-transcription/types.ts:206](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L206)
+
+___
+
+### endSample
+
+• `Optional` **endSample**: `number`
+
+#### Defined in
+
+[realtime-transcription/types.ts:209](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L209)
 
 ___
 
@@ -51,7 +63,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:186](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L186)
+[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L190)
 
 ___
 
@@ -63,7 +75,7 @@ Whether this is the final transcription of the slice (else a draft that a later 
 
 #### Defined in
 
-[realtime-transcription/types.ts:196](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L196)
+[realtime-transcription/types.ts:200](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L200)
 
 ___
 
@@ -81,7 +93,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:189](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L189)
+[realtime-transcription/types.ts:193](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L193)
 
 ___
 
@@ -91,7 +103,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:191](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L191)
 
 ___
 
@@ -101,7 +113,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:188](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L188)
+[realtime-transcription/types.ts:192](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L192)
 
 ___
 
@@ -111,7 +123,19 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:184](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L184)
+[realtime-transcription/types.ts:188](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L188)
+
+___
+
+### startSample
+
+• `Optional` **startSample**: `number`
+
+Position of the slice's audio in the stream, in samples (`endSample` exclusive)
+
+#### Defined in
+
+[realtime-transcription/types.ts:208](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L208)
 
 ___
 
@@ -121,7 +145,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:183](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L183)
+[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L187)
 
 ___
 
@@ -131,4 +155,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:194](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L194)
+[realtime-transcription/types.ts:198](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L198)

@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:262](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L262)
+[realtime-transcription/types.ts:307](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L307)
 
 ___
 
@@ -30,7 +30,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:260](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L260)
+[realtime-transcription/types.ts:305](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L305)
 
 ___
 
@@ -40,4 +40,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:261](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L261)
+[realtime-transcription/types.ts:306](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L306)

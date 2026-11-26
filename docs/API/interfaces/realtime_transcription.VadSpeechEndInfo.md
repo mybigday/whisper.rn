@@ -11,6 +11,7 @@ End of a speech segment
 ### Properties
 
 - [endSample](realtime_transcription.VadSpeechEndInfo.md#endsample)
+- [inSpeech](realtime_transcription.VadSpeechEndInfo.md#inspeech)
 - [reason](realtime_transcription.VadSpeechEndInfo.md#reason)
 
 ## Properties
@@ -25,7 +26,19 @@ earlier pause); that audio is not part of this segment.
 
 #### Defined in
 
-[realtime-transcription/types.ts:175](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L175)
+[realtime-transcription/types.ts:177](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L177)
+
+___
+
+### inSpeech
+
+• `Optional` **inSpeech**: `boolean`
+
+A max-duration split inside speech: the next segment starts at `endSample`
+
+#### Defined in
+
+[realtime-transcription/types.ts:180](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L180)
 
 ___
 
@@ -35,4 +48,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:176](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L176)
+[realtime-transcription/types.ts:178](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L178)

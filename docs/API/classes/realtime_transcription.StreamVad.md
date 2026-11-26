@@ -35,6 +35,10 @@ Input: 16 kHz mono PCM16.
 
 - [constructor](realtime_transcription.StreamVad.md#constructor)
 
+### Accessors
+
+- [options](realtime_transcription.StreamVad.md#options)
+
 ### Methods
 
 - [flush](realtime_transcription.StreamVad.md#flush)
@@ -62,7 +66,23 @@ Input: 16 kHz mono PCM16.
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:172](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L172)
+[realtime-transcription/StreamVad.ts:178](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L178)
+
+## Accessors
+
+### options
+
+• `get` **options**(): [`VadOptions`](../modules/index.md#vadoptions)
+
+Current VAD options (preset merged with overrides)
+
+#### Returns
+
+[`VadOptions`](../modules/index.md#vadoptions)
+
+#### Defined in
+
+[realtime-transcription/StreamVad.ts:199](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L199)
 
 ## Methods
 
@@ -82,7 +102,7 @@ End of audio: emits the remaining probabilities and closes open speech.
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:217](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L217)
+[realtime-transcription/StreamVad.ts:235](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L235)
 
 ___
 
@@ -106,7 +126,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:201](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L201)
+[realtime-transcription/StreamVad.ts:219](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L219)
 
 ___
 
@@ -130,7 +150,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:191](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L191)
+[realtime-transcription/StreamVad.ts:209](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L209)
 
 ___
 
@@ -154,7 +174,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:197](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L197)
+[realtime-transcription/StreamVad.ts:215](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L215)
 
 ___
 
@@ -178,7 +198,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:185](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L185)
+[realtime-transcription/StreamVad.ts:203](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L203)
 
 ___
 
@@ -202,7 +222,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:210](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L210)
+[realtime-transcription/StreamVad.ts:228](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L228)
 
 ___
 
@@ -222,7 +242,7 @@ Frees the native stream.
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:233](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L233)
+[realtime-transcription/StreamVad.ts:251](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L251)
 
 ___
 
@@ -242,7 +262,7 @@ Waits for queued audio, then starts over (model state included).
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:223](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L223)
+[realtime-transcription/StreamVad.ts:241](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L241)
 
 ___
 
@@ -266,4 +286,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:205](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L205)
+[realtime-transcription/StreamVad.ts:223](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L223)

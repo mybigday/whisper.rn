@@ -47,7 +47,7 @@ chunks and segments exactly, per hop.
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:57](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L57)
+[realtime-transcription/RingBufferVad.ts:57](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L57)
 
 ## Methods
 
@@ -65,7 +65,7 @@ chunks and segments exactly, per hop.
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:138](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L138)
+[realtime-transcription/RingBufferVad.ts:138](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L138)
 
 ___
 
@@ -89,7 +89,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:104](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L104)
+[realtime-transcription/RingBufferVad.ts:104](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L104)
 
 ___
 
@@ -113,7 +113,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:96](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L96)
+[realtime-transcription/RingBufferVad.ts:96](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L96)
 
 ___
 
@@ -137,7 +137,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:100](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L100)
+[realtime-transcription/RingBufferVad.ts:100](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L100)
 
 ___
 
@@ -161,7 +161,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:92](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L92)
+[realtime-transcription/RingBufferVad.ts:92](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L92)
 
 ___
 
@@ -185,7 +185,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:108](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L108)
+[realtime-transcription/RingBufferVad.ts:108](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L108)
 
 ___
 
@@ -203,7 +203,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:161](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L161)
+[realtime-transcription/RingBufferVad.ts:161](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L161)
 
 ___
 
@@ -227,4 +227,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:286](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L286)
+[realtime-transcription/RingBufferVad.ts:286](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RingBufferVad.ts#L286)
