@@ -952,7 +952,20 @@ TranscribeConfig createTranscribeConfig(
     config.language = getStringProperty(runtime, options, "language");
 
     config.params.no_context = true;
-    config.params.single_segment = false;
+    config.params.single_segment =
+        getBoolProperty(runtime, options, "singleSegment", false);
+    config.params.max_tokens =
+        std::max(0, getIntProperty(runtime, options, "maxTokens", config.params.max_tokens));
+    config.params.no_speech_thold = getFloatProperty(
+        runtime, options, "noSpeechThold", config.params.no_speech_thold);
+    config.params.logprob_thold = getFloatProperty(
+        runtime, options, "logprobThold", config.params.logprob_thold);
+    config.params.entropy_thold = getFloatProperty(
+        runtime, options, "entropyThold", config.params.entropy_thold);
+    config.params.suppress_blank = getBoolProperty(
+        runtime, options, "suppressBlank", config.params.suppress_blank);
+    config.params.suppress_nst = getBoolProperty(
+        runtime, options, "suppressNst", config.params.suppress_nst);
 
     if (options.hasProperty(runtime, "onProgress")) {
         config.onProgress = makeJsiFunction(
