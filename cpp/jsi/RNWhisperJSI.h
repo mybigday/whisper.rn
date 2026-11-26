@@ -42,13 +42,24 @@ struct WhisperContextInitOptions {
     bool useCoreMLIos = true;
     bool downloadCoreMLAssets = false;
     std::vector<CoreMLAssetInfo> coreMLAssets;
+    // DTW token timestamps: alignment-heads preset name, empty = off
+    std::string dtwAheadsPreset;
+    int dtwNTop = -1;
 };
 
 struct WhisperContextInitResult {
     whisper_context *context = nullptr;
     bool gpu = false;
     std::string reasonNoGPU;
+    // DTW token timestamps are computed (requested and not disabled by flash attention)
+    bool dtw = false;
 };
+
+// Set the DTW fields of whisper_context_params from the init options (hosts call
+// it on their params); after the hosts settle flash_attn, dtwActive() says
+// whether whisper.cpp will keep DTW on.
+void applyDtwParams(whisper_context_params &params, const WhisperContextInitOptions &options);
+bool dtwActive(const whisper_context_params &params);
 
 struct WhisperVadContextInitOptions {
     std::string filePath;

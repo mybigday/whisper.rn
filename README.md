@@ -100,6 +100,15 @@ const { result } = await promise
 // result: (The inference text result from audio file)
 ```
 
+Each segment also carries `noSpeechProb` and `avgLogprob` (the mean log probability of its tokens), signals to drop hallucinated text on silence or noise; pick thresholds for your model and audio. With `language: 'auto'`, `languageProb` is the probability of the detected language. `includeTokens: true` adds the segment's text tokens (a character split across tokens, common in CJK, comes with the token that completes it; the others get empty text). Their times need either `tokenTimestamps: true` (`t0`/`t1`) or a context created with `dtwAheadsPreset` (`tDtw`, aligned from the attention weights and more accurate; not available with flash attention, see `whisperContext.dtw`):
+
+```js
+const whisperContext = await initWhisper({ filePath, dtwAheadsPreset: 'base.en' })
+const { promise } = whisperContext.transcribe(sampleFilePath, { includeTokens: true })
+const { segments } = await promise
+segments[0].tokens.forEach(({ text, p, tDtw }) => console.log(text, p, tDtw / 100))
+```
+
 ## NVIDIA Parakeet TDT
 
 `ParakeetContext` runs NVIDIA's Parakeet TDT 0.6B v3 model through the Parakeet API included in whisper.cpp. The v3 model supports English plus 24 other European languages.

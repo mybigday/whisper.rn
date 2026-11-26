@@ -898,6 +898,7 @@ struct whisper_state {
     std::vector<whisper_token>   prompt_past1; // dynamic context from decoded output
 
     int lang_id = 0; // english by default
+    float lang_prob = -1.0f; // probability of lang_id when auto-detected, -1 otherwise
 
     std::string path_model; // populated by whisper_init_from_file_with_params()
 
@@ -7051,6 +7052,7 @@ int whisper_full_with_state(
     auto & result_all = state->result_all;
 
     result_all.clear();
+    state->lang_prob = -1.0f;
 
     if (n_samples > 0) {
         // compute log mel spectrogram
@@ -7077,6 +7079,7 @@ int whisper_full_with_state(
             return -3;
         }
         state->lang_id = lang_id;
+        state->lang_prob = probs[lang_id];
         params.language = whisper_lang_str(lang_id);
 
         WHISPER_LOG_INFO("%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
@@ -7409,6 +7412,12 @@ int whisper_full_with_state(
 
                 whisper_batch_prep_legacy(state->batch, prompt.data(), prompt.size(), 0, 0);
 
+                // The no-speech probability is read at the <|startoftranscript|> position (as in
+                // OpenAI's whisper), so request its logits too: otherwise only the last position
+                // is written and the row read below holds stale logits (e.g. from language detection).
+                const int i_sot = (int) (prompt.size() - prompt_init.size());
+                state->batch.logits[i_sot] = 1;
+
                 if (!whisper_decode_internal(*ctx, *state, state->batch, params.n_threads, false, params.abort_callback, params.abort_callback_user_data)) {
                     WHISPER_LOG_ERROR("%s: failed to decode\n", __func__);
                     return -8;
@@ -7417,12 +7426,16 @@ int whisper_full_with_state(
                 // Calculate no_speech probability after first decode.
                 // This has to be done before any logit filtering. Hence we cannot use the probs from the whisper_process_logits.
                 {
+                    const int n_vocab  = ctx->model.hparams.n_vocab;
                     const int n_logits = ctx->vocab.id_to_token.size();
+                    const std::vector<float> logits_sot(
+                            state->logits.begin() + (size_t) i_sot*n_vocab,
+                            state->logits.begin() + (size_t) i_sot*n_vocab + n_logits);
                     std::vector<float> logprobs(n_logits);
                     std::vector<float> probs(n_logits);
 
-                    whisper_compute_logprobs(state->logits, n_logits, logprobs);
-                    whisper_compute_probs(state->logits, n_logits, logprobs, probs);
+                    whisper_compute_logprobs(logits_sot, n_logits, logprobs);
+                    whisper_compute_probs(logits_sot, n_logits, logprobs, probs);
                     state->no_speech_prob = probs[whisper_token_nosp(ctx)];
                 }
 
@@ -8186,6 +8199,14 @@ int whisper_full_lang_id_from_state(struct whisper_state * state) {
 
 int whisper_full_lang_id(struct whisper_context * ctx) {
     return ctx->state->lang_id;
+}
+
+float whisper_full_lang_prob_from_state(struct whisper_state * state) {
+    return state->lang_prob;
+}
+
+float whisper_full_lang_prob(struct whisper_context * ctx) {
+    return ctx->state->lang_prob;
 }
 
 static int64_t map_processed_to_original_time(int64_t processed_time, const std::vector<vad_time_mapping> & mapping_table) {

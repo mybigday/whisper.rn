@@ -277,14 +277,32 @@ private:
     bool tracked_;
 };
 
+struct TokenData {
+    int id = 0;
+    std::string text;
+    float p = 0.0f;
+    float plog = 0.0f;
+    int t0 = -1;
+    int t1 = -1;
+    int tDtw = -1;
+};
+
 struct SegmentData {
     std::string text;
     int t0 = 0;
     int t1 = 0;
+    // Whisper only (hasDecodeInfo)
+    bool hasDecodeInfo = false;
+    float noSpeechProb = 0.0f;
+    float avgLogprob = 0.0f;
+    bool hasTokens = false;
+    std::vector<TokenData> tokens;
 };
 
 struct TranscribeResultData {
     std::string language;
+    // Probability of the auto-detected language, < 0 if not detected (or Parakeet)
+    float languageProb = -1.0f;
     std::string result;
     std::vector<SegmentData> segments;
     bool isAborted = false;
@@ -372,6 +390,7 @@ struct WhisperContextHolder : public ContextLifecycle {
     long ptr = 0;
     bool gpu = false;
     std::string reasonNoGPU;
+    bool dtw = false;
 
     std::mutex operationMutex;
     bool busy = false;
@@ -525,6 +544,7 @@ struct JsiCallbackState {
 
 struct SegmentCallbackState : public JsiCallbackState {
     bool tdrzEnable = false;
+    bool includeTokens = false;
     int totalNNew = 0;
 };
 
@@ -885,6 +905,7 @@ struct TranscribeConfig {
     int nProcessors = 1;
     int jobId = 0;
     bool tdrzEnable = false;
+    bool includeTokens = false;
     JsiFunctionPtr onProgress;
     JsiFunctionPtr onNewSegments;
 
@@ -917,6 +938,7 @@ TranscribeConfig createTranscribeConfig(
         getBoolProperty(runtime, options, "tokenTimestamps", false);
     config.params.tdrz_enable = getBoolProperty(runtime, options, "tdrzEnable", false);
     config.tdrzEnable = config.params.tdrz_enable;
+    config.includeTokens = getBoolProperty(runtime, options, "includeTokens", false);
     config.params.max_len = getIntProperty(runtime, options, "maxLen", config.params.max_len);
     config.params.n_max_text_ctx =
         getIntProperty(runtime, options, "maxContext", config.params.n_max_text_ctx);
@@ -1419,11 +1441,52 @@ std::vector<float> readWaveAudio(const std::string &pathOrBase64) {
     return decodeWaveBytes(rnwhisper_jsi::hostLoadFileBytes(pathOrBase64));
 }
 
+// Bytes of the longest prefix of `text` that ends on a character boundary: a
+// trailing UTF-8 sequence that is not complete yet is left out.
+size_t completeUtf8Length(const std::string &text) {
+    const size_t size = text.size();
+    // A sequence is at most 4 bytes: look back for the last lead byte
+    for (size_t back = 1; back <= 4 && back <= size; ++back) {
+        const unsigned char c = static_cast<unsigned char>(text[size - back]);
+        if ((c & 0xC0) == 0x80) {
+            continue; // continuation byte
+        }
+        const size_t length = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 1;
+        return back >= length ? size : size - back;
+    }
+    return size;
+}
+
+// Replace malformed UTF-8 with U+FFFD so it can become a JS string
+std::string sanitizeUtf8(const std::string &text) {
+    std::string out;
+    out.reserve(text.size());
+    size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        const size_t length = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 0;
+        bool valid = length > 0 && i + length <= text.size();
+        for (size_t k = 1; valid && k < length; ++k) {
+            valid = (static_cast<unsigned char>(text[i + k]) & 0xC0) == 0x80;
+        }
+        if (valid) {
+            out.append(text, i, length);
+            i += length;
+        } else {
+            out.append("\xEF\xBF\xBD");
+            i += 1;
+        }
+    }
+    return out;
+}
+
 std::vector<SegmentData> readSegments(
     whisper_context *context,
     int start,
     bool tdrzEnable,
+    bool includeTokens,
     std::string *resultText = nullptr) {
+    const whisper_token eot = whisper_token_eot(context);
     int count = whisper_full_n_segments(context);
     std::vector<SegmentData> segments;
     if (count <= start) {
@@ -1439,11 +1502,51 @@ std::vector<SegmentData> readSegments(
         if (resultText) {
             resultText->append(text);
         }
-        segments.push_back({
-            text,
-            static_cast<int>(whisper_full_get_segment_t0(context, index)),
-            static_cast<int>(whisper_full_get_segment_t1(context, index)),
-        });
+        SegmentData segment;
+        segment.text = std::move(text);
+        segment.t0 = static_cast<int>(whisper_full_get_segment_t0(context, index));
+        segment.t1 = static_cast<int>(whisper_full_get_segment_t1(context, index));
+        segment.hasDecodeInfo = true;
+        segment.noSpeechProb = whisper_full_get_segment_no_speech_prob(context, index);
+        segment.hasTokens = includeTokens;
+
+        // Text tokens only: special and timestamp tokens (id >= eot) are skipped
+        double plogSum = 0.0;
+        int textTokens = 0;
+        // A token can end inside a multi-byte character (common for CJK): its
+        // incomplete bytes move to the next token, so every token text is valid
+        // and the texts still add up to the segment's
+        std::string pendingBytes;
+        const int nTokens = whisper_full_n_tokens(context, index);
+        for (int t = 0; t < nTokens; ++t) {
+            const whisper_token_data data = whisper_full_get_token_data(context, index, t);
+            if (data.id >= eot) {
+                continue;
+            }
+            plogSum += data.plog;
+            textTokens += 1;
+            if (includeTokens) {
+                const char *tokenText = whisper_full_get_token_text(context, index, t);
+                pendingBytes += tokenText ? tokenText : "";
+                const size_t complete = completeUtf8Length(pendingBytes);
+                std::string textOut = sanitizeUtf8(pendingBytes.substr(0, complete));
+                pendingBytes.erase(0, complete);
+                segment.tokens.push_back({
+                    data.id,
+                    std::move(textOut),
+                    data.p,
+                    data.plog,
+                    static_cast<int>(data.t0),
+                    static_cast<int>(data.t1),
+                    static_cast<int>(data.t_dtw),
+                });
+            }
+        }
+        if (!pendingBytes.empty() && !segment.tokens.empty()) {
+            segment.tokens.back().text += sanitizeUtf8(pendingBytes);
+        }
+        segment.avgLogprob = textTokens > 0 ? static_cast<float>(plogSum / textTokens) : 0.0f;
+        segments.push_back(std::move(segment));
     }
 
     return segments;
@@ -1452,12 +1555,14 @@ std::vector<SegmentData> readSegments(
 TranscribeResultData buildTranscribeResult(
     whisper_context *context,
     bool tdrzEnable,
+    bool includeTokens,
     bool isAborted) {
     TranscribeResultData result;
     result.isAborted = isAborted;
-    result.segments = readSegments(context, 0, tdrzEnable, &result.result);
+    result.segments = readSegments(context, 0, tdrzEnable, includeTokens, &result.result);
     const char *language = whisper_lang_str(whisper_full_lang_id(context));
     result.language = language ? language : "";
+    result.languageProb = whisper_full_lang_prob(context);
     return result;
 }
 
@@ -1502,6 +1607,29 @@ jsi::Array createSegmentsArray(
             jsi::String::createFromUtf8(runtime, segment.text));
         item.setProperty(runtime, "t0", jsi::Value(segment.t0));
         item.setProperty(runtime, "t1", jsi::Value(segment.t1));
+        if (segment.hasDecodeInfo) {
+            item.setProperty(runtime, "noSpeechProb", jsi::Value(segment.noSpeechProb));
+            item.setProperty(runtime, "avgLogprob", jsi::Value(segment.avgLogprob));
+        }
+        if (segment.hasTokens) {
+            jsi::Array tokens(runtime, segment.tokens.size());
+            for (size_t t = 0; t < segment.tokens.size(); ++t) {
+                const auto &token = segment.tokens[t];
+                jsi::Object tokenItem(runtime);
+                tokenItem.setProperty(runtime, "id", jsi::Value(token.id));
+                tokenItem.setProperty(
+                    runtime,
+                    "text",
+                    jsi::String::createFromUtf8(runtime, token.text));
+                tokenItem.setProperty(runtime, "p", jsi::Value(token.p));
+                tokenItem.setProperty(runtime, "plog", jsi::Value(token.plog));
+                tokenItem.setProperty(runtime, "t0", jsi::Value(token.t0));
+                tokenItem.setProperty(runtime, "t1", jsi::Value(token.t1));
+                tokenItem.setProperty(runtime, "tDtw", jsi::Value(token.tDtw));
+                tokens.setValueAtIndex(runtime, t, tokenItem);
+            }
+            item.setProperty(runtime, "tokens", tokens);
+        }
         array.setValueAtIndex(runtime, index, item);
     }
     return array;
@@ -1515,6 +1643,9 @@ jsi::Value createTranscribeResultValue(
         runtime,
         "language",
         jsi::String::createFromUtf8(runtime, data.language));
+    if (data.languageProb >= 0.0f) {
+        result.setProperty(runtime, "languageProb", jsi::Value(data.languageProb));
+    }
     result.setProperty(
         runtime,
         "result",
@@ -1558,6 +1689,7 @@ jsi::Value createContextValue(
     jsi::Runtime &runtime,
     const std::shared_ptr<WhisperContextHolder> &holder) {
     jsi::Object result(runtime);
+    result.setProperty(runtime, "dtw", jsi::Value(holder->dtw));
     result.setProperty(
         runtime,
         "contextPtr",
@@ -1859,6 +1991,44 @@ TranscribeResultData runParakeetTranscription(
 
 namespace rnwhisper_jsi {
 
+void applyDtwParams(whisper_context_params &params, const WhisperContextInitOptions &options) {
+    static const std::pair<const char *, whisper_alignment_heads_preset> kPresets[] = {
+        {"tiny.en", WHISPER_AHEADS_TINY_EN},
+        {"tiny", WHISPER_AHEADS_TINY},
+        {"base.en", WHISPER_AHEADS_BASE_EN},
+        {"base", WHISPER_AHEADS_BASE},
+        {"small.en", WHISPER_AHEADS_SMALL_EN},
+        {"small", WHISPER_AHEADS_SMALL},
+        {"medium.en", WHISPER_AHEADS_MEDIUM_EN},
+        {"medium", WHISPER_AHEADS_MEDIUM},
+        {"large-v1", WHISPER_AHEADS_LARGE_V1},
+        {"large-v2", WHISPER_AHEADS_LARGE_V2},
+        {"large-v3", WHISPER_AHEADS_LARGE_V3},
+        {"large-v3-turbo", WHISPER_AHEADS_LARGE_V3_TURBO},
+        {"n-top-most", WHISPER_AHEADS_N_TOP_MOST},
+    };
+    params.dtw_token_timestamps = false;
+    if (options.dtwAheadsPreset.empty()) {
+        return;
+    }
+    for (const auto &preset : kPresets) {
+        if (options.dtwAheadsPreset == preset.first) {
+            params.dtw_token_timestamps = true;
+            params.dtw_aheads_preset = preset.second;
+            if (preset.second == WHISPER_AHEADS_N_TOP_MOST && options.dtwNTop > 0) {
+                params.dtw_n_top = options.dtwNTop;
+            }
+            return;
+        }
+    }
+    LOG_ERROR("Unknown dtwAheadsPreset '%s', DTW token timestamps disabled", options.dtwAheadsPreset.c_str());
+}
+
+bool dtwActive(const whisper_context_params &params) {
+    // whisper.cpp turns DTW off when flash attention is on
+    return params.dtw_token_timestamps && !params.flash_attn;
+}
+
 void installJSIBindings(
     jsi::Runtime &runtime,
     std::shared_ptr<react::CallInvoker> callInvoker) {
@@ -1922,6 +2092,9 @@ void installJSIBindings(
             hostOptions.downloadCoreMLAssets =
                 getBoolProperty(runtime, options, "downloadCoreMLAssets", false);
             hostOptions.coreMLAssets = parseCoreMLAssets(runtime, options);
+            hostOptions.dtwAheadsPreset =
+                getStringProperty(runtime, options, "dtwAheadsPreset");
+            hostOptions.dtwNTop = getIntProperty(runtime, options, "dtwNTop", -1);
 
             return createPromiseTask(runtime, callInvoker, [contextId, hostOptions]() -> PromiseResultGenerator {
                 auto result = hostInitWhisperContext(hostOptions);
@@ -1941,6 +2114,7 @@ void installJSIBindings(
                 holder->ptr = reinterpret_cast<long>(result.context);
                 holder->gpu = result.gpu;
                 holder->reasonNoGPU = result.reasonNoGPU;
+                holder->dtw = result.dtw;
                 g_whisperContexts.add(contextId, holder);
 
                 return [holder](jsi::Runtime &rt) {
@@ -2083,6 +2257,7 @@ void installJSIBindings(
                     segmentsState->runtime = runtimePtr;
                     segmentsState->contextId = holder->id;
                     segmentsState->tdrzEnable = config.tdrzEnable;
+                    segmentsState->includeTokens = config.includeTokens;
 
                     if (config.onNewSegments) {
                         config.params.new_segment_callback =
@@ -2095,7 +2270,12 @@ void installJSIBindings(
                                 (*state)->totalNNew += nNew;
                                 int offset = (*state)->totalNNew - nNew;
                                 std::string resultText;
-                                auto segments = readSegments(ctx, offset, (*state)->tdrzEnable, &resultText);
+                                auto segments = readSegments(
+                                    ctx,
+                                    offset,
+                                    (*state)->tdrzEnable,
+                                    (*state)->includeTokens,
+                                    &resultText);
 
                                 NewSegmentsData payload;
                                 payload.nNew = nNew;
@@ -2129,6 +2309,7 @@ void installJSIBindings(
                     auto result = buildTranscribeResult(
                         holder->context,
                         config.tdrzEnable,
+                        config.includeTokens,
                         isAborted);
                     return [result](jsi::Runtime &rt) {
                         return createTranscribeResultValue(rt, result);
@@ -2200,6 +2381,7 @@ void installJSIBindings(
                     segmentsState->runtime = runtimePtr;
                     segmentsState->contextId = holder->id;
                     segmentsState->tdrzEnable = config.tdrzEnable;
+                    segmentsState->includeTokens = config.includeTokens;
 
                     if (config.onNewSegments) {
                         config.params.new_segment_callback =
@@ -2212,7 +2394,12 @@ void installJSIBindings(
                                 (*state)->totalNNew += nNew;
                                 int offset = (*state)->totalNNew - nNew;
                                 std::string resultText;
-                                auto segments = readSegments(ctx, offset, (*state)->tdrzEnable, &resultText);
+                                auto segments = readSegments(
+                                    ctx,
+                                    offset,
+                                    (*state)->tdrzEnable,
+                                    (*state)->includeTokens,
+                                    &resultText);
 
                                 NewSegmentsData payload;
                                 payload.nNew = nNew;
@@ -2246,6 +2433,7 @@ void installJSIBindings(
                     auto result = buildTranscribeResult(
                         holder->context,
                         config.tdrzEnable,
+                        config.includeTokens,
                         isAborted);
                     return [result](jsi::Runtime &rt) {
                         return createTranscribeResultValue(rt, result);

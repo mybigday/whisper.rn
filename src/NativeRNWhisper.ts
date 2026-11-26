@@ -35,15 +35,48 @@ export type TranscribeOptions = {
   bestOf?: number
   /** Initial Prompt */
   prompt?: string
+  /**
+   * Add each segment's text tokens (`segments[].tokens`) to the result (Default: false).
+   * Token times need `tokenTimestamps` (t0 / t1) or a context initialized with DTW (tDtw).
+   */
+  includeTokens?: boolean
+}
+
+/** A text token of a Whisper result (special and timestamp tokens are left out) */
+export type TranscribeToken = {
+  id: number
+  /**
+   * Text of the token. A character split across tokens (common in CJK) comes with
+   * the token that completes it, earlier ones have empty text; the texts of a
+   * segment's tokens add up to its text.
+   */
+  text: string
+  /** Probability of the token */
+  p: number
+  /** Log probability of the token */
+  plog: number
+  /** Start / end in 10 ms units with `tokenTimestamps`, else -1 */
+  t0: number
+  t1: number
+  /** DTW-aligned time in 10 ms units when the context uses DTW (`dtwAheadsPreset`), else -1 */
+  tDtw: number
 }
 
 export type TranscribeResult = {
   result: string
   language: string
+  /** Whisper: probability of the language when it was auto-detected (`language` unset or 'auto') */
+  languageProb?: number
   segments: Array<{
     text: string
     t0: number
     t1: number
+    /** Whisper: probability that the segment's audio window has no speech */
+    noSpeechProb?: number
+    /** Whisper: mean log probability of the segment's text tokens (low values suggest hallucination) */
+    avgLogprob?: number
+    /** Whisper with `includeTokens` */
+    tokens?: TranscribeToken[]
   }>
   isAborted: boolean
 }
@@ -61,6 +94,8 @@ export type NativeContextOptions = {
   useCoreMLIos?: boolean
   downloadCoreMLAssets?: boolean
   coreMLAssets?: CoreMLAsset[]
+  dtwAheadsPreset?: string
+  dtwNTop?: number
 }
 
 export type NativeWhisperContext = {
@@ -68,6 +103,8 @@ export type NativeWhisperContext = {
   contextId: number
   gpu: boolean
   reasonNoGPU: string
+  /** DTW token timestamps are on */
+  dtw?: boolean
 }
 
 export type NativeParakeetContextOptions = {

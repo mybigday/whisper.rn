@@ -16,6 +16,11 @@ type ParakeetContextCompatibility =
 
 const parakeetContextIsRealtimeCompatible: ParakeetContextCompatibility = true
 
+// Captured before the JSI install removes the globals
+const whisperInitMock = global.whisperInitContext as jest.MockedFunction<
+  typeof global.whisperInitContext
+>
+
 const parakeetMocks = {
   init: global.parakeetInitContext as jest.MockedFunction<
     typeof global.parakeetInitContext
@@ -54,6 +59,28 @@ test('provides the Whisper mock API', async () => {
     segments: [{ text: ' Test', t0: 0, t1: 33 }],
   })
   await context.release()
+  await releaseAllWhisper()
+})
+
+test('passes DTW options and reports whether DTW is on', async () => {
+  const init = whisperInitMock
+  init.mockImplementationOnce(async (contextId: number) => ({
+    contextPtr: contextId,
+    contextId,
+    gpu: false,
+    reasonNoGPU: '',
+    dtw: true,
+  }))
+  const context = await initWhisper({ filePath: 'test.bin', dtwAheadsPreset: 'base.en' })
+  expect(init).toHaveBeenCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ dtwAheadsPreset: 'base.en' }),
+  )
+  expect(context.dtw).toBe(true)
+
+  const plain = await initWhisper({ filePath: 'test.bin' })
+  expect(init.mock.calls[init.mock.calls.length - 1]![1]).not.toHaveProperty('dtwAheadsPreset')
+  expect(plain.dtw).toBe(false)
   await releaseAllWhisper()
 })
 
