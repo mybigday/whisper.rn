@@ -9,7 +9,7 @@ same audio.
 
 ```sh
 cmake -S scripts/realtime-eval -B build-realtime-eval -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja -C build-realtime-eval whisper-server
+ninja -C build-realtime-eval whisper-server vad-probs
 ```
 
 `whisper-server` loads a model once and transcribes requests from stdin, using
@@ -33,12 +33,14 @@ npx ts-node --transpile-only -O '{"module":"commonjs","esModuleInterop":true,"re
 | `--manifest`, `--item`, `--root` | an item of a set manifest (`items[].wav`, `items[].ref_src`), with paths relative to `--root` |
 | `--options` | `RealtimeOptions` as JSON (drafts are off unless `realtimeProcessingPauseMs` is set: they do not change finals) |
 | `--dtw` | alignment-heads preset for DTW token times, `-` for none |
+| `--vad`, `--vad-probs` | a Silero model: segment with a VAD, from probabilities `vad-probs` computes for the file (default: next to `--server`) |
 | `--hardcut` | split at the limit (`splitAtDip: false`) instead of at a dip |
 | `--seconds` | only the first N seconds (drops the reference) |
 | `--print finals` / `raw` | each final with its range / raw segments and tokens |
 | `--log 1` | the transcriber's log on stderr |
 
-There is no VAD on the host: the audio is sliced by `maxSpeechDurationS`, which
-exercises the max-duration splits (and `splitOverlapMs`). The report line is
+Without `--vad` the audio is sliced by `maxSpeechDurationS` only, which
+exercises the max-duration splits (and `splitOverlapMs`); with it, slices
+follow the speech as in the app. The report line is
 JSON: final count and end reasons, word (or CJK character) error rate against
 the reference, and compute time per audio second.

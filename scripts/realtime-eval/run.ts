@@ -6,7 +6,7 @@
 //     --server <build>/whisper-server --model ggml-base.bin [--dtw base] \
 //     (--wav clip.wav [--ref "text"] | --manifest set/manifest.json --item 0 --root <dir>) \
 //     [--options '{"vadOptions":{"maxSpeechDurationS":6},"splitOverlapMs":400}'] [--seconds 120]
-import { spawn } from 'child_process'
+import { execFileSync, spawn } from 'child_process'
 import { readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
 import { createInterface } from 'readline'
@@ -90,6 +90,40 @@ async function startServer(server: string, model: string, dtw: string, threads: 
   }
 }
 
+/**
+ * A VAD probability source from vad.cpp probabilities computed up front
+ * (vad-probs): the stream is stateful, so they equal what a live stream gives
+ */
+function precomputedVad(vadProbsBin: string, model: string, wav: string) {
+  const { hopSamples, probs } = JSON.parse(
+    execFileSync(vadProbsBin, [model, wav], { maxBuffer: 256 * 1024 * 1024 }).toString(),
+  ) as { hopSamples: number; probs: number[] }
+  return {
+    hopSamples,
+    sampleRate: 16000,
+    createStream: async () => {
+      let pending = 0
+      let next = 0
+      return {
+        push: async (audio: Uint8Array) => {
+          pending += audio.byteLength / 2
+          const n = Math.floor(pending / hopSamples)
+          pending -= n * hopSamples
+          next += n
+          return probs.slice(next - n, next)
+        },
+        flush: async () => {
+          const rest = probs.slice(next)
+          next = probs.length
+          return rest
+        },
+        reset: async () => { pending = 0; next = 0 },
+        release: async () => {},
+      }
+    },
+  }
+}
+
 /** An audio stream that plays the samples in 100 ms chunks as fast as the pipeline takes them */
 function replayStream(samples: Int16Array) {
   let onData: (d: any) => void = () => {}
@@ -143,12 +177,14 @@ async function main() {
   let samples: Int16Array
   let ref = arg('ref')
   let name = arg('wav') ?? ''
+  let wavPath = arg('wav') ?? ''
   if (arg('manifest')) {
     const manifestPath = arg('manifest')!
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
     const item = manifest.items[Number(arg('item', '0'))]
     const root = arg('root', resolve(dirname(manifestPath), '../../..'))!
-    samples = readWav(resolve(root, item.wav))
+    wavPath = resolve(root, item.wav)
+    samples = readWav(wavPath)
     const refSrc: string[] = Array.isArray(item.ref_src) ? item.ref_src : JSON.parse(item.ref_src)
     ref = refSrc.join(' ')
     name = item.id
@@ -171,8 +207,12 @@ async function main() {
   if (arg('hardcut')) options.probabilitySegmenter = new StreamingVadSegmenter({}, 512, 16000, { splitAtDip: false })
   const finals: RealtimeTranscribeEvent[] = []
   const { stream, play } = replayStream(samples)
+  // --vad <silero model> [--vad-probs <bin>]: probabilities of the whole file (not truncated by --seconds)
+  const vadContext = arg('vad')
+    ? precomputedVad(arg('vad-probs', resolve(dirname(arg('server')!), 'vad-probs'))!, arg('vad')!, wavPath)
+    : undefined
   const transcriber = new RealtimeTranscriber(
-    { whisperContext: server.context, audioStream: stream },
+    { whisperContext: server.context, audioStream: stream, vadContext },
     options,
     {
       onTranscribe: (e) => { if (e.type === 'transcribe' && e.isFinal) finals.push(e) },
@@ -195,6 +235,7 @@ async function main() {
     finals: finals.length,
     reasons,
     dtw: server.dtw,
+    vad: !!vadContext,
     requests,
     computePerAudio: computeMs / 1000 / (samples.length / 16000),
     options: { ...options, segmenter: options.probabilitySegmenter ? "hardcut" : undefined },

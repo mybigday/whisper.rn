@@ -15,3 +15,11 @@ target_link_libraries(whisper PUBLIC ggml)
 add_executable(whisper-server whisper-server.cpp)
 target_include_directories(whisper-server PRIVATE ${ROOT}/cpp/jsi)
 target_link_libraries(whisper-server whisper)
+
+# Speech probabilities of a WAV with vad.cpp (same ggml), for a VAD on the host
+set(VAD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(VAD_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(VAD_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+add_subdirectory(${ROOT}/vendor/vad.cpp vad.cpp)
+add_executable(vad-probs vad-probs.cpp)
+target_link_libraries(vad-probs vad)
