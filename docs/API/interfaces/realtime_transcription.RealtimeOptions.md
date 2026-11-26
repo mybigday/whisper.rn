@@ -30,7 +30,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:179](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L179)
+[realtime-transcription/types.ts:208](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L208)
 
 ___
 
@@ -40,7 +40,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:205](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L205)
+[realtime-transcription/types.ts:234](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L234)
 
 ___
 
@@ -50,7 +50,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:178](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L178)
+[realtime-transcription/types.ts:207](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L207)
 
 ___
 
@@ -60,7 +60,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:208](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L208)
+[realtime-transcription/types.ts:237](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L237)
 
 ___
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:215](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L215)
+[realtime-transcription/types.ts:244](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L244)
 
 ___
 
@@ -82,7 +82,7 @@ Initial Whisper prompt. Ignored when using ParakeetContext.
 
 #### Defined in
 
-[realtime-transcription/types.ts:193](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L193)
+[realtime-transcription/types.ts:222](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L222)
 
 ___
 
@@ -106,7 +106,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:211](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L211)
+[realtime-transcription/types.ts:240](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L240)
 
 ___
 
@@ -121,7 +121,7 @@ Default: unlimited (bounded only by `maxResultsInMemory`).
 
 #### Defined in
 
-[realtime-transcription/types.ts:202](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L202)
+[realtime-transcription/types.ts:231](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L231)
 
 ___
 
@@ -135,7 +135,7 @@ reached, which keeps long-running (24/7) sessions bounded. Default: unlimited.
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:216](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L216)
 
 ___
 
@@ -147,7 +147,7 @@ Maximum number of raw audio slices kept in memory. Default: 3.
 
 #### Defined in
 
-[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L181)
+[realtime-transcription/types.ts:210](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L210)
 
 ___
 
@@ -159,7 +159,7 @@ Add previous Whisper results to the next prompt. Ignored for Parakeet. Defaults 
 
 #### Defined in
 
-[realtime-transcription/types.ts:195](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L195)
+[realtime-transcription/types.ts:224](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L224)
 
 ___
 
@@ -169,7 +169,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:214](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L214)
+[realtime-transcription/types.ts:243](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L243)
 
 ___
 
@@ -181,4 +181,4 @@ Options for the selected Whisper or Parakeet context.
 
 #### Defined in
 
-[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L190)
+[realtime-transcription/types.ts:219](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L219)

@@ -18,12 +18,13 @@ certain:
   segments would meet, the pause between them is split in half. An end is
   therefore reported once that is decided: when the next segment is
   confirmed, or `2 * speechPadMs` into the pause;
-- `maxSpeechDurationS`: a longer segment is split, at the start of the
-  current pause if there is one, else right away (the next segment then
-  starts at the split). Unlike the offline pass it cannot go back to the
-  longest earlier pause, since that audio is out.
+- `maxSpeechDurationS`: a longer segment is split, like offline, at the
+  longest earlier pause of more than 98 ms; the next segment starts where
+  that pause ended. Both events then lie in the past, so the consumer must
+  keep the open segment's audio (from `retainFrom`) to cut it there.
+  Without such a pause see `StreamingVadSegmenterOptions.splitAtDip`.
 
-Apart from the split rule, the segments equal the offline result.
+With `splitAtDip: false` the segments equal the offline result.
 
 ## Table of contents
 
@@ -34,6 +35,7 @@ Apart from the split rule, the segments equal the offline result.
 ### Accessors
 
 - [inSpeech](realtime_transcription.StreamingVadSegmenter.md#inspeech)
+- [maySplitBack](realtime_transcription.StreamingVadSegmenter.md#maysplitback)
 - [processedSamples](realtime_transcription.StreamingVadSegmenter.md#processedsamples)
 - [retainFrom](realtime_transcription.StreamingVadSegmenter.md#retainfrom)
 - [speechCertainUntil](realtime_transcription.StreamingVadSegmenter.md#speechcertainuntil)
@@ -43,13 +45,14 @@ Apart from the split rule, the segments equal the offline result.
 - [flush](realtime_transcription.StreamingVadSegmenter.md#flush)
 - [push](realtime_transcription.StreamingVadSegmenter.md#push)
 - [reset](realtime_transcription.StreamingVadSegmenter.md#reset)
+- [setFrameEnergy](realtime_transcription.StreamingVadSegmenter.md#setframeenergy)
 - [setOptions](realtime_transcription.StreamingVadSegmenter.md#setoptions)
 
 ## Constructors
 
 ### constructor
 
-• **new StreamingVadSegmenter**(`options`, `hopSamples`, `sampleRate?`)
+• **new StreamingVadSegmenter**(`options`, `hopSamples`, `sampleRate?`, `segmenterOptions?`)
 
 #### Parameters
 
@@ -58,10 +61,11 @@ Apart from the split rule, the segments equal the offline result.
 | `options` | [`VadOptions`](../modules/index.md#vadoptions) | `undefined` |
 | `hopSamples` | `number` | `undefined` |
 | `sampleRate` | `number` | `16000` |
+| `segmenterOptions` | [`StreamingVadSegmenterOptions`](../modules/realtime_transcription.md#streamingvadsegmenteroptions) | `{}` |
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:85](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L85)
+[realtime-transcription/StreamingVadSegmenter.ts:145](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L145)
 
 ## Accessors
 
@@ -77,7 +81,26 @@ Whether a confirmed speech segment is open (its end not reported yet)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:110](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L110)
+[realtime-transcription/StreamingVadSegmenter.ts:178](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L178)
+
+___
+
+### maySplitBack
+
+• `get` **maySplitBack**(): `boolean`
+
+Whether segment bounds may still move back into audio already consumed:
+an open segment may be split, or the end of one split at a pause in
+progress waits for the next start, which can come sooner than
+`minSilenceDurationMs` and take part of the padding already consumed.
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[realtime-transcription/StreamingVadSegmenter.ts:235](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L235)
 
 ___
 
@@ -93,7 +116,7 @@ Samples covered by the probabilities consumed so far
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:115](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L115)
+[realtime-transcription/StreamingVadSegmenter.ts:183](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L183)
 
 ___
 
@@ -101,7 +124,9 @@ ___
 
 • `get` **retainFrom**(): `number`
 
-Earliest sample a future or pending segment may still need
+Earliest sample a future or pending segment may still need. While a
+segment that may be split is open, that is all of it: a split can move
+both its end and the next start back into audio already consumed.
 
 #### Returns
 
@@ -109,7 +134,7 @@ Earliest sample a future or pending segment may still need
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:135](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L135)
+[realtime-transcription/StreamingVadSegmenter.ts:224](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L224)
 
 ___
 
@@ -117,7 +142,8 @@ ___
 
 • `get` **speechCertainUntil**(): `number`
 
-End of the audio that surely belongs to the open speech segment (padded).
+End of the audio that surely belongs to the open speech segment (padded),
+unless a max-duration split later moves the end back.
 Only meaningful while `inSpeech`.
 
 #### Returns
@@ -126,7 +152,7 @@ Only meaningful while `inSpeech`.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:123](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L123)
+[realtime-transcription/StreamingVadSegmenter.ts:192](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L192)
 
 ## Methods
 
@@ -150,7 +176,7 @@ probabilities (the final hop may be partial) and closes open speech.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:166](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L166)
+[realtime-transcription/StreamingVadSegmenter.ts:276](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L276)
 
 ___
 
@@ -172,7 +198,7 @@ Consume the next probabilities, one per hop.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:153](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L153)
+[realtime-transcription/StreamingVadSegmenter.ts:263](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L263)
 
 ___
 
@@ -186,7 +212,29 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:140](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L140)
+[realtime-transcription/StreamingVadSegmenter.ts:247](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L247)
+
+___
+
+### setFrameEnergy
+
+▸ **setFrameEnergy**(`frameEnergy`): `void`
+
+Set or replace the energy function of `StreamingVadSegmenterOptions.frameEnergy`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `frameEnergy` | `undefined` \| (`start`: `number`, `end`: `number`) => `number` |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+[realtime-transcription/StreamingVadSegmenter.ts:243](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L243)
 
 ___
 
@@ -206,4 +254,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:91](https://github.com/mybigday/whisper.rn/blob/30c029e/src/realtime-transcription/StreamingVadSegmenter.ts#L91)
+[realtime-transcription/StreamingVadSegmenter.ts:159](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L159)

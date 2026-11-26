@@ -804,6 +804,198 @@ describe('RealtimeTranscriber', () => {
     })
   })
 
+  describe('slice ends', () => {
+    // A VAD context whose callbacks the test drives
+    const createManualVad = () => {
+      const handlers: any = {}
+      const vad = {
+        processAudio: jest.fn(),
+        onSpeechStart: (cb: any) => { handlers.start = cb },
+        onSpeechContinue: (cb: any) => { handlers.continue = cb },
+        onSpeechEnd: (cb: any) => { handlers.end = cb },
+        onError: jest.fn(),
+        updateOptions: jest.fn(),
+        flush: jest.fn(async () => undefined),
+        reset: jest.fn(async () => undefined),
+      }
+      return { vad, handlers }
+    }
+    const pcm = (samples: number, offset = 0) => {
+      const data = new Uint8Array(samples * 2)
+      for (let i = 0; i < samples; i += 1) data[i * 2] = (offset + i) % 251
+      return data
+    }
+    const flushQueue = () => new Promise((resolve) => setTimeout(resolve, 20))
+    const finals = () =>
+      mockCallbacks.onTranscribe.mock.calls
+        .map(([event]: any) => event)
+        .filter((event: any) => event.type === 'transcribe' && event.isFinal)
+
+    it('cuts the slice where the VAD segment ends and reports why', async () => {
+      const { vad, handlers } = createManualVad()
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, vadContext: vad, audioStream: mockAudioStream },
+        { audioSliceSec: 30, realtimeProcessingPauseMs: 1e9 },
+        mockCallbacks,
+      )
+      await t.start()
+      handlers.start(0.9, pcm(16000, 1000), { startSample: 1000 })
+      // The split went back to sample 9000: only 8000 samples belong to this segment
+      handlers.end(0.9, { endSample: 9000, reason: 'max_duration' })
+      handlers.start(0.9, pcm(9000, 8500), { startSample: 8500 })
+      handlers.end(0.9, { endSample: 17500, reason: 'pause' })
+      await flushQueue()
+
+      const sent = mockWhisperContext.transcribeData.mock.calls.map(([buffer]: any) => buffer.byteLength)
+      expect(sent).toContain(8000 * 2)
+      expect(finals().map((e: any) => e.endReason)).toEqual(['max_duration', 'pause'])
+      await t.release()
+    })
+
+    it('keeps the slice whole without positions (older VAD contexts)', async () => {
+      const { vad, handlers } = createManualVad()
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, vadContext: vad, audioStream: mockAudioStream },
+        { audioSliceSec: 30, realtimeProcessingPauseMs: 1e9 },
+        mockCallbacks,
+      )
+      await t.start()
+      handlers.start(0.9, pcm(16000))
+      handlers.end(0.9)
+      await flushQueue()
+      const sent = mockWhisperContext.transcribeData.mock.calls.map(([buffer]: any) => buffer.byteLength)
+      expect(sent).toContain(16000 * 2)
+      // Unknown: this VAD context does not say why the speech ended
+      expect(finals().map((e: any) => e.endReason)).toEqual([undefined])
+      await t.release()
+    })
+
+    const finalSamples = () =>
+      mockWhisperContext.transcribeData.mock.calls
+        .filter((_call: any, i: number) => {
+          const results = mockCallbacks.onTranscribe.mock.calls
+            .map(([event]: any) => event)
+            .filter((event: any) => event.type === 'transcribe')
+          return results[i]?.isFinal
+        })
+        .map(([buffer]: any) => Array.from(new Int16Array(buffer)))
+
+    it('does not transcribe audio twice when a split goes back before a full slice', async () => {
+      const { vad, handlers } = createManualVad()
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, vadContext: vad, audioStream: mockAudioStream },
+        { audioSliceSec: 1, realtimeProcessingPauseMs: 1e9 },
+        mockCallbacks,
+      )
+      await t.start()
+      handlers.start(0.9, pcm(8000, 0), { startSample: 0 })
+      handlers.continue(0.9, pcm(8000, 8000), { startSample: 8000 })
+      // Slice 0 = samples [0, 16000) is full and final; slice 1 starts at 16000
+      handlers.continue(0.9, pcm(4000, 16000), { startSample: 16000 })
+      // The VAD splits back to a pause at 8000; its next segment re-sends from 7500
+      handlers.end(0.9, { endSample: 8000, reason: 'max_duration' })
+      handlers.start(0.9, pcm(12500, 7500), { startSample: 7500 })
+      handlers.end(0.9, { endSample: 20000, reason: 'pause' })
+      await flushQueue()
+
+      const samples = finalSamples()
+      // [0, 16000) once, then only the part not in slice 0: [16000, 20000)
+      expect(samples.map((x: number[]) => x.length)).toEqual([16000, 4000])
+      expect(samples[1]).toEqual(Array.from(new Int16Array(pcm(4000, 16000).buffer)))
+      await t.release()
+    })
+
+    it('keeps positions after nextSlice() in the middle of speech', async () => {
+      const { vad, handlers } = createManualVad()
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, vadContext: vad, audioStream: mockAudioStream },
+        { audioSliceSec: 30, realtimeProcessingPauseMs: 1e9 },
+        mockCallbacks,
+      )
+      await t.start()
+      handlers.start(0.9, pcm(10000, 0), { startSample: 0 })
+      await t.nextSlice()
+      handlers.continue(0.9, pcm(10000, 10000), { startSample: 10000 })
+      handlers.end(0.9, { endSample: 15000, reason: 'max_duration' })
+      await flushQueue()
+
+      expect(finals().map((e: any) => e.endReason)).toEqual(['manual', 'max_duration'])
+      expect(finalSamples().map((x: number[]) => x.length)).toEqual([10000, 5000])
+      await t.release()
+    })
+
+    it('reports end_of_stream for the last slice without VAD', async () => {
+      let endHandler: () => void = () => {}
+      const audioStream = {
+        initialize: jest.fn(async () => undefined),
+        start: jest.fn(async () => undefined),
+        stop: jest.fn(async () => undefined),
+        release: jest.fn(async () => undefined),
+        isRecording: () => true,
+        onData: jest.fn(),
+        onError: jest.fn(),
+        onStatusChange: jest.fn(),
+        onEnd: (cb: () => void) => { endHandler = cb },
+      }
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, audioStream },
+        { audioSliceSec: 1, realtimeProcessingPauseMs: 1e9 },
+        mockCallbacks,
+      )
+      await t.start()
+      const onData = (audioStream.onData as jest.Mock).mock.calls[0][0]
+      onData({ data: pcm(10000), sampleRate: 16000, channels: 1, timestamp: 0 })
+      onData({ data: pcm(10000), sampleRate: 16000, channels: 1, timestamp: 0 })
+      await flushQueue()
+      endHandler()
+      await flushQueue()
+      expect(finals().map((e: any) => e.endReason)).toEqual(['max_duration', 'end_of_stream'])
+      await t.release()
+    })
+
+    it('finalizes a slice that fills up before the speech ends', async () => {
+      const { vad, handlers } = createManualVad()
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, vadContext: vad, audioStream: mockAudioStream },
+        { audioSliceSec: 1, realtimeProcessingPauseMs: 1e9 },
+        mockCallbacks,
+      )
+      await t.start()
+      handlers.start(0.9, pcm(8000, 0), { startSample: 0 })
+      handlers.continue(0.9, pcm(8000, 8000), { startSample: 8000 })
+      // 1 s slice is full: this chunk starts the next slice
+      handlers.continue(0.9, pcm(8000, 16000), { startSample: 16000 })
+      handlers.end(0.9, { endSample: 20000, reason: 'pause' })
+      await flushQueue()
+
+      expect(finals().map((e: any) => [e.sliceIndex, e.endReason])).toEqual([
+        [0, 'max_duration'],
+        [1, 'pause'],
+      ])
+      // The cut is relative to the second slice, which starts at sample 16000
+      const sent = mockWhisperContext.transcribeData.mock.calls.map(([buffer]: any) => buffer.byteLength)
+      // (after the first draft, which the throttle lets through)
+      expect(sent.slice(-2)).toEqual([16000 * 2, 4000 * 2])
+      await t.release()
+    })
+
+    it('marks drafts as not final', async () => {
+      const { vad, handlers } = createManualVad()
+      const t = new RealtimeTranscriber(
+        { whisperContext: mockWhisperContext, vadContext: vad, audioStream: mockAudioStream },
+        { audioSliceSec: 30, realtimeProcessingPauseMs: 1 },
+        mockCallbacks,
+      )
+      await t.start()
+      handlers.start(0.9, pcm(16000), { startSample: 0 })
+      await flushQueue()
+      const events = mockCallbacks.onTranscribe.mock.calls.map(([event]: any) => event)
+      expect(events.find((e: any) => e.type === 'transcribe')).toMatchObject({ isFinal: false })
+      expect(events.find((e: any) => e.type === 'transcribe').endReason).toBeUndefined()
+      await t.release()
+    })
+  })
+
   describe('configuration updates', () => {
     it('should update callbacks', () => {
       const newCallbacks = {

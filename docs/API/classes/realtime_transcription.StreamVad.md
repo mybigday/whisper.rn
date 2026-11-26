@@ -15,12 +15,19 @@ events carry the segment's audio:
 - `onSpeechContinue`: further audio of the segment, each sample once;
 - `onSpeechEnd`: after the audio up to the padded end.
 
-Positions are counted in samples of the pushed audio, not wall-clock time.
+Each callback also gets the position of its audio (`VadSpeechChunkInfo`,
+`VadSpeechEndInfo`), counted in samples of the pushed audio, not wall-clock
+time. A segment longer than `maxSpeechDurationS` is split like offline, at
+its longest earlier pause (or else at the least speech-like frame of the
+last seconds), so the split usually lies in audio already handed out: the
+end then reports `endSample` before the audio sent so far (the consumer
+drops the rest), and the next segment's audio starts again from its own
+padded start, repeating that audio.
 Input: 16 kHz mono PCM16.
 
 ## Implements
 
-- `RealtimeVadContextLike`
+- [`RealtimeVadContextLike`](../interfaces/realtime_transcription.RealtimeVadContextLike.md)
 
 ## Table of contents
 
@@ -55,7 +62,7 @@ Input: 16 kHz mono PCM16.
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:140](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L140)
+[realtime-transcription/StreamVad.ts:172](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L172)
 
 ## Methods
 
@@ -71,11 +78,11 @@ End of audio: emits the remaining probabilities and closes open speech.
 
 #### Implementation of
 
-RealtimeVadContextLike.flush
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[flush](../interfaces/realtime_transcription.RealtimeVadContextLike.md#flush)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:180](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L180)
+[realtime-transcription/StreamVad.ts:217](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L217)
 
 ___
 
@@ -95,11 +102,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onError
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onError](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onerror)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:164](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L164)
+[realtime-transcription/StreamVad.ts:201](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L201)
 
 ___
 
@@ -111,7 +118,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `callback` | (`confidence`: `number`, `data`: `Uint8Array`) => `void` |
+| `callback` | (`confidence`: `number`, `data`: `Uint8Array`, `info`: [`VadSpeechChunkInfo`](../interfaces/realtime_transcription.VadSpeechChunkInfo.md)) => `void` |
 
 #### Returns
 
@@ -119,11 +126,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onSpeechContinue
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechContinue](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechcontinue)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:156](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L156)
+[realtime-transcription/StreamVad.ts:191](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L191)
 
 ___
 
@@ -135,7 +142,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `callback` | (`confidence`: `number`) => `void` |
+| `callback` | (`confidence`: `number`, `info`: [`VadSpeechEndInfo`](../interfaces/realtime_transcription.VadSpeechEndInfo.md)) => `void` |
 
 #### Returns
 
@@ -143,11 +150,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onSpeechEnd
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechEnd](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechend)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:160](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L160)
+[realtime-transcription/StreamVad.ts:197](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L197)
 
 ___
 
@@ -159,7 +166,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `callback` | (`confidence`: `number`, `data`: `Uint8Array`) => `void` |
+| `callback` | (`confidence`: `number`, `data`: `Uint8Array`, `info`: [`VadSpeechChunkInfo`](../interfaces/realtime_transcription.VadSpeechChunkInfo.md)) => `void` |
 
 #### Returns
 
@@ -167,11 +174,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onSpeechStart
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechStart](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechstart)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:152](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L152)
+[realtime-transcription/StreamVad.ts:185](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L185)
 
 ___
 
@@ -191,11 +198,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.processAudio
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[processAudio](../interfaces/realtime_transcription.RealtimeVadContextLike.md#processaudio)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:173](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L173)
+[realtime-transcription/StreamVad.ts:210](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L210)
 
 ___
 
@@ -211,11 +218,11 @@ Frees the native stream.
 
 #### Implementation of
 
-RealtimeVadContextLike.release
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[release](../interfaces/realtime_transcription.RealtimeVadContextLike.md#release)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:196](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L196)
+[realtime-transcription/StreamVad.ts:233](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L233)
 
 ___
 
@@ -231,11 +238,11 @@ Waits for queued audio, then starts over (model state included).
 
 #### Implementation of
 
-RealtimeVadContextLike.reset
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[reset](../interfaces/realtime_transcription.RealtimeVadContextLike.md#reset)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:186](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L186)
+[realtime-transcription/StreamVad.ts:223](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L223)
 
 ___
 
@@ -255,8 +262,8 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.updateOptions
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[updateOptions](../interfaces/realtime_transcription.RealtimeVadContextLike.md#updateoptions)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:168](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L168)
+[realtime-transcription/StreamVad.ts:205](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L205)

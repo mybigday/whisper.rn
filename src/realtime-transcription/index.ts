@@ -12,7 +12,11 @@ export { RingBufferVad } from './RingBufferVad'
 export { StreamVad } from './StreamVad'
 export type { StreamVadOptions, StreamVadContextLike, VadStreamLike } from './StreamVad'
 export { StreamingVadSegmenter } from './StreamingVadSegmenter'
-export type { VadSegmenterEvent } from './StreamingVadSegmenter'
+export type {
+  VadSegmenterEvent,
+  VadSegmentEndReason,
+  StreamingVadSegmenterOptions,
+} from './StreamingVadSegmenter'
 
 export type { WavFileWriterFs } from '../utils/WavFileWriter'
 
@@ -27,6 +31,10 @@ export type {
   RealtimeVadEvent,
   RealtimeTranscribeEvent,
   RealtimeStatsEvent,
+  RealtimeSliceEndReason,
+  RealtimeVadContextLike,
+  VadSpeechChunkInfo,
+  VadSpeechEndInfo,
 
   // Configuration types
   RealtimeTranscriberDependencies,

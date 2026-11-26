@@ -5,6 +5,7 @@ import type {
   VadOptions,
 } from '../index'
 import type { WavFileWriterFs } from '../utils/WavFileWriter'
+import type { VadSegmentEndReason } from './StreamingVadSegmenter'
 
 // === Audio Stream Interfaces ===
 
@@ -158,6 +159,26 @@ export interface RealtimeVadEvent {
   environmentNoise?: number
 }
 
+/** Position of the audio passed to a speech start / continue callback */
+export interface VadSpeechChunkInfo {
+  /** Stream sample (counted from the start of the pushed audio) of the first sample of `data` */
+  startSample: number
+}
+
+/** End of a speech segment */
+export interface VadSpeechEndInfo {
+  /**
+   * Stream sample where the segment ends (exclusive). It can lie before audio
+   * already passed for the segment (a max-duration split going back to an
+   * earlier pause); that audio is not part of this segment.
+   */
+  endSample: number
+  reason: VadSegmentEndReason
+}
+
+/** Why a slice was finalized: its VAD segment's end reason, or `manual` (`nextSlice()`) */
+export type RealtimeSliceEndReason = VadSegmentEndReason | 'manual'
+
 export interface RealtimeTranscribeEvent {
   type: 'start' | 'transcribe' | 'end' | 'error'
   sliceIndex: number
@@ -171,6 +192,14 @@ export interface RealtimeTranscribeEvent {
     estimatedMB: number
   }
   vadEvent?: RealtimeVadEvent
+  /** Whether this is the final transcription of the slice (else a draft that a later one replaces) */
+  isFinal?: boolean
+  /**
+   * Final transcriptions: why the slice ended. `max_duration` means the speech
+   * went on: the text likely ends mid-sentence (Whisper may still end it with
+   * a period). Undefined when a custom VAD context does not report it.
+   */
+  endReason?: RealtimeSliceEndReason
 }
 
 export interface RealtimeOptions {
@@ -303,12 +332,16 @@ export type WhisperVadContextLike = {
 export interface RealtimeVadContextLike {
   // Push audio data to the VAD context
   processAudio(data: Uint8Array): void
-  // Callback for when speech is detected
-  onSpeechStart: (callback: (confidence: number, data: Uint8Array) => void) => void
+  // Callback for when speech is detected. `info` (optional for implementers) locates the audio.
+  onSpeechStart: (
+    callback: (confidence: number, data: Uint8Array, info?: VadSpeechChunkInfo) => void,
+  ) => void
   // Callback for when speech is detected and continues
-  onSpeechContinue: (callback: (confidence: number, data: Uint8Array) => void) => void
-  // Callback for when speech ends
-  onSpeechEnd: (callback: (confidence: number) => void) => void
+  onSpeechContinue: (
+    callback: (confidence: number, data: Uint8Array, info?: VadSpeechChunkInfo) => void,
+  ) => void
+  // Callback for when speech ends. With `info`, the transcriber cuts the slice at `info.endSample`.
+  onSpeechEnd: (callback: (confidence: number, info?: VadSpeechEndInfo) => void) => void
   // Callback for when VAD encounters an error
   onError: (callback: (error: string) => void) => void
   // Update VAD options

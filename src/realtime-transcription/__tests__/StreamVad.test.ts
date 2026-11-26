@@ -1,6 +1,7 @@
 import { StreamVad } from '../StreamVad'
 import type { StreamVadContextLike, VadStreamLike } from '../StreamVad'
 import { StreamingVadSegmenter } from '../StreamingVadSegmenter'
+import { RealtimeTranscriber } from '../RealtimeTranscriber'
 
 const SR = 16000
 const HOP = 512
@@ -64,12 +65,19 @@ function feed(vad: StreamVad, audio: Int16Array, chunkMs: number) {
 }
 
 function record(vad: StreamVad) {
-  const events: Array<{ type: string; samples: Int16Array }> = []
-  vad.onSpeechStart((_c, data) =>
-    events.push({ type: 'start', samples: new Int16Array(data.slice().buffer) }))
-  vad.onSpeechContinue((_c, data) =>
-    events.push({ type: 'continue', samples: new Int16Array(data.slice().buffer) }))
-  vad.onSpeechEnd(() => events.push({ type: 'end', samples: new Int16Array(0) }))
+  const events: Array<{
+    type: string
+    samples: Int16Array
+    /** start: first sample of `samples`; end: end of the segment */
+    sample: number
+    reason?: string
+  }> = []
+  vad.onSpeechStart((_c, data, info) =>
+    events.push({ type: 'start', samples: new Int16Array(data.slice().buffer), sample: info.startSample }))
+  vad.onSpeechContinue((_c, data, info) =>
+    events.push({ type: 'continue', samples: new Int16Array(data.slice().buffer), sample: info.startSample }))
+  vad.onSpeechEnd((_c, info) =>
+    events.push({ type: 'end', samples: new Int16Array(0), sample: info.endSample, reason: info.reason }))
   return events
 }
 
@@ -81,6 +89,26 @@ function concat(parts: Int16Array[]): Int16Array {
     offset += p.length
   })
   return out
+}
+
+/** Each segment's audio as a consumer keeping positions sees it: chunks in order, cut at the end */
+function collectSegments(events: ReturnType<typeof record>): Int16Array[] {
+  const segments: Int16Array[] = []
+  let current: Int16Array[] = []
+  let first = -1
+  let next = -1
+  events.forEach((e) => {
+    if (e.type === 'end') {
+      segments.push(concat(current).slice(0, Math.max(0, e.sample - first)))
+      current = []
+    } else {
+      if (e.type === 'start') first = e.sample
+      else expect(e.sample).toBe(next) // contiguous
+      next = e.sample + e.samples.length
+      current.push(e.samples)
+    }
+  })
+  return segments
 }
 
 describe('StreamVad', () => {
@@ -185,13 +213,18 @@ describe('StreamVad', () => {
     ['pause shorter than 2 * pad', { speechPadMs: 100, minSilenceDurationMs: 50 }, [[1000, false], [1000, true], [150, false], [1000, true], [1000, false]]],
     ['pause between minSilence and 2 * pad', { speechPadMs: 300 }, [[512, false], [1024, true], [160, false], [1024, true], [1000, false]]],
     ['max-duration split', { maxSpeechDurationS: 1 }, [[500, false], [3000, true], [500, false]]],
+    ['max-duration split at an earlier pause', { maxSpeechDurationS: 1, minSilenceDurationMs: 300 }, [[300, false], [600, true], [200, false], [600, true], [300, false]]],
   ] as Array<[string, Partial<typeof options.vadOptions>, Array<[number, boolean]>]>)(
     'hands each segment exactly its own audio (%s)',
     async (_name, vadOptions, regions) => {
       const merged = { ...options.vadOptions, ...vadOptions }
       const audio = makeAudio(regions)
 
-      const segmenter = new StreamingVadSegmenter(merged, HOP, SR)
+      // Same dip choice as StreamVad: mean square of the audio
+      const segmenter = new StreamingVadSegmenter(merged, HOP, SR, {
+        frameEnergy: (from, to) =>
+          audio.slice(from, to).reduce((sum, v) => sum + (v / 32768) ** 2, 0) / (to - from),
+      })
       const probs: number[] = []
       for (let i = 0; i < audio.length; i += HOP) {
         const hop = audio.subarray(i, i + HOP)
@@ -216,19 +249,140 @@ describe('StreamVad', () => {
       feed(vad, audio, 10)
       await vad.flush()
 
-      const segments: Int16Array[] = []
-      let current: Int16Array[] = []
-      events.forEach((e) => {
-        if (e.type === 'end') {
-          segments.push(concat(current))
-          current = []
-        } else {
-          current.push(e.samples)
-        }
-      })
-      expect(segments).toEqual(expected)
+      expect(collectSegments(events)).toEqual(expected)
     },
   )
+
+  describe('on the max-split cases (dip splits on)', () => {
+    const cases: Array<{ params: any; probs: number[] }> = require('./__fixtures__/vad-segments-max-split.json')
+
+    it.each(cases.map((c, index) => [index, c] as const))(
+      'hands each segment exactly its own audio at any chunk size (case %i)',
+      async (_index, { params, probs: fixtureProbs }) => {
+        // Audio whose fake-context probabilities are 0.9 / 0.05 by the fixture's threshold
+        const audio = makeAudio(fixtureProbs.map((p) => [32, p >= params.threshold] as [number, boolean]))
+        const vadOptions = { ...params, negThreshold: -1 }
+        const segmenter = new StreamingVadSegmenter(vadOptions, HOP, SR, {
+          frameEnergy: (from, to) =>
+            audio.slice(from, to).reduce((sum, v) => sum + (v / 32768) ** 2, 0) / (to - from),
+        })
+        const probs = fixtureProbs.map((p) => (p >= params.threshold ? 0.9 : 0.05))
+        const bounds = [...segmenter.push(probs), ...segmenter.flush(audio.length)]
+        const expected: Int16Array[] = []
+        for (let i = 0; i < bounds.length; i += 2) {
+          expected.push(audio.slice(bounds[i]!.sample, bounds[i + 1]!.sample))
+        }
+
+        // eslint-disable-next-line no-restricted-syntax
+        for (const chunkMs of [10, 37]) {
+          const { context } = createFakeContext()
+          const vad = new StreamVad(context, { vadOptions })
+          const events = record(vad)
+          feed(vad, audio, chunkMs)
+          // eslint-disable-next-line no-await-in-loop
+          await vad.flush()
+          // Compared as bytes: deep equality over every sample is slow
+          const hex = (segments: Int16Array[]) =>
+            segments.map((x) => Buffer.from(x.buffer, x.byteOffset, x.byteLength).toString('hex'))
+          expect(hex(collectSegments(events))).toEqual(hex(expected))
+        }
+      },
+    )
+  })
+
+  it('goes back to an earlier pause at a max-duration split and sends that audio again', async () => {
+    const { context } = createFakeContext()
+    const vad = new StreamVad(context, {
+      vadOptions: { ...options.vadOptions, maxSpeechDurationS: 1, minSilenceDurationMs: 300 },
+    })
+    const events = record(vad)
+    // 600 ms speech, 200 ms pause (shorter than minSilence), 600 ms speech: split at 1 s
+    feed(vad, makeAudio([[300, false], [600, true], [200, false], [600, true], [300, false]]), 10)
+    await vad.flush()
+
+    const firstEnd = events.findIndex((e) => e.type === 'end')
+    const sentBefore = events
+      .slice(0, firstEnd)
+      .reduce((end, e) => Math.max(end, e.sample + e.samples.length), 0)
+    // The end lies within the pause, before audio already handed out
+    expect(events[firstEnd]).toMatchObject({ reason: 'max_duration' })
+    expect(events[firstEnd]!.sample).toBeGreaterThanOrEqual((900 * SR) / 1000)
+    expect(events[firstEnd]!.sample).toBeLessThan((1100 * SR) / 1000)
+    expect(events[firstEnd]!.sample).toBeLessThan(sentBefore)
+    // The next segment restarts at its padded start, inside that audio
+    const next = events[firstEnd + 1]!
+    expect(next.type).toBe('start')
+    expect(next.sample).toBeLessThan(sentBefore)
+    expect(next.sample).toBeGreaterThanOrEqual(events[firstEnd]!.sample)
+  })
+
+  it('gives RealtimeTranscriber exactly each segment\'s audio across a split back', async () => {
+    const vadOptions = { ...options.vadOptions, maxSpeechDurationS: 1, minSilenceDurationMs: 300 }
+    const audio = makeAudio([[300, false], [600, true], [200, false], [900, true], [120, false], [500, true], [400, false]])
+
+    // Expected segments, from the segmenter alone
+    const segmenter = new StreamingVadSegmenter(vadOptions, HOP, SR, {
+      frameEnergy: (from, to) =>
+        audio.slice(from, to).reduce((sum, v) => sum + (v / 32768) ** 2, 0) / (to - from),
+    })
+    const probs: number[] = []
+    for (let i = 0; i < audio.length; i += HOP) {
+      const hop = audio.subarray(i, i + HOP)
+      probs.push(hop.reduce((sum, v) => sum + Math.abs(v), 0) / HOP > 1000 ? 0.9 : 0.05)
+    }
+    const lastFull = Math.floor(audio.length / HOP)
+    const bounds = [
+      ...segmenter.push(probs.slice(0, lastFull)),
+      ...segmenter.flush(audio.length, probs.slice(lastFull)),
+    ]
+    const expected: number[][] = []
+    for (let i = 0; i < bounds.length; i += 2) {
+      expected.push(Array.from(audio.slice(bounds[i]!.sample, bounds[i + 1]!.sample)))
+    }
+    expect(bounds.some((b) => b.type === 'end' && b.reason === 'max_duration')).toBe(true)
+
+    const finals: number[][] = []
+    const whisperContext = {
+      transcribeData: jest.fn((buffer: ArrayBuffer) => ({
+        stop: jest.fn(),
+        promise: Promise.resolve({ result: 'x', language: 'en', segments: [], isAborted: false, buffer }),
+      })),
+    }
+    let endHandler: (() => void) | undefined
+    const audioStream = {
+      initialize: jest.fn(async () => undefined),
+      start: jest.fn(async () => undefined),
+      stop: jest.fn(async () => undefined),
+      release: jest.fn(async () => undefined),
+      isRecording: () => true,
+      onData: jest.fn(),
+      onError: jest.fn(),
+      onStatusChange: jest.fn(),
+      onEnd: (cb: () => void) => { endHandler = cb },
+    }
+    const { context } = createFakeContext()
+    const vad = new StreamVad(context, { vadOptions })
+    const transcriber = new RealtimeTranscriber(
+      { whisperContext, vadContext: vad, audioStream },
+      { audioSliceSec: 30, realtimeProcessingPauseMs: 1e9 },
+      {
+        onTranscribe: (event) => {
+          if (event.type === 'transcribe' && event.isFinal) {
+            const { buffer } = event.data as unknown as { buffer: ArrayBuffer }
+            finals.push(Array.from(new Int16Array(buffer)))
+          }
+        },
+      },
+    )
+    await transcriber.start()
+    feed(vad, audio, 10)
+    endHandler!()
+    await vad.flush()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(finals).toEqual(expected)
+    await transcriber.release()
+  })
 
   it('reports no speech for a final partial hop below the minimum', async () => {
     const { context } = createFakeContext()

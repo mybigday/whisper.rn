@@ -251,6 +251,17 @@ export class SliceManager {
   }
 
   /**
+   * Shorten the current slice to its first `byteLength` bytes (no-op if it is
+   * not longer), e.g. when its speech segment turns out to end earlier.
+   */
+  truncateCurrentSlice(byteLength: number): void {
+    const slice = this.slices.find((s) => s.index === this.currentSliceIndex)
+    if (slice && byteLength < slice.sampleCount) {
+      slice.sampleCount = Math.max(0, byteLength - (byteLength % 2))
+    }
+  }
+
+  /**
    * Force move to the next slice, finalizing the current one regardless of capacity
    */
   forceNextSlice(): { slice?: AudioSlice } {

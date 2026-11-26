@@ -33,7 +33,7 @@ Omit.endTime
 
 #### Defined in
 
-[realtime-transcription/types.ts:223](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L223)
+[realtime-transcription/types.ts:252](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L252)
 
 ___
 
@@ -47,7 +47,7 @@ Omit.index
 
 #### Defined in
 
-[realtime-transcription/types.ts:219](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L219)
+[realtime-transcription/types.ts:248](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L248)
 
 ___
 
@@ -61,7 +61,7 @@ Omit.isProcessed
 
 #### Defined in
 
-[realtime-transcription/types.ts:224](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L224)
+[realtime-transcription/types.ts:253](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L253)
 
 ___
 
@@ -75,7 +75,7 @@ Omit.isReleased
 
 #### Defined in
 
-[realtime-transcription/types.ts:225](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L225)
+[realtime-transcription/types.ts:254](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L254)
 
 ___
 
@@ -89,7 +89,7 @@ Omit.sampleCount
 
 #### Defined in
 
-[realtime-transcription/types.ts:221](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L221)
+[realtime-transcription/types.ts:250](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L250)
 
 ___
 
@@ -103,4 +103,4 @@ Omit.startTime
 
 #### Defined in
 
-[realtime-transcription/types.ts:222](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L222)
+[realtime-transcription/types.ts:251](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L251)

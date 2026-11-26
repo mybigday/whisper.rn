@@ -65,7 +65,7 @@
 
 #### Defined in
 
-[index.ts:235](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L235)
+[index.ts:235](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L235)
 
 ___
 
@@ -86,7 +86,7 @@ ___
 
 #### Defined in
 
-[index.ts:387](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L387)
+[index.ts:387](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L387)
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 #### Defined in
 
-[index.ts:467](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L467)
+[index.ts:467](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L467)
 
 ___
 
@@ -121,7 +121,7 @@ ___
 
 #### Defined in
 
-[index.ts:475](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L475)
+[index.ts:475](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L475)
 
 ___
 
@@ -140,7 +140,7 @@ ___
 
 #### Defined in
 
-[index.ts:221](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L221)
+[index.ts:221](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L221)
 
 ___
 
@@ -152,6 +152,7 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
+| `audioCtx?` | `number` \| ``"auto"`` | Encoder audio context size (whisper.cpp `audio_ctx`). A smaller context encodes less than the model's full 30 s window, which is faster for short audio at some cost in accuracy. - number: fixed size, a non-negative integer (0 = model default, the default). Must not exceed the model's audio context (1500 for stock models). - 'auto': fit to the input length (after `offset`/`duration`), with ~2 s of headroom, aligned to 64, at least 256 and capped at the model's audio context. Ignored (full context, with a warning) while the Core ML encoder is active on iOS, whose model has a fixed 30 s input. |
 | `beamSize?` | `number` | Beam size for beam search |
 | `bestOf?` | `number` | Number of best candidates to keep |
 | `duration?` | `number` | Duration of audio to process in milliseconds |
@@ -171,7 +172,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/917444a/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -190,7 +191,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:40](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L40)
+[NativeRNWhisper.ts:54](https://github.com/mybigday/whisper.rn/blob/917444a/src/NativeRNWhisper.ts#L54)
 
 ___
 
@@ -209,7 +210,7 @@ ___
 
 #### Defined in
 
-[index.ts:595](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L595)
+[index.ts:595](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L595)
 
 ___
 
@@ -231,7 +232,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:85](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L85)
+[NativeRNWhisper.ts:99](https://github.com/mybigday/whisper.rn/blob/917444a/src/NativeRNWhisper.ts#L99)
 
 ___
 
@@ -248,7 +249,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:127](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/NativeRNWhisper.ts#L127)
+[NativeRNWhisper.ts:141](https://github.com/mybigday/whisper.rn/blob/917444a/src/NativeRNWhisper.ts#L141)
 
 ## Variables
 
@@ -260,7 +261,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:460](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L460)
+[index.ts:460](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L460)
 
 ___
 
@@ -272,7 +273,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:457](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L457)
+[index.ts:457](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L457)
 
 ___
 
@@ -284,7 +285,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:454](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L454)
+[index.ts:454](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L454)
 
 ## Functions
 
@@ -310,7 +311,7 @@ Add a listener for native whisper.cpp log output
 
 #### Defined in
 
-[index.ts:831](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L831)
+[index.ts:831](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L831)
 
 ___
 
@@ -332,7 +333,7 @@ Initialize a Parakeet context with a GGML model file.
 
 #### Defined in
 
-[index.ts:558](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L558)
+[index.ts:558](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L558)
 
 ___
 
@@ -356,7 +357,7 @@ Promise resolving to WhisperContext instance
 
 #### Defined in
 
-[index.ts:413](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L413)
+[index.ts:413](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L413)
 
 ___
 
@@ -380,7 +381,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:779](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L779)
+[index.ts:779](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L779)
 
 ___
 
@@ -394,7 +395,7 @@ ___
 
 #### Defined in
 
-[index.ts:98](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L98)
+[index.ts:98](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L98)
 
 ___
 
@@ -410,7 +411,7 @@ Release every Parakeet context and free its memory.
 
 #### Defined in
 
-[index.ts:585](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L585)
+[index.ts:585](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L585)
 
 ___
 
@@ -424,7 +425,7 @@ ___
 
 #### Defined in
 
-[index.ts:447](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L447)
+[index.ts:447](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L447)
 
 ___
 
@@ -442,7 +443,7 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:811](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L811)
+[index.ts:811](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L811)
 
 ___
 
@@ -464,4 +465,4 @@ Enable or disable native whisper.cpp logging
 
 #### Defined in
 
-[index.ts:820](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L820)
+[index.ts:820](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L820)

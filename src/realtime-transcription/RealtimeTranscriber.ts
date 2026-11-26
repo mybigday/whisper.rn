@@ -20,7 +20,18 @@ import type {
   WhisperContextLike,
   ParakeetContextLike,
   RealtimeVadContextLike,
+  RealtimeSliceEndReason,
+  VadSpeechChunkInfo,
+  VadSpeechEndInfo,
 } from './types'
+
+type TranscriptionItem = {
+  sliceIndex: number
+  audioData: Uint8Array
+  isFinal?: boolean
+  /** Final transcriptions: why the slice ended */
+  endReason?: RealtimeSliceEndReason
+}
 
 const SILENCE_SEGMENT_REGEX = /\[(\s*\w+\s*)]/i
 
@@ -89,13 +100,22 @@ export class RealtimeTranscriber {
 
   private isSpeechActive = false
 
-  private transcriptionQueue: Array<{
-    sliceIndex: number
-    audioData: Uint8Array
-    isFinal?: boolean
-  }> = []
+  private transcriptionQueue: TranscriptionItem[] = []
 
   private wavFileWriter: WavFileWriter | null = null
+
+  /**
+   * Stream sample of the current slice's first byte, when the VAD reports
+   * positions. Lets a segment end (`VadSpeechEndInfo.endSample`) cut the slice.
+   */
+  private sliceStartSample: number | null = null
+
+  /**
+   * With positions: audio before this stream sample is in a finalized slice.
+   * Audio the VAD sends again after a split back is trimmed to it, so no
+   * audio is transcribed in two finals.
+   */
+  private committedUntil = 0
 
   // Simplified VAD state management
   private lastSpeechDetectedTime = 0
@@ -325,14 +345,18 @@ export class RealtimeTranscriber {
       this.vadContext.processAudio(data)
     } else {
       // Fallback: If no VAD context, treat everything as speech/audio to be processed
-      this.sliceManager.addAudioData(data)
+      this.appendAudio(data)
       this.triggerTranscription(false)
     }
   }
 
   // --- VAD Handlers ---
 
-  private async handleSpeechDetected(confidence: number, data: Uint8Array): Promise<void> {
+  private async handleSpeechDetected(
+    confidence: number,
+    data: Uint8Array,
+    info?: VadSpeechChunkInfo,
+  ): Promise<void> {
     if (!this.isActive) return
     if (!this.isSpeechActive) {
       // Speech Start
@@ -341,24 +365,78 @@ export class RealtimeTranscriber {
       this.lastSpeechDetectedTime = Date.now()
       this.emitVadEvent('speech_start', confidence)
 
-      this.sliceManager.addAudioData(data)
+      // The previous segment's slice was finalized, so the audio starts a slice
+      this.sliceStartSample =
+        info !== undefined ? Math.max(info.startSample, this.committedUntil) : null
+      this.appendAudio(data, info?.startSample)
       this.triggerTranscription(false)
     }
   }
 
-  private async handleSpeechContinue(confidence: number, data: Uint8Array): Promise<void> {
+  private async handleSpeechContinue(
+    confidence: number,
+    data: Uint8Array,
+    info?: VadSpeechChunkInfo,
+  ): Promise<void> {
     if (!this.isActive || !this.isSpeechActive) return
     this.emitVadEvent('speech_continue', confidence)
-    this.sliceManager.addAudioData(data)
+    this.appendAudio(data, info?.startSample)
     this.triggerTranscription(false)
   }
 
-  private async handleSpeechEnded(confidence: number): Promise<void> {
+  /**
+   * @param info From the VAD; without it the end reason is `fallbackReason`
+   *   (unknown for a VAD context that does not report it)
+   */
+  private async handleSpeechEnded(
+    confidence: number,
+    info?: VadSpeechEndInfo,
+    fallbackReason?: RealtimeSliceEndReason,
+  ): Promise<void> {
     if (!this.isActive) return
 
     this.isSpeechActive = false
+    if (info && this.sliceStartSample !== null) {
+      // A max-duration split may end the segment before audio already
+      // received; that audio is sent again with the next segment
+      this.sliceManager.truncateCurrentSlice((info.endSample - this.sliceStartSample) * 2)
+    }
     this.emitVadEvent('speech_end', confidence)
-    await this.nextSlice()
+    this.finishSlice(info?.reason ?? fallbackReason)
+  }
+
+  /**
+   * Add audio to the current slice. A slice that fills up (`audioSliceSec`)
+   * is closed by the slice manager; its final transcription is queued here.
+   *
+   * @param startSample Stream sample of `data[0]`, when the VAD reports positions
+   */
+  private appendAudio(data: Uint8Array, startSample?: number): void {
+    let chunk = data
+    if (startSample !== undefined && this.sliceStartSample !== null) {
+      const committed = this.committedUntil - startSample
+      if (committed > 0) chunk = chunk.subarray(Math.min(chunk.length, committed * 2))
+    }
+    if (chunk.length === 0) return
+
+    const before = this.sliceManager.getCurrentSliceInfo().currentSliceIndex
+    this.sliceManager.addAudioData(chunk)
+    const after = this.sliceManager.getCurrentSliceInfo().currentSliceIndex
+    for (let index = before; index < after; index += 1) {
+      const audioData = this.sliceManager.getAudioDataForTranscription(index)
+      this.advanceSliceStart(audioData?.length ?? 0)
+      if (audioData) {
+        this.log(`Slice ${index} is full (audioSliceSec), finalizing it`)
+        this.queueFinal(index, audioData, 'max_duration')
+      }
+    }
+  }
+
+  /** The current slice, of `byteLength` bytes, was finalized: positions move past it */
+  private advanceSliceStart(byteLength: number): void {
+    if (this.sliceStartSample === null) return
+    this.sliceStartSample += byteLength / 2
+    this.committedUntil = this.sliceStartSample
   }
 
   /**
@@ -401,10 +479,25 @@ export class RealtimeTranscriber {
       this.transcriptionQueue.push({
         sliceIndex: slice.index,
         audioData,
-        isFinal // Pass flag to processTranscription (need update)
+        isFinal,
       })
       this.processTranscriptionQueue().catch(e => this.handleError(e))
     }
+  }
+
+  /**
+   * Queue the final transcription of a slice; it makes waiting drafts of the slice moot.
+   */
+  private queueFinal(
+    sliceIndex: number,
+    audioData: Uint8Array,
+    endReason: RealtimeSliceEndReason | undefined,
+  ): void {
+    this.dropQueuedDrafts(sliceIndex)
+    this.transcriptionQueue.push({ sliceIndex, audioData, isFinal: true, endReason })
+    this.processTranscriptionQueue().catch((error) => {
+      this.handleError(`Failed to process slice ${sliceIndex}: ${error}`)
+    })
   }
 
   /**
@@ -506,11 +599,7 @@ export class RealtimeTranscriber {
   /**
    * Process a single transcription
    */
-  private async processTranscription(item: {
-    sliceIndex: number
-    audioData: Uint8Array
-    isFinal?: boolean
-  }): Promise<void> {
+  private async processTranscription(item: TranscriptionItem): Promise<void> {
     if (!this.isActive) {
       return
     }
@@ -615,7 +704,9 @@ export class RealtimeTranscriber {
         recordingTime: item.audioData.length / (sampleRate / 1000) / 2, // ms,
         memoryUsage: this.sliceManager.getMemoryUsage(),
         vadEvent: this.vadEvents.get(item.sliceIndex),
+        isFinal: !!item.isFinal,
       }
+      if (item.isFinal) transcribeEvent.endReason = item.endReason
 
       // if the current result is invalid, use the previous result
       const previousTranscribe = this.transcriptionResults.get(item.sliceIndex)
@@ -681,11 +772,11 @@ export class RealtimeTranscriber {
     // If speech is still active after flush, force end it
     if (this.isSpeechActive) {
       this.log('Speech still active after stream end, forcing speech end')
-      await this.handleSpeechEnded(1.0)
+      await this.handleSpeechEnded(1.0, undefined, 'end_of_stream')
     }
 
     // Ensure last slice is processed if it has data
-    await this.nextSlice()
+    this.finishSlice('end_of_stream')
   }
 
   /**
@@ -759,6 +850,11 @@ export class RealtimeTranscriber {
    * Force move to the next slice, finalizing the current one regardless of capacity
    */
   async nextSlice(): Promise<void> {
+    this.finishSlice('manual')
+  }
+
+  /** Finalize the current slice and queue its final transcription */
+  private finishSlice(endReason: RealtimeSliceEndReason | undefined): void {
     if (!this.isActive) {
       this.log('Cannot force next slice - transcriber is not active')
       return
@@ -792,17 +888,9 @@ export class RealtimeTranscriber {
         `Forced slice ${result.slice.index} ready (${result.slice.data.length} bytes)`,
       )
 
-      // Queue for transcription (Final); the final result makes waiting drafts of this slice moot
+      this.advanceSliceStart(result.slice.data.length)
       if (result.slice.data.length > 0) {
-        this.dropQueuedDrafts(result.slice.index)
-        this.transcriptionQueue.push({
-          sliceIndex: result.slice.index,
-          audioData: result.slice.data,
-          isFinal: true
-        })
-        this.processTranscriptionQueue().catch((error) => {
-          this.handleError(`Failed to process forced slice: ${error}`)
-        })
+        this.queueFinal(result.slice.index, result.slice.data, endReason)
       }
 
       this.emitStatsUpdate('memory_change')
@@ -826,6 +914,9 @@ export class RealtimeTranscriber {
     this.lastStatsSnapshot = null
 
     this.lastRealtimeTranscriptionTime = 0
+
+    this.sliceStartSample = null
+    this.committedUntil = 0
 
     // Cancel WAV file writing if in progress
     if (this.wavFileWriter) {

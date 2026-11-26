@@ -13,7 +13,7 @@ chunks and segments exactly, per hop.
 
 ## Implements
 
-- `RealtimeVadContextLike`
+- [`RealtimeVadContextLike`](../interfaces/realtime_transcription.RealtimeVadContextLike.md)
 
 ## Table of contents
 
@@ -47,7 +47,7 @@ chunks and segments exactly, per hop.
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:57](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L57)
+[realtime-transcription/RingBufferVad.ts:57](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L57)
 
 ## Methods
 
@@ -61,11 +61,11 @@ chunks and segments exactly, per hop.
 
 #### Implementation of
 
-RealtimeVadContextLike.flush
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[flush](../interfaces/realtime_transcription.RealtimeVadContextLike.md#flush)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:138](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L138)
+[realtime-transcription/RingBufferVad.ts:138](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L138)
 
 ___
 
@@ -85,11 +85,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onError
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onError](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onerror)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:104](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L104)
+[realtime-transcription/RingBufferVad.ts:104](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L104)
 
 ___
 
@@ -109,11 +109,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onSpeechContinue
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechContinue](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechcontinue)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:96](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L96)
+[realtime-transcription/RingBufferVad.ts:96](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L96)
 
 ___
 
@@ -133,11 +133,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onSpeechEnd
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechEnd](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechend)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:100](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L100)
+[realtime-transcription/RingBufferVad.ts:100](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L100)
 
 ___
 
@@ -157,11 +157,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.onSpeechStart
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechStart](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechstart)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:92](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L92)
+[realtime-transcription/RingBufferVad.ts:92](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L92)
 
 ___
 
@@ -181,11 +181,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.processAudio
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[processAudio](../interfaces/realtime_transcription.RealtimeVadContextLike.md#processaudio)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:108](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L108)
+[realtime-transcription/RingBufferVad.ts:108](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L108)
 
 ___
 
@@ -199,11 +199,11 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.reset
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[reset](../interfaces/realtime_transcription.RealtimeVadContextLike.md#reset)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:161](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L161)
+[realtime-transcription/RingBufferVad.ts:161](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L161)
 
 ___
 
@@ -223,8 +223,8 @@ ___
 
 #### Implementation of
 
-RealtimeVadContextLike.updateOptions
+[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[updateOptions](../interfaces/realtime_transcription.RealtimeVadContextLike.md#updateoptions)
 
 #### Defined in
 
-[realtime-transcription/RingBufferVad.ts:286](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/RingBufferVad.ts#L286)
+[realtime-transcription/RingBufferVad.ts:286](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/RingBufferVad.ts#L286)

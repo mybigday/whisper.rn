@@ -219,7 +219,7 @@ await stream.reset() // start over with a new audio stream
 await stream.release() // also freed when the context is released
 ```
 
-`StreamingVadSegmenter` (from `whisper.rn/realtime-transcription`) turns these probabilities into speech segments as they arrive. It uses the same options and segmentation as `detectSpeech*`. `StreamVad` combines the stream and the segmenter for `RealtimeTranscriber` (see below).
+`StreamingVadSegmenter` (from `whisper.rn/realtime-transcription`) turns these probabilities into speech segments as they arrive. It uses the same options and segmentation as `detectSpeech*`, except that speech longer than `maxSpeechDurationS` with no pause over 98 ms is split at its least speech-like frame rather than right at the limit (`splitAtDip: false` restores the offline rule). `StreamVad` combines the stream and the segmenter for `RealtimeTranscriber` (see below).
 
 #### Release VAD Context
 
@@ -305,6 +305,14 @@ const transcriber = new RealtimeTranscriber(
   callbacks,
 )
 ```
+
+**Long speech:** with `StreamVad`, speech longer than the VAD's `maxSpeechDurationS` is split the way `detectSpeech*` splits it: at the longest earlier pause over 98 ms, even when that audio was already transcribed as a draft. The slice is cut there, and the rest starts the next slice. If a pause is in progress at the limit and it is longer than every earlier one, the segment ends where that pause began. Otherwise, with no pause at all, the split falls on the least speech-like 32 ms frame of the last 3 s (at least 0.5 s before the limit), the quietest one when several are about as low, aiming for a gap between words. Final `onTranscribe` events have `isFinal: true` and an `endReason`:
+- `'pause'`: the speaker paused.
+- `'max_duration'`: the speech went on, so the text probably ends mid-sentence, even if Whisper ended it with a period.
+- `'end_of_stream'`: the audio ended.
+- `'manual'`: `nextSlice()` was called.
+
+Keep `audioSliceSec` at least as long as `maxSpeechDurationS` (plus padding). A slice that fills up first is cut at a chunk boundary, with `endReason: 'max_duration'`.
 
 **Dependencies:**
 

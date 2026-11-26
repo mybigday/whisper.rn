@@ -25,14 +25,20 @@
 - [RealtimeStatsEvent](../interfaces/realtime_transcription.RealtimeStatsEvent.md)
 - [RealtimeTranscribeEvent](../interfaces/realtime_transcription.RealtimeTranscribeEvent.md)
 - [RealtimeTranscriberCallbacks](../interfaces/realtime_transcription.RealtimeTranscriberCallbacks.md)
+- [RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md)
 - [RealtimeVadEvent](../interfaces/realtime_transcription.RealtimeVadEvent.md)
+- [VadSpeechChunkInfo](../interfaces/realtime_transcription.VadSpeechChunkInfo.md)
+- [VadSpeechEndInfo](../interfaces/realtime_transcription.VadSpeechEndInfo.md)
 - [WavFileWriterFs](../interfaces/realtime_transcription.WavFileWriterFs.md)
 
 ### Type Aliases
 
+- [RealtimeSliceEndReason](realtime_transcription.md#realtimesliceendreason)
 - [RealtimeTranscriberDependencies](realtime_transcription.md#realtimetranscriberdependencies)
 - [StreamVadContextLike](realtime_transcription.md#streamvadcontextlike)
 - [StreamVadOptions](realtime_transcription.md#streamvadoptions)
+- [StreamingVadSegmenterOptions](realtime_transcription.md#streamingvadsegmenteroptions)
+- [VadSegmentEndReason](realtime_transcription.md#vadsegmentendreason)
 - [VadSegmenterEvent](realtime_transcription.md#vadsegmenterevent)
 - [VadStreamLike](realtime_transcription.md#vadstreamlike)
 
@@ -42,16 +48,28 @@
 
 ## Type Aliases
 
+### RealtimeSliceEndReason
+
+Ƭ **RealtimeSliceEndReason**: [`VadSegmentEndReason`](realtime_transcription.md#vadsegmentendreason) \| ``"manual"``
+
+Why a slice was finalized: its VAD segment's end reason, or `manual` (`nextSlice()`)
+
+#### Defined in
+
+[realtime-transcription/types.ts:180](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L180)
+
+___
+
 ### RealtimeTranscriberDependencies
 
-Ƭ **RealtimeTranscriberDependencies**: { `audioStream`: [`AudioStreamInterface`](../interfaces/realtime_transcription.AudioStreamInterface.md) ; `fs?`: [`WavFileWriterFs`](../interfaces/realtime_transcription.WavFileWriterFs.md) ; `vadContext?`: `RealtimeVadContextLike`  } & { `parakeetContext?`: `never` ; `whisperContext`: `WhisperContextLike`  } \| { `parakeetContext`: `ParakeetContextLike` ; `whisperContext?`: `never`  }
+Ƭ **RealtimeTranscriberDependencies**: { `audioStream`: [`AudioStreamInterface`](../interfaces/realtime_transcription.AudioStreamInterface.md) ; `fs?`: [`WavFileWriterFs`](../interfaces/realtime_transcription.WavFileWriterFs.md) ; `vadContext?`: [`RealtimeVadContextLike`](../interfaces/realtime_transcription.RealtimeVadContextLike.md)  } & { `parakeetContext?`: `never` ; `whisperContext`: `WhisperContextLike`  } \| { `parakeetContext`: `ParakeetContextLike` ; `whisperContext?`: `never`  }
 
 Dependencies for realtime transcription. Provide exactly one transcription
 context: `whisperContext` or `parakeetContext`.
 
 #### Defined in
 
-[realtime-transcription/types.ts:328](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L328)
+[realtime-transcription/types.ts:361](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L361)
 
 ___
 
@@ -71,7 +89,7 @@ The part of `WhisperVadContext` StreamVad uses
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:15](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L15)
+[realtime-transcription/StreamVad.ts:15](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L15)
 
 ___
 
@@ -89,17 +107,46 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:21](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L21)
+[realtime-transcription/StreamVad.ts:21](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L21)
+
+___
+
+### StreamingVadSegmenterOptions
+
+Ƭ **StreamingVadSegmenterOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `frameEnergy?` | (`start`: `number`, `end`: `number`) => `number` | Energy (e.g. mean square) of the audio samples `[start, end)`, used to pick the quietest of the near-lowest frames for a dip split. Without it, the latest frame with the lowest probability wins. |
+| `splitAtDip?` | `boolean` | Where a segment without any usable pause is split at `maxSpeechDurationS`. - true (default): at the least speech-like frame of the last 3 s (0.5 s before the limit at the latest), the quietest one per `frameEnergy` when several are about as low. An ongoing pause longer than every earlier one ends the segment where it began. - false: right at the limit, exactly as the offline pass does. |
+
+#### Defined in
+
+[realtime-transcription/StreamingVadSegmenter.ts:36](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L36)
+
+___
+
+### VadSegmentEndReason
+
+Ƭ **VadSegmentEndReason**: ``"pause"`` \| ``"max_duration"`` \| ``"end_of_stream"``
+
+Why a speech segment ended
+
+#### Defined in
+
+[realtime-transcription/StreamingVadSegmenter.ts:4](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L4)
 
 ___
 
 ### VadSegmenterEvent
 
-Ƭ **VadSegmenterEvent**: { `prob`: `number` ; `sample`: `number` ; `type`: ``"start"``  } \| { `prob`: `number` ; `sample`: `number` ; `type`: ``"end"``  }
+Ƭ **VadSegmenterEvent**: { `prob`: `number` ; `sample`: `number` ; `type`: ``"start"``  } \| { `prob`: `number` ; `reason`: [`VadSegmentEndReason`](realtime_transcription.md#vadsegmentendreason) ; `sample`: `number` ; `type`: ``"end"``  }
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:3](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamingVadSegmenter.ts#L3)
+[realtime-transcription/StreamingVadSegmenter.ts:12](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamingVadSegmenter.ts#L12)
 
 ___
 
@@ -120,7 +167,7 @@ The part of `WhisperVadStream` StreamVad uses
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:7](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/StreamVad.ts#L7)
+[realtime-transcription/StreamVad.ts:7](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/StreamVad.ts#L7)
 
 ## Variables
 
@@ -207,4 +254,4 @@ Key Parameters:
 
 #### Defined in
 
-[realtime-transcription/types.ts:66](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L66)
+[realtime-transcription/types.ts:67](https://github.com/mybigday/whisper.rn/blob/917444a/src/realtime-transcription/types.ts#L67)

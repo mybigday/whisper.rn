@@ -48,7 +48,7 @@ exact streaming semantics). Calls on one stream run in call order.
 
 #### Defined in
 
-[index.ts:635](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L635)
+[index.ts:635](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L635)
 
 ## Properties
 
@@ -58,7 +58,7 @@ exact streaming semantics). Calls on one stream run in call order.
 
 #### Defined in
 
-[index.ts:623](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L623)
+[index.ts:623](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L623)
 
 ___
 
@@ -70,7 +70,7 @@ Samples covered by each probability (512 = 32 ms for Silero)
 
 #### Defined in
 
-[index.ts:631](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L631)
+[index.ts:631](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L631)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[index.ts:625](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L625)
+[index.ts:625](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L625)
 
 ___
 
@@ -92,7 +92,7 @@ Sample rate the stream expects (16000)
 
 #### Defined in
 
-[index.ts:628](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L628)
+[index.ts:628](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L628)
 
 ## Methods
 
@@ -108,7 +108,7 @@ End of audio: resolves with the probabilities still pending (a partial hop is ze
 
 #### Defined in
 
-[index.ts:666](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L666)
+[index.ts:666](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L666)
 
 ___
 
@@ -132,7 +132,7 @@ stream covers samples `[i * hopSamples, (i + 1) * hopSamples)`.
 
 #### Defined in
 
-[index.ts:659](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L659)
+[index.ts:659](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L659)
 
 ___
 
@@ -148,7 +148,7 @@ Free the stream. Releasing the context frees its streams as well.
 
 #### Defined in
 
-[index.ts:678](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L678)
+[index.ts:678](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L678)
 
 ___
 
@@ -164,4 +164,4 @@ Clear the model state and buffered audio to start a new audio stream.
 
 #### Defined in
 
-[index.ts:672](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L672)
+[index.ts:672](https://github.com/mybigday/whisper.rn/blob/917444a/src/index.ts#L672)
