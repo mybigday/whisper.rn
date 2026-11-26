@@ -1,3 +1,12 @@
+Keep the probability of the auto-detected language (whisper_full_lang_prob, see
+whisper.h.patch); whisper_full() only logged it.
+
+No-speech probability: whisper_full read it from logits row 0, but the first
+decode only wrote the last prompt position, so the row was stale (with
+language detection it happened to hold the detection's <|startoftranscript|>
+logits, otherwise near 0). Request the logits at the <|startoftranscript|>
+position, as OpenAI's whisper reads them, and read that row.
+
 Honour whisper_context_params.use_coreml (see whisper.h.patch) when loading the
 Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple targets.
 
@@ -39,7 +48,15 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  
      whisper_decoder decoders[WHISPER_MAX_DECODERS];
  
-@@ -932,6 +932,9 @@
+@@ -898,6 +898,7 @@
+     std::vector<whisper_token>   prompt_past1; // dynamic context from decoded output
+ 
+     int lang_id = 0; // english by default
++    float lang_prob = -1.0f; // probability of lang_id when auto-detected, -1 otherwise
+ 
+     std::string path_model; // populated by whisper_init_from_file_with_params()
+ 
+@@ -932,6 +933,9 @@
      // [EXPERIMENTAL] speed-up techniques
      int32_t exp_n_audio_ctx = 0; // 0 - use default
  
@@ -49,7 +66,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      whisper_vad_context * vad_context = nullptr;
  
      struct vad_segment_info {
-@@ -1418,10 +1421,8 @@
+@@ -1418,10 +1422,8 @@
  static bool weight_buft_supported(const whisper_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
      bool op_supported = true;
  
@@ -62,7 +79,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          op_supported = true;
      } else {
          switch (op) {
-@@ -1461,7 +1462,9 @@
+@@ -1461,7 +1463,9 @@
                  break;
              }
              default: {
@@ -73,7 +90,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  break;
              }
          };
-@@ -1862,12 +1865,15 @@
+@@ -1862,12 +1866,15 @@
          ggml_backend_buffer_type_t buft = p.first;
          ggml_context * ctx = p.second;
          ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
@@ -94,7 +111,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      }
  
      // load weights
-@@ -1968,10 +1974,6 @@
+@@ -1968,10 +1975,6 @@
          }
      }
  
@@ -105,7 +122,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      wctx.t_load_us = ggml_time_us() - t_start_us;
  
      return true;
-@@ -2104,6 +2106,14 @@
+@@ -2104,6 +2107,14 @@
  
      struct ggml_context * ctx0 = ggml_init(params);
  
@@ -120,7 +137,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      ggml_cgraph * gf = ggml_new_graph_custom(ctx0, WHISPER_MAX_NODES, false);
  
      struct ggml_tensor * cur = ggml_view_tensor(ctx0, wstate.embd_conv);
-@@ -2181,8 +2191,12 @@
+@@ -2181,8 +2192,12 @@
                          0, 2, 1, 3);
  
              if (wctx.params.flash_attn) {
@@ -135,7 +152,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  
                  struct ggml_tensor * K =
                      ggml_view_3d(ctx0, kv_pad.k,
-@@ -2333,6 +2347,14 @@
+@@ -2333,6 +2348,14 @@
  
      struct ggml_context * ctx0 = ggml_init(params);
  
@@ -150,7 +167,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      ggml_cgraph * gf = ggml_new_graph(ctx0);
  
      struct ggml_tensor * cur = ggml_view_tensor(ctx0, wstate.embd_enc);
-@@ -2362,10 +2384,12 @@
+@@ -2362,10 +2385,12 @@
          struct ggml_tensor * v;
  
          if (wctx.params.flash_attn) {
@@ -165,7 +182,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                      (ggml_element_size(wstate.kv_cross.v)*n_state)*(il*n_ctx_pad));
          } else {
              Vcross = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, Vcross, n_state, n_ctx));
-@@ -2378,8 +2402,13 @@
+@@ -2378,8 +2403,13 @@
                      (il*n_ctx)*ggml_element_size(wstate.kv_cross.v)*n_state);
          }
  
@@ -181,7 +198,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      }
  
      //ggml_graph_print(gf);
-@@ -2408,6 +2437,21 @@
+@@ -2408,6 +2438,21 @@
                     void * abort_callback_data) {
      const int64_t t_start_us = ggml_time_us();
  
@@ -203,7 +220,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // conv
      {
          auto & sched = wstate.sched_conv.sched;
-@@ -2491,6 +2535,13 @@
+@@ -2491,6 +2536,13 @@
              return false;
          }
  
@@ -217,7 +234,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
              return false;
          }
-@@ -2507,6 +2558,13 @@
+@@ -2507,6 +2559,13 @@
              return false;
          }
  
@@ -231,7 +248,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          if (!ggml_graph_compute_helper(sched, gf, n_threads)) {
              return false;
          }
-@@ -2566,6 +2624,14 @@
+@@ -2566,6 +2625,14 @@
      ggml_set_name(position, "position");
      ggml_set_input(position);
  
@@ -246,7 +263,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      const float KQscale = pow(float(n_state_head), -0.25);
  
      struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
-@@ -2633,11 +2699,13 @@
+@@ -2633,11 +2700,13 @@
                  struct ggml_tensor * v;
  
                  if (wctx.params.flash_attn) {
@@ -264,7 +281,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  } else {
                      Vcur = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, Vcur, n_state, n_tokens));
  
-@@ -2649,8 +2717,13 @@
+@@ -2649,8 +2718,13 @@
                              (il*n_ctx)*ggml_element_size(kv_self.v)*n_state + kv_head*ggml_element_size(kv_self.v));
                  }
  
@@ -280,7 +297,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
              }
  
              // ------
-@@ -2961,6 +3034,13 @@
+@@ -2961,6 +3035,13 @@
          }
  
          {
@@ -294,7 +311,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
              struct ggml_tensor * position = ggml_graph_get_tensor(gf, "position");
              for (int i = 0; i < n_tokens; ++i) {
                  const int32_t val = batch.pos[i];
-@@ -3514,10 +3594,12 @@
+@@ -3514,10 +3595,12 @@
              return nullptr;
          }
          const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
@@ -308,7 +325,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
  
      WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -3533,6 +3615,7 @@
+@@ -3533,6 +3616,7 @@
      } else {
          WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
      }
@@ -316,7 +333,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  #endif
  
  #ifdef WHISPER_USE_VITISAI
-@@ -3713,6 +3796,7 @@
+@@ -3713,6 +3797,7 @@
  struct whisper_context_params whisper_context_default_params() {
      struct whisper_context_params result = {
          /*.use_gpu              =*/ true,
@@ -324,7 +341,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          /*.flash_attn           =*/ true,
          /*.gpu_device           =*/ 0,
  
-@@ -3846,7 +3930,8 @@
+@@ -3846,7 +3931,8 @@
      if (!model_loaded) {
          loader->close(loader->context);
          WHISPER_LOG_ERROR("%s: failed to load model\n", __func__);
@@ -334,7 +351,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          return nullptr;
      }
  
-@@ -4618,10 +4703,8 @@
+@@ -4618,10 +4704,8 @@
  static bool weight_buft_supported(const whisper_vad_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
      bool op_supported = true;
  
@@ -347,7 +364,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          op_supported = true;
      } else {
          switch (op) {
-@@ -4654,7 +4737,9 @@
+@@ -4654,7 +4738,9 @@
                  break;
              }
              default: {
@@ -358,7 +375,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  break;
              }
          };
-@@ -5144,12 +5229,16 @@
+@@ -5144,12 +5230,16 @@
          ggml_backend_buffer_type_t buft = p.first;
          ggml_context * ctx = p.second;
          ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
@@ -380,7 +397,23 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      }
  
      // load weights
-@@ -7145,6 +7234,15 @@
+@@ -6980,6 +7070,7 @@
+     auto & result_all = state->result_all;
+ 
+     result_all.clear();
++    state->lang_prob = -1.0f;
+ 
+     if (n_samples > 0) {
+         // compute log mel spectrogram
+@@ -7006,6 +7097,7 @@
+             return -3;
+         }
+         state->lang_id = lang_id;
++        state->lang_prob = probs[lang_id];
+         params.language = whisper_lang_str(lang_id);
+ 
+         WHISPER_LOG_INFO("%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
+@@ -7145,6 +7237,15 @@
      }
      state->exp_n_audio_ctx = params.audio_ctx;
  
@@ -396,7 +429,54 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // these tokens determine the task that will be performed
      std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
  
-@@ -9358,7 +9456,9 @@
+@@ -7338,6 +7439,12 @@
+ 
+                 whisper_batch_prep_legacy(state->batch, prompt.data(), prompt.size(), 0, 0);
+ 
++                // The no-speech probability is read at the <|startoftranscript|> position (as in
++                // OpenAI's whisper), so request its logits too: otherwise only the last position
++                // is written and the row read below holds stale logits (e.g. from language detection).
++                const int i_sot = (int) (prompt.size() - prompt_init.size());
++                state->batch.logits[i_sot] = 1;
++
+                 if (!whisper_decode_internal(*ctx, *state, state->batch, params.n_threads, false, params.abort_callback, params.abort_callback_user_data)) {
+                     WHISPER_LOG_ERROR("%s: failed to decode\n", __func__);
+                     return -8;
+@@ -7346,12 +7453,16 @@
+                 // Calculate no_speech probability after first decode.
+                 // This has to be done before any logit filtering. Hence we cannot use the probs from the whisper_process_logits.
+                 {
++                    const int n_vocab  = ctx->model.hparams.n_vocab;
+                     const int n_logits = ctx->vocab.id_to_token.size();
++                    const std::vector<float> logits_sot(
++                            state->logits.begin() + (size_t) i_sot*n_vocab,
++                            state->logits.begin() + (size_t) i_sot*n_vocab + n_logits);
+                     std::vector<float> logprobs(n_logits);
+                     std::vector<float> probs(n_logits);
+ 
+-                    whisper_compute_logprobs(state->logits, n_logits, logprobs);
+-                    whisper_compute_probs(state->logits, n_logits, logprobs, probs);
++                    whisper_compute_logprobs(logits_sot, n_logits, logprobs);
++                    whisper_compute_probs(logits_sot, n_logits, logprobs, probs);
+                     state->no_speech_prob = probs[whisper_token_nosp(ctx)];
+                 }
+ 
+@@ -8117,6 +8228,14 @@
+     return ctx->state->lang_id;
+ }
+ 
++float whisper_full_lang_prob_from_state(struct whisper_state * state) {
++    return state->lang_prob;
++}
++
++float whisper_full_lang_prob(struct whisper_context * ctx) {
++    return ctx->state->lang_prob;
++}
++
+ static int64_t map_processed_to_original_time(int64_t processed_time, const std::vector<vad_time_mapping> & mapping_table) {
+     if (mapping_table.empty()) {
+         return processed_time;
+@@ -9358,7 +9477,9 @@
      (void) level;
      (void) user_data;
  #ifndef WHISPER_DEBUG
