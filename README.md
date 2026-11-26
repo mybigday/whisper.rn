@@ -100,6 +100,19 @@ const { result } = await promise
 // result: (The inference text result from audio file)
 ```
 
+### Raw PCM input
+
+`transcribeData` accepts base64 encoded PCM, `ArrayBuffer`, `Int16Array`, and `Float32Array`. Audio must be mono at 16 kHz. `Int16Array` and `ArrayBuffer` input is signed 16-bit PCM. `Float32Array` samples in -1..1 are converted to signed 16-bit PCM.
+
+A `peakThreshold` option in 0..1 drops buffers whose peak amplitude is below the threshold before inference. The returned result has an empty `result` and `skipped: 'silence'`. This is a cheap peak gate, not voice activity detection: quiet speech can be dropped and loud noise can pass. Use `WhisperVadContext` when you need model-based VAD.
+
+```js
+const { promise } = context.transcribeData(pcm, {
+  peakThreshold: 0.01,
+})
+const { result, skipped } = await promise
+```
+
 ## NVIDIA Parakeet TDT
 
 `ParakeetContext` runs NVIDIA's Parakeet TDT 0.6B v3 model through the Parakeet API included in whisper.cpp. The v3 model supports English plus 24 other European languages.
