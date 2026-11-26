@@ -94,6 +94,15 @@ export const isRepetitive = (text: string): boolean => {
   return grams.size / (units.length - 2) < 0.5
 }
 
+/** The text up to its last sentence end (`.`, `!`, `?` and their CJK forms), '' if there is none */
+export const untilLastSentenceEnd = (text: string): string => {
+  // A CJK mark ends a sentence anywhere; a Latin one only before a space or the end
+  const match = /^[\s\S]*(?:[\u3002\uff01\uff1f][\u300d\u300f\u201d)]*|[.!?]["'\u201d)\]]*(?=\s|$))/u.exec(
+    text.trim(),
+  )
+  return match ? match[0] : ''
+}
+
 const isStreamVadContext = (value: unknown): value is StreamVadContextLike =>
   !!value &&
   typeof (value as StreamVadContextLike).createStream === 'function' &&
@@ -196,6 +205,12 @@ export class RealtimeTranscriber {
   private previousKeptUnits: TimedUnit[] = []
 
   private languageLock?: LanguageLock
+
+  /** Slices that ended at a split inside speech (their text ends mid-sentence) */
+  private inSpeechCuts = new Set<number>()
+
+  /** Prompt chaining across an in-speech split (evaluation toggle) */
+  private readonly promptAcrossSplit: 'full' | 'sentence' | 'drop'
 
   // Simplified VAD state management
   private lastSpeechDetectedTime = 0
@@ -309,6 +324,8 @@ export class RealtimeTranscriber {
     this.overlapSamples = isWhisper
       ? Math.max(0, Math.round(((options.splitOverlapMs ?? 0) * this.sampleRate) / 1000))
       : 0
+    this.promptAcrossSplit =
+      (options as { promptAcrossSplit?: 'full' | 'sentence' | 'drop' }).promptAcrossSplit ?? 'sentence'
     const { language } = this.options.transcribeOptions as TranscribeOptions
     if (isWhisper && options.languageLock && (!language || language === 'auto')) {
       this.languageLock = new LanguageLock(
@@ -519,6 +536,7 @@ export class RealtimeTranscriber {
       if (this.currentSliceAudio().length / 2 >= this.maxSliceSamples) {
         this.log('Slice reached maxSpeechDurationS, finalizing it')
         // The speech goes on in the next slice
+        this.markInSpeechCut()
         this.finishSlice('max_duration')
       }
     }
@@ -555,7 +573,18 @@ export class RealtimeTranscriber {
       this.sliceManager.truncateCurrentSlice(cut * 2)
     }
     this.emitVadEvent('speech_end', confidence)
+    if (info.inSpeech) this.markInSpeechCut()
     this.finishSlice(info.reason, keepUntil)
+  }
+
+  /** The current slice ends at a split inside speech */
+  private markInSpeechCut(): void {
+    const index = this.sliceManager.getCurrentSliceInfo().currentSliceIndex
+    this.inSpeechCuts.add(index)
+    // Only the slice right before a prompt matters
+    this.inSpeechCuts.forEach((old) => {
+      if (old < index - 1) this.inSpeechCuts.delete(old)
+    })
   }
 
   private currentSliceAudio(): Uint8Array {
@@ -704,7 +733,14 @@ export class RealtimeTranscriber {
   private getPreviousResultTexts(currentSliceIndex: number): string[] {
     const previous: Array<[number, string]> = []
     this.transcriptionResults.forEach((result, sliceIndex) => {
-      const text = result.transcribeEvent.data?.result
+      let text = result.transcribeEvent.data?.result
+      if (text && sliceIndex === currentSliceIndex - 1 && this.inSpeechCuts.has(sliceIndex)) {
+        // The slice right before was cut inside speech: its text ends mid-sentence
+        // where this audio goes on, and Whisper tends to skip what it believes
+        // the prompt already covers
+        if (this.promptAcrossSplit === 'drop') text = ''
+        else if (this.promptAcrossSplit === 'sentence') text = untilLastSentenceEnd(text)
+      }
       // A repetition loop in the prompt makes Whisper repeat it in every later slice
       if (sliceIndex < currentSliceIndex && text && !isRepetitive(text)) {
         previous.push([sliceIndex, text])
@@ -1109,6 +1145,7 @@ export class RealtimeTranscriber {
     this.sliceKeepFrom = undefined
     this.overlapCarry = null
     this.previousKeptUnits = []
+    this.inSpeechCuts.clear()
     this.languageLock?.reset()
 
     // Cancel WAV file writing if in progress
