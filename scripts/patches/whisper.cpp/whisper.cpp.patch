@@ -1,3 +1,7 @@
+Apply audio_ctx (and the Core ML full-context fallback) before language
+detection: detection encodes too, and used the previous call's audio context
+(the full 30 s on the first call).
+
 Honour whisper_context_params.use_coreml (see whisper.h.patch) when loading the
 Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple targets.
 
@@ -380,10 +384,13 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      }
  
      // load weights
-@@ -7145,6 +7234,15 @@
+@@ -6989,6 +7078,18 @@
+         }
      }
-     state->exp_n_audio_ctx = params.audio_ctx;
  
++    // before language detection, which encodes too
++    state->exp_n_audio_ctx = params.audio_ctx;
++
 +#ifdef WHISPER_USE_COREML
 +    // the Core ML encoder takes a fixed 1x80x3000 mel input, a shorter audio context cannot be fed to it
 +    if (state->ctx_coreml != nullptr && state->exp_n_audio_ctx > 0 && state->exp_n_audio_ctx < whisper_n_audio_ctx(ctx)) {
@@ -393,10 +400,19 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
 +    }
 +#endif
 +
+     // auto-detect language if not specified
+     if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
+         std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
+@@ -7143,8 +7244,6 @@
+         WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
+         return -5;
+     }
+-    state->exp_n_audio_ctx = params.audio_ctx;
+-
      // these tokens determine the task that will be performed
      std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
  
-@@ -9358,7 +9456,9 @@
+@@ -9358,7 +9457,9 @@
      (void) level;
      (void) user_data;
  #ifndef WHISPER_DEBUG

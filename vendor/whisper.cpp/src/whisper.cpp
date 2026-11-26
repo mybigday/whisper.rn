@@ -7078,6 +7078,18 @@ int whisper_full_with_state(
         }
     }
 
+    // before language detection, which encodes too
+    state->exp_n_audio_ctx = params.audio_ctx;
+
+#ifdef WHISPER_USE_COREML
+    // the Core ML encoder takes a fixed 1x80x3000 mel input, a shorter audio context cannot be fed to it
+    if (state->ctx_coreml != nullptr && state->exp_n_audio_ctx > 0 && state->exp_n_audio_ctx < whisper_n_audio_ctx(ctx)) {
+        WHISPER_LOG_WARN("%s: audio_ctx = %d is not supported by the Core ML encoder, using the full context (%d)\n",
+                __func__, state->exp_n_audio_ctx, whisper_n_audio_ctx(ctx));
+        state->exp_n_audio_ctx = 0;
+    }
+#endif
+
     // auto-detect language if not specified
     if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
         std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
@@ -7232,17 +7244,6 @@ int whisper_full_with_state(
         WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
         return -5;
     }
-    state->exp_n_audio_ctx = params.audio_ctx;
-
-#ifdef WHISPER_USE_COREML
-    // the Core ML encoder takes a fixed 1x80x3000 mel input, a shorter audio context cannot be fed to it
-    if (state->ctx_coreml != nullptr && state->exp_n_audio_ctx > 0 && state->exp_n_audio_ctx < whisper_n_audio_ctx(ctx)) {
-        WHISPER_LOG_WARN("%s: audio_ctx = %d is not supported by the Core ML encoder, using the full context (%d)\n",
-                __func__, state->exp_n_audio_ctx, whisper_n_audio_ctx(ctx));
-        state->exp_n_audio_ctx = 0;
-    }
-#endif
-
     // these tokens determine the task that will be performed
     std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
 
