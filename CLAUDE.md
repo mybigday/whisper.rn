@@ -153,7 +153,7 @@ The modern `RealtimeTranscriber` (in `src/realtime-transcription/`) provides:
 
 4. **Prompt Chaining**:
    - Optional initial prompt
-   - Can chain previous slice results as context
+   - Can chain previous slice results as context (not across an in-speech split: that slice gets no history, `promptAcrossSplit` in `RealtimeTranscriber.ts`; nor repetition loops)
    - Improves continuity in long transcriptions
 
 5. **Audio Stream Adapters**:

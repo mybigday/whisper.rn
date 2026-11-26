@@ -303,7 +303,7 @@ const transcriber = new RealtimeTranscriber(
 )
 ```
 
-`initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. A result that is a repetition loop (mostly repeated 3-grams) is not chained into later prompts, since Whisper would repeat it in every following slice. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
+`initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. A result that is a repetition loop (mostly repeated 3-grams) is not chained into later prompts, since Whisper would repeat it in every following slice. Neither is a slice that follows a split inside speech (`endReason: 'max_duration'` with no pause at the cut): the prompt would end mid-sentence where the audio goes on, and Whisper then drops or repeats words at the cut, with every model size we measured (base to large-v3-turbo). The slice is transcribed with `initialPrompt` only. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
 
 **Long-running sessions:** `maxSlicesInMemory` only bounds raw audio. Per-slice results (transcript + segments) returned by `getTranscriptionResults()` are kept until `stop()`/`reset()` by default, so a transcriber that runs for hours or days grows without bound. Set `maxResultsInMemory` to keep only the newest N results (older ones are dropped oldest-first) and, when `promptPreviousSlices` is enabled, `maxPromptSlices` to cap how many previous results are appended to each Whisper prompt. Consumers that need every result should collect them from `onTranscribe` as they arrive.
 
