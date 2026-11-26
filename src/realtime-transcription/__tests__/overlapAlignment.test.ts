@@ -1,4 +1,4 @@
-import { dropRepeatedPrefix, joinUnits, keepUnitsInRange, timedUnits } from '../overlapAlignment'
+import { anchorAfterPrevious, dropRepeatedPrefix, joinUnits, keepUnitsInRange, timedUnits } from '../overlapAlignment'
 
 const token = (text: string, t0: number, tDtw = -1) => ({ id: 0, text, p: 1, plog: 0, t0, t1: -1, tDtw })
 
@@ -39,5 +39,17 @@ describe('overlap alignment', () => {
     const chars = (text: string) => [...text].map((t) => ({ text: t, start: 0 }))
     expect(joinUnits(dropRepeatedPrefix(chars('我的'), chars('的話')))).toBe('的話')
     expect(joinUnits(dropRepeatedPrefix(chars('實驗時'), chars('驗時用')))).toBe('用')
+  })
+
+  it('anchors a slice right after the previous slice\'s last words', () => {
+    const at = (text: string, start: number) => text.split(' ').map((t, i) => ({ text: ` ${t}`, start: start + i * 100 }))
+    const previous = at('ask not what your country', 0)
+    // Times would put "can" before the cut; the text says it comes after "your country"
+    const units = at('your country can do for you', 900)
+    expect(anchorAfterPrevious(previous, units, 2000)).toBe(2)
+    // Not found past the search window
+    expect(anchorAfterPrevious(previous, units, 950)).toBe(-1)
+    // A short single word does not anchor
+    expect(anchorAfterPrevious(at('so do', 0), at('do it', 0), 2000)).toBe(-1)
   })
 })

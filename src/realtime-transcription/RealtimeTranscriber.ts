@@ -12,6 +12,7 @@ import type { StreamVadContextLike } from './StreamVad'
 import { ContinuousSpeechSource } from './ContinuousSpeechSource'
 import { LanguageLock } from './LanguageLock'
 import {
+  anchorAfterPrevious,
   dropRepeatedPrefix,
   joinUnits,
   keepUnitsInRange,
@@ -63,6 +64,9 @@ const DEFAULT_MAX_SEGMENT_SEC = 30
 /** Overlap word assignment: a word starting this much before the cut may still be kept */
 const OVERLAP_SLACK_SEC = 0.1
 
+/** Overlap text anchor: look for the previous slice's last words this far past the cut */
+const OVERLAP_ANCHOR_SEARCH_SEC = 1
+
 /** Treat undefined / non-positive limits as "unbounded". */
 const normalizeLimit = (value: number | undefined): number =>
   value && value > 0 ? Math.floor(value) : Infinity
@@ -77,6 +81,20 @@ const trimMapToLimit = (map: Map<number, unknown>, limit: number): void => {
     map.delete(oldestKey)
     excess -= 1
   }
+}
+
+/**
+ * Whether a transcript is a repetition loop ("A B C. A B C. A B C ..."): at
+ * least 12 words (or CJK characters) of which most 3-grams are repeats.
+ */
+export const isRepetitive = (text: string): boolean => {
+  const units = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/.test(text)
+    ? [...text.replace(/\s+/g, '')]
+    : text.toLowerCase().split(/\s+/).filter(Boolean)
+  if (units.length < 12) return false
+  const grams = new Set<string>()
+  for (let i = 0; i + 3 <= units.length; i += 1) grams.add(units.slice(i, i + 3).join(' '))
+  return grams.size / (units.length - 2) < 0.5
 }
 
 const isStreamVadContext = (value: unknown): value is StreamVadContextLike =>
@@ -171,6 +189,9 @@ export class RealtimeTranscriber {
 
   /** Units kept by the previous final, for the repeated-prefix check */
   private previousKeptUnits: TimedUnit[] = []
+
+  /** Overlap: anchor a slice's start on the previous slice's last words (evaluation toggle) */
+  private readonly overlapTextAnchor: boolean
 
   private languageLock?: LanguageLock
 
@@ -284,6 +305,7 @@ export class RealtimeTranscriber {
     this.overlapSamples = isWhisper
       ? Math.max(0, Math.round(((options.splitOverlapMs ?? 0) * this.sampleRate) / 1000))
       : 0
+    this.overlapTextAnchor = (options as { overlapTextAnchor?: boolean }).overlapTextAnchor !== false
     const { language } = this.options.transcribeOptions as TranscribeOptions
     if (isWhisper && options.languageLock && (!language || language === 'auto')) {
       this.languageLock = new LanguageLock(
@@ -661,7 +683,10 @@ export class RealtimeTranscriber {
     const previous: Array<[number, string]> = []
     this.transcriptionResults.forEach((result, sliceIndex) => {
       const text = result.transcribeEvent.data?.result
-      if (sliceIndex < currentSliceIndex && text) previous.push([sliceIndex, text])
+      // A repetition loop in the prompt makes Whisper repeat it in every later slice
+      if (sliceIndex < currentSliceIndex && text && !isRepetitive(text)) {
+        previous.push([sliceIndex, text])
+      }
     })
     previous.sort(([a], [b]) => a - b)
 
@@ -731,13 +756,20 @@ export class RealtimeTranscriber {
       this.previousKeptUnits = []
       return
     }
-    let kept = keepUnitsInRange(
-      units,
-      item.keepFrom,
-      item.keepUntil,
-      OVERLAP_SLACK_SEC * this.sampleRate,
-    )
-    if (item.keepFrom !== undefined) kept = dropRepeatedPrefix(this.previousKeptUnits, kept)
+    let kept: TimedUnit[] | null = null
+    if (item.keepFrom !== undefined && this.overlapTextAnchor) {
+      // Text first: continue right after the previous slice's last kept words
+      const anchor = anchorAfterPrevious(
+        this.previousKeptUnits,
+        units,
+        item.keepFrom + OVERLAP_ANCHOR_SEARCH_SEC * this.sampleRate,
+      )
+      if (anchor >= 0) kept = keepUnitsInRange(units.slice(anchor), undefined, item.keepUntil, 0)
+    }
+    if (!kept) {
+      kept = keepUnitsInRange(units, item.keepFrom, item.keepUntil, OVERLAP_SLACK_SEC * this.sampleRate)
+      if (item.keepFrom !== undefined) kept = dropRepeatedPrefix(this.previousKeptUnits, kept)
+    }
     result.result = joinUnits(kept)
     this.previousKeptUnits = kept
   }

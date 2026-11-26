@@ -97,3 +97,31 @@ export function keepUnitsInRange(
 }
 
 export const joinUnits = (units: TimedUnit[]) => units.map((u) => u.text).join('').trim()
+
+/**
+ * Where a slice that starts with overlap audio should begin, by text: right
+ * after the previous slice's last kept units (2 or 3 of them, or a single
+ * spaced word), found among the units starting before `searchUntil`. DTW times
+ * are compressed at the end of a decode and early at its start, so a word just
+ * after the cut can look like it is before it, in both slices; the text match
+ * keeps it. Returns -1 when there is no match.
+ */
+export function anchorAfterPrevious(
+  previous: TimedUnit[],
+  units: TimedUnit[],
+  searchUntil: number,
+): number {
+  const prev = previous.map((u) => normalize(u.text)).filter(Boolean)
+  const cur = units.map((u) => normalize(u.text))
+  const searchable = units.findIndex((u) => u.start >= searchUntil)
+  const limit = searchable < 0 ? units.length : searchable
+  for (let k = Math.min(3, prev.length); k >= 1; k -= 1) {
+    const tail = prev.slice(prev.length - k)
+    // A single unit only anchors as a spaced word of some length
+    if (k === 1 && (CJK.test(tail[0]!) || tail[0]!.length < 4)) break
+    for (let end = k; end <= limit; end += 1) {
+      if (tail.every((w, i) => w === cur[end - k + i])) return end
+    }
+  }
+  return -1
+}

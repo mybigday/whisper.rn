@@ -1,4 +1,4 @@
-import { RealtimeTranscriber } from '../RealtimeTranscriber'
+import { RealtimeTranscriber, isRepetitive } from '../RealtimeTranscriber'
 import { StreamVad } from '../StreamVad'
 import type { StreamVadContextLike, VadStreamLike } from '../StreamVad'
 import { StreamingVadSegmenter } from '../StreamingVadSegmenter'
@@ -584,6 +584,34 @@ describe('RealtimeTranscriber', () => {
   })
 
   describe('quality', () => {
+    it('spots repetition loops', () => {
+      expect(isRepetitive('And then we have a new data set. '.repeat(4))).toBe(true)
+      expect(isRepetitive('Lexical borrowing is a type of linguistic borrowing, which is basically reproducing patterns.')).toBe(false)
+      expect(isRepetitive('我們有一個新的資料集'.repeat(3))).toBe(true)
+      expect(isRepetitive('short. short. short.')).toBe(false)
+    })
+
+    it('keeps repetition loops out of the prompt', async () => {
+      const stream = createStream()
+      const loop = 'And then we have a new data set. '.repeat(4).trim()
+      const { context, calls } = createWhisper((_c, i) => ({ result: i === 0 ? loop : `r${i}` }))
+      const t = new RealtimeTranscriber(
+        { whisperContext: context, audioStream: stream },
+        { realtimeProcessingPauseMs: 1e9, initRealtimeAfterMs: 1e9 },
+      )
+      await t.start()
+      for (let i = 0; i < 3; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await feed(stream, makeAudio([[300, true]]))
+        // eslint-disable-next-line no-await-in-loop
+        await t.nextSlice()
+        // eslint-disable-next-line no-await-in-loop
+        await settle()
+      }
+      expect(calls.map((c) => c.options.prompt)).toEqual([undefined, undefined, 'r1'])
+      await t.release()
+    })
+
     it('drops segments below minAvgLogprob', async () => {
       const stream = createStream()
       const onTranscribe = jest.fn()
