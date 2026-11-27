@@ -130,9 +130,14 @@ const styles = StyleSheet.create({
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
 // 3:19 public-domain speech (16 kHz mono PCM16): long enough to show pauses,
-// max-duration splits and memory behaviour, unlike the 11 s jfk.wav
-const SAMPLE_AUDIO_URL =
-  'https://huggingface.co/datasets/BricksDisplay/speech-samples/resolve/main/gwb-columbia.wav'
+// max-duration splits and memory behaviour, unlike the 11 s jfk.wav. The noisy
+// one mixes in restaurant / shopping-mall ambience (sources in the dataset card)
+const SAMPLE_BASE_URL =
+  'https://huggingface.co/datasets/BricksDisplay/speech-samples/resolve/main'
+const SAMPLES = [
+  { file: 'gwb-columbia.wav', label: 'Clean speech' },
+  { file: 'gwb-columbia-restaurant-5db.wav', label: 'Noisy (restaurant, 5 dB SNR)' },
+]
 
 export default function RealtimeTranscriberDemo() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
@@ -161,6 +166,7 @@ export default function RealtimeTranscriberDemo() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const [simulationStats, setSimulationStats] = useState<any>(null)
   const [audioFilePath, setAudioFilePath] = useState<string | null>(null)
+  const [sampleIndex, setSampleIndex] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
@@ -199,12 +205,12 @@ export default function RealtimeTranscriberDemo() {
     return () => clearInterval(interval)
   }, [useFileSimulation, isTranscribing])
 
-  const downloadAudioFile = async () => {
+  const downloadAudioFile = async (sample = SAMPLES[sampleIndex]!) => {
     setIsDownloading(true)
     setDownloadProgress(0)
 
     try {
-      const downloadPath = `${fileDir}/gwb-columbia.wav`
+      const downloadPath = `${fileDir}/${sample.file}`
 
       // Check if file already exists
       const exists = await RNFS.exists(downloadPath)
@@ -218,7 +224,7 @@ export default function RealtimeTranscriberDemo() {
       log('Downloading the speech sample (3:19)...')
 
       const downloadResult = await RNFS.downloadFile({
-        fromUrl: SAMPLE_AUDIO_URL,
+        fromUrl: `${SAMPLE_BASE_URL}/${sample.file}`,
         toFile: downloadPath,
         progress: (res) => {
           const progress = (res.bytesWritten / res.contentLength) * 100
@@ -761,6 +767,25 @@ export default function RealtimeTranscriberDemo() {
               Using a 3:19 public-domain speech sample (Columbia address, 2003)
             </Text>
           )}
+          {useFileSimulation && (
+            <>
+              <View style={styles.configRow}>
+                <Text style={styles.configLabel}>Sample:</Text>
+                <Text style={styles.configValue}>{SAMPLES[sampleIndex]!.label}</Text>
+              </View>
+              <Button
+                title="Change Sample"
+                onPress={() => {
+                  const next = (sampleIndex + 1) % SAMPLES.length
+                  setSampleIndex(next)
+                  setAudioFilePath(null)
+                  downloadAudioFile(SAMPLES[next])
+                }}
+                style={styles.buttonClear}
+                disabled={isDownloading || isTranscribing}
+              />
+            </>
+          )}
           <View style={styles.configRow}>
             <Text style={styles.configLabel}>Use File Simulation:</Text>
             <Switch
@@ -947,7 +972,7 @@ export default function RealtimeTranscriberDemo() {
               Slices: {realtimeStats.sliceStats?.currentSliceIndex || 0}{' '}
               current, {realtimeStats.sliceStats?.transcribeSliceIndex || 0}{' '}
               transcribing | Audio Source:{' '}
-              {useFileSimulation ? 'File (sample)' : 'Live'}
+              {useFileSimulation ? `File (${SAMPLES[sampleIndex]!.label})` : 'Live'}
               {useFileSimulation && ` @ ${playbackSpeed}x`}
             </Text>
             <Text style={styles.statusText}>
