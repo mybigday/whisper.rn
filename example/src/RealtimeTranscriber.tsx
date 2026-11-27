@@ -12,11 +12,19 @@ import {
   Switch,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import { initWhisper, initWhisperVad, libVersion } from '../../src'
-import type { WhisperContext, WhisperVadContext } from '../../src'
+import { initParakeet, initWhisper, initWhisperVad, libVersion } from '../../src'
+import type { ParakeetContext, WhisperContext, WhisperVadContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, toTimestamp, downloadModel, whisperModels, WhisperModel } from './util'
+import {
+  createDir,
+  fileDir,
+  toTimestamp,
+  downloadModel,
+  downloadParakeetModel,
+  whisperModels,
+  WhisperModel,
+} from './util'
 import {
   RealtimeTranscriber,
   VAD_PRESETS,
@@ -132,6 +140,8 @@ const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 // 3:19 public-domain speech (16 kHz mono PCM16): long enough to show pauses,
 // max-duration splits and memory behaviour, unlike the 11 s jfk.wav. The noisy
 // one mixes in restaurant / shopping-mall ambience (sources in the dataset card)
+const PARAKEET_MODEL = 'parakeet-v3 (q8_0)'
+
 const SAMPLE_BASE_URL =
   'https://huggingface.co/datasets/BricksDisplay/speech-samples/resolve/main'
 const SAMPLES = [
@@ -141,6 +151,9 @@ const SAMPLES = [
 
 export default function RealtimeTranscriberDemo() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
+  // Either engine transcribes; initializing one releases the other
+  const parakeetContextRef = useRef<ParakeetContext | null>(null)
+  const [engine, setEngine] = useState<'whisper' | 'parakeet' | null>(null)
   const vadContextRef = useRef<WhisperVadContext | null>(null)
   const realtimeTranscriberRef = useRef<RealtimeTranscriber | null>(null)
   const audioStreamRef = useRef<AudioStreamInterface | null>(null)
@@ -169,10 +182,13 @@ export default function RealtimeTranscriberDemo() {
   const [sampleIndex, setSampleIndex] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
-  const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
+  // Whisper models, plus Parakeet TDT 0.6B v3 (q8_0) as the other engine
+  const [selectedModel, setSelectedModel] = useState<WhisperModel | typeof PARAKEET_MODEL>('base')
   const [modelDownloadProgress, setModelDownloadProgress] = useState<number>(0)
 
   const log = useCallback((...messages: any[]) => {
+    // Also to the console (logcat / Xcode), to follow a long session
+    console.log('[RealtimeDemo]', ...messages)
     setLogs((prev) => [
       ...prev,
       `${new Date().toLocaleTimeString()}: ${messages.join(' ')}`,
@@ -183,6 +199,7 @@ export default function RealtimeTranscriberDemo() {
     () => () => {
       // Cleanup on unmount
       whisperContextRef.current?.release()
+      parakeetContextRef.current?.release()
       vadContextRef.current?.release()
       realtimeTranscriberRef.current?.release()
     },
@@ -261,6 +278,11 @@ export default function RealtimeTranscriberDemo() {
         whisperContextRef.current = null
         log('Released previous Whisper context')
       }
+      if (parakeetContextRef.current) {
+        await parakeetContextRef.current.release()
+        parakeetContextRef.current = null
+        log('Released previous Parakeet context')
+      }
 
       if (vadContextRef.current) {
         log('Found previous VAD context')
@@ -279,6 +301,7 @@ export default function RealtimeTranscriberDemo() {
       log('Loaded Whisper model, ID:', whisperCtx.id)
       log('Loaded Whisper model in', endTime - startTime, `ms in ${mode} mode`)
       whisperContextRef.current = whisperCtx
+      setEngine('whisper')
 
       log('Initializing VAD context...')
       const vadStartTime = Date.now()
@@ -304,12 +327,21 @@ export default function RealtimeTranscriberDemo() {
   }
 
   const initializeContextsWithDownload = async () => {
+    if (selectedModel === PARAKEET_MODEL) {
+      await initializeParakeet()
+      return
+    }
     try {
       if (whisperContextRef.current) {
         log('Found previous Whisper context')
         await whisperContextRef.current.release()
         whisperContextRef.current = null
         log('Released previous Whisper context')
+      }
+      if (parakeetContextRef.current) {
+        await parakeetContextRef.current.release()
+        parakeetContextRef.current = null
+        log('Released previous Parakeet context')
       }
 
       if (vadContextRef.current) {
@@ -320,7 +352,7 @@ export default function RealtimeTranscriberDemo() {
       }
 
       const modelFilePath = await downloadModel(
-        selectedModel,
+        selectedModel as WhisperModel,
         (progress) => {
           setModelDownloadProgress(progress)
           log(`Download progress: ${Math.round(progress * 100)}%`)
@@ -335,6 +367,7 @@ export default function RealtimeTranscriberDemo() {
       log('Loaded Whisper model, ID:', whisperCtx.id)
       log('Loaded Whisper model in', endTime - startTime, `ms in ${mode} mode`)
       whisperContextRef.current = whisperCtx
+      setEngine('whisper')
       setModelDownloadProgress(0)
 
       log('Initializing VAD context...')
@@ -361,8 +394,47 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
+  const initializeParakeet = async () => {
+    try {
+      if (whisperContextRef.current) {
+        await whisperContextRef.current.release()
+        whisperContextRef.current = null
+        log('Released previous Whisper context')
+      }
+      if (parakeetContextRef.current) {
+        await parakeetContextRef.current.release()
+        parakeetContextRef.current = null
+      }
+      const modelPath = await downloadParakeetModel(
+        'q8_0',
+        (progress) => setModelDownloadProgress(progress),
+        log,
+      )
+      setModelDownloadProgress(0)
+      log('Initializing Parakeet context...')
+      const startTime = Date.now()
+      parakeetContextRef.current = await initParakeet({ filePath: modelPath })
+      log(`Loaded Parakeet model in ${Date.now() - startTime} ms in ${mode} mode`)
+      setEngine('parakeet')
+
+      if (!vadContextRef.current) {
+        vadContextRef.current = await initWhisperVad({
+          filePath: require('../assets/ggml-silero-v6.2.0.bin'),
+          useGpu: true,
+          nThreads: 4,
+        })
+        log('Loaded VAD model')
+      }
+      log('Parakeet and VAD contexts initialized successfully!')
+    } catch (error) {
+      log('Error initializing Parakeet:', error)
+      setModelDownloadProgress(0)
+      Alert.alert('Error', `Failed to initialize Parakeet: ${error}`)
+    }
+  }
+
   const startRealtimeTranscription = async () => {
-    if (!whisperContextRef.current || !vadContextRef.current) {
+    if ((!whisperContextRef.current && !parakeetContextRef.current) || !vadContextRef.current) {
       Alert.alert('Error', 'Contexts not initialized')
       return
     }
@@ -419,7 +491,9 @@ export default function RealtimeTranscriberDemo() {
       const transcriber = new RealtimeTranscriber(
         // Dependencies
         {
-          whisperContext: whisperContextRef.current,
+          ...(parakeetContextRef.current
+            ? { parakeetContext: parakeetContextRef.current }
+            : { whisperContext: whisperContextRef.current! }),
           // Stateful VAD: one native stream, one speech probability per 32 ms hop
           vadContext: vadContextRef.current,
           audioStream,
@@ -538,10 +612,9 @@ export default function RealtimeTranscriberDemo() {
       }
 
       log(
-        `Transcribed slice ${sliceIndex}: "${data.result.substring(
-          0,
-          50,
-        )}..." (Total results: ${allResults.length})`,
+        `Transcribed slice ${sliceIndex} (${event.isFinal ? 'final' : 'draft'}, ${
+          event.processTime
+        } ms): "${data.result.substring(0, 50)}..." (Total results: ${allResults.length})`,
       )
     }
   }
@@ -721,9 +794,9 @@ export default function RealtimeTranscriberDemo() {
         <Text style={[styles.configTitle, { fontSize: 18, marginBottom: 12, textAlign: 'center' }]}>Realtime Transcriber Demo</Text>
         {/* Model Selection */}
         <View style={styles.configContainer}>
-          <Text style={styles.configTitle}>Whisper Model Selection</Text>
+          <Text style={styles.configTitle}>Model Selection</Text>
           <View style={styles.buttons}>
-            {whisperModels.map((model) => (
+            {[...whisperModels, PARAKEET_MODEL as typeof PARAKEET_MODEL].map((model) => (
               <Button
                 key={model}
                 title={model}
@@ -750,6 +823,11 @@ export default function RealtimeTranscriberDemo() {
             disabled={isTranscribing}
           />
         </View>
+        {engine && (
+          <Text style={styles.configLabel}>
+            Engine: {engine === 'parakeet' ? 'Parakeet TDT 0.6B v3 (q8_0)' : 'Whisper'}
+          </Text>
+        )}
 
         {modelDownloadProgress > 0 && modelDownloadProgress < 1 && (
           <View style={styles.logContainer}>
@@ -885,7 +963,7 @@ export default function RealtimeTranscriberDemo() {
             }
             style={isTranscribing ? styles.buttonDanger : styles.buttonActive}
             disabled={
-              !whisperContextRef.current ||
+              !engine ||
               (useFileSimulation && !audioFilePath) ||
               isDownloading
             }
