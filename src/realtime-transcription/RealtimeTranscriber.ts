@@ -335,7 +335,7 @@ export class RealtimeTranscriber {
 
   /** A finite maximum segment duration: it bounds every slice, and so each draft's cost */
   private boundedMaxSpeech(value: number | undefined): number {
-    if (value !== undefined && value > 0) return value
+    if (value !== undefined && Number.isFinite(value) && value > 0) return value
     this.log(`maxSpeechDurationS must be finite, using ${DEFAULT_MAX_SEGMENT_SEC} s`)
     return DEFAULT_MAX_SEGMENT_SEC
   }
@@ -551,7 +551,16 @@ export class RealtimeTranscriber {
     const cut = info.endSample - this.sliceStartSample
     let keepUntil: number | undefined
     if (info.inSpeech && this.overlapSamples > 0) {
-      const audio = this.currentSliceAudio()
+      let audio = this.currentSliceAudio()
+      // Audio past the cut the slice has not received yet (one chunk spanning the cut)
+      const have = audio.length / 2 - cut
+      if (info.after && have < this.overlapSamples) {
+        const extra = info.after.subarray(Math.max(0, have) * 2, this.overlapSamples * 2)
+        if (extra.byteLength > 0) {
+          this.sliceManager.addAudioData(extra)
+          audio = this.currentSliceAudio()
+        }
+      }
       const available = audio.length / 2
       const end = Math.min(available, cut + this.overlapSamples)
       this.sliceManager.truncateCurrentSlice(Math.max(0, end) * 2)

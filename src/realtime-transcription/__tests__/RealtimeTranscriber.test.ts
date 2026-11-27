@@ -373,6 +373,19 @@ describe('RealtimeTranscriber', () => {
       await t.release()
     })
 
+    it('does not take an infinite maximum, at construction or later', async () => {
+      const logger = jest.fn()
+      const t = new RealtimeTranscriber(
+        { whisperContext: createWhisper().context, audioStream: createStream() },
+        { vadOptions: { maxSpeechDurationS: Infinity }, logger },
+      )
+      expect(logger).toHaveBeenCalledTimes(1)
+      t.updateVadOptions({ maxSpeechDurationS: Infinity })
+      expect(logger).toHaveBeenCalledTimes(2)
+      expect(logger.mock.calls.every(([m]) => /maxSpeechDurationS must be finite/.test(m))).toBe(true)
+      await t.release()
+    })
+
     it('says that audioSliceSec is gone', async () => {
       const logger = jest.fn()
       const t = new RealtimeTranscriber(
@@ -790,6 +803,34 @@ describe('RealtimeTranscriber', () => {
       const words = finals.map((e) => e.data!.result).join(' ').split(/\s+/).filter(Boolean)
       const expected = Array.from({ length: total / 1600 }, (_, k) => `w${k}`)
       expect(words).toEqual(expected)
+      await t.release()
+    })
+
+    it('gives the right-hand overlap even when one chunk spans the split', async () => {
+      const stream = createStream()
+      const onTranscribe = jest.fn()
+      const { context, calls } = wordWhisper()
+      const t = new RealtimeTranscriber(
+        { whisperContext: context, audioStream: stream },
+        { vadOptions: { maxSpeechDurationS: 2 }, splitOverlapMs: 400, realtimeProcessingPauseMs: 1e9, initRealtimeAfterMs: 1e9 },
+        { onTranscribe },
+      )
+      await t.start()
+      const total = 4 * SR
+      // The whole audio in one chunk: the split falls inside it
+      await feed(stream, positionAudio(total), 4000)
+      await t.stop()
+
+      const finals = finalsOf(onTranscribe)
+      const first = finals[0]!
+      expect(first.endReason).toBe('max_duration')
+      // The next slice starts 400 ms before the cut (left overlap); the first
+      // final's audio reaches 400 ms past it
+      const cut = finals[1]!.startSample! + 0.4 * SR
+      const firstCall = calls.find((c) => c.samples[0] === 0)!
+      expect(firstCall.samples.length).toBe(cut + 0.4 * SR)
+      const words = finals.map((e) => e.data!.result).join(' ').split(/\s+/).filter(Boolean)
+      expect(words).toEqual(Array.from({ length: total / 1600 }, (_, k) => `w${k}`))
       await t.release()
     })
   })

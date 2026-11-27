@@ -178,6 +178,11 @@ export interface VadSpeechEndInfo {
   reason: VadSegmentEndReason
   /** A max-duration split inside speech: the next segment starts at `endSample` */
   inSpeech?: boolean
+  /**
+   * For an in-speech split: audio already received from `endSample` on (it
+   * comes again with the next segment), as right-hand context for the ending one
+   */
+  after?: Uint8Array
 }
 
 /** Why a slice was finalized: its VAD segment's end reason, or `manual` (`nextSlice()`) */

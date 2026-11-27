@@ -336,7 +336,11 @@ export class StreamVad implements RealtimeSegmenterLike {
         this.speechEndCallback?.(1 - event.prob, {
           endSample,
           reason: event.reason,
-          ...(event.inSpeech ? { inSpeech: true } : {}),
+          // A chunk can reach past the cut: hand its audio along, so the ending
+          // segment gets right-hand context however the audio was chunked
+          ...(event.inSpeech
+            ? { inSpeech: true, after: this.audio.read(endSample, this.audio.end) }
+            : {}),
         })
       }
     })
