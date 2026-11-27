@@ -1,11 +1,6 @@
-Keep the probability of the auto-detected language (whisper_full_lang_prob, see
-whisper.h.patch); whisper_full() only logged it.
-
-No-speech probability: whisper_full read it from logits row 0, but the first
-decode only wrote the last prompt position, so the row was stale (with
-language detection it happened to hold the detection's <|startoftranscript|>
-logits, otherwise near 0). Request the logits at the <|startoftranscript|>
-position, as OpenAI's whisper reads them, and read that row.
+Apply audio_ctx (and the Core ML full-context fallback) before language
+detection: detection encodes too, and used the previous call's audio context
+(the full 30 s on the first call).
 
 Honour whisper_context_params.use_coreml (see whisper.h.patch) when loading the
 Core ML encoder, and fix a %ld/size_t format mismatch that warns on Apple targets.
@@ -415,11 +410,15 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  
      if (n_samples > 0) {
          // compute log mel spectrogram
-@@ -6989,6 +7084,18 @@
+@@ -6989,6 +7084,22 @@
          }
      }
  
-+    // before language detection, which encodes too
++    // before language detection, which encodes too (so is the bound check)
++    if (params.audio_ctx > whisper_n_audio_ctx(ctx)) {
++        WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
++        return -5;
++    }
 +    state->exp_n_audio_ctx = params.audio_ctx;
 +
 +#ifdef WHISPER_USE_COREML
@@ -434,7 +433,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // auto-detect language if not specified
      if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
          std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
-@@ -7006,6 +7113,7 @@
+@@ -7006,6 +7117,7 @@
              return -3;
          }
          state->lang_id = lang_id;
@@ -442,7 +441,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          params.language = whisper_lang_str(lang_id);
  
          WHISPER_LOG_INFO("%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
-@@ -7143,8 +7251,6 @@
+@@ -7143,8 +7255,6 @@
          WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
          return -5;
      }
@@ -451,7 +450,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // these tokens determine the task that will be performed
      std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
  
-@@ -7338,6 +7444,12 @@
+@@ -7338,6 +7448,12 @@
  
                  whisper_batch_prep_legacy(state->batch, prompt.data(), prompt.size(), 0, 0);
  
@@ -464,7 +463,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  if (!whisper_decode_internal(*ctx, *state, state->batch, params.n_threads, false, params.abort_callback, params.abort_callback_user_data)) {
                      WHISPER_LOG_ERROR("%s: failed to decode\n", __func__);
                      return -8;
-@@ -7346,12 +7458,16 @@
+@@ -7346,12 +7462,16 @@
                  // Calculate no_speech probability after first decode.
                  // This has to be done before any logit filtering. Hence we cannot use the probs from the whisper_process_logits.
                  {
@@ -483,7 +482,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                      state->no_speech_prob = probs[whisper_token_nosp(ctx)];
                  }
  
-@@ -7911,10 +8027,9 @@
+@@ -7911,10 +8031,9 @@
                      const int n_frames = std::min(std::min(WHISPER_CHUNK_SIZE * 100, seek_delta), seek_end - seek);
                      whisper_exp_compute_token_level_timestamps_dtw(
                              ctx, state, params, result_all.size() - n_segments, n_segments, seek, n_frames, 7, params.n_threads);
@@ -496,7 +495,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                      }
                  }
              }
-@@ -8052,6 +8167,12 @@
+@@ -8052,6 +8171,12 @@
              // correct the segment timestamp taking into account the offset
              result.t0 += chunk_offset_t;
              result.t1 += chunk_offset_t;
@@ -509,7 +508,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  
              // make sure that segments are not overlapping
              if (!ctx->state->result_all.empty()) {
-@@ -8117,6 +8238,14 @@
+@@ -8117,6 +8242,14 @@
      return ctx->state->lang_id;
  }
  
@@ -524,7 +523,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  static int64_t map_processed_to_original_time(int64_t processed_time, const std::vector<vad_time_mapping> & mapping_table) {
      if (mapping_table.empty()) {
          return processed_time;
-@@ -9358,7 +9487,9 @@
+@@ -9358,7 +9491,9 @@
      (void) level;
      (void) user_data;
  #ifndef WHISPER_DEBUG
