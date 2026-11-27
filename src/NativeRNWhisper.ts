@@ -33,6 +33,26 @@ export type TranscribeOptions = {
   beamSize?: number
   /** Number of best candidates to keep */
   bestOf?: number
+  /** Maximum number of text tokens per segment, 0 for no limit (Default: 0). A cap proportional to the audio length stops repetition loops early. */
+  maxTokens?: number
+  /** No timestamp-based splits: one segment per 30-second decoding window, so longer audio still gives several (Default: false) */
+  singleSegment?: boolean
+  /**
+   * A segment whose no-speech probability is above this, and whose average log
+   * probability is below `logprobThold`, is treated as silence and skipped (Default: 0.6)
+   */
+  noSpeechThold?: number
+  /** Retry with a higher temperature when the average log probability is below this (Default: -1) */
+  logprobThold?: number
+  /**
+   * Retry with a higher temperature when a result longer than 32 tokens has a token
+   * entropy below this, i.e. it repeats itself; higher catches more repetition, 0 turns the check off (Default: 2.4)
+   */
+  entropyThold?: number
+  /** Suppress blank outputs at the beginning of sampling (Default: true) */
+  suppressBlank?: boolean
+  /** Suppress non-speech tokens such as [MUSIC] or ♪ (Default: false) */
+  suppressNst?: boolean
   /** Initial Prompt */
   prompt?: string
 }
