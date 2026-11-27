@@ -64,6 +64,19 @@ const styles = StyleSheet.create({
   logText: { fontSize: 12, color: '#333' },
   // Grows with every slice: scroll inside, following the newest result
   resultScroll: { maxHeight: 320 },
+  liveContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    width: '95%',
+    marginVertical: 8,
+  },
+  liveScroll: { maxHeight: 160 },
+  liveText: { fontSize: 18, lineHeight: 26, color: '#111' },
+  liveDraft: { color: '#888', fontStyle: 'italic' },
+  liveHint: { fontSize: 11, color: '#888', marginTop: 6 },
   configContainer: {
     backgroundColor: '#f0f0f0',
     padding: 12,
@@ -138,6 +151,10 @@ export default function RealtimeTranscriberDemo() {
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
   const [vadEvents, setVadEvents] = useState<RealtimeVadEvent[]>([])
   const [stabilizedText, setStabilizedText] = useState<string>('')
+  // Live transcript: finals by slice, plus the newest draft of a slice not final yet
+  const [liveFinals, setLiveFinals] = useState<Record<number, string>>({})
+  const [liveDraft, setLiveDraft] = useState<{ sliceIndex: number; text: string } | null>(null)
+  const liveScrollRef = useRef<ScrollView | null>(null)
 
   // File simulation specific state
   const [useFileSimulation, setUseFileSimulation] = useState(false)
@@ -346,6 +363,8 @@ export default function RealtimeTranscriberDemo() {
 
     try {
       await createDir(log)
+      setLiveFinals({})
+      setLiveDraft(null)
 
       // Create appropriate audio stream adapter
       let audioStream: AudioStreamInterface
@@ -409,6 +428,14 @@ export default function RealtimeTranscriberDemo() {
             language: 'en',
             maxLen: 1,
           },
+          // Drafts only preview the segment still being spoken: encode just its
+          // length and decode greedily, so they keep up with the audio
+          draftTranscribeOptions: {
+            audioCtx: 'auto',
+            maxTokens: 64,
+            singleSegment: true,
+            temperatureInc: 0,
+          },
           audioOutputPath: `${fileDir}/realtime-recording.wav`,
         },
         // Callbacks
@@ -456,6 +483,17 @@ export default function RealtimeTranscriberDemo() {
 
   const handleTranscribeEvent = (event: RealtimeTranscribeEvent) => {
     const { data, sliceIndex } = event
+
+    // A final replaces the slice's draft; a draft only shows until its final
+    const text = data?.result?.trim() ?? ''
+    if (event.isFinal) {
+      setLiveFinals((prev) => ({ ...prev, [sliceIndex]: text }))
+      setLiveDraft((prev) => (prev && prev.sliceIndex <= sliceIndex ? null : prev))
+    } else if (text) {
+      setLiveDraft((prev) =>
+        prev && prev.sliceIndex > sliceIndex ? prev : { sliceIndex, text },
+      )
+    }
 
     if (data?.result) {
       // Get all transcription results from the transcriber
@@ -595,6 +633,8 @@ export default function RealtimeTranscriberDemo() {
     setRealtimeStats(null)
     setSimulationStats(null)
     setStabilizedText('')
+    setLiveFinals({})
+    setLiveDraft(null)
     log('Reset all components')
   }
 
@@ -913,6 +953,33 @@ export default function RealtimeTranscriberDemo() {
             <Text style={styles.statusText}>
               Stabilized Transcription:{' '}
               {stabilizedText}
+            </Text>
+          </View>
+        )}
+
+        {/* Live transcript: finals as they settle, the current draft in gray */}
+        {(Object.keys(liveFinals).length > 0 || liveDraft) && (
+          <View style={styles.liveContainer}>
+            <Text style={styles.configTitle}>Live Transcript</Text>
+            <ScrollView
+              ref={liveScrollRef}
+              style={styles.liveScroll}
+              nestedScrollEnabled
+              onContentSizeChange={() => liveScrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              <Text style={styles.liveText}>
+                {Object.entries(liveFinals)
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([, t]) => t)
+                  .filter(Boolean)
+                  .join(' ')}
+                {liveDraft && !(liveDraft.sliceIndex in liveFinals) && (
+                  <Text style={styles.liveDraft}>{` ${liveDraft.text}`}</Text>
+                )}
+              </Text>
+            </ScrollView>
+            <Text style={styles.liveHint}>
+              Black: final (per speech segment) · gray: draft of the segment still being spoken
             </Text>
           </View>
         )}
