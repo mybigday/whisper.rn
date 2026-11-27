@@ -230,6 +230,24 @@ describe('SimulateFileAudioStreamAdapter', () => {
       await chunkAdapter.release()
     })
 
+    it('should deliver the audio due by the clock when the timer fires late', async () => {
+      mockWavFileReader.getAudioSlice.mockImplementation(
+        (_offset: number, size: number) => new Uint8Array(size),
+      )
+      const paced = new SimulateFileAudioStreamAdapter({ fs: mockFs, filePath: 'test.wav' })
+      await paced.initialize({ sampleRate: 16000, channels: 1, bitsPerSample: 16 })
+      paced.onData(mockDataCallback)
+      await paced.start()
+
+      // A busy JS thread: 1 s passes before the first 100 ms tick runs
+      jest.setSystemTime(Date.now() + 1000)
+      jest.advanceTimersByTime(100)
+
+      // 1.1 s of audio in 100 ms chunks, not one chunk per tick
+      expect(mockDataCallback).toHaveBeenCalledTimes(11)
+      await paced.release()
+    })
+
     it('should stop streaming when end of file is reached', async () => {
       mockWavFileReader.getAudioSlice.mockReturnValue(null)
 
