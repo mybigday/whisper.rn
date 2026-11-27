@@ -12,6 +12,7 @@ import type {
   NativeVadContextOptions,
   TranscribeOptions,
   TranscribeResult,
+  TranscribeToken,
   VadOptions,
   VadSegment,
 } from './NativeRNWhisper'
@@ -214,6 +215,7 @@ const emitNativeLog = (level: string, text: string) => {
 export type {
   TranscribeOptions,
   TranscribeResult,
+  TranscribeToken,
   VadOptions,
   VadSegment,
 }
@@ -250,16 +252,21 @@ export class WhisperContext {
 
   reasonNoGPU = ''
 
+  /** Whether DTW token timestamps are computed (`dtwAheadsPreset`, off with flash attention) */
+  dtw = false
+
   constructor({
     contextPtr,
     contextId,
     gpu,
     reasonNoGPU,
+    dtw,
   }: NativeWhisperContext) {
     this.ptr = contextPtr
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
+    this.dtw = !!dtw
   }
 
   private runTranscription(
@@ -384,6 +391,22 @@ export class WhisperContext {
   }
 }
 
+/** Alignment heads for DTW token timestamps: the model the context loads, or `n-top-most` */
+export type DtwAheadsPreset =
+  | 'tiny.en'
+  | 'tiny'
+  | 'base.en'
+  | 'base'
+  | 'small.en'
+  | 'small'
+  | 'medium.en'
+  | 'medium'
+  | 'large-v1'
+  | 'large-v2'
+  | 'large-v3'
+  | 'large-v3-turbo'
+  | 'n-top-most'
+
 export type ContextOptions = {
   filePath: string | number
   /**
@@ -403,7 +426,17 @@ export type ContextOptions = {
   useGpu?: boolean
   /** Use Flash Attention, only recommended if GPU available. Always on when the Hexagon NPU is used. */
   useFlashAttn?: boolean
+  /**
+   * Compute DTW-aligned token timestamps (`tokens[].tDtw` with `includeTokens`), more
+   * accurate than `tokenTimestamps`, with the alignment heads of this model (Default: off).
+   * `n-top-most` uses all heads of the top `dtwNTop` text layers, for other models.
+   * Not available with flash attention (so not on the Hexagon NPU): see `WhisperContext.dtw`.
+   */
+  dtwAheadsPreset?: DtwAheadsPreset
+  /** Text layers used by the `n-top-most` preset (Default: all) */
+  dtwNTop?: number
 }
+
 
 /**
  * Initialize a whisper context with a GGML model file
@@ -417,6 +450,8 @@ export async function initWhisper({
   useGpu = true,
   useCoreMLIos = true,
   useFlashAttn = false,
+  dtwAheadsPreset,
+  dtwNTop,
 }: ContextOptions): Promise<WhisperContext> {
   await installJsi()
   const { whisperInitContext } = getJsi()
@@ -439,6 +474,8 @@ export async function initWhisper({
     useCoreMLIos,
     downloadCoreMLAssets: __DEV__ && !!coreMLAssets,
     coreMLAssets,
+    ...(dtwAheadsPreset ? { dtwAheadsPreset } : {}),
+    ...(dtwNTop !== undefined ? { dtwNTop } : {}),
   } satisfies NativeContextOptions)
 
   return new WhisperContext(context)

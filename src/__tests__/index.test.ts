@@ -16,6 +16,11 @@ type ParakeetContextCompatibility =
 
 const parakeetContextIsRealtimeCompatible: ParakeetContextCompatibility = true
 
+// Captured before the JSI install removes the globals
+const whisperInitMock = global.whisperInitContext as jest.MockedFunction<
+  typeof global.whisperInitContext
+>
+
 const parakeetMocks = {
   init: global.parakeetInitContext as jest.MockedFunction<
     typeof global.parakeetInitContext
@@ -37,6 +42,15 @@ const parakeetMocks = {
   >,
 }
 
+const whisperMocks = {
+  transcribeFile: global.whisperTranscribeFile as jest.MockedFunction<
+    typeof global.whisperTranscribeFile
+  >,
+  transcribeData: global.whisperTranscribeData as jest.MockedFunction<
+    typeof global.whisperTranscribeData
+  >,
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
 })
@@ -54,6 +68,48 @@ test('provides the Whisper mock API', async () => {
     segments: [{ text: ' Test', t0: 0, t1: 33 }],
   })
   await context.release()
+  await releaseAllWhisper()
+})
+
+test('passes Whisper audioCtx (number or auto) to file and data transcription', async () => {
+  const { transcribeFile, transcribeData } = whisperMocks
+  const context = await initWhisper({ filePath: 'test.bin' })
+
+  await context.transcribe('test.wav', { audioCtx: 768 }).promise
+  expect(transcribeFile.mock.calls[0]![2]).toMatchObject({ audioCtx: 768 })
+
+  await context.transcribe('test.wav', { audioCtx: 'auto' }).promise
+  expect(transcribeFile.mock.calls[1]![2]).toMatchObject({ audioCtx: 'auto' })
+
+  const audioData = new ArrayBuffer(3200)
+  await context.transcribeData(audioData, { audioCtx: 'auto' }).promise
+  expect(transcribeData.mock.calls[0]![1]).toMatchObject({ audioCtx: 'auto' })
+
+  await context.transcribeData(audioData, { audioCtx: 0 }).promise
+  expect(transcribeData.mock.calls[1]![1]).toMatchObject({ audioCtx: 0 })
+
+  await context.release()
+})
+
+test('passes DTW options and reports whether DTW is on', async () => {
+  const init = whisperInitMock
+  init.mockImplementationOnce(async (contextId: number) => ({
+    contextPtr: contextId,
+    contextId,
+    gpu: false,
+    reasonNoGPU: '',
+    dtw: true,
+  }))
+  const context = await initWhisper({ filePath: 'test.bin', dtwAheadsPreset: 'base.en' })
+  expect(init).toHaveBeenCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ dtwAheadsPreset: 'base.en' }),
+  )
+  expect(context.dtw).toBe(true)
+
+  const plain = await initWhisper({ filePath: 'test.bin' })
+  expect(init.mock.calls[init.mock.calls.length - 1]![1]).not.toHaveProperty('dtwAheadsPreset')
+  expect(plain.dtw).toBe(false)
   await releaseAllWhisper()
 })
 

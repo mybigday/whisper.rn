@@ -36,6 +36,11 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
 
   private currentBytePosition = 0
 
+  // Wall-clock pacing: the audio due at time t is everything since this anchor
+  private paceAnchorTime = 0
+
+  private paceAnchorBytes = 0
+
   private startTime = 0
 
   private pausedTime = 0
@@ -211,13 +216,28 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       (this.options.chunkDurationMs || 100) /
       (this.options.playbackSpeed || 1.0)
 
+    // Like a microphone, deliver all audio due by the clock: a timer that fires
+    // late (busy JS thread) sends the backlog instead of slowing playback down
+    this.paceAnchorTime = Date.now()
+    this.paceAnchorBytes = this.currentBytePosition
+    const bytesPerMs = (bytesPerSecond * (this.options.playbackSpeed || 1.0)) / 1000
+
     this.streamInterval = setInterval(() => {
       if (!this.recording) {
         return
       }
 
       try {
-        this.streamNextChunk(chunkSizeBytes)
+        const due =
+          this.paceAnchorBytes + (Date.now() - this.paceAnchorTime) * bytesPerMs
+        for (;;) {
+          const before = this.currentBytePosition
+          this.streamNextChunk(chunkSizeBytes)
+          // Stop at the due position, the end of the file, or a loop restart
+          // (which re-anchors the pacing)
+          const advanced = this.currentBytePosition > before
+          if (!this.recording || !advanced || this.currentBytePosition + chunkSizeBytes > due) break
+        }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Streaming error'
@@ -254,6 +274,8 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
         this.startTime = Date.now()
         this.pausedTime = 0
         this.hasReachedEnd = false
+        this.paceAnchorTime = Date.now()
+        this.paceAnchorBytes = 0
         this.log('Looping audio file simulation')
         return
       }
@@ -326,6 +348,8 @@ export class SimulateFileAudioStreamAdapter implements AudioStreamInterface {
       this.startTime =
         Date.now() - (clampedTime * 1000) / (this.options.playbackSpeed || 1.0)
       this.pausedTime = 0
+      this.paceAnchorTime = Date.now()
+      this.paceAnchorBytes = this.currentBytePosition
     }
 
     this.log(`Seeked to ${clampedTime.toFixed(2)}s`)

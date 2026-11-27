@@ -1,7 +1,8 @@
 import type { VadOptions } from '../index'
-import type { RealtimeVadContextLike } from './types'
+import type { RealtimeSegmenterLike, VadSpeechChunkInfo, VadSpeechEndInfo } from './types'
 import { VAD_PRESETS } from './types'
 import { StreamingVadSegmenter } from './StreamingVadSegmenter'
+import type { ProbabilitySegmenter } from './StreamingVadSegmenter'
 
 /** The part of `WhisperVadStream` StreamVad uses */
 export type VadStreamLike = {
@@ -21,6 +22,11 @@ export type StreamVadContextLike = {
 export type StreamVadOptions = {
   vadOptions?: VadOptions
   vadPreset?: keyof typeof VAD_PRESETS
+  /**
+   * Segmentation of the probabilities (Default: a `StreamingVadSegmenter` with
+   * `vadOptions`). A custom one gets `vadOptions` through `setOptions`.
+   */
+  segmenter?: ProbabilitySegmenter
   logger?: (message: string) => void
 }
 
@@ -37,6 +43,11 @@ class PcmQueue {
 
   get end(): number {
     return this.total
+  }
+
+  /** First sample still held */
+  get start(): number {
+    return this.base
   }
 
   append(data: Uint8Array): void {
@@ -66,6 +77,22 @@ class PcmQueue {
       return chunkEnd >= end
     })
     return out
+  }
+
+  /** Mean square of samples [from, to); Infinity if they are no longer held */
+  energy(from: number, to: number): number {
+    // E.g. a limit set mid-segment (updateOptions) reaching into dropped audio
+    if (from < this.base) return Infinity
+    const data = this.read(from, to)
+    const n = data.byteLength / BYTES_PER_SAMPLE
+    if (n === 0) return 0
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+    let sum = 0
+    for (let i = 0; i < n; i += 1) {
+      const x = view.getInt16(i * BYTES_PER_SAMPLE, true) / 32768
+      sum += x * x
+    }
+    return sum / n
   }
 
   /** Drop whole chunks that end at or before `sample` */
@@ -98,13 +125,20 @@ class PcmQueue {
  * - `onSpeechContinue`: further audio of the segment, each sample once;
  * - `onSpeechEnd`: after the audio up to the padded end.
  *
- * Positions are counted in samples of the pushed audio, not wall-clock time.
+ * Each callback also gets the position of its audio (`VadSpeechChunkInfo`,
+ * `VadSpeechEndInfo`), counted in samples of the pushed audio, not wall-clock
+ * time. A segment longer than `maxSpeechDurationS` is split like offline, at
+ * its longest earlier pause (or else at the least speech-like frame of the
+ * last seconds), so the split usually lies in audio already handed out: the
+ * end then reports `endSample` before the audio sent so far (the consumer
+ * drops the rest), and the next segment's audio starts again from its own
+ * padded start, repeating that audio.
  * Input: 16 kHz mono PCM16.
  */
-export class StreamVad implements RealtimeVadContextLike {
+export class StreamVad implements RealtimeSegmenterLike {
   private readonly vadContext: StreamVadContextLike
 
-  private readonly segmenter: StreamingVadSegmenter
+  private readonly segmenter: ProbabilitySegmenter
 
   private readonly audio = new PcmQueue()
 
@@ -129,11 +163,15 @@ export class StreamVad implements RealtimeVadContextLike {
 
   private lastProb = 0
 
-  private speechStartCallback: ((confidence: number, data: Uint8Array) => void) | null = null
+  private speechStartCallback:
+    | ((confidence: number, data: Uint8Array, info: VadSpeechChunkInfo) => void)
+    | null = null
 
-  private speechContinueCallback: ((confidence: number, data: Uint8Array) => void) | null = null
+  private speechContinueCallback:
+    | ((confidence: number, data: Uint8Array, info: VadSpeechChunkInfo) => void)
+    | null = null
 
-  private speechEndCallback: ((confidence: number) => void) | null = null
+  private speechEndCallback: ((confidence: number, info: VadSpeechEndInfo) => void) | null = null
 
   private errorCallback: ((error: string) => void) | null = null
 
@@ -142,22 +180,39 @@ export class StreamVad implements RealtimeVadContextLike {
     this.logger = options.logger || (() => {})
     const preset = options.vadPreset ? VAD_PRESETS[options.vadPreset] : VAD_PRESETS.default
     this.vadOptions = { ...preset, ...options.vadOptions }
-    this.segmenter = new StreamingVadSegmenter(
-      this.vadOptions,
-      vadContext.hopSamples,
-      vadContext.sampleRate,
-    )
+    const frameEnergy = (from: number, to: number) => this.audio.energy(from, to)
+    if (options.segmenter) {
+      this.segmenter = options.segmenter
+      this.segmenter.setOptions(this.vadOptions)
+      this.segmenter.setFrameEnergy?.(frameEnergy)
+    } else {
+      this.segmenter = new StreamingVadSegmenter(
+        this.vadOptions,
+        vadContext.hopSamples,
+        vadContext.sampleRate,
+        { frameEnergy },
+      )
+    }
   }
 
-  onSpeechStart(callback: (confidence: number, data: Uint8Array) => void): void {
+  /** Current VAD options (preset merged with overrides) */
+  get options(): VadOptions {
+    return this.vadOptions
+  }
+
+  onSpeechStart(
+    callback: (confidence: number, data: Uint8Array, info: VadSpeechChunkInfo) => void,
+  ): void {
     this.speechStartCallback = callback
   }
 
-  onSpeechContinue(callback: (confidence: number, data: Uint8Array) => void): void {
+  onSpeechContinue(
+    callback: (confidence: number, data: Uint8Array, info: VadSpeechChunkInfo) => void,
+  ): void {
     this.speechContinueCallback = callback
   }
 
-  onSpeechEnd(callback: (confidence: number) => void): void {
+  onSpeechEnd(callback: (confidence: number, info: VadSpeechEndInfo) => void): void {
     this.speechEndCallback = callback
   }
 
@@ -254,7 +309,12 @@ export class StreamVad implements RealtimeVadContextLike {
     if (this.speechOpen) {
       this.emitUntil(this.segmenter.speechCertainUntil)
     }
-    this.audio.dropBefore(Math.max(this.emittedUpTo, this.segmenter.retainFrom))
+    this.audio.dropBefore(
+      // A split can go back into the open segment's audio already handed out
+      this.segmenter.maySplitBack
+        ? this.segmenter.retainFrom
+        : Math.max(this.emittedUpTo, this.segmenter.retainFrom),
+    )
   }
 
   private apply(events: ReturnType<StreamingVadSegmenter['push']>): void {
@@ -263,28 +323,39 @@ export class StreamVad implements RealtimeVadContextLike {
         this.speechOpen = true
         this.startPending = true
         this.lastProb = event.prob
-        // A padded start never reaches back into audio already handed out
-        this.emittedUpTo = Math.max(this.emittedUpTo, event.sample)
+        // Normally at or after the audio handed out; after a split back into
+        // the previous segment, that audio is sent again for this one
+        this.emittedUpTo = event.sample
         this.log(`speech start at ${event.sample}`)
       } else if (this.speechOpen) {
         this.emitUntil(event.sample)
         this.speechOpen = false
         this.startPending = false
-        this.log(`speech end at ${Math.min(event.sample, this.audio.end)}`)
-        this.speechEndCallback?.(1 - event.prob)
+        const endSample = Math.min(event.sample, this.audio.end)
+        this.log(`speech end at ${endSample} (${event.reason})`)
+        this.speechEndCallback?.(1 - event.prob, {
+          endSample,
+          reason: event.reason,
+          // A chunk can reach past the cut: hand its audio along, so the ending
+          // segment gets right-hand context however the audio was chunked
+          ...(event.inSpeech
+            ? { inSpeech: true, after: this.audio.read(endSample, this.audio.end) }
+            : {}),
+        })
       }
     })
   }
 
   private emitUntil(sample: number): void {
     const to = Math.min(sample, this.audio.end)
+    const info = { startSample: Math.max(this.emittedUpTo, this.audio.start) }
     const data = this.audio.read(this.emittedUpTo, to)
     if (to > this.emittedUpTo) this.emittedUpTo = to
     if (this.startPending) {
       this.startPending = false
-      this.speechStartCallback?.(this.lastProb, data)
+      this.speechStartCallback?.(this.lastProb, data, info)
     } else if (data.byteLength > 0) {
-      this.speechContinueCallback?.(this.lastProb, data)
+      this.speechContinueCallback?.(this.lastProb, data, info)
     }
   }
 

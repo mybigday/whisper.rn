@@ -4,6 +4,13 @@
 
 [realtime-transcription](../modules/realtime_transcription.md).SliceManager
 
+Audio slices of a realtime session: one per speech segment, closed by
+`forceNextSlice()`. Slices grow as audio arrives (their length is bounded by
+the segmenter's maximum duration); only the newest `maxSlicesInMemory` keep
+their audio.
+
+Note: `sampleCount` counts bytes of PCM16, not samples.
+
 ## Table of contents
 
 ### Constructors
@@ -22,24 +29,23 @@
 - [markSliceAsProcessed](realtime_transcription.SliceManager.md#marksliceasprocessed)
 - [moveToNextTranscribeSlice](realtime_transcription.SliceManager.md#movetonexttranscribeslice)
 - [reset](realtime_transcription.SliceManager.md#reset)
+- [truncateCurrentSlice](realtime_transcription.SliceManager.md#truncatecurrentslice)
 
 ## Constructors
 
 ### constructor
 
-• **new SliceManager**(`sliceDurationSec?`, `maxSlicesInMemory?`, `sampleRate?`)
+• **new SliceManager**(`maxSlicesInMemory?`)
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `sliceDurationSec` | `number` | `30` |
-| `maxSlicesInMemory` | `number` | `1` |
-| `sampleRate` | `number` | `16000` |
+| `maxSlicesInMemory` | `number` | `3` |
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:41](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L41)
+[realtime-transcription/SliceManager.ts:47](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L47)
 
 ## Methods
 
@@ -61,11 +67,11 @@ Add audio data to the current slice
 
 | Name | Type |
 | :------ | :------ |
-| `slice?` | [`AudioSlice`](../interfaces/realtime_transcription.AudioSlice.md) |
+| `slice` | [`AudioSlice`](../interfaces/realtime_transcription.AudioSlice.md) |
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:54](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L54)
+[realtime-transcription/SliceManager.ts:54](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L54)
 
 ___
 
@@ -73,7 +79,7 @@ ___
 
 ▸ **forceNextSlice**(): `Object`
 
-Force move to the next slice, finalizing the current one regardless of capacity
+Close the current slice and move to the next one
 
 #### Returns
 
@@ -85,7 +91,7 @@ Force move to the next slice, finalizing the current one regardless of capacity
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:256](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L256)
+[realtime-transcription/SliceManager.ts:235](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L235)
 
 ___
 
@@ -93,7 +99,7 @@ ___
 
 ▸ **getAudioDataForTranscription**(`sliceIndex`): ``null`` \| `Uint8Array`
 
-Get audio data for transcription (base64 encoded)
+The audio of a slice (a view of exactly its bytes)
 
 #### Parameters
 
@@ -107,7 +113,7 @@ Get audio data for transcription (base64 encoded)
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:161](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L161)
+[realtime-transcription/SliceManager.ts:129](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L129)
 
 ___
 
@@ -130,7 +136,7 @@ Get current slice information
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:244](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L244)
+[realtime-transcription/SliceManager.ts:212](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L212)
 
 ___
 
@@ -146,7 +152,7 @@ Get memory usage statistics
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:207](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L207)
+[realtime-transcription/SliceManager.ts:175](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L175)
 
 ___
 
@@ -168,7 +174,7 @@ Get a slice by index
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:173](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L173)
+[realtime-transcription/SliceManager.ts:141](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L141)
 
 ___
 
@@ -184,7 +190,7 @@ Get a slice for transcription
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:129](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L129)
+[realtime-transcription/SliceManager.ts:97](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L97)
 
 ___
 
@@ -206,7 +212,7 @@ Mark a slice as processed
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:144](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L144)
+[realtime-transcription/SliceManager.ts:112](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L112)
 
 ___
 
@@ -222,7 +228,7 @@ Move to the next slice for transcription
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:154](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L154)
+[realtime-transcription/SliceManager.ts:122](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L122)
 
 ___
 
@@ -238,4 +244,27 @@ Reset all slices and indices
 
 #### Defined in
 
-[realtime-transcription/SliceManager.ts:227](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/SliceManager.ts#L227)
+[realtime-transcription/SliceManager.ts:195](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L195)
+
+___
+
+### truncateCurrentSlice
+
+▸ **truncateCurrentSlice**(`byteLength`): `void`
+
+Shorten the current slice to its first `byteLength` bytes (no-op if it is
+not longer), e.g. when its speech segment turns out to end earlier.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `byteLength` | `number` |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+[realtime-transcription/SliceManager.ts:225](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/SliceManager.ts#L225)

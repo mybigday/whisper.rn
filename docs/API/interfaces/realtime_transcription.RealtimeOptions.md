@@ -8,31 +8,26 @@
 
 ### Properties
 
-- [audioMinSec](realtime_transcription.RealtimeOptions.md#audiominsec)
 - [audioOutputPath](realtime_transcription.RealtimeOptions.md#audiooutputpath)
-- [audioSliceSec](realtime_transcription.RealtimeOptions.md#audioslicesec)
 - [audioStreamConfig](realtime_transcription.RealtimeOptions.md#audiostreamconfig)
+- [draftTranscribeOptions](realtime_transcription.RealtimeOptions.md#drafttranscribeoptions)
 - [initRealtimeAfterMs](realtime_transcription.RealtimeOptions.md#initrealtimeafterms)
 - [initialPrompt](realtime_transcription.RealtimeOptions.md#initialprompt)
+- [languageLock](realtime_transcription.RealtimeOptions.md#languagelock)
 - [logger](realtime_transcription.RealtimeOptions.md#logger)
 - [maxPromptSlices](realtime_transcription.RealtimeOptions.md#maxpromptslices)
 - [maxResultsInMemory](realtime_transcription.RealtimeOptions.md#maxresultsinmemory)
 - [maxSlicesInMemory](realtime_transcription.RealtimeOptions.md#maxslicesinmemory)
+- [minAvgLogprob](realtime_transcription.RealtimeOptions.md#minavglogprob)
+- [probabilitySegmenter](realtime_transcription.RealtimeOptions.md#probabilitysegmenter)
 - [promptPreviousSlices](realtime_transcription.RealtimeOptions.md#promptpreviousslices)
 - [realtimeProcessingPauseMs](realtime_transcription.RealtimeOptions.md#realtimeprocessingpausems)
+- [splitOverlapMs](realtime_transcription.RealtimeOptions.md#splitoverlapms)
 - [transcribeOptions](realtime_transcription.RealtimeOptions.md#transcribeoptions)
+- [vadOptions](realtime_transcription.RealtimeOptions.md#vadoptions)
+- [vadPreset](realtime_transcription.RealtimeOptions.md#vadpreset)
 
 ## Properties
-
-### audioMinSec
-
-• `Optional` **audioMinSec**: `number`
-
-#### Defined in
-
-[realtime-transcription/types.ts:179](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L179)
-
-___
 
 ### audioOutputPath
 
@@ -40,17 +35,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:205](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L205)
-
-___
-
-### audioSliceSec
-
-• `Optional` **audioSliceSec**: `number`
-
-#### Defined in
-
-[realtime-transcription/types.ts:178](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L178)
+[realtime-transcription/types.ts:281](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L281)
 
 ___
 
@@ -60,7 +45,21 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:208](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L208)
+[realtime-transcription/types.ts:284](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L284)
+
+___
+
+### draftTranscribeOptions
+
+• `Optional` **draftTranscribeOptions**: `Partial`<[`TranscribeOptions`](../modules/index.md#transcribeoptions)\> \| `Partial`<[`ParakeetTranscribeOptions`](../modules/index.md#parakeettranscribeoptions)\>
+
+Overrides of `transcribeOptions` for drafts (the repeated passes while a
+slice grows), e.g. `{ audioCtx: 'auto', maxTokens: 64, singleSegment: true,
+temperatureInc: 0 }` to keep them cheap. Default: none.
+
+#### Defined in
+
+[realtime-transcription/types.ts:244](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L244)
 
 ___
 
@@ -68,9 +67,11 @@ ___
 
 • `Optional` **initRealtimeAfterMs**: `number`
 
+Audio a slice needs before its first draft, in ms (Default: 200)
+
 #### Defined in
 
-[realtime-transcription/types.ts:215](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L215)
+[realtime-transcription/types.ts:292](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L292)
 
 ___
 
@@ -82,7 +83,21 @@ Initial Whisper prompt. Ignored when using ParakeetContext.
 
 #### Defined in
 
-[realtime-transcription/types.ts:193](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L193)
+[realtime-transcription/types.ts:269](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L269)
+
+___
+
+### languageLock
+
+• `Optional` **languageLock**: `boolean` \| [`LanguageLockOptions`](../modules/realtime_transcription.md#languagelockoptions)
+
+Whisper with language auto-detection: keep the detected language once it
+was detected confidently a few times, and pass it explicitly from then on
+(see `LanguageLockOptions`). Default: off.
+
+#### Defined in
+
+[realtime-transcription/types.ts:257](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L257)
 
 ___
 
@@ -106,7 +121,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:211](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L211)
+[realtime-transcription/types.ts:287](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L287)
 
 ___
 
@@ -121,7 +136,7 @@ Default: unlimited (bounded only by `maxResultsInMemory`).
 
 #### Defined in
 
-[realtime-transcription/types.ts:202](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L202)
+[realtime-transcription/types.ts:278](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L278)
 
 ___
 
@@ -135,7 +150,7 @@ reached, which keeps long-running (24/7) sessions bounded. Default: unlimited.
 
 #### Defined in
 
-[realtime-transcription/types.ts:187](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L187)
+[realtime-transcription/types.ts:235](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L235)
 
 ___
 
@@ -147,7 +162,34 @@ Maximum number of raw audio slices kept in memory. Default: 3.
 
 #### Defined in
 
-[realtime-transcription/types.ts:181](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L181)
+[realtime-transcription/types.ts:229](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L229)
+
+___
+
+### minAvgLogprob
+
+• `Optional` **minAvgLogprob**: `number`
+
+Whisper: drop result segments whose average token log probability
+(`avgLogprob`) is below this, typically text hallucinated on noise or
+silence. Pick it for your model and audio. Default: off.
+
+#### Defined in
+
+[realtime-transcription/types.ts:251](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L251)
+
+___
+
+### probabilitySegmenter
+
+• `Optional` **probabilitySegmenter**: [`ProbabilitySegmenter`](realtime_transcription.ProbabilitySegmenter.md)
+
+Custom segmentation of the probabilities of a probability-source
+`vadContext` (Default: `StreamingVadSegmenter`)
+
+#### Defined in
+
+[realtime-transcription/types.ts:227](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L227)
 
 ___
 
@@ -159,7 +201,7 @@ Add previous Whisper results to the next prompt. Ignored for Parakeet. Defaults 
 
 #### Defined in
 
-[realtime-transcription/types.ts:195](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L195)
+[realtime-transcription/types.ts:271](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L271)
 
 ___
 
@@ -167,9 +209,28 @@ ___
 
 • `Optional` **realtimeProcessingPauseMs**: `number`
 
+Audio time between drafts of a slice, in ms (Default: 200)
+
 #### Defined in
 
-[realtime-transcription/types.ts:214](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L214)
+[realtime-transcription/types.ts:290](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L290)
+
+___
+
+### splitOverlapMs
+
+• `Optional` **splitOverlapMs**: `number`
+
+Whisper: audio, in ms, both slices keep beyond a split that falls inside
+speech (a max-duration split without a pause). A word cut by the split is
+then whole on one side; each word is kept on the side it starts in, by its
+token times (DTW times when the context has `dtwAheadsPreset`, else token
+timestamps). Final results of such slices are assembled from their tokens.
+Default: 0 (off).
+
+#### Defined in
+
+[realtime-transcription/types.ts:266](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L266)
 
 ___
 
@@ -181,4 +242,32 @@ Options for the selected Whisper or Parakeet context.
 
 #### Defined in
 
-[realtime-transcription/types.ts:190](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L190)
+[realtime-transcription/types.ts:238](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L238)
+
+___
+
+### vadOptions
+
+• `Optional` **vadOptions**: [`VadOptions`](../modules/index.md#vadoptions)
+
+Segmentation options, merged over `vadPreset`. With a `vadContext` they
+drive the speech segmentation; without one only `maxSpeechDurationS`
+applies (continuous audio is cut into slices of at most that length).
+`maxSpeechDurationS` bounds every slice and so the cost of each draft; it
+must be finite (Default: the preset's, 30 s for `default`).
+
+#### Defined in
+
+[realtime-transcription/types.ts:220](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L220)
+
+___
+
+### vadPreset
+
+• `Optional` **vadPreset**: ``"continuous"`` \| ``"default"`` \| ``"sensitive"`` \| ``"very-sensitive"`` \| ``"conservative"`` \| ``"very-conservative"`` \| ``"meeting"`` \| ``"noisy"``
+
+Preset for `vadOptions` (Default: 'default')
+
+#### Defined in
+
+[realtime-transcription/types.ts:222](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L222)

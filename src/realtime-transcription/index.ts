@@ -12,7 +12,17 @@ export { RingBufferVad } from './RingBufferVad'
 export { StreamVad } from './StreamVad'
 export type { StreamVadOptions, StreamVadContextLike, VadStreamLike } from './StreamVad'
 export { StreamingVadSegmenter } from './StreamingVadSegmenter'
-export type { VadSegmenterEvent } from './StreamingVadSegmenter'
+export type {
+  VadSegmenterEvent,
+  VadSegmentEndReason,
+  StreamingVadSegmenterOptions,
+  ProbabilitySegmenter,
+} from './StreamingVadSegmenter'
+
+// Probability source without a VAD, and the language lock (used by RealtimeTranscriber)
+export { ContinuousSpeechSource } from './ContinuousSpeechSource'
+export { LanguageLock } from './LanguageLock'
+export type { LanguageLockOptions } from './LanguageLock'
 
 export type { WavFileWriterFs } from '../utils/WavFileWriter'
 
@@ -27,6 +37,11 @@ export type {
   RealtimeVadEvent,
   RealtimeTranscribeEvent,
   RealtimeStatsEvent,
+  RealtimeSliceEndReason,
+  RealtimeSegmenterLike,
+  RealtimeVadContextLike,
+  VadSpeechChunkInfo,
+  VadSpeechEndInfo,
 
   // Configuration types
   RealtimeTranscriberDependencies,

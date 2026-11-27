@@ -36,7 +36,7 @@
 
 #### Defined in
 
-[index.ts:489](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L489)
+[index.ts:526](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L526)
 
 ## Properties
 
@@ -46,7 +46,7 @@
 
 #### Defined in
 
-[index.ts:485](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L485)
+[index.ts:522](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L522)
 
 ___
 
@@ -56,7 +56,7 @@ ___
 
 #### Defined in
 
-[index.ts:483](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L483)
+[index.ts:520](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L520)
 
 ___
 
@@ -66,7 +66,7 @@ ___
 
 #### Defined in
 
-[index.ts:487](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L487)
+[index.ts:524](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L524)
 
 ## Methods
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[index.ts:551](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L551)
+[index.ts:588](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L588)
 
 ___
 
@@ -108,7 +108,7 @@ Transcribe an audio file path, bundled asset, or base64-encoded WAV.
 
 #### Defined in
 
-[index.ts:508](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L508)
+[index.ts:545](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L545)
 
 ___
 
@@ -136,4 +136,4 @@ Transcribe base64-encoded signed 16-bit PCM data or an ArrayBuffer.
 
 #### Defined in
 
-[index.ts:535](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L535)
+[index.ts:572](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L572)

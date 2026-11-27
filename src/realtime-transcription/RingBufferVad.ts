@@ -1,7 +1,7 @@
 
 import { RingBuffer } from './RingBuffer'
 
-import type { RealtimeVadContextLike, WhisperVadContextLike } from './types'
+import type { RealtimeSegmenterLike, WhisperVadContextLike } from './types'
 import { VAD_PRESETS } from './types'
 import type { VadOptions } from '../index'
 
@@ -21,7 +21,7 @@ export type RingBufferVadOptions = {
  * times speech with the wall clock; StreamVad keeps the model state across
  * chunks and segments exactly, per hop.
  */
-export class RingBufferVad implements RealtimeVadContextLike {
+export class RingBufferVad implements RealtimeSegmenterLike {
     private vadContext: WhisperVadContextLike
 
     private ringBuffer: RingBuffer

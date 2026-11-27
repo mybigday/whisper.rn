@@ -12,14 +12,21 @@ import {
   Switch,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import { initWhisper, initWhisperVad, libVersion } from '../../src'
-import type { WhisperContext, WhisperVadContext } from '../../src'
+import { initParakeet, initWhisper, initWhisperVad, libVersion } from '../../src'
+import type { ParakeetContext, WhisperContext, WhisperVadContext } from '../../src'
 import { Button } from './Button'
 import contextOpts from './context-opts'
-import { createDir, fileDir, toTimestamp, downloadModel, whisperModels, WhisperModel } from './util'
+import {
+  createDir,
+  fileDir,
+  toTimestamp,
+  downloadModel,
+  downloadParakeetModel,
+  whisperModels,
+  WhisperModel,
+} from './util'
 import {
   RealtimeTranscriber,
-  StreamVad,
   VAD_PRESETS,
   type RealtimeTranscribeEvent,
   type RealtimeVadEvent,
@@ -63,6 +70,21 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   logText: { fontSize: 12, color: '#333' },
+  // Grows with every slice: scroll inside, following the newest result
+  resultScroll: { maxHeight: 320 },
+  liveContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    width: '95%',
+    marginVertical: 8,
+  },
+  liveScroll: { maxHeight: 160 },
+  liveText: { fontSize: 18, lineHeight: 26, color: '#111' },
+  liveDraft: { color: '#888', fontStyle: 'italic' },
+  liveHint: { fontSize: 11, color: '#888', marginTop: 6 },
   configContainer: {
     backgroundColor: '#f0f0f0',
     padding: 12,
@@ -115,15 +137,27 @@ const styles = StyleSheet.create({
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
-// JFK audio file URL from whisper.cpp repository
-const JFK_AUDIO_URL =
-  'https://github.com/ggml-org/whisper.cpp/raw/refs/heads/master/samples/jfk.wav'
+// 3:19 public-domain speech (16 kHz mono PCM16): long enough to show pauses,
+// max-duration splits and memory behaviour, unlike the 11 s jfk.wav. The noisy
+// one mixes in restaurant / shopping-mall ambience (sources in the dataset card)
+const PARAKEET_MODEL = 'parakeet-v3 (q8_0)'
+
+const SAMPLE_BASE_URL =
+  'https://huggingface.co/datasets/BricksDisplay/speech-samples/resolve/main'
+const SAMPLES = [
+  { file: 'gwb-columbia.wav', label: 'Clean speech' },
+  { file: 'gwb-columbia-restaurant-5db.wav', label: 'Noisy (restaurant, 5 dB SNR)' },
+]
 
 export default function RealtimeTranscriberDemo() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
+  // Either engine transcribes; initializing one releases the other
+  const parakeetContextRef = useRef<ParakeetContext | null>(null)
+  const [engine, setEngine] = useState<'whisper' | 'parakeet' | null>(null)
   const vadContextRef = useRef<WhisperVadContext | null>(null)
   const realtimeTranscriberRef = useRef<RealtimeTranscriber | null>(null)
   const audioStreamRef = useRef<AudioStreamInterface | null>(null)
+  const resultScrollRef = useRef<ScrollView | null>(null)
 
   const [logs, setLogs] = useState([
     `Realtime Transcriber Demo - whisper.cpp v${libVersion}`,
@@ -135,18 +169,26 @@ export default function RealtimeTranscriberDemo() {
   const [realtimeStats, setRealtimeStats] = useState<any>(null)
   const [vadEvents, setVadEvents] = useState<RealtimeVadEvent[]>([])
   const [stabilizedText, setStabilizedText] = useState<string>('')
+  // Live transcript: finals by slice, plus the newest draft of a slice not final yet
+  const [liveFinals, setLiveFinals] = useState<Record<number, string>>({})
+  const [liveDraft, setLiveDraft] = useState<{ sliceIndex: number; text: string } | null>(null)
+  const liveScrollRef = useRef<ScrollView | null>(null)
 
   // File simulation specific state
   const [useFileSimulation, setUseFileSimulation] = useState(false)
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const [simulationStats, setSimulationStats] = useState<any>(null)
   const [audioFilePath, setAudioFilePath] = useState<string | null>(null)
+  const [sampleIndex, setSampleIndex] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
-  const [selectedModel, setSelectedModel] = useState<WhisperModel>('base')
+  // Whisper models, plus Parakeet TDT 0.6B v3 (q8_0) as the other engine
+  const [selectedModel, setSelectedModel] = useState<WhisperModel | typeof PARAKEET_MODEL>('base')
   const [modelDownloadProgress, setModelDownloadProgress] = useState<number>(0)
 
   const log = useCallback((...messages: any[]) => {
+    // Also to the console (logcat / Xcode), to follow a long session
+    console.log('[RealtimeDemo]', ...messages)
     setLogs((prev) => [
       ...prev,
       `${new Date().toLocaleTimeString()}: ${messages.join(' ')}`,
@@ -157,6 +199,7 @@ export default function RealtimeTranscriberDemo() {
     () => () => {
       // Cleanup on unmount
       whisperContextRef.current?.release()
+      parakeetContextRef.current?.release()
       vadContextRef.current?.release()
       realtimeTranscriberRef.current?.release()
     },
@@ -179,12 +222,12 @@ export default function RealtimeTranscriberDemo() {
     return () => clearInterval(interval)
   }, [useFileSimulation, isTranscribing])
 
-  const downloadAudioFile = async () => {
+  const downloadAudioFile = async (sample = SAMPLES[sampleIndex]!) => {
     setIsDownloading(true)
     setDownloadProgress(0)
 
     try {
-      const downloadPath = `${fileDir}/jfk-sample.wav`
+      const downloadPath = `${fileDir}/${sample.file}`
 
       // Check if file already exists
       const exists = await RNFS.exists(downloadPath)
@@ -195,10 +238,10 @@ export default function RealtimeTranscriberDemo() {
         return downloadPath
       }
 
-      log('Downloading JFK audio sample from whisper.cpp repository...')
+      log('Downloading the speech sample (3:19)...')
 
       const downloadResult = await RNFS.downloadFile({
-        fromUrl: JFK_AUDIO_URL,
+        fromUrl: `${SAMPLE_BASE_URL}/${sample.file}`,
         toFile: downloadPath,
         progress: (res) => {
           const progress = (res.bytesWritten / res.contentLength) * 100
@@ -235,6 +278,11 @@ export default function RealtimeTranscriberDemo() {
         whisperContextRef.current = null
         log('Released previous Whisper context')
       }
+      if (parakeetContextRef.current) {
+        await parakeetContextRef.current.release()
+        parakeetContextRef.current = null
+        log('Released previous Parakeet context')
+      }
 
       if (vadContextRef.current) {
         log('Found previous VAD context')
@@ -253,6 +301,7 @@ export default function RealtimeTranscriberDemo() {
       log('Loaded Whisper model, ID:', whisperCtx.id)
       log('Loaded Whisper model in', endTime - startTime, `ms in ${mode} mode`)
       whisperContextRef.current = whisperCtx
+      setEngine('whisper')
 
       log('Initializing VAD context...')
       const vadStartTime = Date.now()
@@ -278,12 +327,21 @@ export default function RealtimeTranscriberDemo() {
   }
 
   const initializeContextsWithDownload = async () => {
+    if (selectedModel === PARAKEET_MODEL) {
+      await initializeParakeet()
+      return
+    }
     try {
       if (whisperContextRef.current) {
         log('Found previous Whisper context')
         await whisperContextRef.current.release()
         whisperContextRef.current = null
         log('Released previous Whisper context')
+      }
+      if (parakeetContextRef.current) {
+        await parakeetContextRef.current.release()
+        parakeetContextRef.current = null
+        log('Released previous Parakeet context')
       }
 
       if (vadContextRef.current) {
@@ -294,7 +352,7 @@ export default function RealtimeTranscriberDemo() {
       }
 
       const modelFilePath = await downloadModel(
-        selectedModel,
+        selectedModel as WhisperModel,
         (progress) => {
           setModelDownloadProgress(progress)
           log(`Download progress: ${Math.round(progress * 100)}%`)
@@ -309,6 +367,7 @@ export default function RealtimeTranscriberDemo() {
       log('Loaded Whisper model, ID:', whisperCtx.id)
       log('Loaded Whisper model in', endTime - startTime, `ms in ${mode} mode`)
       whisperContextRef.current = whisperCtx
+      setEngine('whisper')
       setModelDownloadProgress(0)
 
       log('Initializing VAD context...')
@@ -335,14 +394,55 @@ export default function RealtimeTranscriberDemo() {
     }
   }
 
+  const initializeParakeet = async () => {
+    try {
+      if (whisperContextRef.current) {
+        await whisperContextRef.current.release()
+        whisperContextRef.current = null
+        log('Released previous Whisper context')
+      }
+      if (parakeetContextRef.current) {
+        await parakeetContextRef.current.release()
+        parakeetContextRef.current = null
+      }
+      const modelPath = await downloadParakeetModel(
+        'q8_0',
+        (progress) => setModelDownloadProgress(progress),
+        log,
+      )
+      setModelDownloadProgress(0)
+      log('Initializing Parakeet context...')
+      const startTime = Date.now()
+      parakeetContextRef.current = await initParakeet({ filePath: modelPath })
+      log(`Loaded Parakeet model in ${Date.now() - startTime} ms in ${mode} mode`)
+      setEngine('parakeet')
+
+      if (!vadContextRef.current) {
+        vadContextRef.current = await initWhisperVad({
+          filePath: require('../assets/ggml-silero-v6.2.0.bin'),
+          useGpu: true,
+          nThreads: 4,
+        })
+        log('Loaded VAD model')
+      }
+      log('Parakeet and VAD contexts initialized successfully!')
+    } catch (error) {
+      log('Error initializing Parakeet:', error)
+      setModelDownloadProgress(0)
+      Alert.alert('Error', `Failed to initialize Parakeet: ${error}`)
+    }
+  }
+
   const startRealtimeTranscription = async () => {
-    if (!whisperContextRef.current || !vadContextRef.current) {
+    if ((!whisperContextRef.current && !parakeetContextRef.current) || !vadContextRef.current) {
       Alert.alert('Error', 'Contexts not initialized')
       return
     }
 
     try {
       await createDir(log)
+      setLiveFinals({})
+      setLiveDraft(null)
 
       // Create appropriate audio stream adapter
       let audioStream: AudioStreamInterface
@@ -387,30 +487,34 @@ export default function RealtimeTranscriberDemo() {
         realtimeTranscriberRef.current.release()
       }
 
-      // Stateful VAD: one native stream, one speech probability per 32 ms hop
-      const vadContext = new StreamVad(vadContextRef.current, {
-        vadPreset: currentVadPreset,
-        logger: (message) => log(message),
-      })
-
       // Create RealtimeTranscriber if not exists
       const transcriber = new RealtimeTranscriber(
         // Dependencies
         {
-          whisperContext: whisperContextRef.current,
-          vadContext,
+          ...(parakeetContextRef.current
+            ? { parakeetContext: parakeetContextRef.current }
+            : { whisperContext: whisperContextRef.current! }),
+          // Stateful VAD: one native stream, one speech probability per 32 ms hop
+          vadContext: vadContextRef.current,
           audioStream,
           fs: RNFS,
         },
         // Options
         {
           logger: (message) => log(message),
-          audioSliceSec: 30,
-          audioMinSec: 0.5,
+          vadPreset: currentVadPreset,
           maxSlicesInMemory: 1,
           transcribeOptions: {
             language: 'en',
             maxLen: 1,
+          },
+          // Drafts only preview the segment still being spoken: encode just its
+          // length and decode greedily, so they keep up with the audio
+          draftTranscribeOptions: {
+            audioCtx: 'auto',
+            maxTokens: 64,
+            singleSegment: true,
+            temperatureInc: 0,
           },
           audioOutputPath: `${fileDir}/realtime-recording.wav`,
         },
@@ -433,7 +537,7 @@ export default function RealtimeTranscriberDemo() {
       // Start transcription
       await realtimeTranscriberRef.current.start()
       log(
-        `Realtime transcription started (${useFileSimulation ? 'File Simulation - JFK Speech' : 'Live Audio'
+        `Realtime transcription started (${useFileSimulation ? 'File Simulation - Speech Sample' : 'Live Audio'
         })`,
       )
     } catch (error) {
@@ -459,6 +563,17 @@ export default function RealtimeTranscriberDemo() {
 
   const handleTranscribeEvent = (event: RealtimeTranscribeEvent) => {
     const { data, sliceIndex } = event
+
+    // A final replaces the slice's draft; a draft only shows until its final
+    const text = data?.result?.trim() ?? ''
+    if (event.isFinal) {
+      setLiveFinals((prev) => ({ ...prev, [sliceIndex]: text }))
+      setLiveDraft((prev) => (prev && prev.sliceIndex <= sliceIndex ? null : prev))
+    } else if (text) {
+      setLiveDraft((prev) =>
+        prev && prev.sliceIndex > sliceIndex ? prev : { sliceIndex, text },
+      )
+    }
 
     if (data?.result) {
       // Get all transcription results from the transcriber
@@ -497,10 +612,9 @@ export default function RealtimeTranscriberDemo() {
       }
 
       log(
-        `Transcribed slice ${sliceIndex}: "${data.result.substring(
-          0,
-          50,
-        )}..." (Total results: ${allResults.length})`,
+        `Transcribed slice ${sliceIndex} (${event.isFinal ? 'final' : 'draft'}, ${
+          event.processTime
+        } ms): "${data.result.substring(0, 50)}..." (Total results: ${allResults.length})`,
       )
     }
   }
@@ -598,6 +712,8 @@ export default function RealtimeTranscriberDemo() {
     setRealtimeStats(null)
     setSimulationStats(null)
     setStabilizedText('')
+    setLiveFinals({})
+    setLiveDraft(null)
     log('Reset all components')
   }
 
@@ -678,9 +794,9 @@ export default function RealtimeTranscriberDemo() {
         <Text style={[styles.configTitle, { fontSize: 18, marginBottom: 12, textAlign: 'center' }]}>Realtime Transcriber Demo</Text>
         {/* Model Selection */}
         <View style={styles.configContainer}>
-          <Text style={styles.configTitle}>Whisper Model Selection</Text>
+          <Text style={styles.configTitle}>Model Selection</Text>
           <View style={styles.buttons}>
-            {whisperModels.map((model) => (
+            {[...whisperModels, PARAKEET_MODEL as typeof PARAKEET_MODEL].map((model) => (
               <Button
                 key={model}
                 title={model}
@@ -707,6 +823,11 @@ export default function RealtimeTranscriberDemo() {
             disabled={isTranscribing}
           />
         </View>
+        {engine && (
+          <Text style={styles.configLabel}>
+            Engine: {engine === 'parakeet' ? 'Parakeet TDT 0.6B v3 (q8_0)' : 'Whisper'}
+          </Text>
+        )}
 
         {modelDownloadProgress > 0 && modelDownloadProgress < 1 && (
           <View style={styles.logContainer}>
@@ -721,8 +842,27 @@ export default function RealtimeTranscriberDemo() {
           <Text style={styles.configTitle}>Audio Source</Text>
           {useFileSimulation && (
             <Text style={styles.configLabel}>
-              Using JFK speech sample from whisper.cpp repository
+              Using a 3:19 public-domain speech sample (Columbia address, 2003)
             </Text>
+          )}
+          {useFileSimulation && (
+            <>
+              <View style={styles.configRow}>
+                <Text style={styles.configLabel}>Sample:</Text>
+                <Text style={styles.configValue}>{SAMPLES[sampleIndex]!.label}</Text>
+              </View>
+              <Button
+                title="Change Sample"
+                onPress={() => {
+                  const next = (sampleIndex + 1) % SAMPLES.length
+                  setSampleIndex(next)
+                  setAudioFilePath(null)
+                  downloadAudioFile(SAMPLES[next])
+                }}
+                style={styles.buttonClear}
+                disabled={isDownloading || isTranscribing}
+              />
+            </>
           )}
           <View style={styles.configRow}>
             <Text style={styles.configLabel}>Use File Simulation:</Text>
@@ -823,7 +963,7 @@ export default function RealtimeTranscriberDemo() {
             }
             style={isTranscribing ? styles.buttonDanger : styles.buttonActive}
             disabled={
-              !whisperContextRef.current ||
+              !engine ||
               (useFileSimulation && !audioFilePath) ||
               isDownloading
             }
@@ -910,12 +1050,39 @@ export default function RealtimeTranscriberDemo() {
               Slices: {realtimeStats.sliceStats?.currentSliceIndex || 0}{' '}
               current, {realtimeStats.sliceStats?.transcribeSliceIndex || 0}{' '}
               transcribing | Audio Source:{' '}
-              {useFileSimulation ? 'File (JFK)' : 'Live'}
+              {useFileSimulation ? `File (${SAMPLES[sampleIndex]!.label})` : 'Live'}
               {useFileSimulation && ` @ ${playbackSpeed}x`}
             </Text>
             <Text style={styles.statusText}>
               Stabilized Transcription:{' '}
               {stabilizedText}
+            </Text>
+          </View>
+        )}
+
+        {/* Live transcript: finals as they settle, the current draft in gray */}
+        {(Object.keys(liveFinals).length > 0 || liveDraft) && (
+          <View style={styles.liveContainer}>
+            <Text style={styles.configTitle}>Live Transcript</Text>
+            <ScrollView
+              ref={liveScrollRef}
+              style={styles.liveScroll}
+              nestedScrollEnabled
+              onContentSizeChange={() => liveScrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              <Text style={styles.liveText}>
+                {Object.entries(liveFinals)
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([, t]) => t)
+                  .filter(Boolean)
+                  .join(' ')}
+                {liveDraft && !(liveDraft.sliceIndex in liveFinals) && (
+                  <Text style={styles.liveDraft}>{` ${liveDraft.text}`}</Text>
+                )}
+              </Text>
+            </ScrollView>
+            <Text style={styles.liveHint}>
+              Black: final (per speech segment) · gray: draft of the segment still being spoken
             </Text>
           </View>
         )}
@@ -937,7 +1104,14 @@ export default function RealtimeTranscriberDemo() {
         {transcribeResult && (
           <View style={styles.logContainer}>
             <Text style={styles.configTitle}>Latest Transcription</Text>
-            <Text style={styles.logText}>{transcribeResult}</Text>
+            <ScrollView
+              ref={resultScrollRef}
+              style={styles.resultScroll}
+              nestedScrollEnabled
+              onContentSizeChange={() => resultScrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              <Text style={styles.logText}>{transcribeResult}</Text>
+            </ScrollView>
           </View>
         )}
 

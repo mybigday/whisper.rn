@@ -12,6 +12,7 @@
 
 ### Properties
 
+- [dtw](index.WhisperContext.md#dtw)
 - [gpu](index.WhisperContext.md#gpu)
 - [id](index.WhisperContext.md#id)
 - [ptr](index.WhisperContext.md#ptr)
@@ -38,9 +39,21 @@
 
 #### Defined in
 
-[index.ts:253](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L253)
+[index.ts:258](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L258)
 
 ## Properties
+
+### dtw
+
+• **dtw**: `boolean` = `false`
+
+Whether DTW token timestamps are computed (`dtwAheadsPreset`, off with flash attention)
+
+#### Defined in
+
+[index.ts:256](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L256)
+
+___
 
 ### gpu
 
@@ -48,7 +61,7 @@
 
 #### Defined in
 
-[index.ts:249](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L249)
+[index.ts:251](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L251)
 
 ___
 
@@ -58,7 +71,7 @@ ___
 
 #### Defined in
 
-[index.ts:247](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L247)
+[index.ts:249](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L249)
 
 ___
 
@@ -68,7 +81,7 @@ ___
 
 #### Defined in
 
-[index.ts:245](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L245)
+[index.ts:247](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L247)
 
 ___
 
@@ -78,7 +91,7 @@ ___
 
 #### Defined in
 
-[index.ts:251](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L251)
+[index.ts:253](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L253)
 
 ## Methods
 
@@ -98,7 +111,7 @@ ___
 
 #### Defined in
 
-[index.ts:375](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L375)
+[index.ts:382](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L382)
 
 ___
 
@@ -112,7 +125,7 @@ ___
 
 #### Defined in
 
-[index.ts:381](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L381)
+[index.ts:388](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L388)
 
 ___
 
@@ -141,7 +154,7 @@ base64: need add `data:audio/wav;base64,` prefix
 
 #### Defined in
 
-[index.ts:283](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L283)
+[index.ts:290](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L290)
 
 ___
 
@@ -169,4 +182,4 @@ Transcribe audio data (base64 encoded float32 PCM data or ArrayBuffer)
 
 #### Defined in
 
-[index.ts:336](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/index.ts#L336)
+[index.ts:343](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L343)

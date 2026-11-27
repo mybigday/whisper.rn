@@ -25,6 +25,20 @@ export type TranscribeOptions = {
   offset?: number
   /** Duration of audio to process in milliseconds */
   duration?: number
+  /**
+   * Encoder audio context size (whisper.cpp `audio_ctx`). A smaller context
+   * encodes less than the model's full 30 s window, which is faster for short
+   * audio at some cost in accuracy.
+   * - number: fixed size, a non-negative integer (0 = model default, the
+   *   default). Must not exceed the model's audio context (1500 for stock models).
+   * - 'auto': fit to the input length (after `offset`/`duration`), with ~2 s
+   *   of headroom, aligned to 64, at least 256 and capped at the model's
+   *   audio context.
+   *
+   * Ignored (full context, with a warning) while the Core ML encoder is
+   * active on iOS, whose model has a fixed 30 s input.
+   */
+  audioCtx?: number | 'auto'
   /** Initial decoding temperature */
   temperature?: number
   /** Temperature fallback increment applied between decoding retries */
@@ -33,17 +47,70 @@ export type TranscribeOptions = {
   beamSize?: number
   /** Number of best candidates to keep */
   bestOf?: number
+  /** Maximum number of text tokens per segment, 0 for no limit (Default: 0). A cap proportional to the audio length stops repetition loops early. */
+  maxTokens?: number
+  /** No timestamp-based splits: one segment per 30-second decoding window, so longer audio still gives several (Default: false) */
+  singleSegment?: boolean
+  /**
+   * A segment whose no-speech probability is above this, and whose average log
+   * probability is below `logprobThold`, is treated as silence and skipped (Default: 0.6)
+   */
+  noSpeechThold?: number
+  /** Retry with a higher temperature when the average log probability is below this (Default: -1) */
+  logprobThold?: number
+  /**
+   * Retry with a higher temperature when a result longer than 32 tokens has a token
+   * entropy below this, i.e. it repeats itself; higher catches more repetition, 0 turns the check off (Default: 2.4)
+   */
+  entropyThold?: number
+  /** Suppress blank outputs at the beginning of sampling (Default: true) */
+  suppressBlank?: boolean
+  /** Suppress non-speech tokens such as [MUSIC] or ♪ (Default: false) */
+  suppressNst?: boolean
   /** Initial Prompt */
   prompt?: string
+  /**
+   * Add each segment's text tokens (`segments[].tokens`) to the result (Default: false).
+   * Token times need `tokenTimestamps` (t0 / t1) or a context initialized with DTW (tDtw).
+   */
+  includeTokens?: boolean
+}
+
+/** A text token of a Whisper result (special and timestamp tokens are left out) */
+export type TranscribeToken = {
+  id: number
+  /**
+   * Text of the token. A character split across tokens (common in CJK) comes with
+   * the token that completes it, earlier ones have empty text; the texts of a
+   * segment's tokens add up to its text.
+   */
+  text: string
+  /** Probability of the token */
+  p: number
+  /** Log probability of the token */
+  plog: number
+  /** Start / end in 10 ms units with `tokenTimestamps`, else -1 */
+  t0: number
+  t1: number
+  /** DTW-aligned time in 10 ms units when the context uses DTW (`dtwAheadsPreset`), else -1 */
+  tDtw: number
 }
 
 export type TranscribeResult = {
   result: string
   language: string
+  /** Whisper: probability of the language when it was auto-detected (`language` unset or 'auto') */
+  languageProb?: number
   segments: Array<{
     text: string
     t0: number
     t1: number
+    /** Whisper: probability that the segment's audio window has no speech */
+    noSpeechProb?: number
+    /** Whisper: mean log probability of the segment's text tokens (low values suggest hallucination) */
+    avgLogprob?: number
+    /** Whisper with `includeTokens` */
+    tokens?: TranscribeToken[]
   }>
   isAborted: boolean
 }
@@ -61,6 +128,8 @@ export type NativeContextOptions = {
   useCoreMLIos?: boolean
   downloadCoreMLAssets?: boolean
   coreMLAssets?: CoreMLAsset[]
+  dtwAheadsPreset?: string
+  dtwNTop?: number
 }
 
 export type NativeWhisperContext = {
@@ -68,6 +137,8 @@ export type NativeWhisperContext = {
   contextId: number
   gpu: boolean
   reasonNoGPU: string
+  /** DTW token timestamps are on */
+  dtw?: boolean
 }
 
 export type NativeParakeetContextOptions = {

@@ -21,7 +21,7 @@
 
 ### onBeginTranscribe
 
-• `Optional` **onBeginTranscribe**: (`sliceInfo`: { `audioData`: `Uint8Array` ; `duration`: `number` ; `sliceIndex`: `number` ; `vadEvent?`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)  }) => `Promise`<`boolean`\>
+• `Optional` **onBeginTranscribe**: (`sliceInfo`: { `audioData`: `Uint8Array` ; `duration`: `number` ; `isFinal`: `boolean` ; `sliceIndex`: `number` ; `vadEvent?`: [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md)  }) => `Promise`<`boolean`\>
 
 #### Type declaration
 
@@ -29,13 +29,14 @@
 
 ##### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `sliceInfo` | `Object` |
-| `sliceInfo.audioData` | `Uint8Array` |
-| `sliceInfo.duration` | `number` |
-| `sliceInfo.sliceIndex` | `number` |
-| `sliceInfo.vadEvent?` | [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `sliceInfo` | `Object` | - |
+| `sliceInfo.audioData` | `Uint8Array` | - |
+| `sliceInfo.duration` | `number` | - |
+| `sliceInfo.isFinal` | `boolean` | A final transcription (else a draft, which can be skipped to save work) |
+| `sliceInfo.sliceIndex` | `number` | - |
+| `sliceInfo.vadEvent?` | [`RealtimeVadEvent`](realtime_transcription.RealtimeVadEvent.md) | - |
 
 ##### Returns
 
@@ -43,7 +44,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:254](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L254)
+[realtime-transcription/types.ts:331](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L331)
 
 ___
 
@@ -70,7 +71,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:261](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L261)
+[realtime-transcription/types.ts:340](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L340)
 
 ___
 
@@ -94,7 +95,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:267](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L267)
+[realtime-transcription/types.ts:346](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L346)
 
 ___
 
@@ -118,7 +119,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:270](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L270)
+[realtime-transcription/types.ts:349](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L349)
 
 ___
 
@@ -142,7 +143,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:269](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L269)
+[realtime-transcription/types.ts:348](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L348)
 
 ___
 
@@ -166,7 +167,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:268](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L268)
+[realtime-transcription/types.ts:347](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L347)
 
 ___
 
@@ -190,7 +191,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:260](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L260)
+[realtime-transcription/types.ts:339](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L339)
 
 ___
 
@@ -214,4 +215,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:266](https://github.com/mybigday/whisper.rn/blob/2e31d0d/src/realtime-transcription/types.ts#L266)
+[realtime-transcription/types.ts:345](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L345)
