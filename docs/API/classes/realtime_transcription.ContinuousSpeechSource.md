@@ -42,7 +42,7 @@ duration (at the quietest moment it finds, see `StreamingVadSegmenter`).
 
 #### Defined in
 
-[realtime-transcription/ContinuousSpeechSource.ts:13](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/ContinuousSpeechSource.ts#L13)
+[realtime-transcription/ContinuousSpeechSource.ts:13](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/ContinuousSpeechSource.ts#L13)
 
 ## Properties
 
@@ -56,7 +56,7 @@ StreamVadContextLike.hopSamples
 
 #### Defined in
 
-[realtime-transcription/ContinuousSpeechSource.ts:9](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/ContinuousSpeechSource.ts#L9)
+[realtime-transcription/ContinuousSpeechSource.ts:9](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/ContinuousSpeechSource.ts#L9)
 
 ___
 
@@ -70,7 +70,7 @@ StreamVadContextLike.sampleRate
 
 #### Defined in
 
-[realtime-transcription/ContinuousSpeechSource.ts:11](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/ContinuousSpeechSource.ts#L11)
+[realtime-transcription/ContinuousSpeechSource.ts:11](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/ContinuousSpeechSource.ts#L11)
 
 ## Methods
 
@@ -88,4 +88,4 @@ StreamVadContextLike.createStream
 
 #### Defined in
 
-[realtime-transcription/ContinuousSpeechSource.ts:18](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/ContinuousSpeechSource.ts#L18)
+[realtime-transcription/ContinuousSpeechSource.ts:18](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/ContinuousSpeechSource.ts#L18)

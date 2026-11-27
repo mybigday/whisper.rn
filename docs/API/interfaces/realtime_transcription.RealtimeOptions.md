@@ -19,9 +19,9 @@
 - [maxResultsInMemory](realtime_transcription.RealtimeOptions.md#maxresultsinmemory)
 - [maxSlicesInMemory](realtime_transcription.RealtimeOptions.md#maxslicesinmemory)
 - [minAvgLogprob](realtime_transcription.RealtimeOptions.md#minavglogprob)
+- [probabilitySegmenter](realtime_transcription.RealtimeOptions.md#probabilitysegmenter)
 - [promptPreviousSlices](realtime_transcription.RealtimeOptions.md#promptpreviousslices)
 - [realtimeProcessingPauseMs](realtime_transcription.RealtimeOptions.md#realtimeprocessingpausems)
-- [segmenter](realtime_transcription.RealtimeOptions.md#segmenter)
 - [splitOverlapMs](realtime_transcription.RealtimeOptions.md#splitoverlapms)
 - [transcribeOptions](realtime_transcription.RealtimeOptions.md#transcribeoptions)
 - [vadOptions](realtime_transcription.RealtimeOptions.md#vadoptions)
@@ -35,7 +35,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:278](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L278)
+[realtime-transcription/types.ts:281](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L281)
 
 ___
 
@@ -45,7 +45,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:281](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L281)
+[realtime-transcription/types.ts:284](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L284)
 
 ___
 
@@ -59,7 +59,7 @@ temperatureInc: 0 }` to keep them cheap. Default: none.
 
 #### Defined in
 
-[realtime-transcription/types.ts:241](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L241)
+[realtime-transcription/types.ts:244](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L244)
 
 ___
 
@@ -71,7 +71,7 @@ Audio a slice needs before its first draft, in ms (Default: 200)
 
 #### Defined in
 
-[realtime-transcription/types.ts:289](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L289)
+[realtime-transcription/types.ts:292](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L292)
 
 ___
 
@@ -83,7 +83,7 @@ Initial Whisper prompt. Ignored when using ParakeetContext.
 
 #### Defined in
 
-[realtime-transcription/types.ts:266](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L266)
+[realtime-transcription/types.ts:269](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L269)
 
 ___
 
@@ -97,7 +97,7 @@ was detected confidently a few times, and pass it explicitly from then on
 
 #### Defined in
 
-[realtime-transcription/types.ts:254](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L254)
+[realtime-transcription/types.ts:257](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L257)
 
 ___
 
@@ -121,7 +121,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:284](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L284)
+[realtime-transcription/types.ts:287](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L287)
 
 ___
 
@@ -136,7 +136,7 @@ Default: unlimited (bounded only by `maxResultsInMemory`).
 
 #### Defined in
 
-[realtime-transcription/types.ts:275](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L275)
+[realtime-transcription/types.ts:278](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L278)
 
 ___
 
@@ -150,7 +150,7 @@ reached, which keeps long-running (24/7) sessions bounded. Default: unlimited.
 
 #### Defined in
 
-[realtime-transcription/types.ts:232](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L232)
+[realtime-transcription/types.ts:235](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L235)
 
 ___
 
@@ -162,7 +162,7 @@ Maximum number of raw audio slices kept in memory. Default: 3.
 
 #### Defined in
 
-[realtime-transcription/types.ts:226](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L226)
+[realtime-transcription/types.ts:229](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L229)
 
 ___
 
@@ -176,7 +176,20 @@ silence. Pick it for your model and audio. Default: off.
 
 #### Defined in
 
-[realtime-transcription/types.ts:248](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L248)
+[realtime-transcription/types.ts:251](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L251)
+
+___
+
+### probabilitySegmenter
+
+• `Optional` **probabilitySegmenter**: [`ProbabilitySegmenter`](realtime_transcription.ProbabilitySegmenter.md)
+
+Custom segmentation of the probabilities of a probability-source
+`vadContext` (Default: `StreamingVadSegmenter`)
+
+#### Defined in
+
+[realtime-transcription/types.ts:227](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L227)
 
 ___
 
@@ -188,7 +201,7 @@ Add previous Whisper results to the next prompt. Ignored for Parakeet. Defaults 
 
 #### Defined in
 
-[realtime-transcription/types.ts:268](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L268)
+[realtime-transcription/types.ts:271](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L271)
 
 ___
 
@@ -200,19 +213,7 @@ Audio time between drafts of a slice, in ms (Default: 200)
 
 #### Defined in
 
-[realtime-transcription/types.ts:287](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L287)
-
-___
-
-### segmenter
-
-• `Optional` **segmenter**: [`SpeechSegmenter`](realtime_transcription.SpeechSegmenter.md)
-
-Custom segmentation of the VAD probabilities (Default: `StreamingVadSegmenter`)
-
-#### Defined in
-
-[realtime-transcription/types.ts:224](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L224)
+[realtime-transcription/types.ts:290](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L290)
 
 ___
 
@@ -229,7 +230,7 @@ Default: 0 (off).
 
 #### Defined in
 
-[realtime-transcription/types.ts:263](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L263)
+[realtime-transcription/types.ts:266](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L266)
 
 ___
 
@@ -241,7 +242,7 @@ Options for the selected Whisper or Parakeet context.
 
 #### Defined in
 
-[realtime-transcription/types.ts:235](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L235)
+[realtime-transcription/types.ts:238](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L238)
 
 ___
 
@@ -257,7 +258,7 @@ must be finite (Default: the preset's, 30 s for `default`).
 
 #### Defined in
 
-[realtime-transcription/types.ts:220](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L220)
+[realtime-transcription/types.ts:220](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L220)
 
 ___
 
@@ -269,4 +270,4 @@ Preset for `vadOptions` (Default: 'default')
 
 #### Defined in
 
-[realtime-transcription/types.ts:222](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L222)
+[realtime-transcription/types.ts:222](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L222)

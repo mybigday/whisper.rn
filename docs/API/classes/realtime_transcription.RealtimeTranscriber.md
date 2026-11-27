@@ -6,10 +6,12 @@
 
 RealtimeTranscriber transcribes a live audio stream in slices.
 
-- The audio goes through a speech probability source (a `WhisperVadContext`
-  stream, or "always speech" without one) and a segmenter: each speech
-  segment becomes a slice. Segments longer than `maxSpeechDurationS` are
-  split, at an earlier pause when there is one.
+- The audio goes through a segmenter: each speech segment becomes a slice.
+  Given a speech probability source (a `WhisperVadContext`, or "always
+  speech" without a VAD) the transcriber segments the probabilities itself
+  (`StreamVad`): segments longer than `maxSpeechDurationS` are split, at an
+  earlier pause when there is one. A segmenter VAD (`RealtimeSegmenterLike`)
+  is used as it is.
 - While a slice grows it gets draft transcriptions (`isFinal: false`); when
   it ends, one final transcription (`isFinal: true`, with `endReason`).
 - Finals run before drafts, and a running draft is aborted for a final.
@@ -54,7 +56,7 @@ RealtimeTranscriber transcribes a live audio stream in slices.
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:212](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L212)
+[realtime-transcription/RealtimeTranscriber.ts:227](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L227)
 
 ## Accessors
 
@@ -70,7 +72,7 @@ The language the language lock holds, if any
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:958](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L958)
+[realtime-transcription/RealtimeTranscriber.ts:1012](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1012)
 
 ## Methods
 
@@ -101,7 +103,7 @@ Get current statistics
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:965](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L965)
+[realtime-transcription/RealtimeTranscriber.ts:1019](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1019)
 
 ___
 
@@ -120,7 +122,7 @@ every result should collect them from the `onTranscribe` callback as they arrive
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:991](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L991)
+[realtime-transcription/RealtimeTranscriber.ts:1045](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1045)
 
 ___
 
@@ -137,7 +139,7 @@ on continues in the next slice.
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:1002](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L1002)
+[realtime-transcription/RealtimeTranscriber.ts:1056](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1056)
 
 ___
 
@@ -154,7 +156,7 @@ stream this transcriber created on it is freed.
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:1105](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L1105)
+[realtime-transcription/RealtimeTranscriber.ts:1160](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1160)
 
 ___
 
@@ -170,7 +172,7 @@ Reset all components
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:1064](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L1064)
+[realtime-transcription/RealtimeTranscriber.ts:1118](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1118)
 
 ___
 
@@ -186,7 +188,7 @@ Start realtime transcription
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:327](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L327)
+[realtime-transcription/RealtimeTranscriber.ts:346](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L346)
 
 ___
 
@@ -204,7 +206,7 @@ drafts are dropped.
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:379](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L379)
+[realtime-transcription/RealtimeTranscriber.ts:398](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L398)
 
 ___
 
@@ -226,7 +228,7 @@ Update callbacks
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:942](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L942)
+[realtime-transcription/RealtimeTranscriber.ts:996](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L996)
 
 ___
 
@@ -248,4 +250,4 @@ Update segmentation options dynamically (maxSpeechDurationS stays finite)
 
 #### Defined in
 
-[realtime-transcription/RealtimeTranscriber.ts:949](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/RealtimeTranscriber.ts#L949)
+[realtime-transcription/RealtimeTranscriber.ts:1003](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/RealtimeTranscriber.ts#L1003)

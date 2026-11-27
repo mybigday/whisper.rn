@@ -1,8 +1,14 @@
-[whisper.rn](../README.md) / [realtime-transcription](../modules/realtime_transcription.md) / RealtimeVadContextLike
+[whisper.rn](../README.md) / [realtime-transcription](../modules/realtime_transcription.md) / RealtimeSegmenterLike
 
-# Interface: RealtimeVadContextLike
+# Interface: RealtimeSegmenterLike
 
-[realtime-transcription](../modules/realtime_transcription.md).RealtimeVadContextLike
+[realtime-transcription](../modules/realtime_transcription.md).RealtimeSegmenterLike
+
+A segmenter: turns pushed audio into speech segments, reported as start /
+continue / end events with the segment's audio. `StreamVad` and
+`RingBufferVad` implement it; other VADs can too. The optional `info`
+arguments (sample positions, end reason) let `RealtimeTranscriber` cut slices
+exactly and report why they ended.
 
 ## Implemented by
 
@@ -13,18 +19,18 @@
 
 ### Properties
 
-- [onError](realtime_transcription.RealtimeVadContextLike.md#onerror)
-- [onSpeechContinue](realtime_transcription.RealtimeVadContextLike.md#onspeechcontinue)
-- [onSpeechEnd](realtime_transcription.RealtimeVadContextLike.md#onspeechend)
-- [onSpeechStart](realtime_transcription.RealtimeVadContextLike.md#onspeechstart)
+- [onError](realtime_transcription.RealtimeSegmenterLike.md#onerror)
+- [onSpeechContinue](realtime_transcription.RealtimeSegmenterLike.md#onspeechcontinue)
+- [onSpeechEnd](realtime_transcription.RealtimeSegmenterLike.md#onspeechend)
+- [onSpeechStart](realtime_transcription.RealtimeSegmenterLike.md#onspeechstart)
 
 ### Methods
 
-- [flush](realtime_transcription.RealtimeVadContextLike.md#flush)
-- [processAudio](realtime_transcription.RealtimeVadContextLike.md#processaudio)
-- [release](realtime_transcription.RealtimeVadContextLike.md#release)
-- [reset](realtime_transcription.RealtimeVadContextLike.md#reset)
-- [updateOptions](realtime_transcription.RealtimeVadContextLike.md#updateoptions)
+- [flush](realtime_transcription.RealtimeSegmenterLike.md#flush)
+- [processAudio](realtime_transcription.RealtimeSegmenterLike.md#processaudio)
+- [release](realtime_transcription.RealtimeSegmenterLike.md#release)
+- [reset](realtime_transcription.RealtimeSegmenterLike.md#reset)
+- [updateOptions](realtime_transcription.RealtimeSegmenterLike.md#updateoptions)
 
 ## Properties
 
@@ -48,7 +54,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:393](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L393)
+[realtime-transcription/types.ts:403](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L403)
 
 ___
 
@@ -72,7 +78,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:387](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L387)
+[realtime-transcription/types.ts:397](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L397)
 
 ___
 
@@ -96,7 +102,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:391](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L391)
+[realtime-transcription/types.ts:401](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L401)
 
 ___
 
@@ -120,7 +126,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:383](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L383)
+[realtime-transcription/types.ts:393](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L393)
 
 ## Methods
 
@@ -134,7 +140,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:397](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L397)
+[realtime-transcription/types.ts:407](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L407)
 
 ___
 
@@ -154,7 +160,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:381](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L381)
+[realtime-transcription/types.ts:391](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L391)
 
 ___
 
@@ -168,7 +174,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:401](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L401)
+[realtime-transcription/types.ts:411](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L411)
 
 ___
 
@@ -182,7 +188,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:399](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L399)
+[realtime-transcription/types.ts:409](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L409)
 
 ___
 
@@ -202,4 +208,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:395](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L395)
+[realtime-transcription/types.ts:405](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L405)

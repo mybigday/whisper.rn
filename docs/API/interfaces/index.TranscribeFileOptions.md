@@ -66,7 +66,7 @@ TranscribeOptions.audioCtx
 
 #### Defined in
 
-[NativeRNWhisper.ts:41](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L41)
+[NativeRNWhisper.ts:41](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L41)
 
 ___
 
@@ -82,7 +82,7 @@ TranscribeOptions.beamSize
 
 #### Defined in
 
-[NativeRNWhisper.ts:47](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L47)
+[NativeRNWhisper.ts:47](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L47)
 
 ___
 
@@ -98,7 +98,7 @@ TranscribeOptions.bestOf
 
 #### Defined in
 
-[NativeRNWhisper.ts:49](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L49)
+[NativeRNWhisper.ts:49](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L49)
 
 ___
 
@@ -114,7 +114,7 @@ TranscribeOptions.duration
 
 #### Defined in
 
-[NativeRNWhisper.ts:27](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L27)
+[NativeRNWhisper.ts:27](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L27)
 
 ___
 
@@ -122,7 +122,8 @@ ___
 
 • `Optional` **entropyThold**: `number`
 
-Retry with a higher temperature when the token entropy is above this, e.g. on repetition (Default: 2.4)
+Retry with a higher temperature when a result longer than 32 tokens has a token
+entropy below this, i.e. it repeats itself; higher catches more repetition, 0 turns the check off (Default: 2.4)
 
 #### Inherited from
 
@@ -130,7 +131,7 @@ TranscribeOptions.entropyThold
 
 #### Defined in
 
-[NativeRNWhisper.ts:62](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L62)
+[NativeRNWhisper.ts:65](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L65)
 
 ___
 
@@ -147,7 +148,7 @@ TranscribeOptions.includeTokens
 
 #### Defined in
 
-[NativeRNWhisper.ts:73](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L73)
+[NativeRNWhisper.ts:76](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L76)
 
 ___
 
@@ -163,7 +164,7 @@ TranscribeOptions.language
 
 #### Defined in
 
-[NativeRNWhisper.ts:7](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L7)
+[NativeRNWhisper.ts:7](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L7)
 
 ___
 
@@ -179,7 +180,7 @@ TranscribeOptions.logprobThold
 
 #### Defined in
 
-[NativeRNWhisper.ts:60](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L60)
+[NativeRNWhisper.ts:60](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L60)
 
 ___
 
@@ -195,7 +196,7 @@ TranscribeOptions.maxContext
 
 #### Defined in
 
-[NativeRNWhisper.ts:15](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L15)
+[NativeRNWhisper.ts:15](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L15)
 
 ___
 
@@ -211,7 +212,7 @@ TranscribeOptions.maxLen
 
 #### Defined in
 
-[NativeRNWhisper.ts:17](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L17)
+[NativeRNWhisper.ts:17](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L17)
 
 ___
 
@@ -227,7 +228,7 @@ TranscribeOptions.maxThreads
 
 #### Defined in
 
-[NativeRNWhisper.ts:11](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L11)
+[NativeRNWhisper.ts:11](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L11)
 
 ___
 
@@ -243,7 +244,7 @@ TranscribeOptions.maxTokens
 
 #### Defined in
 
-[NativeRNWhisper.ts:51](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L51)
+[NativeRNWhisper.ts:51](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L51)
 
 ___
 
@@ -259,7 +260,7 @@ TranscribeOptions.nProcessors
 
 #### Defined in
 
-[NativeRNWhisper.ts:13](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L13)
+[NativeRNWhisper.ts:13](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L13)
 
 ___
 
@@ -276,7 +277,7 @@ TranscribeOptions.noSpeechThold
 
 #### Defined in
 
-[NativeRNWhisper.ts:58](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L58)
+[NativeRNWhisper.ts:58](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L58)
 
 ___
 
@@ -292,7 +293,7 @@ TranscribeOptions.offset
 
 #### Defined in
 
-[NativeRNWhisper.ts:25](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L25)
+[NativeRNWhisper.ts:25](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L25)
 
 ___
 
@@ -318,7 +319,7 @@ Callback when new segments are transcribed
 
 #### Defined in
 
-[index.ts:234](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L234)
+[index.ts:234](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L234)
 
 ___
 
@@ -344,7 +345,7 @@ Progress callback, the progress is between 0 and 100
 
 #### Defined in
 
-[index.ts:232](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L232)
+[index.ts:232](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L232)
 
 ___
 
@@ -360,7 +361,7 @@ TranscribeOptions.prompt
 
 #### Defined in
 
-[NativeRNWhisper.ts:68](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L68)
+[NativeRNWhisper.ts:71](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L71)
 
 ___
 
@@ -368,7 +369,7 @@ ___
 
 • `Optional` **singleSegment**: `boolean`
 
-Return the whole input as one segment (Default: false)
+No timestamp-based splits: one segment per 30-second decoding window, so longer audio still gives several (Default: false)
 
 #### Inherited from
 
@@ -376,7 +377,7 @@ TranscribeOptions.singleSegment
 
 #### Defined in
 
-[NativeRNWhisper.ts:53](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L53)
+[NativeRNWhisper.ts:53](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L53)
 
 ___
 
@@ -392,7 +393,7 @@ TranscribeOptions.suppressBlank
 
 #### Defined in
 
-[NativeRNWhisper.ts:64](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L64)
+[NativeRNWhisper.ts:67](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L67)
 
 ___
 
@@ -408,7 +409,7 @@ TranscribeOptions.suppressNst
 
 #### Defined in
 
-[NativeRNWhisper.ts:66](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L66)
+[NativeRNWhisper.ts:69](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L69)
 
 ___
 
@@ -424,7 +425,7 @@ TranscribeOptions.tdrzEnable
 
 #### Defined in
 
-[NativeRNWhisper.ts:21](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L21)
+[NativeRNWhisper.ts:21](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L21)
 
 ___
 
@@ -440,7 +441,7 @@ TranscribeOptions.temperature
 
 #### Defined in
 
-[NativeRNWhisper.ts:43](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L43)
+[NativeRNWhisper.ts:43](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L43)
 
 ___
 
@@ -456,7 +457,7 @@ TranscribeOptions.temperatureInc
 
 #### Defined in
 
-[NativeRNWhisper.ts:45](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L45)
+[NativeRNWhisper.ts:45](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L45)
 
 ___
 
@@ -472,7 +473,7 @@ TranscribeOptions.tokenTimestamps
 
 #### Defined in
 
-[NativeRNWhisper.ts:19](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L19)
+[NativeRNWhisper.ts:19](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L19)
 
 ___
 
@@ -488,7 +489,7 @@ TranscribeOptions.translate
 
 #### Defined in
 
-[NativeRNWhisper.ts:9](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L9)
+[NativeRNWhisper.ts:9](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L9)
 
 ___
 
@@ -504,4 +505,4 @@ TranscribeOptions.wordThold
 
 #### Defined in
 
-[NativeRNWhisper.ts:23](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L23)
+[NativeRNWhisper.ts:23](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L23)

@@ -67,7 +67,7 @@
 
 #### Defined in
 
-[index.ts:237](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L237)
+[index.ts:237](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L237)
 
 ___
 
@@ -90,7 +90,7 @@ ___
 
 #### Defined in
 
-[index.ts:410](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L410)
+[index.ts:410](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L410)
 
 ___
 
@@ -102,7 +102,7 @@ Alignment heads for DTW token timestamps: the model the context loads, or `n-top
 
 #### Defined in
 
-[index.ts:395](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L395)
+[index.ts:395](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L395)
 
 ___
 
@@ -120,7 +120,7 @@ ___
 
 #### Defined in
 
-[index.ts:504](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L504)
+[index.ts:504](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L504)
 
 ___
 
@@ -137,7 +137,7 @@ ___
 
 #### Defined in
 
-[index.ts:512](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L512)
+[index.ts:512](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L512)
 
 ___
 
@@ -156,7 +156,7 @@ ___
 
 #### Defined in
 
-[index.ts:223](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L223)
+[index.ts:223](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L223)
 
 ___
 
@@ -172,7 +172,7 @@ ___
 | `beamSize?` | `number` | Beam size for beam search |
 | `bestOf?` | `number` | Number of best candidates to keep |
 | `duration?` | `number` | Duration of audio to process in milliseconds |
-| `entropyThold?` | `number` | Retry with a higher temperature when the token entropy is above this, e.g. on repetition (Default: 2.4) |
+| `entropyThold?` | `number` | Retry with a higher temperature when a result longer than 32 tokens has a token entropy below this, i.e. it repeats itself; higher catches more repetition, 0 turns the check off (Default: 2.4) |
 | `includeTokens?` | `boolean` | Add each segment's text tokens (`segments[].tokens`) to the result (Default: false). Token times need `tokenTimestamps` (t0 / t1) or a context initialized with DTW (tDtw). |
 | `language?` | `string` | Spoken language (Default: 'auto' for auto-detect) |
 | `logprobThold?` | `number` | Retry with a higher temperature when the average log probability is below this (Default: -1) |
@@ -184,7 +184,7 @@ ___
 | `noSpeechThold?` | `number` | A segment whose no-speech probability is above this, and whose average log probability is below `logprobThold`, is treated as silence and skipped (Default: 0.6) |
 | `offset?` | `number` | Time offset in milliseconds |
 | `prompt?` | `string` | Initial Prompt |
-| `singleSegment?` | `boolean` | Return the whole input as one segment (Default: false) |
+| `singleSegment?` | `boolean` | No timestamp-based splits: one segment per 30-second decoding window, so longer audio still gives several (Default: false) |
 | `suppressBlank?` | `boolean` | Suppress blank outputs at the beginning of sampling (Default: true) |
 | `suppressNst?` | `boolean` | Suppress non-speech tokens such as [MUSIC] or ♪ (Default: false) |
 | `tdrzEnable?` | `boolean` | Enable tinydiarize (requires a tdrz model) |
@@ -196,7 +196,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L5)
+[NativeRNWhisper.ts:5](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L5)
 
 ___
 
@@ -216,7 +216,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:96](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L96)
+[NativeRNWhisper.ts:99](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L99)
 
 ___
 
@@ -240,7 +240,7 @@ A text token of a Whisper result (special and timestamp tokens are left out)
 
 #### Defined in
 
-[NativeRNWhisper.ts:77](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L77)
+[NativeRNWhisper.ts:80](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L80)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 #### Defined in
 
-[index.ts:632](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L632)
+[index.ts:632](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L632)
 
 ___
 
@@ -281,7 +281,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:153](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L153)
+[NativeRNWhisper.ts:156](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L156)
 
 ___
 
@@ -298,7 +298,7 @@ ___
 
 #### Defined in
 
-[NativeRNWhisper.ts:195](https://github.com/mybigday/whisper.rn/blob/3a63101/src/NativeRNWhisper.ts#L195)
+[NativeRNWhisper.ts:198](https://github.com/mybigday/whisper.rn/blob/90f6961/src/NativeRNWhisper.ts#L198)
 
 ## Variables
 
@@ -310,7 +310,7 @@ Is allow fallback to CPU if load CoreML model failed
 
 #### Defined in
 
-[index.ts:497](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L497)
+[index.ts:497](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L497)
 
 ___
 
@@ -322,7 +322,7 @@ Is use CoreML models on iOS
 
 #### Defined in
 
-[index.ts:494](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L494)
+[index.ts:494](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L494)
 
 ___
 
@@ -334,7 +334,7 @@ Current version of whisper.cpp
 
 #### Defined in
 
-[index.ts:491](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L491)
+[index.ts:491](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L491)
 
 ## Functions
 
@@ -360,7 +360,7 @@ Add a listener for native whisper.cpp log output
 
 #### Defined in
 
-[index.ts:868](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L868)
+[index.ts:868](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L868)
 
 ___
 
@@ -382,7 +382,7 @@ Initialize a Parakeet context with a GGML model file.
 
 #### Defined in
 
-[index.ts:595](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L595)
+[index.ts:595](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L595)
 
 ___
 
@@ -406,7 +406,7 @@ Promise resolving to WhisperContext instance
 
 #### Defined in
 
-[index.ts:446](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L446)
+[index.ts:446](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L446)
 
 ___
 
@@ -430,7 +430,7 @@ Promise resolving to WhisperVadContext instance
 
 #### Defined in
 
-[index.ts:816](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L816)
+[index.ts:816](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L816)
 
 ___
 
@@ -444,7 +444,7 @@ ___
 
 #### Defined in
 
-[index.ts:99](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L99)
+[index.ts:99](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L99)
 
 ___
 
@@ -460,7 +460,7 @@ Release every Parakeet context and free its memory.
 
 #### Defined in
 
-[index.ts:622](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L622)
+[index.ts:622](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L622)
 
 ___
 
@@ -474,7 +474,7 @@ ___
 
 #### Defined in
 
-[index.ts:484](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L484)
+[index.ts:484](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L484)
 
 ___
 
@@ -492,7 +492,7 @@ Promise resolving when all contexts are released
 
 #### Defined in
 
-[index.ts:848](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L848)
+[index.ts:848](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L848)
 
 ___
 
@@ -514,4 +514,4 @@ Enable or disable native whisper.cpp logging
 
 #### Defined in
 
-[index.ts:857](https://github.com/mybigday/whisper.rn/blob/3a63101/src/index.ts#L857)
+[index.ts:857](https://github.com/mybigday/whisper.rn/blob/90f6961/src/index.ts#L857)

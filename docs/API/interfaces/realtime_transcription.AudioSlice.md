@@ -24,7 +24,7 @@
 
 #### Defined in
 
-[realtime-transcription/types.ts:294](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L294)
+[realtime-transcription/types.ts:297](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L297)
 
 ___
 
@@ -34,7 +34,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:297](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L297)
+[realtime-transcription/types.ts:300](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L300)
 
 ___
 
@@ -44,7 +44,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:293](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L293)
+[realtime-transcription/types.ts:296](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L296)
 
 ___
 
@@ -54,7 +54,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:298](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L298)
+[realtime-transcription/types.ts:301](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L301)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:299](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L299)
+[realtime-transcription/types.ts:302](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L302)
 
 ___
 
@@ -74,7 +74,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:295](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L295)
+[realtime-transcription/types.ts:298](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L298)
 
 ___
 
@@ -84,4 +84,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:296](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L296)
+[realtime-transcription/types.ts:299](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L299)

@@ -27,7 +27,7 @@ Input: 16 kHz mono PCM16.
 
 ## Implements
 
-- [`RealtimeVadContextLike`](../interfaces/realtime_transcription.RealtimeVadContextLike.md)
+- [`RealtimeSegmenterLike`](../interfaces/realtime_transcription.RealtimeSegmenterLike.md)
 
 ## Table of contents
 
@@ -66,7 +66,7 @@ Input: 16 kHz mono PCM16.
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:178](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L178)
+[realtime-transcription/StreamVad.ts:178](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L178)
 
 ## Accessors
 
@@ -82,7 +82,7 @@ Current VAD options (preset merged with overrides)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:199](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L199)
+[realtime-transcription/StreamVad.ts:199](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L199)
 
 ## Methods
 
@@ -98,11 +98,11 @@ End of audio: emits the remaining probabilities and closes open speech.
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[flush](../interfaces/realtime_transcription.RealtimeVadContextLike.md#flush)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[flush](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#flush)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:235](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L235)
+[realtime-transcription/StreamVad.ts:235](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L235)
 
 ___
 
@@ -122,11 +122,11 @@ ___
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onError](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onerror)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[onError](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#onerror)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:219](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L219)
+[realtime-transcription/StreamVad.ts:219](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L219)
 
 ___
 
@@ -146,11 +146,11 @@ ___
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechContinue](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechcontinue)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[onSpeechContinue](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#onspeechcontinue)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:209](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L209)
+[realtime-transcription/StreamVad.ts:209](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L209)
 
 ___
 
@@ -170,11 +170,11 @@ ___
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechEnd](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechend)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[onSpeechEnd](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#onspeechend)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:215](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L215)
+[realtime-transcription/StreamVad.ts:215](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L215)
 
 ___
 
@@ -194,11 +194,11 @@ ___
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[onSpeechStart](../interfaces/realtime_transcription.RealtimeVadContextLike.md#onspeechstart)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[onSpeechStart](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#onspeechstart)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:203](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L203)
+[realtime-transcription/StreamVad.ts:203](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L203)
 
 ___
 
@@ -218,11 +218,11 @@ ___
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[processAudio](../interfaces/realtime_transcription.RealtimeVadContextLike.md#processaudio)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[processAudio](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#processaudio)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:228](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L228)
+[realtime-transcription/StreamVad.ts:228](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L228)
 
 ___
 
@@ -238,11 +238,11 @@ Frees the native stream.
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[release](../interfaces/realtime_transcription.RealtimeVadContextLike.md#release)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[release](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#release)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:251](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L251)
+[realtime-transcription/StreamVad.ts:251](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L251)
 
 ___
 
@@ -258,11 +258,11 @@ Waits for queued audio, then starts over (model state included).
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[reset](../interfaces/realtime_transcription.RealtimeVadContextLike.md#reset)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[reset](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#reset)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:241](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L241)
+[realtime-transcription/StreamVad.ts:241](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L241)
 
 ___
 
@@ -282,8 +282,8 @@ ___
 
 #### Implementation of
 
-[RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md).[updateOptions](../interfaces/realtime_transcription.RealtimeVadContextLike.md#updateoptions)
+[RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md).[updateOptions](../interfaces/realtime_transcription.RealtimeSegmenterLike.md#updateoptions)
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:223](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L223)
+[realtime-transcription/StreamVad.ts:223](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L223)

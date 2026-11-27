@@ -40,7 +40,7 @@ on long finals let a real language change unlock it.
 
 #### Defined in
 
-[realtime-transcription/LanguageLock.ts:34](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/LanguageLock.ts#L34)
+[realtime-transcription/LanguageLock.ts:34](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/LanguageLock.ts#L34)
 
 ## Accessors
 
@@ -56,7 +56,7 @@ The locked language, if any
 
 #### Defined in
 
-[realtime-transcription/LanguageLock.ts:46](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/LanguageLock.ts#L46)
+[realtime-transcription/LanguageLock.ts:46](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/LanguageLock.ts#L46)
 
 ## Methods
 
@@ -80,7 +80,7 @@ auto-detect (no lock yet, or a final due for a re-check).
 
 #### Defined in
 
-[realtime-transcription/LanguageLock.ts:54](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/LanguageLock.ts#L54)
+[realtime-transcription/LanguageLock.ts:54](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/LanguageLock.ts#L54)
 
 ___
 
@@ -103,7 +103,7 @@ A final's auto-detected language (only call it when the language was detected)
 
 #### Defined in
 
-[realtime-transcription/LanguageLock.ts:69](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/LanguageLock.ts#L69)
+[realtime-transcription/LanguageLock.ts:69](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/LanguageLock.ts#L69)
 
 ___
 
@@ -117,4 +117,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/LanguageLock.ts:95](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/LanguageLock.ts#L95)
+[realtime-transcription/LanguageLock.ts:95](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/LanguageLock.ts#L95)

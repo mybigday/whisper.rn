@@ -26,7 +26,7 @@ earlier pause); that audio is not part of this segment.
 
 #### Defined in
 
-[realtime-transcription/types.ts:177](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L177)
+[realtime-transcription/types.ts:177](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L177)
 
 ___
 
@@ -38,7 +38,7 @@ A max-duration split inside speech: the next segment starts at `endSample`
 
 #### Defined in
 
-[realtime-transcription/types.ts:180](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L180)
+[realtime-transcription/types.ts:180](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L180)
 
 ___
 
@@ -48,4 +48,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/types.ts:178](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L178)
+[realtime-transcription/types.ts:178](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L178)

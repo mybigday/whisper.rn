@@ -22,4 +22,4 @@ Stream sample (counted from the start of the pushed audio) of the first sample o
 
 #### Defined in
 
-[realtime-transcription/types.ts:167](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L167)
+[realtime-transcription/types.ts:167](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L167)

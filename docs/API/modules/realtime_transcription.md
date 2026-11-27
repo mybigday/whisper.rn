@@ -23,13 +23,13 @@
 - [AudioStreamData](../interfaces/realtime_transcription.AudioStreamData.md)
 - [AudioStreamInterface](../interfaces/realtime_transcription.AudioStreamInterface.md)
 - [MemoryUsage](../interfaces/realtime_transcription.MemoryUsage.md)
+- [ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md)
 - [RealtimeOptions](../interfaces/realtime_transcription.RealtimeOptions.md)
+- [RealtimeSegmenterLike](../interfaces/realtime_transcription.RealtimeSegmenterLike.md)
 - [RealtimeStatsEvent](../interfaces/realtime_transcription.RealtimeStatsEvent.md)
 - [RealtimeTranscribeEvent](../interfaces/realtime_transcription.RealtimeTranscribeEvent.md)
 - [RealtimeTranscriberCallbacks](../interfaces/realtime_transcription.RealtimeTranscriberCallbacks.md)
-- [RealtimeVadContextLike](../interfaces/realtime_transcription.RealtimeVadContextLike.md)
 - [RealtimeVadEvent](../interfaces/realtime_transcription.RealtimeVadEvent.md)
-- [SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md)
 - [VadSpeechChunkInfo](../interfaces/realtime_transcription.VadSpeechChunkInfo.md)
 - [VadSpeechEndInfo](../interfaces/realtime_transcription.VadSpeechEndInfo.md)
 - [WavFileWriterFs](../interfaces/realtime_transcription.WavFileWriterFs.md)
@@ -39,6 +39,7 @@
 - [LanguageLockOptions](realtime_transcription.md#languagelockoptions)
 - [RealtimeSliceEndReason](realtime_transcription.md#realtimesliceendreason)
 - [RealtimeTranscriberDependencies](realtime_transcription.md#realtimetranscriberdependencies)
+- [RealtimeVadContextLike](realtime_transcription.md#realtimevadcontextlike)
 - [StreamVadContextLike](realtime_transcription.md#streamvadcontextlike)
 - [StreamVadOptions](realtime_transcription.md#streamvadoptions)
 - [StreamingVadSegmenterOptions](realtime_transcription.md#streamingvadsegmenteroptions)
@@ -69,7 +70,7 @@
 
 #### Defined in
 
-[realtime-transcription/LanguageLock.ts:1](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/LanguageLock.ts#L1)
+[realtime-transcription/LanguageLock.ts:1](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/LanguageLock.ts#L1)
 
 ___
 
@@ -81,20 +82,34 @@ Why a slice was finalized: its VAD segment's end reason, or `manual` (`nextSlice
 
 #### Defined in
 
-[realtime-transcription/types.ts:184](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L184)
+[realtime-transcription/types.ts:184](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L184)
 
 ___
 
 ### RealtimeTranscriberDependencies
 
-Ƭ **RealtimeTranscriberDependencies**: { `audioStream`: [`AudioStreamInterface`](../interfaces/realtime_transcription.AudioStreamInterface.md) ; `fs?`: [`WavFileWriterFs`](../interfaces/realtime_transcription.WavFileWriterFs.md) ; `vadContext?`: [`StreamVadContextLike`](realtime_transcription.md#streamvadcontextlike)  } & { `parakeetContext?`: `never` ; `whisperContext`: `WhisperContextLike`  } \| { `parakeetContext`: `ParakeetContextLike` ; `whisperContext?`: `never`  }
+Ƭ **RealtimeTranscriberDependencies**: { `audioStream`: [`AudioStreamInterface`](../interfaces/realtime_transcription.AudioStreamInterface.md) ; `fs?`: [`WavFileWriterFs`](../interfaces/realtime_transcription.WavFileWriterFs.md) ; `vadContext?`: [`StreamVadContextLike`](realtime_transcription.md#streamvadcontextlike) \| [`RealtimeSegmenterLike`](../interfaces/realtime_transcription.RealtimeSegmenterLike.md)  } & { `parakeetContext?`: `never` ; `whisperContext`: `WhisperContextLike`  } \| { `parakeetContext`: `ParakeetContextLike` ; `whisperContext?`: `never`  }
 
 Dependencies for realtime transcription. Provide exactly one transcription
 context: `whisperContext` or `parakeetContext`.
 
 #### Defined in
 
-[realtime-transcription/types.ts:408](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L408)
+[realtime-transcription/types.ts:421](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L421)
+
+___
+
+### RealtimeVadContextLike
+
+Ƭ **RealtimeVadContextLike**: [`RealtimeSegmenterLike`](../interfaces/realtime_transcription.RealtimeSegmenterLike.md)
+
+**`Deprecated`**
+
+Renamed to `RealtimeSegmenterLike`
+
+#### Defined in
+
+[realtime-transcription/types.ts:415](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L415)
 
 ___
 
@@ -114,7 +129,7 @@ The part of `WhisperVadContext` StreamVad uses
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:16](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L16)
+[realtime-transcription/StreamVad.ts:16](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L16)
 
 ___
 
@@ -127,13 +142,13 @@ ___
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `logger?` | (`message`: `string`) => `void` | - |
-| `segmenter?` | [`SpeechSegmenter`](../interfaces/realtime_transcription.SpeechSegmenter.md) | Segmentation of the probabilities (Default: a `StreamingVadSegmenter` with `vadOptions`). A custom one gets `vadOptions` through `setOptions`. |
+| `segmenter?` | [`ProbabilitySegmenter`](../interfaces/realtime_transcription.ProbabilitySegmenter.md) | Segmentation of the probabilities (Default: a `StreamingVadSegmenter` with `vadOptions`). A custom one gets `vadOptions` through `setOptions`. |
 | `vadOptions?` | [`VadOptions`](index.md#vadoptions) | - |
 | `vadPreset?` | keyof typeof [`VAD_PRESETS`](realtime_transcription.md#vad_presets) | - |
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:22](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L22)
+[realtime-transcription/StreamVad.ts:22](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L22)
 
 ___
 
@@ -150,7 +165,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:61](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L61)
+[realtime-transcription/StreamingVadSegmenter.ts:61](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L61)
 
 ___
 
@@ -162,7 +177,7 @@ Why a speech segment ended
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:4](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L4)
+[realtime-transcription/StreamingVadSegmenter.ts:4](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L4)
 
 ___
 
@@ -172,7 +187,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:12](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L12)
+[realtime-transcription/StreamingVadSegmenter.ts:12](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L12)
 
 ___
 
@@ -193,7 +208,7 @@ The part of `WhisperVadStream` StreamVad uses
 
 #### Defined in
 
-[realtime-transcription/StreamVad.ts:8](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamVad.ts#L8)
+[realtime-transcription/StreamVad.ts:8](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamVad.ts#L8)
 
 ## Variables
 
@@ -280,4 +295,4 @@ Key Parameters:
 
 #### Defined in
 
-[realtime-transcription/types.ts:69](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/types.ts#L69)
+[realtime-transcription/types.ts:69](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/types.ts#L69)

@@ -28,7 +28,7 @@ With `splitAtDip: false` the segments equal the offline result.
 
 ## Implements
 
-- [`SpeechSegmenter`](../interfaces/realtime_transcription.SpeechSegmenter.md)
+- [`ProbabilitySegmenter`](../interfaces/realtime_transcription.ProbabilitySegmenter.md)
 
 ## Table of contents
 
@@ -69,7 +69,7 @@ With `splitAtDip: false` the segments equal the offline result.
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:174](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L174)
+[realtime-transcription/StreamingVadSegmenter.ts:174](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L174)
 
 ## Accessors
 
@@ -85,7 +85,7 @@ Whether a confirmed speech segment is open (its end not reported yet)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:207](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L207)
+[realtime-transcription/StreamingVadSegmenter.ts:207](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L207)
 
 ___
 
@@ -104,11 +104,11 @@ progress waits for the next start, which can come sooner than
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[maySplitBack](../interfaces/realtime_transcription.SpeechSegmenter.md#maysplitback)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[maySplitBack](../interfaces/realtime_transcription.ProbabilitySegmenter.md#maysplitback)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:264](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L264)
+[realtime-transcription/StreamingVadSegmenter.ts:264](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L264)
 
 ___
 
@@ -124,7 +124,7 @@ Samples covered by the probabilities consumed so far
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:212](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L212)
+[realtime-transcription/StreamingVadSegmenter.ts:212](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L212)
 
 ___
 
@@ -142,11 +142,11 @@ both its end and the next start back into audio already consumed.
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[retainFrom](../interfaces/realtime_transcription.SpeechSegmenter.md#retainfrom)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[retainFrom](../interfaces/realtime_transcription.ProbabilitySegmenter.md#retainfrom)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:253](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L253)
+[realtime-transcription/StreamingVadSegmenter.ts:253](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L253)
 
 ___
 
@@ -164,11 +164,11 @@ Only meaningful while `inSpeech`.
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[speechCertainUntil](../interfaces/realtime_transcription.SpeechSegmenter.md#speechcertainuntil)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[speechCertainUntil](../interfaces/realtime_transcription.ProbabilitySegmenter.md#speechcertainuntil)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:221](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L221)
+[realtime-transcription/StreamingVadSegmenter.ts:221](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L221)
 
 ## Methods
 
@@ -192,11 +192,11 @@ probabilities (the final hop may be partial) and closes open speech.
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[flush](../interfaces/realtime_transcription.SpeechSegmenter.md#flush)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[flush](../interfaces/realtime_transcription.ProbabilitySegmenter.md#flush)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:305](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L305)
+[realtime-transcription/StreamingVadSegmenter.ts:305](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L305)
 
 ___
 
@@ -218,11 +218,11 @@ Consume the next probabilities, one per hop.
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[push](../interfaces/realtime_transcription.SpeechSegmenter.md#push)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[push](../interfaces/realtime_transcription.ProbabilitySegmenter.md#push)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:292](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L292)
+[realtime-transcription/StreamingVadSegmenter.ts:292](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L292)
 
 ___
 
@@ -236,11 +236,11 @@ ___
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[reset](../interfaces/realtime_transcription.SpeechSegmenter.md#reset)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[reset](../interfaces/realtime_transcription.ProbabilitySegmenter.md#reset)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:276](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L276)
+[realtime-transcription/StreamingVadSegmenter.ts:276](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L276)
 
 ___
 
@@ -262,11 +262,11 @@ Set or replace the energy function of `StreamingVadSegmenterOptions.frameEnergy`
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[setFrameEnergy](../interfaces/realtime_transcription.SpeechSegmenter.md#setframeenergy)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[setFrameEnergy](../interfaces/realtime_transcription.ProbabilitySegmenter.md#setframeenergy)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:272](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L272)
+[realtime-transcription/StreamingVadSegmenter.ts:272](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L272)
 
 ___
 
@@ -286,8 +286,8 @@ ___
 
 #### Implementation of
 
-[SpeechSegmenter](../interfaces/realtime_transcription.SpeechSegmenter.md).[setOptions](../interfaces/realtime_transcription.SpeechSegmenter.md#setoptions)
+[ProbabilitySegmenter](../interfaces/realtime_transcription.ProbabilitySegmenter.md).[setOptions](../interfaces/realtime_transcription.ProbabilitySegmenter.md#setoptions)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:188](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L188)
+[realtime-transcription/StreamingVadSegmenter.ts:188](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L188)

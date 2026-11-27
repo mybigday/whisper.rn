@@ -1,8 +1,8 @@
-[whisper.rn](../README.md) / [realtime-transcription](../modules/realtime_transcription.md) / SpeechSegmenter
+[whisper.rn](../README.md) / [realtime-transcription](../modules/realtime_transcription.md) / ProbabilitySegmenter
 
-# Interface: SpeechSegmenter
+# Interface: ProbabilitySegmenter
 
-[realtime-transcription](../modules/realtime_transcription.md).SpeechSegmenter
+[realtime-transcription](../modules/realtime_transcription.md).ProbabilitySegmenter
 
 Turns per-hop speech probabilities into segment events. `StreamVad` (and so
 `RealtimeTranscriber`) runs one; `StreamingVadSegmenter` is the default.
@@ -15,17 +15,17 @@ Turns per-hop speech probabilities into segment events. `StreamVad` (and so
 
 ### Properties
 
-- [maySplitBack](realtime_transcription.SpeechSegmenter.md#maysplitback)
-- [retainFrom](realtime_transcription.SpeechSegmenter.md#retainfrom)
-- [speechCertainUntil](realtime_transcription.SpeechSegmenter.md#speechcertainuntil)
+- [maySplitBack](realtime_transcription.ProbabilitySegmenter.md#maysplitback)
+- [retainFrom](realtime_transcription.ProbabilitySegmenter.md#retainfrom)
+- [speechCertainUntil](realtime_transcription.ProbabilitySegmenter.md#speechcertainuntil)
 
 ### Methods
 
-- [flush](realtime_transcription.SpeechSegmenter.md#flush)
-- [push](realtime_transcription.SpeechSegmenter.md#push)
-- [reset](realtime_transcription.SpeechSegmenter.md#reset)
-- [setFrameEnergy](realtime_transcription.SpeechSegmenter.md#setframeenergy)
-- [setOptions](realtime_transcription.SpeechSegmenter.md#setoptions)
+- [flush](realtime_transcription.ProbabilitySegmenter.md#flush)
+- [push](realtime_transcription.ProbabilitySegmenter.md#push)
+- [reset](realtime_transcription.ProbabilitySegmenter.md#reset)
+- [setFrameEnergy](realtime_transcription.ProbabilitySegmenter.md#setframeenergy)
+- [setOptions](realtime_transcription.ProbabilitySegmenter.md#setoptions)
 
 ## Properties
 
@@ -37,7 +37,7 @@ Whether an end or next start may still move back into consumed audio
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:56](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L56)
+[realtime-transcription/StreamingVadSegmenter.ts:56](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L56)
 
 ___
 
@@ -49,7 +49,7 @@ Earliest sample a future or pending segment may still need
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:54](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L54)
+[realtime-transcription/StreamingVadSegmenter.ts:54](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L54)
 
 ___
 
@@ -61,7 +61,7 @@ Audio up to here surely belongs to the open segment (emitted as it comes)
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:52](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L52)
+[realtime-transcription/StreamingVadSegmenter.ts:52](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L52)
 
 ## Methods
 
@@ -84,7 +84,7 @@ End of audio after `totalSamples` samples, with the last probabilities
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:48](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L48)
+[realtime-transcription/StreamingVadSegmenter.ts:48](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L48)
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:46](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L46)
+[realtime-transcription/StreamingVadSegmenter.ts:46](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L46)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:49](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L49)
+[realtime-transcription/StreamingVadSegmenter.ts:49](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L49)
 
 ___
 
@@ -140,7 +140,7 @@ Optional: energy of audio samples, for picking split points
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:58](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L58)
+[realtime-transcription/StreamingVadSegmenter.ts:58](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L58)
 
 ___
 
@@ -160,4 +160,4 @@ ___
 
 #### Defined in
 
-[realtime-transcription/StreamingVadSegmenter.ts:50](https://github.com/mybigday/whisper.rn/blob/3a63101/src/realtime-transcription/StreamingVadSegmenter.ts#L50)
+[realtime-transcription/StreamingVadSegmenter.ts:50](https://github.com/mybigday/whisper.rn/blob/90f6961/src/realtime-transcription/StreamingVadSegmenter.ts#L50)
