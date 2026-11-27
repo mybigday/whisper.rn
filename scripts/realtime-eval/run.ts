@@ -75,7 +75,7 @@ async function startServer(server: string, args: string[]) {
     if (options.tokenTimestamps) kv.push('token_timestamps=1')
     // --dump <dir>: each request's PCM, to check what a slice was given
     if (arg('dump')) {
-      writeFileSync(`${arg('dump')}/req-${String(dumped).padStart(4, '0')}.pcm`, Buffer.from(data))
+      writeFileSync(`${arg('dump')}/req-${String(dumped).padStart(4, '0')}.pcm`, new Uint8Array(data))
       dumped += 1
     }
     const promise = (chain = chain.then(async () => {
