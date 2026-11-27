@@ -49,7 +49,7 @@ export type TranscribeOptions = {
   bestOf?: number
   /** Maximum number of text tokens per segment, 0 for no limit (Default: 0). A cap proportional to the audio length stops repetition loops early. */
   maxTokens?: number
-  /** Return the whole input as one segment (Default: false) */
+  /** No timestamp-based splits: one segment per 30-second decoding window, so longer audio still gives several (Default: false) */
   singleSegment?: boolean
   /**
    * A segment whose no-speech probability is above this, and whose average log
@@ -58,7 +58,10 @@ export type TranscribeOptions = {
   noSpeechThold?: number
   /** Retry with a higher temperature when the average log probability is below this (Default: -1) */
   logprobThold?: number
-  /** Retry with a higher temperature when the token entropy is above this, e.g. on repetition (Default: 2.4) */
+  /**
+   * Retry with a higher temperature when a result longer than 32 tokens has a token
+   * entropy below this, i.e. it repeats itself; higher catches more repetition, 0 turns the check off (Default: 2.4)
+   */
   entropyThold?: number
   /** Suppress blank outputs at the beginning of sampling (Default: true) */
   suppressBlank?: boolean

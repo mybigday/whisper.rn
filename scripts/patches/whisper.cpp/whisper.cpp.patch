@@ -1,7 +1,3 @@
-Apply audio_ctx (and the Core ML full-context fallback) before language
-detection: detection encodes too, and used the previous call's audio context
-(the full 30 s on the first call).
-
 Keep the probability of the auto-detected language (whisper_full_lang_prob, see
 whisper.h.patch); whisper_full() only logged it.
 
@@ -315,7 +311,17 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
              struct ggml_tensor * position = ggml_graph_get_tensor(gf, "position");
              for (int i = 0; i < n_tokens; ++i) {
                  const int32_t val = batch.pos[i];
-@@ -3514,10 +3595,12 @@
+@@ -3508,16 +3589,22 @@
+ 
+     // [EXPERIMENTAL] Token-level timestamps with DTW
+     if (ctx->params.dtw_token_timestamps) {
++        // whisper.rn: an unset n-top-most count means all text layers
++        if (ctx->params.dtw_aheads_preset == WHISPER_AHEADS_N_TOP_MOST && ctx->params.dtw_n_top <= 0) {
++            ctx->params.dtw_n_top = ctx->model.hparams.n_text_layer;
++        }
+         if (!aheads_masks_init(ctx->params, ctx->model.hparams, state->aheads_masks, state->backends[0])) {
+             WHISPER_LOG_ERROR("%s: aheads_masks_init() failed for alignment heads masks\n", __func__);
+             whisper_free_state(state);
              return nullptr;
          }
          const size_t memory_size = aheads_masks_nbytes(state->aheads_masks);
@@ -329,7 +335,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
  
      WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
-@@ -3533,6 +3616,7 @@
+@@ -3533,6 +3620,7 @@
      } else {
          WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
      }
@@ -337,7 +343,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  #endif
  
  #ifdef WHISPER_USE_VITISAI
-@@ -3713,6 +3797,7 @@
+@@ -3713,6 +3801,7 @@
  struct whisper_context_params whisper_context_default_params() {
      struct whisper_context_params result = {
          /*.use_gpu              =*/ true,
@@ -345,7 +351,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          /*.flash_attn           =*/ true,
          /*.gpu_device           =*/ 0,
  
-@@ -3846,7 +3931,8 @@
+@@ -3846,7 +3935,8 @@
      if (!model_loaded) {
          loader->close(loader->context);
          WHISPER_LOG_ERROR("%s: failed to load model\n", __func__);
@@ -355,7 +361,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          return nullptr;
      }
  
-@@ -4618,10 +4704,8 @@
+@@ -4618,10 +4708,8 @@
  static bool weight_buft_supported(const whisper_vad_hparams & hparams, ggml_tensor * w, ggml_op op, ggml_backend_buffer_type_t buft, ggml_backend_dev_t dev) {
      bool op_supported = true;
  
@@ -368,7 +374,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          op_supported = true;
      } else {
          switch (op) {
-@@ -4654,7 +4738,9 @@
+@@ -4654,7 +4742,9 @@
                  break;
              }
              default: {
@@ -379,7 +385,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  break;
              }
          };
-@@ -5144,12 +5230,16 @@
+@@ -5144,12 +5234,16 @@
          ggml_backend_buffer_type_t buft = p.first;
          ggml_context * ctx = p.second;
          ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
@@ -401,7 +407,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      }
  
      // load weights
-@@ -6980,6 +7070,7 @@
+@@ -6980,6 +7074,7 @@
      auto & result_all = state->result_all;
  
      result_all.clear();
@@ -409,7 +415,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  
      if (n_samples > 0) {
          // compute log mel spectrogram
-@@ -6989,6 +7080,18 @@
+@@ -6989,6 +7084,18 @@
          }
      }
  
@@ -428,7 +434,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // auto-detect language if not specified
      if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
          std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
-@@ -7006,6 +7109,7 @@
+@@ -7006,6 +7113,7 @@
              return -3;
          }
          state->lang_id = lang_id;
@@ -436,7 +442,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
          params.language = whisper_lang_str(lang_id);
  
          WHISPER_LOG_INFO("%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
-@@ -7143,8 +7247,6 @@
+@@ -7143,8 +7251,6 @@
          WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
          return -5;
      }
@@ -445,7 +451,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // these tokens determine the task that will be performed
      std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
  
-@@ -7338,6 +7440,12 @@
+@@ -7338,6 +7444,12 @@
  
                  whisper_batch_prep_legacy(state->batch, prompt.data(), prompt.size(), 0, 0);
  
@@ -458,7 +464,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                  if (!whisper_decode_internal(*ctx, *state, state->batch, params.n_threads, false, params.abort_callback, params.abort_callback_user_data)) {
                      WHISPER_LOG_ERROR("%s: failed to decode\n", __func__);
                      return -8;
-@@ -7346,12 +7454,16 @@
+@@ -7346,12 +7458,16 @@
                  // Calculate no_speech probability after first decode.
                  // This has to be done before any logit filtering. Hence we cannot use the probs from the whisper_process_logits.
                  {
@@ -477,7 +483,33 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
                      state->no_speech_prob = probs[whisper_token_nosp(ctx)];
                  }
  
-@@ -8117,6 +8229,14 @@
+@@ -7911,10 +8027,9 @@
+                     const int n_frames = std::min(std::min(WHISPER_CHUNK_SIZE * 100, seek_delta), seek_end - seek);
+                     whisper_exp_compute_token_level_timestamps_dtw(
+                             ctx, state, params, result_all.size() - n_segments, n_segments, seek, n_frames, 7, params.n_threads);
++                    // whisper.rn: the callback takes the number of new segments, once per window
+                     if (params.new_segment_callback) {
+-                        for (int seg = (int) result_all.size() - n_segments; seg < n_segments; seg++) {
+-                            params.new_segment_callback(ctx, state, seg, params.new_segment_callback_user_data);
+-                        }
++                        params.new_segment_callback(ctx, state, n_segments, params.new_segment_callback_user_data);
+                     }
+                 }
+             }
+@@ -8052,6 +8167,12 @@
+             // correct the segment timestamp taking into account the offset
+             result.t0 += chunk_offset_t;
+             result.t1 += chunk_offset_t;
++            // whisper.rn: token times too (-1 = not computed)
++            for (auto & token : result.tokens) {
++                if (token.t0 >= 0) token.t0 += chunk_offset_t;
++                if (token.t1 >= 0) token.t1 += chunk_offset_t;
++                if (token.t_dtw >= 0) token.t_dtw += chunk_offset_t;
++            }
+ 
+             // make sure that segments are not overlapping
+             if (!ctx->state->result_all.empty()) {
+@@ -8117,6 +8238,14 @@
      return ctx->state->lang_id;
  }
  
@@ -492,7 +524,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
  static int64_t map_processed_to_original_time(int64_t processed_time, const std::vector<vad_time_mapping> & mapping_table) {
      if (mapping_table.empty()) {
          return processed_time;
-@@ -9358,7 +9478,9 @@
+@@ -9358,7 +9487,9 @@
      (void) level;
      (void) user_data;
  #ifndef WHISPER_DEBUG

@@ -3589,6 +3589,10 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
     // [EXPERIMENTAL] Token-level timestamps with DTW
     if (ctx->params.dtw_token_timestamps) {
+        // whisper.rn: an unset n-top-most count means all text layers
+        if (ctx->params.dtw_aheads_preset == WHISPER_AHEADS_N_TOP_MOST && ctx->params.dtw_n_top <= 0) {
+            ctx->params.dtw_n_top = ctx->model.hparams.n_text_layer;
+        }
         if (!aheads_masks_init(ctx->params, ctx->model.hparams, state->aheads_masks, state->backends[0])) {
             WHISPER_LOG_ERROR("%s: aheads_masks_init() failed for alignment heads masks\n", __func__);
             whisper_free_state(state);
@@ -8023,10 +8027,9 @@ int whisper_full_with_state(
                     const int n_frames = std::min(std::min(WHISPER_CHUNK_SIZE * 100, seek_delta), seek_end - seek);
                     whisper_exp_compute_token_level_timestamps_dtw(
                             ctx, state, params, result_all.size() - n_segments, n_segments, seek, n_frames, 7, params.n_threads);
+                    // whisper.rn: the callback takes the number of new segments, once per window
                     if (params.new_segment_callback) {
-                        for (int seg = (int) result_all.size() - n_segments; seg < n_segments; seg++) {
-                            params.new_segment_callback(ctx, state, seg, params.new_segment_callback_user_data);
-                        }
+                        params.new_segment_callback(ctx, state, n_segments, params.new_segment_callback_user_data);
                     }
                 }
             }
@@ -8164,6 +8167,12 @@ int whisper_full_parallel(
             // correct the segment timestamp taking into account the offset
             result.t0 += chunk_offset_t;
             result.t1 += chunk_offset_t;
+            // whisper.rn: token times too (-1 = not computed)
+            for (auto & token : result.tokens) {
+                if (token.t0 >= 0) token.t0 += chunk_offset_t;
+                if (token.t1 >= 0) token.t1 += chunk_offset_t;
+                if (token.t_dtw >= 0) token.t_dtw += chunk_offset_t;
+            }
 
             // make sure that segments are not overlapping
             if (!ctx->state->result_all.empty()) {
