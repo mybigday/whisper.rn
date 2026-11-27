@@ -384,11 +384,15 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      }
  
      // load weights
-@@ -6989,6 +7078,18 @@
+@@ -6989,6 +7078,22 @@
          }
      }
  
-+    // before language detection, which encodes too
++    // before language detection, which encodes too (so is the bound check)
++    if (params.audio_ctx > whisper_n_audio_ctx(ctx)) {
++        WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
++        return -5;
++    }
 +    state->exp_n_audio_ctx = params.audio_ctx;
 +
 +#ifdef WHISPER_USE_COREML
@@ -403,7 +407,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // auto-detect language if not specified
      if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
          std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
-@@ -7143,8 +7244,6 @@
+@@ -7143,8 +7248,6 @@
          WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
          return -5;
      }
@@ -412,7 +416,7 @@ Hexagon (ggml-hexagon) support, needed until the equivalent lands upstream:
      // these tokens determine the task that will be performed
      std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
  
-@@ -9358,7 +9457,9 @@
+@@ -9358,7 +9461,9 @@
      (void) level;
      (void) user_data;
  #ifndef WHISPER_DEBUG

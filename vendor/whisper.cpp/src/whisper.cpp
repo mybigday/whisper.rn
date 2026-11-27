@@ -7078,7 +7078,11 @@ int whisper_full_with_state(
         }
     }
 
-    // before language detection, which encodes too
+    // before language detection, which encodes too (so is the bound check)
+    if (params.audio_ctx > whisper_n_audio_ctx(ctx)) {
+        WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
+        return -5;
+    }
     state->exp_n_audio_ctx = params.audio_ctx;
 
 #ifdef WHISPER_USE_COREML
