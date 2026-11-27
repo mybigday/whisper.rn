@@ -357,9 +357,11 @@ struct WhisperContextHolder : public ContextLifecycle {
         activeJobId = -1;
     }
 
-    void abortActiveJob() {
+    // jobId >= 0: only that job, so a late stop() of a finished job cannot
+    // abort the next one
+    void abortActiveJob(int jobId = -1) {
         std::lock_guard<std::mutex> lock(operationMutex);
-        if (activeJobId < 0) {
+        if (activeJobId < 0 || (jobId >= 0 && activeJobId != jobId)) {
             return;
         }
         if (auto *job = rnwhisper::job_get(activeJobId)) {
@@ -2274,7 +2276,7 @@ void installJSIBindings(
             return createPromiseTask(runtime, callInvoker, [contextId, jobId]() -> PromiseResultGenerator {
                 auto holder = g_whisperContexts.get(contextId);
                 if (holder) {
-                    holder->abortActiveJob();
+                    holder->abortActiveJob(jobId);
                 }
                 if (jobId >= 0) {
                     if (auto *job = rnwhisper::job_get(jobId)) {
