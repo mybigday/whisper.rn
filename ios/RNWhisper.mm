@@ -177,7 +177,7 @@ WhisperContextInitResult hostInitWhisperContext(
     auto params = whisper_context_default_params();
     params.use_gpu = options.useGpu;
     params.flash_attn = options.useFlashAttn;
-    params.dtw_token_timestamps = false;
+    applyDtwParams(params, options);
     params.use_coreml = options.useCoreMLIos;
 
 #if !defined(WHISPER_USE_COREML)
@@ -202,6 +202,7 @@ WhisperContextInitResult hostInitWhisperContext(
     result.context =
         whisper_init_from_file_with_params(modelPath.c_str(), params);
     result.gpu = params.use_gpu;
+    result.dtw = result.context != nullptr && dtwActive(params);
     result.reasonNoGPU = toStdString(reasonNoGPU);
     return result;
 }

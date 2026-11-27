@@ -605,7 +605,7 @@ WhisperContextInitResult hostInitWhisperContext(
     }
 
     auto params = whisper_context_default_params();
-    params.dtw_token_timestamps = false;
+    applyDtwParams(params, options);
     params.flash_attn = options.useFlashAttn;
     params.use_coreml = false;
     params.use_gpu = options.useGpu && hexagonDeviceAvailable(result.reasonNoGPU);
@@ -657,6 +657,7 @@ WhisperContextInitResult hostInitWhisperContext(
         result.reasonNoGPU = "Failed to initialize on the Hexagon NPU (see logcat)";
     }
     result.gpu = result.context != nullptr && params.use_gpu;
+    result.dtw = result.context != nullptr && dtwActive(params);
 
     detachThreadIfNeeded(needsDetach);
     return result;
