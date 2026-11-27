@@ -62,6 +62,8 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   logText: { fontSize: 12, color: '#333' },
+  // Grows with every slice: scroll inside, following the newest result
+  resultScroll: { maxHeight: 320 },
   configContainer: {
     backgroundColor: '#f0f0f0',
     padding: 12,
@@ -124,6 +126,7 @@ export default function RealtimeTranscriberDemo() {
   const vadContextRef = useRef<WhisperVadContext | null>(null)
   const realtimeTranscriberRef = useRef<RealtimeTranscriber | null>(null)
   const audioStreamRef = useRef<AudioStreamInterface | null>(null)
+  const resultScrollRef = useRef<ScrollView | null>(null)
 
   const [logs, setLogs] = useState([
     `Realtime Transcriber Demo - whisper.cpp v${libVersion}`,
@@ -931,7 +934,14 @@ export default function RealtimeTranscriberDemo() {
         {transcribeResult && (
           <View style={styles.logContainer}>
             <Text style={styles.configTitle}>Latest Transcription</Text>
-            <Text style={styles.logText}>{transcribeResult}</Text>
+            <ScrollView
+              ref={resultScrollRef}
+              style={styles.resultScroll}
+              nestedScrollEnabled
+              onContentSizeChange={() => resultScrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              <Text style={styles.logText}>{transcribeResult}</Text>
+            </ScrollView>
           </View>
         )}
 
