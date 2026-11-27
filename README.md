@@ -305,6 +305,17 @@ const transcriber = new RealtimeTranscriber(
 
 `initialPrompt` and `promptPreviousSlices` are Whisper-only and are ignored when using `parakeetContext`. A result that is a repetition loop (mostly repeated 3-grams) is not chained into later prompts, since Whisper would repeat it in every following slice. Neither is a slice that follows a split inside speech (`endReason: 'max_duration'` with no pause at the cut): the prompt would end mid-sentence where the audio goes on, and Whisper then drops or repeats words at the cut, with every model size we measured (base to large-v3-turbo). The slice is transcribed with `initialPrompt` only. Realtime Parakeet audio must be mono, 16 kHz, signed 16-bit PCM.
 
+With Parakeet, the Whisper-only options (`initialPrompt` / `promptPreviousSlices`, `languageLock`, `splitOverlapMs`, `audioCtx: 'auto'`, `minAvgLogprob`) have no effect, and `transcribeOptions` / `draftTranscribeOptions` pass on only `maxThreads` and a numeric `audioCtx`. Segmentation, drafts and events work as with Whisper. Keep slices cut at pauses (a VAD, and the default 30 s `maxSpeechDurationS`): Parakeet normalizes its features over the whole input, which makes it sensitive to where a cut inside speech falls, and a slice ending on the start of a word can come back as a repetition loop. Measured on the host (`scripts/realtime-eval`, English talk, WER; q8_0 against Whisper base without prompts):
+
+| slicing | Parakeet | Whisper base |
+|---|---|---|
+| VAD (cuts at pauses) | 0.141 | 0.157 |
+| no VAD, 30 s slices | 0.127 | 0.143 |
+| no VAD, 6 s slices, split at a dip | 0.165 | 0.188 |
+| no VAD, 6 s slices, cut at the limit | 0.189 | 0.198 |
+
+On a Snapdragon 888 (CPU), Parakeet finals take a median 0.46 s against about 2 s for Whisper base.
+
 **Long-running sessions:** `maxSlicesInMemory` only bounds raw audio. Per-slice results (transcript + segments) returned by `getTranscriptionResults()` are kept until `stop()`/`reset()` by default, so a transcriber that runs for hours or days grows without bound. Set `maxResultsInMemory` to keep only the newest N results (older ones are dropped oldest-first) and, when `promptPreviousSlices` is enabled, `maxPromptSlices` to cap how many previous results are appended to each Whisper prompt. Consumers that need every result should collect them from `onTranscribe` as they arrive.
 
 ```js

@@ -15,6 +15,12 @@ target_link_libraries(whisper PUBLIC ggml)
 add_executable(whisper-server whisper-server.cpp)
 target_include_directories(whisper-server PRIVATE ${ROOT}/cpp/jsi)
 target_link_libraries(whisper-server whisper)
+add_library(parakeet STATIC ${W}/src/parakeet.cpp)
+target_include_directories(parakeet PUBLIC ${W}/include ${W}/src)
+target_compile_definitions(parakeet PRIVATE PARAKEET_VERSION="realtime-eval")
+target_link_libraries(parakeet PUBLIC ggml)
+add_executable(parakeet-server parakeet-server.cpp)
+target_link_libraries(parakeet-server parakeet)
 
 # Speech probabilities of a WAV with vad.cpp (same ggml), for a VAD on the host
 set(VAD_BUILD_TESTS OFF CACHE BOOL "" FORCE)

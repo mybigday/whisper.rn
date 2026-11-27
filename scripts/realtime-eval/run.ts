@@ -7,7 +7,7 @@
 //     (--wav clip.wav [--ref "text"] | --manifest set/manifest.json --item 0 --root <dir>) \
 //     [--options '{"vadOptions":{"maxSpeechDurationS":6},"splitOverlapMs":400}'] [--seconds 120]
 import { execFileSync, spawn } from 'child_process'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { dirname, resolve } from 'path'
 import { createInterface } from 'readline'
 import { RealtimeTranscriber } from '../../src/realtime-transcription/RealtimeTranscriber'
@@ -50,9 +50,9 @@ function readWav(path: string): Int16Array {
   throw new Error(`${path}: no data chunk`)
 }
 
-/** whisper-server as a WhisperContextLike, one request at a time */
-async function startServer(server: string, model: string, dtw: string, threads: string) {
-  const child = spawn(server, [model, dtw, threads], { stdio: ['pipe', 'pipe', 'inherit'] })
+/** whisper-server (or parakeet-server) as a transcription context, one request at a time */
+async function startServer(server: string, args: string[]) {
+  const child = spawn(server, args, { stdio: ['pipe', 'pipe', 'inherit'] })
   const lines = createInterface({ input: child.stdout })
   const waiting: Array<(line: string) => void> = []
   lines.on('line', (line) => waiting.shift()?.(line))
@@ -60,6 +60,7 @@ async function startServer(server: string, model: string, dtw: string, threads: 
   const ready = JSON.parse(await next())
   let computeMs = 0
   let requests = 0
+  let dumped = 0
   let chain: Promise<unknown> = Promise.resolve()
 
   const transcribeData = (data: ArrayBuffer, options: TranscribeOptions & { audioCtx?: number | 'auto' }) => {
@@ -72,6 +73,11 @@ async function startServer(server: string, model: string, dtw: string, threads: 
     if (options.temperatureInc !== undefined) kv.push(`temperature_inc=${options.temperatureInc}`)
     if (options.includeTokens) kv.push('include_tokens=1')
     if (options.tokenTimestamps) kv.push('token_timestamps=1')
+    // --dump <dir>: each request's PCM, to check what a slice was given
+    if (arg('dump')) {
+      writeFileSync(`${arg('dump')}/req-${String(dumped).padStart(4, '0')}.pcm`, Buffer.from(data))
+      dumped += 1
+    }
     const promise = (chain = chain.then(async () => {
       child.stdin.write(`${data.byteLength} ${kv.join(' ')}\n`)
       child.stdin.write(Buffer.from(data))
@@ -197,7 +203,11 @@ async function main() {
     ref = undefined // a reference for the whole file no longer matches
   }
 
-  const server = await startServer(arg('server')!, arg('model')!, arg('dtw', '-')!, arg('threads', '4')!)
+  // --engine parakeet: parakeet-server next to --server, passed as parakeetContext
+  const parakeet = arg('engine') === 'parakeet'
+  const server = parakeet
+    ? await startServer(resolve(dirname(arg('server')!), 'parakeet-server'), [arg('model')!, arg('threads', '4')!])
+    : await startServer(arg('server')!, [arg('model')!, arg('dtw', '-')!, arg('threads', '4')!])
   const options: RealtimeOptions = {
     realtimeProcessingPauseMs: 1e9, // finals only: drafts do not change them
     ...JSON.parse(arg('options', '{}')!),
@@ -212,7 +222,9 @@ async function main() {
     ? precomputedVad(arg('vad-probs', resolve(dirname(arg('server')!), 'vad-probs'))!, arg('vad')!, wavPath)
     : undefined
   const transcriber = new RealtimeTranscriber(
-    { whisperContext: server.context, audioStream: stream, vadContext },
+    parakeet
+      ? { parakeetContext: server.context, audioStream: stream, vadContext }
+      : { whisperContext: server.context, audioStream: stream, vadContext },
     options,
     {
       onTranscribe: (e) => { if (e.type === 'transcribe' && e.isFinal) finals.push(e) },
@@ -231,6 +243,7 @@ async function main() {
   const { computeMs, requests } = server.stats()
   const report: Record<string, unknown> = {
     name,
+    engine: parakeet ? 'parakeet' : 'whisper',
     audioSec: samples.length / 16000,
     finals: finals.length,
     reasons,
