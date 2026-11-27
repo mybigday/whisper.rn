@@ -114,9 +114,10 @@ const styles = StyleSheet.create({
 
 const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
-// JFK audio file URL from whisper.cpp repository
-const JFK_AUDIO_URL =
-  'https://github.com/ggml-org/whisper.cpp/raw/refs/heads/master/samples/jfk.wav'
+// 3:19 public-domain speech (16 kHz mono PCM16): long enough to show pauses,
+// max-duration splits and memory behaviour, unlike the 11 s jfk.wav
+const SAMPLE_AUDIO_URL =
+  'https://huggingface.co/datasets/BricksDisplay/speech-samples/resolve/main/gwb-columbia.wav'
 
 export default function RealtimeTranscriberDemo() {
   const whisperContextRef = useRef<WhisperContext | null>(null)
@@ -183,7 +184,7 @@ export default function RealtimeTranscriberDemo() {
     setDownloadProgress(0)
 
     try {
-      const downloadPath = `${fileDir}/jfk-sample.wav`
+      const downloadPath = `${fileDir}/gwb-columbia.wav`
 
       // Check if file already exists
       const exists = await RNFS.exists(downloadPath)
@@ -194,10 +195,10 @@ export default function RealtimeTranscriberDemo() {
         return downloadPath
       }
 
-      log('Downloading JFK audio sample from whisper.cpp repository...')
+      log('Downloading the speech sample (3:19)...')
 
       const downloadResult = await RNFS.downloadFile({
-        fromUrl: JFK_AUDIO_URL,
+        fromUrl: SAMPLE_AUDIO_URL,
         toFile: downloadPath,
         progress: (res) => {
           const progress = (res.bytesWritten / res.contentLength) * 100
@@ -426,7 +427,7 @@ export default function RealtimeTranscriberDemo() {
       // Start transcription
       await realtimeTranscriberRef.current.start()
       log(
-        `Realtime transcription started (${useFileSimulation ? 'File Simulation - JFK Speech' : 'Live Audio'
+        `Realtime transcription started (${useFileSimulation ? 'File Simulation - Speech Sample' : 'Live Audio'
         })`,
       )
     } catch (error) {
@@ -714,7 +715,7 @@ export default function RealtimeTranscriberDemo() {
           <Text style={styles.configTitle}>Audio Source</Text>
           {useFileSimulation && (
             <Text style={styles.configLabel}>
-              Using JFK speech sample from whisper.cpp repository
+              Using a 3:19 public-domain speech sample (Columbia address, 2003)
             </Text>
           )}
           <View style={styles.configRow}>
@@ -903,7 +904,7 @@ export default function RealtimeTranscriberDemo() {
               Slices: {realtimeStats.sliceStats?.currentSliceIndex || 0}{' '}
               current, {realtimeStats.sliceStats?.transcribeSliceIndex || 0}{' '}
               transcribing | Audio Source:{' '}
-              {useFileSimulation ? 'File (JFK)' : 'Live'}
+              {useFileSimulation ? 'File (sample)' : 'Live'}
               {useFileSimulation && ` @ ${playbackSpeed}x`}
             </Text>
             <Text style={styles.statusText}>
