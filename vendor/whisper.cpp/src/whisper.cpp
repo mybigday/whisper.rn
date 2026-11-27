@@ -932,6 +932,9 @@ struct whisper_state {
     // [EXPERIMENTAL] speed-up techniques
     int32_t exp_n_audio_ctx = 0; // 0 - use default
 
+    // audio context of the last encode, 0 - none yet (see whisper_encode_internal)
+    int32_t last_n_audio_ctx = 0;
+
     whisper_vad_context * vad_context = nullptr;
 
     struct vad_segment_info {
@@ -2433,6 +2436,21 @@ static bool whisper_encode_internal(
     ggml_abort_callback   abort_callback,
                    void * abort_callback_data) {
     const int64_t t_start_us = ggml_time_us();
+
+    // The flash-attn encoder and cross-attention read GGML_PAD(n_ctx, 256) rows of kv_pad / kv_cross
+    // without a mask, but only the first n_ctx rows are written. When the audio context changes
+    // between encodes, rows left over from the previous one would leak into the attention, so
+    // restore the zero padding of a fresh state.
+    {
+        const int n_ctx = wstate.exp_n_audio_ctx > 0 ? wstate.exp_n_audio_ctx : wctx.model.hparams.n_audio_ctx;
+
+        if (wctx.params.flash_attn && wstate.last_n_audio_ctx != 0 && wstate.last_n_audio_ctx != n_ctx) {
+            ggml_backend_buffer_clear(wstate.kv_pad.buffer, 0);
+            ggml_backend_buffer_clear(wstate.kv_cross.buffer, 0);
+        }
+
+        wstate.last_n_audio_ctx = n_ctx;
+    }
 
     // conv
     {
@@ -7060,6 +7078,22 @@ int whisper_full_with_state(
         }
     }
 
+    // before language detection, which encodes too (so is the bound check)
+    if (params.audio_ctx > whisper_n_audio_ctx(ctx)) {
+        WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
+        return -5;
+    }
+    state->exp_n_audio_ctx = params.audio_ctx;
+
+#ifdef WHISPER_USE_COREML
+    // the Core ML encoder takes a fixed 1x80x3000 mel input, a shorter audio context cannot be fed to it
+    if (state->ctx_coreml != nullptr && state->exp_n_audio_ctx > 0 && state->exp_n_audio_ctx < whisper_n_audio_ctx(ctx)) {
+        WHISPER_LOG_WARN("%s: audio_ctx = %d is not supported by the Core ML encoder, using the full context (%d)\n",
+                __func__, state->exp_n_audio_ctx, whisper_n_audio_ctx(ctx));
+        state->exp_n_audio_ctx = 0;
+    }
+#endif
+
     // auto-detect language if not specified
     if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
         std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
@@ -7214,8 +7248,6 @@ int whisper_full_with_state(
         WHISPER_LOG_ERROR("%s: audio_ctx is larger than the maximum allowed (%d > %d)\n", __func__, params.audio_ctx, whisper_n_audio_ctx(ctx));
         return -5;
     }
-    state->exp_n_audio_ctx = params.audio_ctx;
-
     // these tokens determine the task that will be performed
     std::vector<whisper_token> prompt_init = { whisper_token_sot(ctx), };
 

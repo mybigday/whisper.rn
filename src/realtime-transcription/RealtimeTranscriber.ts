@@ -534,13 +534,12 @@ export class RealtimeTranscriber {
 
       if (this.transcriptionContext.type === 'parakeet') {
         const { maxThreads } = this.options.transcribeOptions
-        const audioCtx = 'audioCtx' in this.options.transcribeOptions
-          ? this.options.transcribeOptions.audioCtx
-          : undefined
+        // Parakeet only takes a fixed size; 'auto' is Whisper-only.
+        const { audioCtx } = this.options.transcribeOptions
         const parakeetOptions: ParakeetTranscribeOptions = {}
 
         if (maxThreads !== undefined) parakeetOptions.maxThreads = maxThreads
-        if (audioCtx !== undefined) parakeetOptions.audioCtx = audioCtx
+        if (typeof audioCtx === 'number') parakeetOptions.audioCtx = audioCtx
 
         transcribeRequest = this.transcriptionContext.context.transcribeData(
           audioBuffer,
@@ -549,12 +548,8 @@ export class RealtimeTranscriber {
       } else {
         // Prompt chaining and progress callbacks are Whisper-only features.
         const prompt = this.buildPrompt(item.sliceIndex)
-        const whisperOptions = {
-          ...this.options.transcribeOptions,
-        } as TranscribeOptions & Partial<ParakeetTranscribeOptions>
-        delete whisperOptions.audioCtx
         const options = {
-          ...whisperOptions,
+          ...(this.options.transcribeOptions as TranscribeOptions),
           prompt,
           onProgress: undefined,
         }
